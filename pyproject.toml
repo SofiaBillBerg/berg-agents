@@ -3,7 +3,7 @@ name = "berg-agents"
 version = "0.1.0"
 description = "Local LLM-driven code assistant for project scaffolding and file operations"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Sofia Billger Bergström" }]
@@ -117,29 +117,32 @@ dev = [
 nvidia-pyindex = ["appdirs"]
 
 [tool.uv.sources]
-torch = { index = "pytorch" }
-torchvision = { index = "pytorch" }
 cuml-cu13 = { index = "nvidia" }
 cudf-cu13 = { index = "nvidia" }
 cutensor-cu13 = { index = "nvidia" }
 nvidia-nccl-cu13 = { index = "nvidia" }
 rmm-cu13 = { index = "nvidia" }
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+    { index = "pytorch-cu130", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+    { index = "pytorch-cu130", marker = "sys_platform == 'linux'" },
+]
 
 
-
-[tool.uv]
-index-strategy = "unsafe-best-match"
-prerelease = "if-necessary"
-no-build-isolation-package = ["flash-attn"]
-package = true
-default-groups=["notebooks","dev","agent-deps"]
-[[tool.uv.index]]
-url = "https://pypi.nvidia.com/"
-name = "nvidia"
 
 [[tool.uv.index]]
-name = "pytorch"
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
 
 [[tool.uv.index]]
 url = "https://pypi.org/simple"
@@ -151,6 +154,17 @@ extra-index-url = [
     "https://download.pytorch.org/whl/cu130",
 ] # This will add the PyTorch index as an additional source for packages, which can help ensure that you have access to the latest versions of PyTorch and related packages.
 index-strategy = "unsafe-best-match"
+
+
+[tool.uv]
+index-strategy = "unsafe-best-match"
+prerelease = "if-necessary"
+no-build-isolation-package = ["flash-attn"]
+package = true
+default-groups=["dev","agent-deps"]
+[[tool.uv.index]]
+url = "https://pypi.nvidia.com/"
+name = "nvidia"
 
 
 [tool.ruff.lint]

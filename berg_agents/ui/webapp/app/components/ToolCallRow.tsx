@@ -19,7 +19,7 @@ const TARGET_KEYS = [
  * @param {object} input Raw tool input/args object.
  * @returns {string} Display target string, or "" when none is found.
  */
-export function toolTarget(input) {
+export function toolTarget(input: { [x: string]: any; }) {
     if (!input || typeof input !== "object") return "";
     for (const key of TARGET_KEYS) {
         const value = input[key];

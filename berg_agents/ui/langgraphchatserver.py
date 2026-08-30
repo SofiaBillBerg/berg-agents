@@ -83,7 +83,7 @@ class AgentState:
 # ---------------------------------------------------------------------------
 
 
-class LangGraphChatServer:
+class LangGraphChatServer:  # ruff: ignore[too-many-public-methods]
     """LangGraph-backed :class:`ChatServer` implementation.
 
     Every mutable piece of state that ``web.py`` used to keep as a module-
@@ -692,18 +692,20 @@ class LangGraphChatServer:
                             "*[No conversation data found for this thread]*"
                         )
                     else:
-                        lines.extend(("*[No messages in conversation]*", ""))oin(debug_data.keys())
+                        lines.extend(("*[No messages in conversation]*", ""))
+                        lines.append(
+                            f"**Debug data keys:** {', '.join(debug_data.keys())}"
+                        )
+                        cv = debug_data.get("channel_values")
+                        if isinstance(cv, dict):
+                            lines.append(
+                                "**Channel values keys:** "
+                                + ", ".join(cv.keys())
                             )
-                            cv = debug_data.get("channel_values")
-                            if isinstance(cv, dict):
+                            if cv.get("messages") is not None:
                                 lines.append(
-                                    "**Channel values keys:** "
-                                    + ", ".join(cv.keys())
+                                    f"**Messages channel_values:** {len(cv.get('messages', []))}"
                                 )
-                                if cv.get("messages") is not None:
-                                    lines.append(
-                                        f"**Messages in channel_values:** {len(cv.get('messages', []))}"
-                                    )
                             if debug_data.get("messages") is not None:
                                 lines.append(
                                     f"**Messages top-level:** {len(debug_data.get('messages', []))}"
