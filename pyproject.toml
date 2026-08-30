@@ -1,0 +1,621 @@
+[project]
+name = "berg-agents"
+version = "0.1.0"
+description = "Local LLM-driven code assistant for project scaffolding and file operations"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Sofia Billger Bergström" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.15",
+
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "autobahn>=26.7.1",
+  "pydantic-ai>=2.30.0",
+  "pydantic-config>=0.4.0",
+  "pyyaml>=6.0.3",
+]
+
+[build-system]
+requires = ["uv-build>=0.11.26,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = ["berg_agents"]
+namespace = true
+
+
+[dependency-groups]
+default-base = [
+    { include-group = "agent-deps" },
+    { include-group = "dev" }
+  ]
+notebooks=[]
+agent-deps = [
+     "quarto>=0.1.0",
+     "chromadb>=1.5.9",
+     "click>=8.1.7",
+     "fastapi",
+     "gpt4all>=2.2.0",
+     "httpx2>=2.9.1",
+     "hypothesis>=6.165.5",
+     "ipykernel>=7.3.0",
+     "jupyterlab-server>=2.28.0",
+     "langchain-chroma>=1.0.0",
+     "langchain-core>=0.2.0",
+     "langchain-mcp-adapters>=0.3.2",
+     "langchain-ollama>=1.1.0",
+     "langchain-openai>=1.4.2",
+     "langchain>=1.3.14",
+     "langgraph-checkpoint-sqlite>=3.1.1",
+     "langgraph>=0.0.48",
+     "markdown>=3.10.3",
+     "matplotlib-inline>=0.2.1",
+     "matplotlib>=3.10.7",
+     "nbformat>=5.10.0",
+     "notebook>=7.4.7",
+     "ollama>=0.6.2",
+     "openai>=2.7.1",
+     "pandas>=2.3.3",
+     "pydantic-settings>=2.15.0",
+     "pydantic>=2.13.4",
+     "pytest-asyncio>=1.4.0",
+     "pyyaml>=6.0",
+     "requests>=2.34.2",
+     "rich>=13.5.2",
+     "typer>=0.9.0",
+     "uvicorn>=0.52.1",
+     "httpx>=0.28.1",
+    "langmem>=0.0.30",
+    "deepagents>=0.7.5",
+]
+
+dev = [
+    "black>=24.3.0",
+    "coverage>=7.15.4",
+    "flake8>=7.3.0",
+    "httpx2>=2.9.1",
+    "isort>=5.13.2",
+    "pandas-stubs==2.3.2.250926",
+    "pre-commit>=4.6.1",
+    "pylint>=4.0.6",
+    "pyrefly>=1.2.0",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.14.0",
+    "pytest>=8.2.0",
+    "ruff>=0.4.0",
+    "setuptools>=68.0",
+    "wheel>=0.45.1",
+    "pip>=26.2.1",
+    "ty>=0.0.71",
+    "pytest-asyncio>=1.4.0",
+    "pytest-twisted>=1.14.3",
+    "twisted>=26.4.0",
+]
+
+
+# [project.scripts]
+# berg_agents = "berg_agents.cli:main"
+
+
+
+# This section configures uv to use the nightly PyTorch index and allow pre-releases.
+# It is the equivalent of running:
+# uv pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu130
+[tool.uv.extra-build-dependencies]
+nvidia-pyindex = ["appdirs"]
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
+cuml-cu13 = { index = "nvidia" }
+cudf-cu13 = { index = "nvidia" }
+cutensor-cu13 = { index = "nvidia" }
+nvidia-nccl-cu13 = { index = "nvidia" }
+rmm-cu13 = { index = "nvidia" }
+
+
+
+[tool.uv]
+index-strategy = "unsafe-best-match"
+prerelease = "if-necessary"
+no-build-isolation-package = ["flash-attn"]
+package = true
+default-groups=["notebooks","dev","agent-deps"]
+[[tool.uv.index]]
+url = "https://pypi.nvidia.com/"
+name = "nvidia"
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu130"
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true
+name = "default"
+
+[tool.uv.pip]
+extra-index-url = [
+    "https://download.pytorch.org/whl/cu130",
+] # This will add the PyTorch index as an additional source for packages, which can help ensure that you have access to the latest versions of PyTorch and related packages.
+index-strategy = "unsafe-best-match"
+
+
+[tool.ruff.lint]
+fixable = ["ALL"]
+unfixable = []
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))"
+extend-fixable = [
+    "I",
+    "B",
+    "E",
+    "doc-line-too-long",
+    "line-too-long",
+    "line-too-long",
+    "PTH",
+    "D",
+] # This will allow Ruff to apply fixes for import-related issues.
+ignore = [
+    "line-too-long",
+    "unused-noqa",
+    "blind-except",
+    "non-imperative-mood",
+    "missing-todo-author",
+    "missing-copyright-notice",
+    "line-contains-todo",
+    "any-type",
+] # This will ignore the RUF100 error to enable the noga rule for Ruff.
+preview = true
+future-annotations = true
+extend-select = [
+    "E",
+    "F",
+    "W",
+    "C90",
+    "I",
+    "N",
+    "UP",
+    "D",
+    "RUF",
+    "ANN",
+    "PD",
+    "W",
+    "E",
+    "F",
+    "NPY",
+    "N",
+    "PL",
+    "UP",
+    "C4",
+    "ISC",
+    "SIM",
+    "TID",
+    "PTH",
+    "A",
+    "FBT",
+    "D",
+]
+task-tags = ["TODO", "FIX", "BUG", "CHECK", "CONTROL"]
+extend-ignore = [
+    "boolean-default-value-positional-argument",
+    "boolean-type-hint-positional-argument",
+    "too-many-arguments",
+    "missing-blank-line-after-summary",
+    "import-outside-top-level",
+    "too-many-locals",
+    "too-many-statements",
+]
+
+[tool.ruff.lint.isort]
+detect-same-package = true # This will allow isort to detect when imports are from the same package and group them together.
+lines-after-imports = 1 # This will ensure that there is a newline before comments in the import section.
+force-sort-within-sections = true # This will force isort to sort imports within each section (standard library, third-party, and local).
+section-order = [
+    "future",
+    "standard-library",
+    "first-party",
+    "local-folder",
+    "third-party",
+]
+known-third-party = ["berg_agents"]
+split-on-trailing-comma = false
+
+[tool.isort]
+dedup_headings = true
+ensure_newline_before_comments = true
+float_to_top = true # This will move imports that are only used in type annotations to the top of the import section.
+honor_noqa = true # This will allow isort to respect `# noqa` comments that are used to ignore specific linting errors.
+profile = "attrs" # This will set the isort profile to "attrs", which will configure isort to format imports in a way that is compatible with the Black code formatter.
+remove_redundant_aliases = true # This will remove redundant aliases from imports (e.g., `import numpy as np` when `np` is not used in the code).
+skip_glob = [
+    "_build",
+    "_extensions",
+    ".*/",
+    ".venv",
+    "*cache*",
+    "node_modules",
+    "dist",
+    "build",
+    ".ipynb_checkpoints",
+    "*support-libs",
+] # This will tell isort to skip these directories when sorting imports.
+sort_reexports = true # This will sort re-exports (e.g., `from . import module`) separately from regular imports,.
+src_paths = ["berg_agents"]
+
+
+[tool.ruff.format]
+docstring-code-format = true           # This will reformat code snippets in docstrings using the same formatting rules as regular code.
+line-ending = "lf"                     # This will ensure that all files use Unix-style line endings.
+preview = true
+docstring-code-line-length = "dynamic"
+quote-style = "double"
+indent-style = "space"
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+[tool.ruff]
+src = [
+    "berg_agents",
+]
+extend-exclude = [
+    "_build",
+    ".venv",
+    "*cache*",
+    "node_modules",
+    "_extensions",
+    ".*/",
+    "dist",
+    "build",
+    ".ipynb_checkpoints",
+    "*support-libs",
+]
+line-length = 80
+fix = true # This will enable Ruff's automatic fixing feature, `--fix` option.
+
+
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = [
+    "unused-import",
+    "undefined-local-with-import-star",
+    "line-too-long",
+    "T20",
+] # Ignore unused imports and wildcard imports in Jupyter notebooks.
+"*test*.py" = ["assert", "magic-value-comparison", "ARG", "implicit-namespace-package"]
+"project_utils/*.py" = ["unused-import", "non-pep604-annotation-union", "non-pep604-annotation-optional", "non-pep585-annotation", "line-too-long"]
+
+
+[tool.black]
+target-version = ["py311", "py312", "py313", "py314"]
+line-length = 80
+
+[tool.ruff.analyze]
+detect-string-imports = true
+direction = "dependencies"
+
+[tool.pydocstyle]
+convention = "pep257"
+
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
+max-line-length = 100
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+[tool.ruff.lint.mccabe]
+# Flag errors (`C901`) whenever the complexity level exceeds 15.
+max-complexity = 15
+
+[tool.ruff.lint.pylint]
+max-nested-blocks = 20
+max-positional-args = 40
+max-bool-expr = 20
+max-branches = 35
+max-returns = 20
+max-statements = 100
+max-locals = 20
+max-args = 40
+max-statements-in-try = 15
+
+[tool.ruff.lint.flake8-import-conventions.extend-aliases]
+
+
+[tool.docutils.parsers]
+validate = true
+
+[tool.docutils.restructuredtext_parser]
+pep_references = true
+smart_qouts = true
+
+[tool.docstring-format-checker]
+optional_style = "validate"
+validate_param_types = true
+allow_undefined_sections = true
+require_docstrings = true
+check_private = true
+
+[tool.codespell]
+skip = "*.txt,*.rst,./**/data,./**/mlruns,**/**/*.js,*make*,**/**/*.html,*.ipynb,**/**/outputs,**/**/*.json,**/**/*.csv,./.venv,./**/*cache*,./_build,./**/.ipynb_checkpoints,./**/unsloth_complied_cache,./**/node_modules,./**/253_32098_74-pycharm-support-libs,./.*,schema/*.json,./**/dist,./**/build,./**/.*,*.lock"
+quiet-level = 3
+builtin = ["clear", "rare", "informal", "usage", "code", "names"]
+enable-colors = true
+write-changes = true
+count = true
+ignore-words-list = [
+    "mlflow",
+    "bertopic",
+    "ctm",
+    "artifacts",
+    "artifact",
+    "mlflow*",
+    "Jupyter",
+    "gr",
+]
+
+[tool.spacy.cli]
+"en-core-web-sm==3.8.0" = "@ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
+
+[tool.mypy]
+disallow_any_generics = true
+disallow_untyped_defs = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+exclude_gitignore = true
+follow_imports = "normal"
+hide_error_codes = false
+# mypy_path = "./stubs"
+no_implicit_reexport = true
+packages = ["berg_agents"]
+pdb = true
+#plugins = "pydantic.mypy"
+pretty = true
+show_error_code_links = true
+show_error_context = true
+show_traceback = true
+warn_redundant_casts = true
+warn_unused_configs = true
+warn_unused_ignores = true
+python_executable = ".venv/bin/python"
+
+
+[[tool.mypy.overrides]]
+module = ["pylibcudf.*"]
+follow_untyped_imports = true
+
+
+[tool.pydantic-mypy]
+init_typed = true
+warn_required_dynamic_aliases = true
+validate_by_name = true
+
+
+[tool.zuban]
+files = ["berg_agents/**/*.py"]
+disallow_any_generics = false
+disallow_untyped_defs = false
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+exclude_gitignore = true
+follow_imports = "normal"
+pretty = true
+show_error_code_links = true
+show_error_context = true
+show_traceback = true
+warn_redundant_casts = true
+warn_unused_configs = true
+warn_unused_ignores = true
+python_executable = ".venv/bin/python"
+mode = "default"
+
+[tool.pyrefly]
+project-includes = ["berg_agents/"]
+search-path = ["./stubs", "berg_agents/"]
+python-interpreter-path = ".venv/bin/python"
+# pyrefly mis-detects Pydantic v2 models and requires `model_config` as a
+# constructor argument; this only affects FileObject (a @dataclass) here.
+project-excludes = [
+    "**/.[!/.]*",
+
+    "_extensions",
+    ".*/",
+    "**/tests",
+    "**/test*",
+    "**/node_modules",
+    "**/dist",
+    "**/build",
+    "**/.venv",
+    "**/.ipynb_checkpoints",
+    "**/_build",
+    "**/*cache*",
+    "**/support-libs",
+    "**/outputs",
+    "**/artifacts",
+]
+use-ignore-files = true
+
+check-unannotated-defs = true
+infer-return-types = "checked"
+
+
+[tool.pyrefly.errors]
+redundant-condition = "error"
+
+[tool.pyanalyze]
+missing_parameter_annotation = true
+paths = ["berg_agents/"]
+
+suggested_parameter_type = true
+suggested_return_type = true
+import_paths = ["berg_agents/", "stubs/", ".venv/"]
+#stub_path = "stubs/*.pyi"
+#find-unused = true
+#find-unused-attributes = true
+#
+
+
+[tool.pytype]
+# Space-separated list of files or directories to exclude.
+exclude = [
+    "**/__pycache__",
+    "**/build",
+    "**/dist",
+    ".venv",
+
+    "_extensions",
+    ".*/",
+    "**/*cache*",
+    ".*",
+    "**/**/node_modules",
+]
+# Space-separated list of files or directories to process.
+inputs = ['.']
+# Keep going past errors to analyze as many files as possible.
+keep_going = false
+# Run N jobs in parallel.
+jobs = 4
+# All pytype output goes here.
+output = '.code_quality_outputs/.pytype'
+# Paths to source code directories, separated by ':'.
+pythonpath = '.'
+# Python version (major.minor) of the target code.
+python_version = '3.12'
+# Bind 'self' in methods with non-transparent decorators.
+bind_decorated_methods = true
+# Don't allow None to match bool.
+none_is_not_bool = false
+# Enable parameter count checks for overriding methods with renamed arguments.
+overriding_renamed_parameter_count_checks = true
+# Variables initialized as None retain their None binding.
+strict_none_binding = false
+# Support the third-party fiddle library.
+use_fiddle_overlay = true
+no_return_any = false
+# Require decoration with @typing.override when overriding a method or
+# nested class attribute of a parent class.
+require_override_decorator = false
+# Infer precise return types even for invalid function calls.
+precise_return = true
+# Solve unknown types to label with structural types.
+protocols = true
+# Only load submodules that are explicitly imported.
+strict_import = false
+# Enable exhaustive checking of function parameter types.
+strict_parameter_checks = true
+# Emit errors for comparisons between incompatible primitive
+# types.
+strict_primitive_comparisons = true
+# Check that variables are defined in all possible code paths.
+strict_undefined_checks = true
+use_rewrite = false
+disable = ['pyi-error']
+report_errors = true
+
+[tool.skylos]
+complexity = 25
+nesting = 15
+max_args = 30
+max_lines = 300
+god_file_max_lines = 800
+god_file_max_definitions = 20
+god_file_max_top_level_definitions = 50
+duplicate_strings = 20
+model = "omniroute/free"
+base_url = "http://localhost:20128/v1"
+exclude = [
+    "**/.*",
+    "notes",
+    "berg_agents.egg-info",
+    "**/*cache*",
+    "build",
+    "_extensions",
+    ".*/",
+    "aws",
+    "requirements.txt",
+    "**/*.json",
+    "**/node_modules",
+    "**/data",
+    ".venv",
+    "notes",
+]
+ignore = ["SKY-S101", "SKY-L021", "SKY-U005"]
+
+[tool.skylos.masking]
+names = []
+decorators = []
+bases = []
+
+[tool.skylos.dead_code]
+entrypoints = []
+
+[tool.skylos.vibe]
+extra_phantom_names = []
+extra_phantom_decorators = []
+extra_credential_names = []
+extra_sensitive_file_keywords = []
+extra_network_timeout_calls = []
+
+[tool.skylos.architecture]
+strict = false
+# Q802/Q803 are file-level I/A/D architecture signals by default. Set this to
+# true only if those signals should block strict gates in this project.
+enforce_iad = false
+
+[tool.skylos.whitelist]
+names = []
+
+[tool.skylos.whitelist.documented]
+
+[tool.skylos.whitelist.temporary]
+
+[tool.skylos.gate]
+fail_on_critical = true
+max_critical = 10
+max_high = 7
+max_security = 0
+max_quality = 10
+strict = false
+
+
+# ===== DEV TIPS =====
+# The below commands is for reference and meant to be run as-is in the terminal from root of the project.
+# run formatters and vis docs with sh pre-hook
+
+# Individual commands to run code quality checks and generate reports
+#  pyrefly check --remove-unused-ignores --check-unannotated-defs=true --infer-return-types=checked --use-ignore-files=true --summary=full  --dependency-graph=./.code_quality_outputs/pyrefly_deps_graph.json --color=always --python-interpreter-path .venv/bin/python3 --verbose --output=.code_quality_outputs/pyrefly_report.txt
+
+#  pyrefly stubgen --output-dir ./stubs --include-docstrings --include-private --check-unannotated-defs=true --infer-return-types=checked --use-ignore-files=true --verbose --color=always --config pyproject.toml --permissive-ignores=true
+
+# stubgen -p scripts -v --include-docstrings --include-private --out stubs
+
+# .venv/bin/sphinx-autobuild source _build
+
+# isort . -s .venv  -s ./node_modules/ --float-to-top
+
+# .venv/bin/uv tool run pyanalyze --config-file pyproject.toml --find-unused --find-unused-attributes --markdown-output=.code_quality_outputs/pyanalyze_reports_0.md --verbose --enable-all  --autofix
+
+# pyanalyze --config-file pyproject.toml --find-unused --find-unused-attributes  --markdown-output=./.code_quality_outputs/pyanalyze_report.txt --run-fixer
+
+# flake8   berg_agents --show-source --verbose --extend-exclude "_build, .venv, *cache*, node_modules, dist, build, .ipynb_checkpoints, *support-libs"  --enable-extensions pycodestyle --format=pylint --max-line-length 80   --output-file "./.code_quality_outputs/flake_report.txt" --max-doc-length 100 --statistics --tee --color always --count --doctests
+
+# skylos   berg_agents --model auto-free-stack --api-base http://localhost:20128/v1 --tree --output .code_quality_outputs/skylos.md --quality --trace --format rich --llm --verbose --ai-defects --config-file pyproject.toml --exclude=.*/**,.venv/,**/**/node_modules,**/data,**/*.json,**/.*
+
+# skylos . -i --comment-out
+
+# pytype berg_agents --config pyproject.toml -v 2 --use-fiddle-overlay --precise-return --protocols --overriding-renamed-parameter-count-checks  --unresolved
+
+# pyreverse  berg_agents -d docs/visualizations --colorized  --color-palette [#ffe4e1,#ffb6c1,#f3e5f5,#db7093,#e0b0ff,#9370db,#f8f0fe,#ba55d3,#ff7f50,#ff4500,#ffcc33,#ff9900,#fffacd,#ffcc00,#ffff99,#ffd700] -o svg
+
+# pyreverse  berg_agents -d docs/visualizations  -S -A  -f ALL --colorized  -a 10 --color-palette [#ffe4e1,#ffb6c1,#f3e5f5,#db7093,#e0b0ff,#9370db,#f8f0fe,#ba55d3,#ff7f50,#ff4500,#ffcc33,#ff9900,#fffacd,#ffcc00,#ffff99,#ffd700] -o svg
+
+# uv export --format requirements.txt --output-file requirements.txt

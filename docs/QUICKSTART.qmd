@@ -1,0 +1,129 @@
+---
+title: "Quick Start"
+format: html
+---
+
+This guide provides the essential steps to get BergAgents installed and running on your local machine.
+
+## 1. Prerequisites
+
+- **Python 3.12+**: Ensure you have a modern version of Python installed.
+
+- **`uv` or `pip`**: A Python package manager. `uv` is recommended for its speed.
+
+- **Ollama or OpenAI-compatible API**: For the agent's LLM capabilities, you need a running provider. We recommend starting with Ollama and pulling a model such as `qwen3.5:9b`.
+
+  ```bash
+  ollama pull qwen3.5:9b
+  ```
+
+## 2. Installation
+
+First, clone the repository and navigate into the project directory.
+
+```bash
+git clone https://github.com/your-username/berg_agents.git
+cd berg_agents
+```
+
+Next, create a virtual environment and install the package in editable mode.
+
+```bash
+# Create and activate the virtual environment
+uv venv
+source .venv/bin/activate
+
+# Install the package
+uv pip install -e .
+```
+
+## 3. Configuration
+
+BergAgents uses a **provider-centric configuration** with an **orchestrator** on top. Each model belongs to a provider;
+provider/baseURL/apiKey resolve FROM the model. Model routing, HITL rules, and plugins live in the same file.
+
+Configuration layers (in order of increasing precedence):
+
+1. **Config file**: `config/bergagents.jsonc` — `providers` + `orchestrator`/`model_routing`/`hitl_rules`/`plugins`
+2. **`.env` file**: Values referenced from config with `${env:VAR_NAME}`
+3. **Environment variables**: `BERG_AGENT_*` override config and `.env`
+4. **MCP config**: `.mcp.json` for MCP server configuration
+
+Example `config/bergagents.jsonc`:
+
+```jsonc
+{
+  "providers": {
+    "ollama": {
+      "options": { "baseURL": "http://localhost:11434", "apiKey": "EMPTY" },
+      "models": { "qwen3.5:9b": {}, "gpt-oss:20b": {} }
+    }
+  },
+  // Orchestrator (small models for small tasks, large for complex)
+  "model_routing": {
+    "tiers": {
+      "small": { "models": ["qwen3.5:9b"], "max_tokens": 4096 },
+      "large": { "models": ["gpt-4o"], "max_tokens": 128000 }
+    }
+  },
+  "hitl_rules": {
+    "auto_execute": ["read_file", "list_files"],
+    "ask_before": ["delete_file", "execute_command"]
+  },
+  "plugins": [".opencode"]
+}
+```
+
+`config/profiles.yaml` is **only** for the optional LangGraph harness (tool visibility, prompts). Core routing lives in
+`bergagents.jsonc`.
+
+Example `.env`:
+
+```dotenv
+BERG_AGENT_OLLAMA_MODEL=qwen3.5:9b
+BERG_AGENT_OLLAMA_BASE_URL=http://localhost:11434
+```
+
+## 4. Basic Usage
+
+You can now use BergAgents directly from your terminal.
+
+### Interactive Chat (TUI)
+
+```bash
+berg_agents chat
+```
+
+Type natural language or slash commands (`/help`, `/agents`, `/orchestrate <task>`, `/stats`). Guardian asks for approval
+on risky actions; Planner breaks complex tasks into subtasks.
+
+> "Create a Python file named 'app.py' and add a simple Flask 'Hello, World!' application to it."
+
+### Web UI (Chat ↔ Orchestrate)
+
+```bash
+berg_agents serve --web --web-port 8001
+# → http://127.0.0.1:8001 — toggle Chat / Orchestrate mode, "/" for slash commands
+```
+
+### Python API (BergAgentsApp)
+
+```python
+from berg_agents import BergAgentsApp
+app = BergAgentsApp.create()
+app.execute("refactor auth module", "refactor")
+```
+
+### Export Conversation
+
+```bash
+berg_agents export <thread_id>
+```
+
+## Next Steps
+
+You have now installed `berg_agents` and seen how to perform basic tasks. To learn more, check out these documents:
+
+- [**Usage**](../docs/USAGE.qmd) - See a wide range of examples for both CLI and Python API usage.
+- [**Tools**](../docs/TOOLS.qmd) - Discover the full suite of tools available to the agent.
+- [**Configuration**](../docs/CONFIGURATION.qmd) - Learn how to configure `berg_agents` for your needs.

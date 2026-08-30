@@ -1,0 +1,220 @@
+---
+title: "berg_agents"
+format: html
+---
+
+**Last updated:** 2026-08-28
+
+# BergAgents
+
+A local, LLM-driven code assistant with a **framework-agnostic core** and
+provider-centric configuration. Built to work with any OpenAI-compatible
+provider (Ollama, OpenAI, Anthropic, custom endpoints) without code changes.
+
+## Features
+
+- **Multi-agent orchestrator**: Framework-agnostic `Orchestrator` coordinates `Guardian`, `Planner`, `Implementation`, `Curator`, `Learning` - LangChain is an optional adapter (`backends/`)
+- **Model routing**: Small models for small tasks, large for complex (configured in `bergagents.jsonc` → `model_routing`)
+- **Human-AI balance**: `Guardian` (risk × complexity × confidence) + `hitl_rules` in config - not lazy "AI does everything"
+- **Learning gate**: Records task → model → outcome, adapts routing, stores in MemPalace (`LearningGate` + `ModelRouter` stats)
+- **Provider-agnostic**: Config-driven registry - add any OpenAI-compatible endpoint, zero code changes
+- **Framework-agnostic core**: `berg_agents/core/` has zero LangChain imports - frameworks are adapters, not the spine
+- **MCP integration**: Load tools from external MCP servers (stdio or HTTP)
+- **Web UI + TUI**: FastAPI + React and interactive terminal - both with slash commands and Chat ↔ Orchestrate toggle
+- **Persistent sessions**: Conversation history via LangGraph checkpointing + long-term learnings via MemPalace
+- **Typed configuration**: Pydantic Settings with `.env` support, all keys prefixed `BERG_AGENT_`
+
+## Installation
+
+```bash
+# Clone and install in editable mode
+git clone <repo-url> && cd berg_agents
+uv venv
+source .venv/bin/activate
+uv pip install -e .
+```
+
+```bash
+# Build the web UI
+cd berg_agents/ui/webapp
+npm run build
+```
+
+### Dependencies
+
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) for package management
+- [Ollama](https://ollama.com/) running locally (or any OpenAI-compatible API)
+
+## Quick Start
+
+```bash
+# Interactive agent (TUI - slash commands: /help, /agents, /orchestrate <task>)
+python -m berg_agents chat
+
+# Web UI - Chat ↔ Orchestrate mode, "/" for slash commands
+python -m berg_agents serve --web --web-port 8001
+
+# Python API (BergAgentsApp)
+python -c "from berg_agents import BergAgentsApp; app = BergAgentsApp.create(); print(app.list_agents())"
+```
+
+## Configuration
+
+BergAgents is **provider-centric + orchestrator-centric**. Each model belongs to a provider; provider/baseURL/apiKey
+resolve FROM the model. The orchestrator (`orchestrator`, `model_routing`, `hitl_rules`, `plugins`, `agents`) lives in
+the same `bergagents.jsonc`.
+
+### Config File (`config/bergagents.jsonc`)
+
+```jsonc
+{
+  "providers": {
+    "ollama": {
+      "options": { "baseURL": "http://localhost:11434", "apiKey": "EMPTY" },
+      "models": { "qwen3.5:9b": {}, "gpt-oss:20b": {} }
+    }
+  },
+  "orchestrator": { "enable_learning": true, "enable_hitl": true },
+  "model_routing": {
+    "tiers": {
+      "small": { "models": ["qwen3.5:9b"], "max_tokens": 4096 },
+      "large": { "models": ["gpt-4o"], "max_tokens": 128000 }
+    }
+  },
+  "hitl_rules": {
+    "auto_execute": ["read_file", "list_files"],
+    "ask_before": ["delete_file", "execute_command"]
+  },
+  "plugins": [".opencode"]
+}
+```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BERG_AGENT_OLLAMA_MODEL` | Default Ollama model | `qwen3.5:9b` |
+| `BERG_AGENT_OLLAMA_BASE_URL` | Ollama server URL | `http://localhost:11434` |
+| `BERG_AGENT_TEMPERATURE` | Sampling temperature | `0.7` |
+| `BERG_AGENT_CHECKPOINT_DIR` | Checkpoint storage path | `.checkpoints` |
+
+### MCP Servers
+
+Configure external MCP servers in `.mcp.json`:
+
+```json
+[
+  {
+    "type": "http",
+    "url": "https://docs.langchain.com/mcp",
+    "name": "docs-langchain"
+  },
+  {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-github"],
+    "name": "github",
+    "env": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+    }
+  }
+]
+```
+
+Values using `${env:VAR_NAME}` are resolved from the `.env` file at startup.
+
+## Architecture
+
+```
+berg_agents/
+├── __init__.py            # BergAgentsApp.create() + get_app()
+├── app.py                 # BergAgentsApp (wires Orchestrator + ModelRouter + LearningGate)
+├── core/                  # Framework-agnostic (zero LangChain imports)
+│   ├── orchestrator.py    # Central coordinator (routes → Guardian/Planner/Implementation/Curator/Learning)
+│   ├── interface.py       # AbstractAgent contract
+│   ├── model_router.py    # Complexity → tier
+│   ├── learning_gate.py   # Outcome → insights → MemPalace
+│   ├── bookkeeper.py      # State management
+│   └── chat_server.py     # Chat server abstraction
+├── agents/                # Subagents (all AbstractAgent)
+│   ├── guardian.py        # HITL/risk
+│   ├── planner.py         # Task breakdown
+│   ├── implementation.py  # Code execution
+│   ├── curator.py         # Docs/memory
+│   ├── learning.py        # Outcome tracking
+│   └── codeagent.py       # LangGraph adapter (build_agent, build_berg_agents)
+├── backends/              # Optional adapters
+│   ├── langchain_adapter.py # LangGraph/DeepAgents
+│   └── native_adapter.py  # Raw HTTP (urllib, no deps)
+├── config/                # Configuration
+│   ├── bergagents.jsonc   # Providers + orchestrator/model_routing/hitl_rules/plugins/agents
+│   ├── profiles.yaml      # LangGraph harness only (optional)
+│   └── settings.py        # Pydantic Settings
+├── providers/             # LLM registry (resolve_model → build_llm)
+├── tools/                 # LangChain BaseTool implementations
+├── ui/                    # Web + CLI
+│   ├── orchestrator_server.py # Wraps Orchestrator for HTTP
+│   ├── orchestrator_routes.py # /api/agents, /api/orchestrate, /api/learning-stats
+│   ├── web.py             # FastAPI server
+│   ├── langgraphchatserver.py # Legacy LangGraph server
+│   ├── protocol.py        # SSE protocol v2
+│   └── webapp/            # React (Chat ↔ Orchestrate, slash commands)
+└── cli.py                 # Typer CLI (serve/chat + TUI slash commands)
+```
+
+### Provider Registry Pattern
+
+Config-driven, zero hardcoded providers:
+
+1. `config/bergagents.jsonc` `"providers"` block → per-provider `options` (baseURL/apiKey/timeout) + `models` map
+2. `resolve_model(model_id)` → flat constructor kwargs (provider/base_url/api_key derived from the model's block)
+3. `build_llm(**kwargs)` → `init_chat_model(**kwargs)` verbatim - no `configurable_fields`, no per-provider branches
+4. `api_key` defaults to empty string; `"EMPTY"` placeholder substituted at client construction
+
+### Orchestrator (Primary - Framework-Agnostic)
+
+`BergAgentsApp.create()` → `Orchestrator` coordinates `Guardian` → `Planner` → `Implementation` → `Curator` → `Learning`.
+All decisions (`model_routing`, `hitl_rules`) come from `bergagents.jsonc`. Works without LangGraph (`NativeAdapter`).
+
+### Agent Harness (Optional - LangGraph)
+
+`build_agent()` uses the DeepAgents harness as an **optional** backend:
+
+- Built on `deepagents.create_deep_agent`
+- Virtual filesystem mounted at `/workspace/`
+- Built-in filesystem tools + permission-based HITL
+- Tuned via `config/profiles.yaml` (LangGraph-only)
+
+## Testing
+
+```bash
+pytest
+```
+
+177+ tests covering unit, integration, web, UI, and agent layers.
+
+## Deployment
+
+### Docker
+
+```bash
+docker build -t berg-agents .
+docker run -p 8001:8001 \
+  -v $(pwd)/config:/app/config:ro \
+  -v berg-agents-data:/data \
+  berg-agents
+```
+
+### Docker Compose
+
+```bash
+docker compose up -d
+```
+
+## Documentation
+
+- [Configuration](../docs/CONFIGURATION.qmd) - Provider-centric config, `.env`, env vars
+- [Usage](../docs/USAGE.qmd) - CLI examples and Python API walkthrough
+- [Tools](../docs/TOOLS.qmd) - Agent tool reference
+- [Contributing](../docs/CONTRIBUTING.qmd) - Guidelines for contributing

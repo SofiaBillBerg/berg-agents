@@ -1,0 +1,12 @@
+/* Dark preset — opt-in by setting <html data-berg-preset="dark">. */
+
+:root[data-berg-preset="dark"] {
+  --berg-text:           #f5f5f7;
+  --berg-bg:             #0d1117;
+  --berg-surface:        #161b22;
+  --berg-surface-tint:   #1f2530;
+  --berg-code-bg:        #1c1f26;
+  --berg-code-text:      #c4a8e8;
+  --berg-border:         #2a2f3a;
+  --berg-muted:          #b58ce0;
+}

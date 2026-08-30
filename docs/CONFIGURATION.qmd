@@ -1,0 +1,229 @@
+---
+title: "Configuration"
+format: html
+---
+
+# Configuration
+
+BergAgents uses a **provider-centric configuration** pattern. Each model
+belongs to a provider; provider/baseURL/apiKey resolve FROM the model —
+never from a single global `BERG_AGENT_PROVIDER` setting.
+
+Configuration layers (in order of increasing precedence):
+
+1. **Config file**: `config/bergagents.jsonc` — provider-centric with `providers` block
+2. **`.env` file**: Values referenced from config with `${env:VAR_NAME}`
+3. **Environment variables**: `BERG_AGENT_*` override config and `.env`
+4. **MCP config**: `.mcp.json` for MCP server configuration
+
+## Config File
+
+The config file is the primary place to define agent behavior. JSONC files support comments and trailing commas.
+
+### Provider-Centric Pattern
+
+```jsonc
+{
+  "providers": {
+    "ollama": {
+      "options": {
+        "baseURL": "http://localhost:11434",
+        "apiKey": "EMPTY"
+      },
+      "models": {
+        "qwen3.5:9b": {},
+        "gpt-oss:20b": {},
+        "mistral:latest": {}
+      }
+    },
+    "openai": {
+      "options": {
+        "baseURL": "https://api.openai.com/v1",
+        "apiKey": "${env:OPENAI_API_KEY}"
+      },
+      "models": {
+        "gpt-4o": {},
+        "gpt-4o-mini": {}
+      }
+    },
+    "custom-endpoint": {
+      "options": {
+        "baseURL": "https://my-server.example.com/v1",
+        "apiKey": "${env:CUSTOM_API_KEY}"
+      },
+      "models": {
+        "my-model": {}
+      }
+    }
+  }
+}
+```
+
+### How Provider Resolution Works
+
+1. `resolve_model("qwen3.5:9b")` → looks up the model in `providers.ollama.models`
+2. Returns flat kwargs: `{base_url: "http://localhost:11434", api_key: "EMPTY", ...}`
+3. `build_llm(**kwargs)` → `init_chat_model(**kwargs)` verbatim
+4. No `configurable_fields`, no per-provider branches
+
+### Legacy Flat Keys (Deprecated)
+
+For backward compatibility, flat keys are auto-synthesized into a registry:
+
+```jsonc
+{
+  "BERG_AGENT_OLLAMA_MODEL": "qwen3.5:9b",
+  "BERG_AGENT_OLLAMA_BASE_URL": "http://localhost:11434"
+}
+```
+
+## Orchestrator (Multi-Agent Core)
+
+BergAgents is a **framework-agnostic orchestrator** with specialized subagents — not a LangChain wrapper. The orchestrator coordinates all work and is configured in the same `bergagents.jsonc`:
+
+```jsonc
+{
+  // Orchestrator as host (framework-agnostic core)
+  "orchestrator": {
+    "enable_learning": true,
+    "enable_hitl": true
+  },
+
+  // Model routing — small models for small tasks, large for complex
+  "model_routing": {
+    "tiers": {
+      "small":  { "models": ["qwen3.5:9b"], "max_tokens": 4096 },
+      "medium": { "models": ["gpt-oss:20b"], "max_tokens": 8192 },
+      "large":  { "models": ["gpt-4o"], "max_tokens": 128000 }
+    },
+    "complexity_rules": {
+      "trivial":  { "patterns": ["read_file", "list_files", "search"], "tier": "small" },
+      "standard": { "patterns": ["edit_file", "new_file", "test"], "tier": "small" },
+      "complex":  { "patterns": ["refactor", "architecture", "multi_file"], "tier": "large" },
+      "critical": { "patterns": ["delete", "security", "production"], "tier": "large", "human_review": true }
+    }
+  },
+
+  // HITL rules — Guardian decides when to ask human
+  "hitl_rules": {
+    "auto_execute": ["read_file", "list_files", "search_code"],
+    "notify_after": ["edit_file", "new_file", "generate_test"],
+    "ask_before": ["delete_file", "execute_command", "refactor"],
+    "human_leads": ["security_change", "production_deploy", "data_migration"]
+  },
+
+  // Plugins — optional .opencode paths (BergAgents works without them)
+  "plugins": [".opencode"],
+
+  // Agent overrides — optional per-agent tuning
+  "agents": {
+    "guardian": { "preferred_model_tier": "medium" },
+    "planner":  { "preferred_model_tier": "medium" },
+    "implementation": { "preferred_model_tier": "small" },
+    "curator":  { "preferred_model_tier": "small" },
+    "learning": { "preferred_model_tier": "medium" }
+  }
+}
+```
+
+Loaded via `BergAgentsApp.create()` → `Settings` → `Orchestrator`/`ModelRouter`/`Guardian`.
+
+| Subagent | Role | Default Tier |
+|----------|------|--------------|
+| `Guardian` | HITL decisions, risk assessment | `medium` |
+| `Planner` | Task breakdown, complexity estimation | `medium` |
+| `Implementation` | Code execution, file ops | `small` (matched to complexity) |
+| `Curator` | Docs, memory | `small` |
+| `Learning` | Outcome tracking, routing adaptation | `medium` |
+
+## `.env` File
+
+Store secrets and defaults in a `.env` file at the project root. Values referenced from the config file with `${env:VAR_NAME}` are resolved from here.
+
+Example `.env`:
+
+```dotenv
+BERG_AGENT_OLLAMA_MODEL=qwen3.5:9b
+BERG_AGENT_OLLAMA_BASE_URL=http://localhost:11434
+OPENAI_API_KEY=sk-...
+GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
+```
+
+## Environment Variables
+
+Any setting can be overridden with an environment variable. The variable name matches the config key, upper-cased with the `BERG_AGENT_` prefix.
+
+Common variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BERG_AGENT_OLLAMA_MODEL` | Default Ollama model | `qwen3.5:9b` |
+| `BERG_AGENT_OLLAMA_BASE_URL` | Ollama server URL | `http://localhost:11434` |
+| `BERG_AGENT_TEMPERATURE` | Sampling temperature | `0.7` |
+| `BERG_AGENT_CHECKPOINT_DIR` | Checkpoint storage path | `.checkpoints` |
+
+## Profiles (LangGraph Adapter Only)
+
+Profiles are for the **optional** LangGraph/DeepAgents backend — not for the core orchestrator. They tune the system prompt, tool visibility, and middleware per model.
+
+Loaded automatically from `config/profiles.yaml`:
+
+```yaml
+"ollama":
+  system_prompt_suffix: "Be concise and prefer minimal, focused diffs."
+  excluded_tools: []
+  tool_description_overrides:
+    read_file: "Read a file from the workspace (read-only)."
+```
+
+Profile keys can be:
+- A bare provider name (e.g. `"ollama"`) for provider-wide defaults
+- A `provider:model` pair (e.g. `"openai:gpt-4o"`) for per-model overrides
+
+Note: model identifiers containing `:` (e.g. `qwen3.5:9b`) cannot be used as exact `provider:model` keys — register them under the bare provider key instead.
+
+> Core orchestrator config (`model_routing`, `hitl_rules`, `agents`) belongs in `bergagents.jsonc`.
+> `profiles.yaml` only affects the LangGraph harness.
+
+## MCP Configuration
+
+External MCP servers are configured in `.mcp.json`:
+
+```json
+[
+  {
+    "type": "http",
+    "url": "https://docs.langchain.com/mcp",
+    "name": "docs-langchain"
+  },
+  {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-github"],
+    "name": "github",
+    "env": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+    }
+  }
+]
+```
+
+Values using `${env:VAR_NAME}` are resolved from the `.env` file at startup. Secrets are never stored in `.mcp.json`.
+
+### HITL Gating for MCP Tools
+
+Sensitive MCP servers (e.g. `github`, `memory`) are intercepted for explicit human approval before tool execution. Read-only servers (`context7`, `docs-langchain`, `reference-langchain`) function without interruption.
+
+## CLI Flags
+
+- `--config <path>`: Load a specific config file instead of the default `config/bergagents.jsonc`.
+
+## Precedence Example
+
+Given:
+
+- Config file: `BERG_AGENT_TEMPERATURE = 0.7`
+- `.env`: `BERG_AGENT_TEMPERATURE=0.9`
+- Environment: `BERG_AGENT_TEMPERATURE=0.5`
+
+The effective value is `0.5` (environment variable wins).

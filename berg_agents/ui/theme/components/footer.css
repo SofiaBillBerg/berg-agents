@@ -1,0 +1,22 @@
+/* Berg Agents — footer banner. */
+
+.berg-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.berg-footer {
+    background: var(--berg-gradient-brand);
+    color: white;
+    padding: var(--berg-sp-6) var(--berg-sp-2);
+    border-radius: var(--berg-radius);
+    box-shadow: var(--berg-shadow-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}

@@ -1,0 +1,161 @@
+---
+title: "Tools"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+# Tools
+
+BergAgents has two layers:
+
+1. **Orchestrator subagents** (`berg_agents/agents/` — `Guardian`, `Planner`, `Implementation`, `Curator`, `Learning`) that
+   route via `Orchestrator`. Add custom subagents by implementing `AbstractAgent` and `app.register_agent()`.
+2. **Filesystem tools** — the optional DeepAgents harness provides built-in tools; custom tools and MCP servers add on top.
+
+## Tool Loading Order
+
+When the agent starts, tools are loaded in this order:
+
+1. **DeepAgents built-in filesystem tools** — always available unless excluded by a harness profile
+2. **Custom tools** from `create_default_tools` — added on top; if a custom tool has the same name as a built-in, the built-in wins and the custom one is dropped
+3. **MCP tools** — loaded from configured MCP servers and prefixed with `mcp_<server>__<tool>`
+
+## Built-in Filesystem Tools
+
+These tools are provided by the DeepAgents harness automatically:
+
+| Tool         | Purpose                                                   |
+|--------------|-----------------------------------------------------------|
+| `ls`         | List files in a directory with metadata                   |
+| `read_file`  | Read file contents with line numbers                      |
+| `write_file` | Create or overwrite a file                                |
+| `edit_file`  | Perform exact string replacements in files                |
+| `glob`       | Find files matching patterns (for example, `**/*.py`)     |
+| `grep`       | Search file contents                                      |
+| `delete`     | Delete a file or directory recursively                    |
+| `execute`    | Run shell commands (available with sandbox backends only) |
+| `task`       | Delegate to a subagent                                    |
+
+### Filesystem Permissions
+
+Declarative permission rules control which files and directories the agent can read or write. Rules are evaluated top to bottom, and the first matching rule wins. If no rule matches, the operation is allowed.
+
+The default permissions:
+- Deny reads/writes to `.env` and `secrets/`
+- Allow reads anywhere under the workspace
+- Pause writes for human review (`mode="interrupt"`)
+
+You can customize permissions when building the agent:
+
+```python
+from deepagents import create_deep_agent
+from deepagents.backends.filesystem import FilesystemPermission
+
+agent = create_deep_agent(
+    model="anthropic:claude-sonnet-4-6",
+    permissions=[
+        {"operations": ["read", "write"], "paths": ["/workspace/**"], "mode": "allow"},
+        {"operations": ["read", "write"], "paths": ["/workspace/.env"], "mode": "deny"},
+    ],
+)
+```
+
+## Custom Tools
+
+These tools are defined in `berg_agents` and registered via `create_default_tools`:
+
+| Tool             | Purpose                                                                                       |
+|------------------|-----------------------------------------------------------------------------------------------|
+| `read_file`      | Read file contents with line numbers (collides with built-in; built-in wins)                  |
+| `edit_file`      | Edit existing files — replace, append, or patch modes (collides with built-in; built-in wins) |
+| `new-file`       | Create a new file with specified content                                                      |
+| `search-explain` | Search the codebase for a term or regex, then summarize matches                               |
+| `generate-test`  | Generate a basic pytest test file for a Python module                                         |
+| `format-code`    | Format Python or R source files                                                               |
+| `py_to_ipynb`    | Convert Python scripts (with `#%%` cell markers) to Jupyter notebooks                         |
+| `general-chat`   | Fallback for non-filesystem questions                                                         |
+| `r-script`       | Execute R code                                                                                |
+
+### Tool Registration
+
+Add new tools to `create_default_tools` in `berg_agents/agents/codeagent.py`:
+
+```python
+from langchain.tools import tool
+
+@tool
+def my_custom_tool(arg: str) -> str:
+    """Description of what the tool does."""
+    return f"Result for {arg}"
+
+# In create_default_tools():
+standard_tools = [
+    # ... existing tools ...
+    my_custom_tool(),
+]
+```
+
+When using the DeepAgents harness, custom tools are additive. If a custom tool has the same name as a built-in filesystem tool, the built-in wins and the custom one is dropped.
+
+## MCP Tools
+
+MCP (Model Context Protocol) servers extend the agent with external tools. Tools are prefixed with `mcp_<server>__<tool>` to avoid name collisions.
+
+Example `.mcp.json`:
+
+```json
+[
+  {
+    "type": "http",
+    "url": "https://docs.langchain.com/mcp",
+    "name": "docs-langchain"
+  },
+  {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-github"],
+    "name": "github",
+    "env": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+    }
+  }
+]
+```
+
+Values using `${env:VAR_NAME}` are resolved from the `.env` file at startup. Secrets are never stored in `.mcp.json`.
+
+### HITL Gating for MCP Tools
+
+Sensitive MCP servers (for example, `github`, `memory`) are intercepted for explicit human approval before tool execution. Read-only servers (`context7`, `docs-langchain`, `reference-langchain`) function without interruption.
+
+## Human-in-the-Loop
+
+Mutating built-in tools default to human-in-the-loop review:
+
+- `write_file`
+- `edit_file`
+- `delete`
+- `execute`
+
+When the agent invokes one of these tools, execution pauses and the user must approve, reject, edit the arguments, or send a message back to the agent.
+
+In the CLI, the prompt looks like:
+
+```
+==================================================
+⚠️  Human approval required before tool execution
+Tool: edit_file
+Args:
+{
+  "file_path": "src/utils.py",
+  "content": "..."
+}
+==================================================
+Decide: [a]pprove  [r]eject  [e]dit  [m]essage
+```
+
+In the web UI, the HITL surface component shows:
+- Tool name and arguments
+- Approve / Reject buttons
+- Edit mode (modify JSON args before approving)
+- Raw interrupt data (collapsible, for debugging unknown shapes)

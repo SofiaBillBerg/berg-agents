@@ -1,0 +1,97 @@
+---
+title: "Berg Agents"
+author: "Sofia Billger Bergström"
+format: html
+output_file: .README.md
+---
+
+<!-- README.md is generated from README.qmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# berg_agents
+
+<!-- badges: start -->
+
+> BergAgents A local, LLM-driven code assistant with a framework-agnostic core and provider-centric configuration.
+
+<!-- badges: end -->
+
+## Quick Start
+
+```bash
+# Install dependencies (uv is recommended)
+uv venv .venv
+source .venv/bin/activate
+uv pip install -e .
+
+# Run the interactive agent
+berg_agents chat
+```
+
+## Features
+
+- **Multi-agent orchestrator**: Framework-agnostic `Orchestrator` coordinates specialized subagents (Guardian, Planner, Implementation, Curator, Learning) — not a LangChain wrapper
+- **Model routing**: Small models for small tasks, large for complex — complexity → tier mapping in `bergagents.jsonc`
+- **Human-AI balance**: Guardian decides when to ask (risk × complexity × confidence), not lazy "AI does everything"
+- **Learning gate**: System adapts from outcomes — records task → model → success, updates routing rules, stores in MemPalace
+- **Provider-agnostic**: Config-driven registry — add any OpenAI-compatible endpoint, zero code changes
+- **Framework-agnostic core**: `berg_agents/core/` has zero LangChain imports — frameworks are adapters (`backends/langchain_adapter.py`, `backends/native_adapter.py`)
+- **MCP integration**: Load tools from external MCP servers (stdio or HTTP)
+- **Web UI + TUI**: FastAPI + React and interactive terminal — both with slash commands (`/help`, `/agents`, `/orchestrate`, …) and orchestrator/Chat mode toggle
+- **Export conversations**: Export thread history as markdown
+
+See [docs/USAGE.qmd](../docs/USAGE.qmd) for CLI and Python API examples.
+
+## Configuration
+
+BergAgents uses a **provider-centric configuration** pattern. Each model
+belongs to a provider; provider/baseURL/apiKey resolve FROM the model —
+never from a single global `BERG_AGENT_PROVIDER` setting.
+
+1. **Config file**: `config/bergagents.jsonc` — provider-centric with `providers` block
+2. **`.env` file**: Values referenced from config with `${env:VAR_NAME}`
+3. **Environment variables**: `BERG_AGENT_*` override config and `.env`
+4. **MCP config**: `.mcp.json` for MCP server configuration
+
+See [docs/CONFIGURATION.qmd](../docs/CONFIGURATION.qmd) for the full reference.
+
+## Running the Web UI
+
+```bash
+# Production (FastAPI serves both API + static UI on same origin):
+python -m berg_agents serve --web --web-port 8001
+# → Open http://127.0.0.1:8001
+
+# Development (Vite dev server with proxy + hot reload):
+npm run dev
+# → Open http://localhost:5173 — proxies API to 8001
+```
+
+## Documentation
+
+| Page | Description |
+|------|-------------|
+| [QUICKSTART](../docs/QUICKSTART.qmd) | Step-by-step installation and configuration guide |
+| [USAGE](../docs/USAGE.qmd) | Example workflows for CLI and Python API usage |
+| [TOOLS](../docs/TOOLS.qmd) | Built-in filesystem and MCP tools |
+| [CONFIGURATION](../docs/CONFIGURATION.qmd) | Provider-centric config, `.env`, and env vars |
+| [CONTRIBUTING](../docs/CONTRIBUTING.qmd) | Guidelines for contributing |
+| [CHANGELOG](../CHANGELOG.qmd) | Version history |
+| [FAQ](../docs/FAQ.qmd) | Common questions and troubleshooting |
+
+## Getting Help
+
+- Read the [QUICKSTART guide](../docs/QUICKSTART.qmd) for installation
+- Check [USAGE examples](../docs/USAGE.qmd) for common workflows
+- See [TOOLS documentation](../docs/TOOLS.qmd) to understand agent capabilities
+- Review [FAQ](../docs/FAQ.qmd) for troubleshooting tips
+
+---
+
+**Version**: 0.2.0 | **License**: MIT

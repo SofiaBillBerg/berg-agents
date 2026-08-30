@@ -1,0 +1,152 @@
+---
+title: "FAQ & Troubleshooting"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+# FAQ & Troubleshooting
+
+## 1. How does the agent remember conversations?
+
+BergAgents has two memory layers:
+
+1. **Short-term (threads)**: LangGraph checkpointing persists per `thread_id` (at `~/.berg_agents/checkpoints/agent.db` by
+   default). Root IDs are short (`f`), sub-agent turns append dotted namespaces (`f.ff33…3967.930f…`). The legacy chat path
+   uses this directly; the new orchestrator path streams via `OrchestratorServer`. Export via
+   `GET /threads/{id}/export` reads `channel_values.messages` (Sqlite) — display truncates to root.
+
+2. **Long-term (learnings)**: `LearningGate` records task → model → outcome and stores insights in **MemPalace** (knowledge
+   graph). `ModelRouter` adapts tier selection based on success rates. Check via `/stats` (TUI) or `GET /api/learning-stats`.
+
+Additionally, the DeepAgents harness can load **memory files** (`AGENTS.md`) that are always injected into the agent's
+context, giving it persistent instructions and preferences across conversations.
+
+## 2. Can I use a cloud LLM instead of Ollama?
+
+Yes. BergAgents is provider-agnostic. Add any OpenAI-compatible endpoint in `config/bergagents.jsonc`:
+
+```jsonc
+"providers": {
+  "openai": {
+    "options": { "baseURL": "https://api.openai.com/v1", "apiKey": "${env:OPENAI_API_KEY}" },
+    "models": { "gpt-4o": {} }
+  }
+}
+```
+
+Or use env vars: `BERG_AGENT_OPENAI_API_KEY` / `BERG_AGENT_OPENAI_MODEL`. In `bergagents.jsonc`, the provider is
+derived **from the model id** — never from a global `BERG_AGENT_PROVIDER` flag (deprecated). Switch at runtime via
+the web UI model selector or `POST /threads/{id}/model`. See `docs/CONFIGURATION.qmd`.
+
+## 3. What happens if the LLM server is not running?
+
+If the agent cannot connect to the configured LLM backend, the `create_llm` function will raise an error when you try to
+invoke the agent. The CLI and web UI will surface the error message so you can diagnose the connection issue.
+
+## 4. Is it safe to let the agent edit my files?
+
+The `Guardian` subagent implements the **human-AI balance** — it assesses risk × complexity × confidence and decides
+`auto_execute` / `notify_after` / `ask_before` / `human_leads` (configured in `bergagents.jsonc` → `hitl_rules`).
+
+On the filesystem side, the sandbox is `root_dir` (default: cwd). The DeepAgents harness mounts the working directory at
+`/workspace/` with `virtual_mode=True`, blocking path escapes (`..`, `~`, absolute outside). Mutating tools
+(`write_file`, `edit_file`, `delete`, `execute`) default to HITL review — the agent pauses for your approval.
+
+You can further restrict access with filesystem permissions:
+
+```python
+from deepagents import create_deep_agent
+from deepagents.backends.filesystem import FilesystemPermission
+
+agent = create_deep_agent(
+    model="anthropic:claude-sonnet-4-6",
+    permissions=[
+        FilesystemPermission(operations=["read", "write"], paths=["/workspace/**"], mode="allow"),
+        FilesystemPermission(operations=["read", "write"], paths=["/workspace/.env"], mode="deny"),
+    ],
+)
+```
+
+## 5. How do I add a new tool or subagent?
+
+**Tool**: add it to `create_default_tools` in `berg_agents/agents/codeagent.py`:
+
+```python
+from langchain.tools import tool
+
+@tool
+def my_custom_tool(arg: str) -> str:
+    """Description of what the tool does."""
+    return f"Result for {arg}"
+
+# In create_default_tools():
+standard_tools = [
+    # ... existing tools ...
+    my_custom_tool(),
+]
+```
+
+When using DeepAgents, custom tools are additive; built-ins win on name collision.
+
+**Subagent**: implement `AbstractAgent` and register with the orchestrator:
+
+```python
+from berg_agents import BergAgentsApp
+from berg_agents.core import AbstractAgent, AgentResult, TaskContext
+
+class MyAgent(AbstractAgent):
+    name = "my_agent"
+    description = "Does X"
+
+    def can_handle(self, task): return 0.8
+    def execute(self, task, context: TaskContext, model=None) -> AgentResult:
+        return AgentResult(success=True, output="done")
+
+app = BergAgentsApp.create()
+app.register_agent("my_agent", MyAgent())
+```
+
+## 6. Why does `berg_agents chat` sometimes look empty or delayed?
+
+The chat interface streams live output when possible. If the final model reply is empty, the CLI shows
+`(no text response)` instead of a blank line. If your backend does not support streaming, the interface falls back to a
+normal blocking request automatically.
+
+Use `--verbose` if you want more visible agent activity during execution.
+
+## 7. How do I configure MCP servers?
+
+Set `BERG_AGENT_MCP_SERVERS` in your `.env` or config file. The value can be inline JSON or a path to a JSON file:
+
+```dotenv
+BERG_AGENT_MCP_SERVERS=[{"type": "http", "url": "https://docs.langchain.com/mcp"}]
+```
+
+Or:
+
+```dotenv
+BERG_AGENT_MCP_SERVERS=mcp.json
+```
+
+Secrets in MCP server configs can reference `${env:VAR}` placeholders, which are resolved from your `.env` file at
+startup.
+
+## 8. What Python version do I need?
+
+Python 3.12+. The project uses `uv` for dependency management.
+
+## 9. Do I need LangGraph installed?
+
+No. BergAgents runs without it. `backends/native_adapter.py` talks directly to OpenAI-compatible APIs via stdlib `urllib`.
+Install LangGraph/DeepAgents only if you want the LangGraph harness (`backends/langchain_adapter.py`).
+
+## 10. How does model routing work?
+
+`ModelRouter` estimates complexity from task description × task_type (patterns + keywords) → `trivial`/`standard`/`complex`/`critical` →
+small/medium/large tier (configured in `bergagents.jsonc` → `model_routing`). `LearningGate` then adapts based on observed
+success rates. Check tiers and stats via `GET /api/learning-stats` or `/stats` in TUI.
+
+## 11. Where is the architecture doc?
+
+`.opencode/context/project-intelligence/BERGAGENTS_PLAN.md` is the north star. It is the single source of truth — if the plan
+changes, update that file first.

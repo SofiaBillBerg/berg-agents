@@ -1,0 +1,84 @@
+---
+title: "Contributing to Berg Agents"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+# Contributing
+
+We welcome contributions from the community! Whether you're fixing a bug, adding a new feature, or improving
+documentation, your help is appreciated. Please read the following guidelines to get started.
+
+## Development Setup
+
+1. **Fork and Clone**: Fork the repository on GitHub, then clone your fork locally.
+   ```bash
+   git clone https://github.com/your-username/berg_agents.git
+   cd berg_agents
+   ```
+
+2. **Create a Virtual Environment**: We recommend using `uv` to create and manage your virtual environment.
+   ```bash
+   uv venv
+   source .venv/bin/activate
+   ```
+
+3. **Install Dependencies**: Install the package in editable mode with all development dependencies.
+   ```bash
+   uv pip install -e .[dev]
+   ```
+
+## Architecture Principles (NEVER DRIFT)
+
+- `berg_agents/core/` has **zero** LangChain/LangGraph imports — frameworks are adapters in `backends/`
+- All tasks route through `Orchestrator`, not directly to agents
+- New agents implement `AbstractAgent` (`can_handle` + `execute`)
+- `.opencode/` is an **optional plugin**, not a structural dependency
+- Read `.opencode/context/project-intelligence/BERGAGENTS_PLAN.md` — it is the north star
+
+## Code Style & Linting
+
+We use `ruff` for linting and formatting. Before committing your changes, please run the following command to ensure
+your code adheres to the project's style guidelines.
+
+```bash
+ruff check --fix .
+ruff format .
+```
+
+- All public functions, classes, and methods should have clear docstrings.
+- Follow standard Python naming conventions (PEP 8).
+
+## Testing
+
+The project uses `pytest` for testing.
+
+- **Run all tests**:
+  ```bash
+  pytest
+  ```
+- **Run tests with coverage**:
+  ```bash
+  pytest --cov=berg_agents
+  ```
+
+Please add tests for any new features or bug fixes to ensure that the codebase remains stable and reliable.
+149+ tests cover core agents, backends, and web/server layers.
+
+## Submitting a Pull Request
+
+1. Create a new branch for your feature or bugfix.
+   ```bash
+   git checkout -b my-new-feature
+   ```
+2. Make your changes, add tests, and ensure all checks pass locally.
+3. Commit your changes with a clear and descriptive commit message.
+4. Push your branch to your fork on GitHub.
+   ```bash
+   git push origin my-new-feature
+   ```
+5. Open a Pull Request from your fork to the main `../berg_agents` repository.
+6. In the PR description, please explain the changes you have made and reference any related issues.
+7. Ensure that all automated CI checks pass on your PR.
+
+Thank you for contributing!

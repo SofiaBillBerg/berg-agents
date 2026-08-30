@@ -1,0 +1,63 @@
+exclude: '^packrat(/|$)'  # Exclude the packrat folder
+repos:
+  # Local hooks must be defined inline (repo: local does not read
+  # .pre-commit-hooks.yaml); the script entries live in project_utils/.
+  - repo: local
+    hooks:
+      - id: run-autofix
+        name: run-autofix
+        entry: project_utils/run_autofix.sh
+        language: script
+      #   stages: [pre-commit, manual]
+      #      - id: pre-commit-quick
+      #        name: pre-commit-quick
+      #        entry: project_utils/pre-commit-quick.sh
+      #        language: script
+      #        stages: [ pre-commit ]
+      - id: run-formatters
+        name: run-formatters
+        entry: project_utils/run_formatters.sh
+        language: script
+        stages: [ manual ]
+      - id: run-diagrams
+        name: run-diagrams
+        entry: project_utils/run_diagrams.sh
+        language: script
+        stages: [ manual ]
+      - id: run-analyzers
+        name: run-analyzers
+        entry: project_utils/run_analyzers.sh
+        language: script
+        stages: [ manual ]
+      - id: pre-push
+        name: pre-push
+        entry: pre-push
+        language: script
+        stages: [ pre-push ]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-builtin-literals
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-vcs-permalinks
+      - id: debug-statements
+      - id: check-toml
+      - id: check-ast
+      - id: destroyed-symlinks
+      - id: sort-simple-yaml
+  - repo: https://github.com/asottile/setup-cfg-fmt
+    rev: v3.2.0
+    hooks:
+      - id: setup-cfg-fmt
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.21.2
+    hooks:
+      - id: pyupgrade
+        args: [ --py311-plus ]

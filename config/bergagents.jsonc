@@ -1,0 +1,228 @@
+{
+  //# CodeAgent (DeepAgents) configuration file (JSONC format, comments allowed).
+  "COHERE_API_KEY": "${env:COHERE_API_KEY}",
+  "COHERE_BASE_URL": "${env:COHERE_BASE_URL}",
+  "COHERE_MODEL": "${env:COHERE_MODEL}",
+  "COHERE_SERVER_PORT": "${env:COHERE_SERVER_PORT}",
+  "BERG_AGENT_OPENAI_API_KEY": "${env:BERG_AGENT_OPENAI_API_KEY}",
+  "BERG_AGENT_OPENAI_MODEL": "${env:BERG_AGENT_OPENAI_MODEL}",
+  "BERG_AGENT_OPENAI_BASE_URL": "${env:BERG_AGENT_OPENAI_BASE_URL}",
+  "BERG_AGENT_OLLAMA_SCHEME": "${env:BERG_AGENT_OLLAMA_SCHEME}",
+  "BERG_AGENT_OLLAMA_HOST": "${env:BERG_AGENT_OLLAMA_HOST}",
+  "BERG_AGENT_OLLAMA_PORT": "${env:BERG_AGENT_OLLAMA_PORT}",
+  "BERG_AGENT_OLLAMA_MODEL": "${env:BERG_AGENT_OLLAMA_MODEL}",
+  "BERG_AGENT_TEMPERATURE": 0.7,
+  "BERG_AGENT_STREAM": true,
+  "BERG_AGENT_ROOT_DIR": "${env:BERG_AGENT_ROOT_DIR}",
+  "BERG_AGENT_VERBOSE": true,
+  "BERG_AGENT_LOG_LEVEL": "info",
+  "BERG_AGENT_MCP_SERVERS": "config/.mcp.json",
+  //# CodeAgents (DeepAgents) skills: JSON array of paths (or [path, label] pairs) to
+  //# SKILL.md directories, loaded progressively by the harness.
+  //# Paths must live under the mounted workspace (BERG_AGENT_ROOT_DIR).
+  //"BERG_AGENT_SKILLS": "[\"skills/code-conventions\"]",
+
+  //# CodeAgents (DeepAgents) memory: JSON array of AGENTS.md file paths, always loaded.
+  //"BERG_AGENT_MEMORY": "[\"AGENTS.md\"]",
+
+  //# CodeAgents (DeepAgents) todo list: when true (default) the agent gets a write_todos
+  //# tool to maintain a structured task list during execution.
+  "BERG_AGENT_TODOS_ENABLED": true,
+  //# CodeAgents (DeepAgents) summarization trigger (context offloading threshold).
+  //# One of: ["messages", 100] | ["tokens", 60000] | ["fraction", 0.85]
+  //#         [["fraction", 0.8], ["messages", 100]] (OR list) |
+  //#         [{"tokens": 4000, "messages": 10}] (AND clause)
+  "BERG_AGENT_SUMMARIZATION_TRIGGER": "[\"messages\", 100]",
+  //# Context retention after summarization, e.g. ["messages", 20].
+  "BERG_AGENT_SUMMARIZATION_KEEP": "[\"messages\", 20]",
+  //# Provider-agnostic configuration. Use BERG_AGENT_PROVIDER to select
+  //# the backend ("openai" or "ollama"). When "ollama" is selected, the
+  //# harness transparently routes to ChatOpenAI against http://localhost:11434/v1.
+  //# Example: "BERG_AGENT_PROVIDER": "openai"
+  "BERG_AGENT_PROVIDER": "ollama",
+  //# Optional explicit base URL for OpenAI-compatible endpoints.
+  //# When unset, the provider's default applies (OpenAI: https://api.openai.com/v1).
+  "BERG_AGENT_BASE_URL": "${env:BERG_AGENT_BASE_URL}",
+  //# Optional explicit model name override.
+  //"BERG_AGENT_MODEL": "${env:BERG_AGENT_MODEL}",
+
+  //# ---------------------------------------------------------------------------
+  //# PROVIDER/MODEL REGISTRY (preferred — replaces the flat keys above).
+  //# Each model belongs to a provider: selecting a model id automatically
+  //# resolves its provider, baseURL and apiKey. Any OpenAI-compatible
+  //# endpoint can be added here with zero code changes. "{env:VAR}" strings
+  //# expand from the environment at load time. "defaultModel" selects the
+  //# startup model; when omitted the first declared model is used.
+  //# ---------------------------------------------------------------------------
+  "providers": {
+    "ollama": {
+      "name": "ollama(Local)",
+      "options": {
+        "baseURL": "http://localhost:11435/v1",
+        "timeout": 6000000
+      },
+      "models": {
+        "SetneufPT/Gemma4-12B-IT-QAT_Q4_64K_16GB-GPU:latest": {
+          "name": "SetneufPT/Gemma4-12B-IT-QAT_Q4_64K_16GB-GPU:latest"
+        },
+        "abdulroqib/qwen3.6-27b-q3-128k:latest": {
+          "name": "abdulroqib/qwen3.6-27b-q3-128k:latest"
+        },
+        "devstral-small-2:24b-instruct-2512-q4_K_M": {
+          "name": "devstral-small-2:24b-instruct-2512-q4_K_M"
+        },
+        "gpt-oss:120b-cloud": {
+          "name": "gpt-oss:120b-cloud"
+        },
+        "hf.co/aquaduck/GLM-4.7-Flash-GGUF:Q4_K_M": {
+          "name": "hf.co/aquaduck/GLM-4.7-Flash-GGUF:Q4_K_M"
+        },
+        "mistral:latest": {
+          "name": "mistral:latest"
+        },
+        "qwen2.5-coder:7b": {
+          "name": "qwen2.5-coder:7b"
+        },
+        "qwen3.5:9b": {
+          "name": "qwen3.5:9b"
+        },
+        "rafw007/qwen35-claude-coder:9b": {
+          "name": "rafw007/qwen35-claude-coder:9b"
+        }
+      }
+    },
+    "omniroute": {
+      "name": "omniroute",
+      "options": {
+        "baseURL": "${env:BERG_AGENT_OPENAI_BASE_URL}",
+        "apiKey": "${env:BERG_AGENT_OPENAI_API_KEY}",
+        "timeout": 6000000
+      },
+      "models": {
+        "auto": {
+          "name": "auto"
+        },
+        "best-free": {
+          "name": "auto/best-free"
+        }
+      }
+    }
+  },
+  //# Startup model (must be declared above); empty = first declared model.
+  "defaultModel": "",
+  //# MCP server secrets (git-ignored; referenced as ${VAR} in .mcp.json)
+  //# "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}",
+  "CONTEXT7_API_KEY": "${env:CONTEXT7_API_KEY}",
+  //# ---------------------------------------------------------------------------
+  //# BERGAGENTS ORCHESTRATOR (new multi-agent system — see BERGAGENTS_PLAN.md)
+  //# ---------------------------------------------------------------------------
+
+  // Orchestrator as host (framework-agnostic core)
+  "orchestrator": {
+    "enable_learning": true,
+    "enable_hitl": true
+  },
+  // Model routing: small models for small tasks, large for complex
+  "model_routing": {
+    "tiers": {
+      "small": {
+        "models": [
+          "rafw007/qwen35-claude-coder:9b"
+        ],
+        "max_tokens": 40000
+      },
+      "medium": {
+        "models": [
+          "abdulroqib/qwen3.6-27b-q3-128k:latest"
+        ],
+        "max_tokens": 60000
+      },
+      "large": {
+        "models": [
+          "gpt-oss:120b-cloud"
+        ],
+        "max_tokens": 124000
+      }
+    },
+    "complexity_rules": {
+      "trivial": {
+        "patterns": [
+          "read_file",
+          "list_files",
+          "search"
+        ],
+        "tier": "small"
+      },
+      "standard": {
+        "patterns": [
+          "edit_file",
+          "new_file",
+          "test"
+        ],
+        "tier": "small"
+      },
+      "complex": {
+        "patterns": [
+          "refactor",
+          "architecture",
+          "multi_file"
+        ],
+        "tier": "large"
+      },
+      "critical": {
+        "patterns": [
+          "delete",
+          "security",
+          "production"
+        ],
+        "tier": "large",
+        "human_review": true
+      }
+    }
+  },
+  // HITL rules: Guardian decides when to ask human
+  "hitl_rules": {
+    "auto_execute": [
+      "read_file",
+      "list_files",
+      "search_code"
+    ],
+    "notify_after": [
+      "edit_file",
+      "new_file",
+      "generate_test"
+    ],
+    "ask_before": [
+      "delete_file",
+      "execute_command",
+      "refactor"
+    ],
+    "human_leads": [
+      "security_change",
+      "production_deploy",
+      "data_migration"
+    ]
+  },
+  // Plugins: optional .opencode paths (BergAgents works without them)
+  "plugins": [
+    ".opencode"
+  ],
+  // Agent overrides (optional)
+  "agents": {
+    "guardian": {
+      "preferred_model_tier": "medium"
+    },
+    "planner": {
+      "preferred_model_tier": "medium"
+    },
+    "implementation": {
+      "preferred_model_tier": "small"
+    },
+    "curator": {
+      "preferred_model_tier": "small"
+    },
+    "learning": {
+      "preferred_model_tier": "medium"
+    }
+  }
+}

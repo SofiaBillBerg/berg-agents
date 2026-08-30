@@ -1,0 +1,268 @@
+---
+title: "Usage Examples"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+# Usage Examples
+
+This page shows how to use BergAgents from the CLI, Python API, and web UI.
+
+## CLI Commands
+
+### Interactive Chat (TUI)
+
+Start an interactive chat session:
+
+```bash
+berg_agents chat
+```
+
+The TUI supports **slash commands** (type `/` to see the picker):
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Show all slash commands |
+| `/agents` | List registered subagents (Guardian, Planner, …) |
+| `/models` | Show available models |
+| `/stats` | Learning/outcome statistics |
+| `/tools` | List available tools |
+| `/health` | System health check |
+| `/history` | Conversation history |
+| `/memory`, `/context` | Memory and current context |
+| `/settings` | Current settings |
+| `/plugins`, `/skills`, `/mcps` | Plugins, skills, MCP status |
+| `/orchestrate <task>` | Run task through the orchestrator |
+| `/task <task>` | Alias for `/orchestrate` |
+| `/clear` | Clear history |
+| `/exit`, `/quit`, `/q` | End session |
+
+Or just type natural language — it goes to the agent. Use `--verbose` / `-v` for streaming "thinking" output:
+
+```bash
+berg_agents chat --verbose
+```
+
+### Serve (Console or Web)
+
+Start the provider selected by the config and serve prompts:
+
+```bash
+berg_agents serve
+```
+
+Start the web UI instead:
+
+```bash
+berg_agents serve --web --web-port 8001
+```
+
+### Create a File
+
+Create a new file with supplied content:
+
+```bash
+berg_agents create ./my_web_app/src/my_web_app/app.py \
+  --content "from flask import Flask\n\napp = Flask(__name__)\n\n@app.route('/')\ndef hello_world():\n    return 'Hello, from Berg Agents!'\n\nif __name__ == '__main__':\n    app.run(debug=True)"
+```
+
+Use `--overwrite` to replace an existing file:
+
+```bash
+berg_agents create output.txt --content "New content" --overwrite
+```
+
+### Append to a File
+
+Append text to an existing file:
+
+```bash
+berg_agents append ./src/utils.py --content "\n\ndef new_function(): ..."
+```
+
+### Export Conversation
+
+Export a thread's conversation as markdown:
+
+```bash
+berg_agents export <thread_id>
+```
+
+## Python API
+
+### BergAgentsApp (Recommended — Multi-Agent)
+
+```python
+from berg_agents import BergAgentsApp
+
+# 1. Create the app (reads config/bergagents.jsonc automatically)
+app = BergAgentsApp.create()
+app = BergAgentsApp.create(config={"plugins": [".opencode"]})
+
+# 2. Execute through the orchestrator (routes to the right subagent)
+result = app.execute("refactor the auth module", "refactor")
+# → {"status": "completed", "complexity": "complex", "model_tier": "large", "plan": [...]}
+
+# 3. Inspect agents and learning
+app.list_agents()        # -> [{name: "guardian", ...}, {name: "planner", ...}]
+app.get_learning_stats() # -> {total: 12, by_model: {...}, by_task_type: {...}}
+
+# 4. Register a custom agent
+from berg_agents.core import AbstractAgent
+app.register_agent("my_agent", MyAgent())
+```
+
+### Low-Level (LangGraph/DeepAgents Direct)
+
+```python
+from berg_agents.agents.codeagent import build_agent, create_default_tools
+from berg_agents.main import create_llm, load_config
+from langchain_core.messages import HumanMessage
+
+# 1. Load config and initialize LLM
+config = load_config()
+llm = create_llm(config)
+
+# 2. Prepare agent with tools
+tools = create_default_tools(root_dir=".", llm=llm)
+agent = build_agent(llm=llm, tools=tools)
+
+# 3. Invoke the agent
+response = agent.invoke({
+    "messages": [HumanMessage(content="Add a Python function to 'my_module.py' that takes two numbers and returns their sum.")]
+})
+```
+
+> `BergAgentsApp` is the framework-agnostic host. `build_agent` is the optional LangGraph adapter.
+> Core (`berg_agents/core/`) has zero LangChain imports.
+
+### Stream Responses
+
+```python
+for event in agent.stream({"messages": [HumanMessage(content="Hello")]}):
+    print(event)
+```
+
+### Available Tools
+
+`create_default_tools` returns these custom tools:
+
+| Tool             | Purpose                                                                                   |
+|------------------|-------------------------------------------------------------------------------------------|
+| `read_file`      | Read file contents (built-in wins if using DeepAgents)                                    |
+| `edit_file`      | Edit existing files — replace, append, or patch modes (built-in wins if using DeepAgents) |
+| `new-file`       | Create a new file with specified content                                                  |
+| `search-explain` | Search the codebase for a term or regex, then summarize matches                           |
+| `generate-test`  | Generate a basic pytest test file for a Python module                                     |
+| `format-code`    | Format Python or R source files                                                           |
+| `py_to_ipynb`    | Convert Python scripts to Jupyter notebooks                                               |
+| `general-chat`   | Fallback for non-filesystem questions                                                     |
+| `r-script`       | Execute R code                                                                            |
+
+When using the DeepAgents harness (the default), the following built-in filesystem tools are also available:
+
+| Tool         | Purpose                                    |
+|--------------|--------------------------------------------|
+| `ls`         | List files in a directory                  |
+| `write_file` | Create or overwrite a file                 |
+| `glob`       | Find files matching patterns               |
+| `grep`       | Search file contents                       |
+| `delete`     | Delete files or directories                |
+| `execute`    | Run shell commands (sandbox backends only) |
+| `task`       | Delegate to a subagent                     |
+
+## Web UI
+
+The web UI is a React single-page app served by FastAPI. Start it with:
+
+```bash
+berg_agents serve --web --web-port 8001
+```
+
+Toggle **Chat** ↔ **Orchestrate** mode in the header. In Orchestrate mode, type `/` to open the slash-command picker (same 17 commands as the TUI). Agent, subtask, and learning panels appear automatically.
+
+### API Endpoints
+
+| Method | Path                | Purpose                             |
+|--------|---------------------|-------------------------------------|
+| `GET`  | `/`                 | Web UI (React SPA)                  |
+| `GET`  | `/api/agents`       | List orchestrator subagents         |
+| `GET`  | `/api/agents/{name}`| Get single agent info              |
+| `POST` | `/api/orchestrate`  | Execute task (sync)                 |
+| `POST` | `/api/orchestrate/{id}/stream` | Submit + stream task        |
+| `GET`  | `/api/orchestrate/{id}/events` | SSE event stream (orchestrator) |
+| `POST` | `/api/orchestrate/{id}/respond` | Respond to HITL interrupt     |
+| `GET`  | `/api/learning-stats` | Learning/outcome statistics       |
+| `GET`  | `/models`           | List available models               |
+| `POST` | `/threads/{id}/commands` | Get available commands          |
+| `GET`  | `/threads/{id}/stream/events` | SSE event stream (LangGraph)  |
+| `POST` | `/threads/{id}/resume` | Resume a paused HITL interrupt    |
+| `GET`  | `/threads/{id}/history` | Get message history for a thread |
+| `POST` | `/threads/{id}/export` | Export thread as markdown        |
+
+> **Thread IDs:** Root threads are short (`f`), sub-agent/checkpoint namespaces are dotted (`f.ff33…3967.930f…`). Export
+> display truncates to the root (`f`) but storage uses the full dotted ID. HITL decisions resume as
+> `{"decisions": [{"type": "approve"}]}` (or `reject`/`edit`) via `Command(resume=…)`.
+
+### SSE Events
+
+The `/threads/{id}/stream/events` endpoint emits these event types:
+
+- `lifecycle` — run started/completed
+- `messages` — message start/finish
+- `values` — state snapshots after each agent step
+- `input` — HITL pause (input-requested)
+
+## MCP Integration
+
+MCP (Model Context Protocol) servers extend the agent with external tools. Configure them in `.mcp.json`:
+
+```json
+[
+  {
+    "type": "http",
+    "url": "https://docs.langchain.com/mcp",
+    "name": "docs-langchain"
+  },
+  {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-github"],
+    "name": "github",
+    "env": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}"
+    }
+  }
+]
+```
+
+MCP tools are prefixed with `mcp_<server>__<tool>` to avoid name collisions.
+
+## Human-in-the-Loop
+
+The agent pauses for approval before executing sensitive tools. In the CLI, you will see:
+
+```
+==================================================
+⚠️  Human approval required before tool execution
+Tool: edit_file
+Args:
+{
+  "file_path": "src/utils.py",
+  "content": "..."
+}
+==================================================
+Decide: [a]pprove  [r]eject  [e]dit  [m]essage
+```
+
+In the web UI, the HITL surface component shows the pending tool call with:
+- Tool name and arguments
+- Approve / Reject buttons
+- Edit mode (modify JSON args before approving)
+- Raw interrupt data (collapsible, for debugging)
+
+## See Also
+
+- [Configuration](CONFIGURATION.qmd) - Provider-centric config, `.env`, and env vars
+- [Tools](TOOLS.qmd) - Built-in filesystem and MCP tools
+- [Quick Start](QUICKSTART.qmd) - Installation and first run

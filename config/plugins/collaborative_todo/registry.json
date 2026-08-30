@@ -1,0 +1,13 @@
+
+{
+  "agents": [
+    {
+      "name": "collaborative_todo",
+      "description": "Manages shared todo lists across different sessions and agents.",
+      "capabilities": [
+        "manage_todo_list",
+        "status_tracking"
+      ]
+    }
+  ]
+}
