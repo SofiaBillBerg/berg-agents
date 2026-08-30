@@ -17,14 +17,20 @@ non-empty namespace and are forwarded unchanged so selector hooks such as
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-from datetime import date, datetime
 import json
+import uuid
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
-import uuid
 
-from langgraph.types import Command
+
+@dataclass
+class Command:
+    """Lightweight command container for resume and steering actions."""
+
+    resume: Any = None
 
 # --- SUBAGENT STATE TRACKING ---
 # Track subagents that have started to emit start/end events

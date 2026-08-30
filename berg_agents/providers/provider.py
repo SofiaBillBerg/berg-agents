@@ -12,9 +12,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from berg_agents.providers.base import ProviderBase
 from langchain.chat_models import init_chat_model
 from pydantic import SecretStr
+
+from berg_agents.providers.base import ProviderBase
+
 
 class ModelProvider(ProviderBase):
     """LLM provider.

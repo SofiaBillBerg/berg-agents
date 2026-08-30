@@ -27,8 +27,8 @@ from __future__ import (
 
 import asyncio  # : Event-loop detection for the async saver guard.
 import logging  # : Standard logging module for WARNING-level entries.
-from pathlib import Path  # : pathlib for filesystem path handling.
 import sqlite3  # : Standard sqlite3 for opening the checkpoint connection.
+from pathlib import Path  # : pathlib for filesystem path handling.
 
 #: Import the LangGraph checkpointer classes needed for persistence.
 #: SqliteSaver provides persistent storage in an SQLite database (sync API).

@@ -7,12 +7,13 @@ details, so altering any entry breaks every subsequent hash in the chain.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 import hashlib
 import json
+from datetime import datetime, UTC
 from pathlib import Path
 
 from pydantic import BaseModel
+
 
 class Receipt(BaseModel):
     """Immutable record of a single capability invocation.

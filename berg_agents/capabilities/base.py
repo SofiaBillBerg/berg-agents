@@ -14,6 +14,7 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
+
 class RiskClass:
     """Canonical risk levels for capabilities.
 

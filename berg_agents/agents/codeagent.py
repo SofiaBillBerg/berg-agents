@@ -47,30 +47,22 @@ backend/permissions, so they win), avoiding duplicate-tool errors.
 
 from __future__ import annotations
 
+import logging
 from builtins import ValueError
 from collections.abc import Iterable, Mapping, Sequence
-import logging
 from pathlib import Path
 from typing import Any, cast
 
-from berg_agents.config.settings import get_settings
-from berg_agents.profiles.router import (
-    DEFAULT_PROFILES_CONFIG,
-    register_profiles_from_config_file,
-    register_profiles_from_settings,
-)
-from deepagents import (
-    FilesystemPermission,
-    HarnessProfile,
-    create_deep_agent,
-    register_harness_profile,
-)
+from deepagents import (create_deep_agent, FilesystemPermission, HarnessProfile, register_harness_profile)
 from deepagents.backends import CompositeBackend, StateBackend
 from deepagents.backends.filesystem import FilesystemBackend
 from deepagents.middleware import SummarizationMiddleware
 from langchain.agents.middleware import TodoListMiddleware
 from langchain.agents.middleware.human_in_the_loop import InterruptOnConfig
-from langchain.agents.middleware.summarization import ContextSize, TriggerClause
+from langchain.agents.middleware.summarization import (
+    ContextSize,
+    TriggerClause,
+)
 from langchain.chat_models import BaseChatModel
 from langchain.messages import SystemMessage
 from langchain_core.runnables import Runnable
@@ -79,18 +71,18 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.base import BaseStore
 
+from berg_agents.config.settings import get_settings
+from berg_agents.profiles.router import (
+    DEFAULT_PROFILES_CONFIG,
+    register_profiles_from_config_file,
+    register_profiles_from_settings,
+)
+
 log = logging.getLogger(__name__)
 
-__all__ = [
-    "FS_BUILTIN_TOOLS",
-    "_resolve_workspace_paths",
-    "build_agent",
-    "build_berg_agents",
-    "create_default_tools",
-    "make_backend",
-    "make_default_permissions",
-    "register_harness_profile",
-]
+__all__ = ['FS_BUILTIN_TOOLS', '_resolve_workspace_paths', 'build_agent',
+ 'build_berg_agents', 'create_default_tools', 'make_backend',
+ 'make_default_permissions', 'register_harness_profile']
 
 #: Tools provided out of the box by ``create_deep_agent``.
 FS_BUILTIN_TOOLS: frozenset[str] = frozenset({

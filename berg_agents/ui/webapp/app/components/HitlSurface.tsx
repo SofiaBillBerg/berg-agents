@@ -1,4 +1,12 @@
-import { useEffect, useState, useMemo } from "react";
+import {
+  Key,
+  ReactElement,
+  ReactNode,
+  ReactPortal,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 /**
  * HitlSurface component — Human-in-the-loop approval card.
@@ -127,7 +135,24 @@ const TOOL_DESCRIPTIONS = {
 /**
  * Get tool description with fallback logic
  */
-function getToolInfo(name: string) {
+function getToolInfo(
+  name:
+    | string
+    | number
+    | bigint
+    | boolean
+    | React.ReactElement
+    | Iterable<React.ReactNode>
+    | Promise<
+        | string
+        | number
+        | bigint
+        | boolean
+        | React.ReactPortal
+        | React.ReactElement
+        | Iterable<React.ReactNode>
+      >,
+) {
   // Exact match
   if (TOOL_DESCRIPTIONS[name]) {
     return TOOL_DESCRIPTIONS[name];
@@ -366,175 +391,198 @@ function HitlSurface({
       </div>
 
       {/* Render every pending action (tool name + args). */}
-      {actions.map((action, idx) => {
-        const toolInfo = getToolInfo(action.name);
-        const isDangerous = toolInfo.dangerous;
-        const argsSummary = formatArgsSummary(action.args);
+      {actions.map(
+        (
+          action: {
+            name:
+              | string
+              | number
+              | bigint
+              | boolean
+              | ReactElement
+              | Iterable<ReactNode>
+              | Promise<
+                  | string
+                  | number
+                  | bigint
+                  | boolean
+                  | ReactPortal
+                  | ReactElement
+                  | Iterable<ReactNode>
+                >;
+            args: { [x: string]: any };
+          },
+          idx: Key,
+        ) => {
+          const toolInfo = getToolInfo(action.name);
+          const isDangerous = toolInfo.dangerous;
+          const argsSummary = formatArgsSummary(action.args);
 
-        return (
-          <div
-            key={idx}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.4rem",
-              padding: "0.75rem",
-              background: isDangerous
-                ? "rgba(215, 48, 39, 0.08)"
-                : "var(--berg-surface)",
-              border: `1px solid ${isDangerous ? "rgba(215, 48, 39, 0.3)" : "var(--berg-border)"}`,
-              borderRadius: "var(--berg-radius)",
-              borderLeft: `4px solid ${isDangerous ? "var(--berg-status-error)" : toolInfo.category === "File" ? "var(--berg-brand-purple)" : toolInfo.category === "Shell" ? "var(--berg-status-warn)" : toolInfo.category === "Web" ? "var(--berg-status-info)" : "var(--berg-status-success)"}`,
-            }}
-          >
+          return (
             <div
+              key={idx}
               style={{
                 display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                flexWrap: "wrap",
+                flexDirection: "column",
+                gap: "0.4rem",
+                padding: "0.75rem",
+                background: isDangerous
+                  ? "rgba(215, 48, 39, 0.08)"
+                  : "var(--berg-surface)",
+                border: `1px solid ${isDangerous ? "rgba(215, 48, 39, 0.3)" : "var(--berg-border)"}`,
+                borderRadius: "var(--berg-radius)",
+                borderLeft: `4px solid ${isDangerous ? "var(--berg-status-error)" : toolInfo.category === "File" ? "var(--berg-brand-purple)" : toolInfo.category === "Shell" ? "var(--berg-status-warn)" : toolInfo.category === "Web" ? "var(--berg-status-info)" : "var(--berg-status-success)"}`,
               }}
             >
-              <span style={{ fontSize: "1.2rem" }}>{toolInfo.icon}</span>
-              <span
+              <div
                 style={{
-                  fontWeight: "600",
-                  color: "var(--berg-brand-blue)",
-                  fontFamily: "var(--berg-font-mono)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  flexWrap: "wrap",
                 }}
               >
-                {action.name}
-              </span>
-              <span
-                style={{
-                  fontSize: "var(--berg-fs-xs)",
-                  fontWeight: "600",
-                  padding: "0.1rem 0.4rem",
-                  borderRadius: "var(--berg-radius-sm)",
-                  background:
-                    toolInfo.category === "File"
-                      ? "rgba(125, 2, 156, 0.12)"
-                      : toolInfo.category === "Shell"
-                        ? "rgba(253, 159, 7, 0.12)"
-                        : toolInfo.category === "Web"
-                          ? "rgba(59, 82, 139, 0.12)"
-                          : toolInfo.category === "Git"
-                            ? "rgba(33, 144, 140, 0.12)"
-                            : toolInfo.category === "Planning"
-                              ? "rgba(232, 65, 199, 0.12)"
-                              : toolInfo.category === "MCP"
-                                ? "rgba(134, 3, 166, 0.12)"
-                                : "var(--berg-border)",
-                  color:
-                    toolInfo.category === "File"
-                      ? "var(--berg-brand-purple)"
-                      : toolInfo.category === "Shell"
-                        ? "var(--berg-status-warn)"
-                        : toolInfo.category === "Web"
-                          ? "var(--berg-status-info)"
-                          : toolInfo.category === "Git"
-                            ? "var(--berg-status-success)"
-                            : toolInfo.category === "Planning"
-                              ? "var(--berg-accent-orchid)"
-                              : toolInfo.category === "MCP"
-                                ? "var(--berg-accent-magenta)"
-                                : "var(--berg-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {toolInfo.category}
-              </span>
-              {isDangerous && (
+                <span style={{ fontSize: "1.2rem" }}>{toolInfo.icon}</span>
+                <span
+                  style={{
+                    fontWeight: "600",
+                    color: "var(--berg-brand-blue)",
+                    fontFamily: "var(--berg-font-mono)",
+                  }}
+                >
+                  {action.name}
+                </span>
                 <span
                   style={{
                     fontSize: "var(--berg-fs-xs)",
                     fontWeight: "600",
                     padding: "0.1rem 0.4rem",
                     borderRadius: "var(--berg-radius-sm)",
-                    background: "rgba(215, 48, 39, 0.12)",
-                    color: "var(--berg-status-error)",
+                    background:
+                      toolInfo.category === "File"
+                        ? "rgba(125, 2, 156, 0.12)"
+                        : toolInfo.category === "Shell"
+                          ? "rgba(253, 159, 7, 0.12)"
+                          : toolInfo.category === "Web"
+                            ? "rgba(59, 82, 139, 0.12)"
+                            : toolInfo.category === "Git"
+                              ? "rgba(33, 144, 140, 0.12)"
+                              : toolInfo.category === "Planning"
+                                ? "rgba(232, 65, 199, 0.12)"
+                                : toolInfo.category === "MCP"
+                                  ? "rgba(134, 3, 166, 0.12)"
+                                  : "var(--berg-border)",
+                    color:
+                      toolInfo.category === "File"
+                        ? "var(--berg-brand-purple)"
+                        : toolInfo.category === "Shell"
+                          ? "var(--berg-status-warn)"
+                          : toolInfo.category === "Web"
+                            ? "var(--berg-status-info)"
+                            : toolInfo.category === "Git"
+                              ? "var(--berg-status-success)"
+                              : toolInfo.category === "Planning"
+                                ? "var(--berg-accent-orchid)"
+                                : toolInfo.category === "MCP"
+                                  ? "var(--berg-accent-magenta)"
+                                  : "var(--berg-muted)",
                     textTransform: "uppercase",
+                    letterSpacing: "0.05em",
                   }}
                 >
-                  ⚠️ Potentially destructive
+                  {toolInfo.category}
                 </span>
-              )}
-              {actions.length > 1 && showEdit && idx === 0 && (
-                <span
+                {isDangerous && (
+                  <span
+                    style={{
+                      fontSize: "var(--berg-fs-xs)",
+                      fontWeight: "600",
+                      padding: "0.1rem 0.4rem",
+                      borderRadius: "var(--berg-radius-sm)",
+                      background: "rgba(215, 48, 39, 0.12)",
+                      color: "var(--berg-status-error)",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    ⚠️ Potentially destructive
+                  </span>
+                )}
+                {actions.length > 1 && showEdit && idx === 0 && (
+                  <span
+                    style={{
+                      marginLeft: "0.5rem",
+                      fontSize: "var(--berg-fs-xs)",
+                      color: "var(--berg-muted)",
+                    }}
+                  >
+                    (editing applies to this action)
+                  </span>
+                )}
+              </div>
+              <div
+                style={{
+                  fontSize: "var(--berg-fs-sm)",
+                  color: "var(--berg-text)",
+                  lineHeight: 1.5,
+                }}
+              >
+                <span style={{ fontWeight: "500", color: "var(--berg-muted)" }}>
+                  What it does:{" "}
+                </span>
+                <span>{toolInfo.description}</span>
+              </div>
+              <div
+                style={{
+                  fontSize: "var(--berg-fs-sm)",
+                  color: "var(--berg-muted)",
+                }}
+              >
+                <span style={{ fontWeight: "500" }}>Arguments: </span>
+                <code
                   style={{
-                    marginLeft: "0.5rem",
+                    fontFamily: "var(--berg-font-mono)",
+                    fontSize: "var(--berg-fs-xs)",
+                    background: "var(--berg-code-bg)",
+                    padding: "0.1rem 0.3rem",
+                    borderRadius: "var(--berg-radius-sm)",
+                  }}
+                >
+                  {argsSummary}
+                </code>
+              </div>
+              <details style={{ marginTop: "0.25rem" }}>
+                <summary
+                  style={{
+                    cursor: "pointer",
                     fontSize: "var(--berg-fs-xs)",
                     color: "var(--berg-muted)",
+                    fontWeight: "500",
                   }}
                 >
-                  (editing applies to this action)
-                </span>
-              )}
+                  Show full JSON arguments
+                </summary>
+                <pre
+                  style={{
+                    margin: "0.5rem 0 0",
+                    padding: "0.75rem",
+                    background: "var(--berg-surface-tint)",
+                    border: "1px solid var(--berg-border)",
+                    borderRadius: "var(--berg-radius)",
+                    fontFamily: "var(--berg-font-mono)",
+                    fontSize: "var(--berg-fs-xs)",
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    maxHeight: "200px",
+                    overflowY: "auto",
+                  }}
+                >
+                  {JSON.stringify(action.args, null, 2)}
+                </pre>
+              </details>
             </div>
-            <div
-              style={{
-                fontSize: "var(--berg-fs-sm)",
-                color: "var(--berg-text)",
-                lineHeight: 1.5,
-              }}
-            >
-              <span style={{ fontWeight: "500", color: "var(--berg-muted)" }}>
-                What it does:{" "}
-              </span>
-              <span>{toolInfo.description}</span>
-            </div>
-            <div
-              style={{
-                fontSize: "var(--berg-fs-sm)",
-                color: "var(--berg-muted)",
-              }}
-            >
-              <span style={{ fontWeight: "500" }}>Arguments: </span>
-              <code
-                style={{
-                  fontFamily: "var(--berg-font-mono)",
-                  fontSize: "var(--berg-fs-xs)",
-                  background: "var(--berg-code-bg)",
-                  padding: "0.1rem 0.3rem",
-                  borderRadius: "var(--berg-radius-sm)",
-                }}
-              >
-                {argsSummary}
-              </code>
-            </div>
-            <details style={{ marginTop: "0.25rem" }}>
-              <summary
-                style={{
-                  cursor: "pointer",
-                  fontSize: "var(--berg-fs-xs)",
-                  color: "var(--berg-muted)",
-                  fontWeight: "500",
-                }}
-              >
-                Show full JSON arguments
-              </summary>
-              <pre
-                style={{
-                  margin: "0.5rem 0 0",
-                  padding: "0.75rem",
-                  background: "var(--berg-surface-tint)",
-                  border: "1px solid var(--berg-border)",
-                  borderRadius: "var(--berg-radius)",
-                  fontFamily: "var(--berg-font-mono)",
-                  fontSize: "var(--berg-fs-xs)",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  maxHeight: "200px",
-                  overflowY: "auto",
-                }}
-              >
-                {JSON.stringify(action.args, null, 2)}
-              </pre>
-            </details>
-          </div>
-        );
-      })}
+          );
+        },
+      )}
 
       {/* Fallback when the payload carried no parseable actions — show last tool call as context. */}
       {actions.length === 0 &&
@@ -559,7 +607,9 @@ function HitlSurface({
               )
             : [];
           const lastSubagentTool = subagentList.length
-            ? subagentList.flatMap((s) => s.toolCalls || []).slice(-1)[0]
+            ? (subagentList as any[])
+                .flatMap((s: any) => s.toolCalls || [])
+                .slice(-1)[0]
             : null;
           const relevantTool = lastTool || lastSubagentTool;
           return (

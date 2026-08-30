@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
+
+from langchain.messages import AIMessage, HumanMessage
 
 from berg_agents.agents.codeagent import build_agent, create_default_tools
 from berg_agents.main import create_llm, load_config
-from langchain.messages import AIMessage, HumanMessage
 
 THREAD_ID = "ci-run"
 

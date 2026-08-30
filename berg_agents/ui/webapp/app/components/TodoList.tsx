@@ -1,113 +1,74 @@
 import React, { useState } from "react";
 
+export interface TodoItem {
+  status?: "pending" | "in_progress" | "completed" | string;
+  content?: string;
+  description?: string;
+  title?: string;
+}
+
+export interface TodoListProps {
+  todos?: TodoItem[];
+  onTodoUpdate?: (todo: TodoItem) => void;
+}
+
+const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  pending: { bg: "#e3f2fd", color: "#1565c0" },
+  in_progress: { bg: "#fff3e0", color: "#e65100" },
+  completed: { bg: "#e8f5e9", color: "#2e7d32" },
+};
+
 /**
- * TodoList component
- * Renders todos SSE events with status badges (pending/in_progress/completed)
- * Collapsible panel
+ * TodoList component.
+ * Renders task planning todo items with collapsible visibility and status badges.
+ *
+ * @param props - Component properties
+ * @returns JSX element rendering the todo list section
  */
-function TodoList({ todos, onTodoUpdate }) {
+export function TodoList({ todos = [], onTodoUpdate }: TodoListProps) {
   const [expanded, setExpanded] = useState(true);
 
-  // Status badge colors
-  const statusColors = {
-    pending: { bg: "#e3f2fd", color: "#1565c0" },
-    in_progress: { bg: "#fff3e0", color: "#e65100" },
-    completed: { bg: "#e8f5e9", color: "#2e7d32" },
-  };
-
-  const getStatusStyle = (status: string | number) => {
-    return statusColors[status] || statusColors.pending;
-  };
-
   return (
-    <div
-      style={{
-        marginTop: "0.75rem",
-        border: "1px solid #e0e0e0",
-        borderRadius: "6px",
-        overflow: "hidden",
-      }}
-    >
+    <div className="todo-list-container my-3 border border-border rounded-lg overflow-hidden bg-surface">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
-        style={{
-          width: "100%",
-          padding: "0.5rem 0.75rem",
-          background: "transparent",
-          border: "none",
-          textAlign: "left",
-          cursor: "pointer",
-          fontSize: "0.85rem",
-          fontFamily: "inherit",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
+        className="w-full px-3 py-2 bg-transparent border-none text-left cursor-pointer text-xs font-semibold flex justify-between items-center text-text"
       >
-        <span style={{ fontWeight: "500", color: "#333" }}>
-          Todo List ({todos?.length || 0})
-        </span>
-        <span style={{ color: "#666" }}>{expanded ? "▼" : "▶"}</span>
+        <span>Todo List ({todos?.length || 0})</span>
+        <span className="text-muted">{expanded ? "▼" : "▶"}</span>
       </button>
+
       {expanded && (
-        <div style={{ padding: "0.5rem" }}>
+        <div className="p-2 flex flex-col gap-1.5">
           {todos && todos.length > 0 ? (
-            todos.map(
-              (
-                todo: {
-                  status: any;
-                  content: any;
-                  description: any;
-                  title: any;
-                },
-                idx: React.Key | null | undefined,
-              ) => {
-                const style = getStatusStyle(todo.status);
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      padding: "0.5rem",
-                      marginBottom: "0.25rem",
-                      background: style.bg,
-                      border: "1px solid #e0e0e0",
-                      borderRadius: "4px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
+            todos.map((todo, idx) => {
+              const status = todo.status || "pending";
+              const style = STATUS_COLORS[status] || STATUS_COLORS.pending;
+              const text =
+                todo.content ||
+                todo.description ||
+                todo.title ||
+                `Task ${idx + 1}`;
+
+              return (
+                <div
+                  key={`todo-${idx}`}
+                  style={{ backgroundColor: style.bg }}
+                  className="p-2 rounded border border-border flex justify-between items-center text-xs text-text"
+                >
+                  <span className="font-medium truncate mr-2">{text}</span>
+                  <span
+                    style={{ backgroundColor: style.color }}
+                    className="text-white text-xs px-2 py-0.5 rounded font-semibold whitespace-nowrap"
                   >
-                    <span style={{ fontSize: "0.85rem", color: "#333" }}>
-                      {/* DeepAgents write_todos items use `content` (not
-                        description/title) - without this check every task
-                        rendered as a generic "Task N" placeholder. */}
-                      {todo.content ||
-                        todo.description ||
-                        todo.title ||
-                        `Task ${idx + 1}`}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "0.75rem",
-                        padding: "0.2rem 0.5rem",
-                        borderRadius: "4px",
-                        background: style.color,
-                        color: "#fff",
-                        fontWeight: "500",
-                      }}
-                    >
-                      {todo.status || "pending"}
-                    </span>
-                  </div>
-                );
-              },
-            )
+                    {status}
+                  </span>
+                </div>
+              );
+            })
           ) : (
-            <div
-              style={{ fontSize: "0.8rem", color: "#999", padding: "0.5rem" }}
-            >
-              No todos yet
-            </div>
+            <div className="text-xs text-muted p-2">No todos yet</div>
           )}
         </div>
       )}

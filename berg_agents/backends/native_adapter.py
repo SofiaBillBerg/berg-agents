@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
 import urllib.error
 import urllib.request
+from typing import Any
 
 from berg_agents.core.interface import AbstractAgent, AgentResult, TaskContext
 

@@ -46,3 +46,10 @@ docs/docs_web/
 .coverage
 **/.hypothesis/
 
+
+/.quarto/
+**/*.quarto_ipynb
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json

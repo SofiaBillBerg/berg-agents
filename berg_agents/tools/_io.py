@@ -30,7 +30,7 @@ except Exception as e:  # pragma: no cover - handled at runtime
     # noinspection PyGlobalVariableRedeclarationInNotebook
     nbformat = None
 
-__all__ = ["FileObject", "_atomic_write", "create_from_template"]
+__all__ = ['FileObject', '_atomic_write', 'create_from_template']
 
 
 @dataclass

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
 REVIEW_PATH = Path(".ci/llm_review.txt")
 

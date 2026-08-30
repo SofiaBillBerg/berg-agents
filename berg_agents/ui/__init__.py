@@ -15,11 +15,5 @@ from .cli_ui import (
     run_cli_ui,
 )
 
-__all__ = [
-    "render_catalog",
-    "render_progress",
-    "render_receipt",
-    "render_request",
-    "render_response",
-    "run_cli_ui",
-]
+__all__ = ['render_catalog', 'render_progress', 'render_receipt', 'render_request',
+ 'render_response', 'run_cli_ui']

@@ -6,8 +6,8 @@ determines dependencies, and suggests optimal execution order.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
 from typing import Any
 
 from berg_agents.core.interface import (

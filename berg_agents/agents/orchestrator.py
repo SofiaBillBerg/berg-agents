@@ -9,4 +9,5 @@ plugin directories.
 from berg_agents.core.bookkeeper import Bookkeeper
 from berg_agents.core.orchestrator import Orchestrator
 
-__all__ = ["Bookkeeper", "Orchestrator"]
+
+__all__ = ['Bookkeeper', 'Orchestrator']

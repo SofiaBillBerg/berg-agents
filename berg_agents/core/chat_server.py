@@ -27,6 +27,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
 from typing import Any, Protocol, runtime_checkable
 
+
 # ---------------------------------------------------------------------------
 # Event types (wire-shape, SSE-compatible)
 # ---------------------------------------------------------------------------
@@ -376,11 +377,5 @@ class ChatServerBase(ABC):
     ) -> dict[str, Any]: ...
 
 
-__all__ = [
-    "ChatServer",
-    "ChatServerBase",
-    "ModelInfo",
-    "ProtocolEvent",
-    "ProviderConfig",
-    "ThreadInfo",
-]
+__all__ = ['ChatServer', 'ChatServerBase', 'ModelInfo', 'ProtocolEvent',
+ 'ProviderConfig', 'ThreadInfo']

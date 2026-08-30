@@ -173,8 +173,9 @@ class BergAgentsApp:
             host: Host to bind to.
             port: Port to listen on.
         """
-        from berg_agents.ui.web import app as fastapi_app
         import uvicorn
+
+        from berg_agents.ui.web import app as fastapi_app
 
         logger.info("Starting BergAgents server on %s:%d", host, port)
         uvicorn.run(fastapi_app, host=host, port=port)

@@ -11,8 +11,15 @@ registry, keeping the suite hermetic and fast.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
 import io
+
+from collections.abc import Callable, Iterator
+
+import pytest
+
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
+from rich.console import Console
 
 from berg_agents.capabilities.audit import Receipt
 from berg_agents.capabilities.base import CapabilityBase, RiskClass
@@ -23,10 +30,7 @@ from berg_agents.capabilities.envelope import (
 from berg_agents.capabilities.registry import CapabilityRegistry
 from berg_agents.ui import cli_ui
 from berg_agents.ui.web import app
-from fastapi.testclient import TestClient
-from pydantic import BaseModel
-import pytest
-from rich.console import Console
+
 
 # ---------------------------------------------------------------------------
 # Dummy capabilities (no network required)
@@ -446,8 +450,9 @@ def test_web_capabilities_proxied_through_vite_target(
         raising=True,
     )
 
-    from berg_agents.ui.web import app as web_app
     from fastapi.testclient import TestClient
+
+    from berg_agents.ui.web import app as web_app
 
     proxy_client = TestClient(web_app, base_url="http://localhost:5173")
     response = proxy_client.get("/capabilities")

@@ -12,6 +12,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Protocol, runtime_checkable
 
+
 @runtime_checkable
 class LLMProvider(Protocol):
     """Structural contract every LLM provider must satisfy.

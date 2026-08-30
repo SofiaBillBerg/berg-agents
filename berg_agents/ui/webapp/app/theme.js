@@ -1,9 +1,8 @@
-// Bridge so Vite picks up the canonical Berg Agents theme as a real CSS asset.
-// Importing via @import url(...) inside styles.css does NOT survive bundling —
-// Vite inlines the surrounding CSS but silently drops the relative @import.
-// Importing from JS works reliably and is the recommended Vite pattern.
+/**
+ * Theme imports aggregator for the Next.js web application.
+ * Loads canonical Berg Agents design tokens, HeroUI theme custom styles, and app styles.
+ */
 
-import "../../theme/theme.css";
+import "./theme.css";
 import "./globals.css";
 import "./styles.css";
-

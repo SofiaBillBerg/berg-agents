@@ -37,7 +37,7 @@ uv pip install -e .
 ```bash
 # Build the web UI
 cd berg_agents/ui/webapp
-npm run build
+next build
 ```
 
 ### Dependencies

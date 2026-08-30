@@ -28,21 +28,22 @@ reads the same values from the ``model_dump()`` dict using the ``ollama_*`` /
 
 from __future__ import annotations
 
-from functools import lru_cache
 import json
 import logging
 import os
-from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Any, get_args, get_origin
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, get_args, get_origin, TYPE_CHECKING
 
-from berg_agents.config.jsonc import loads as jsonc_loads
 from dotenv import dotenv_values
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import PydanticBaseSettingsSource
 from pydantic_settings.sources.providers.json import JsonConfigSettingsSource
 from pydantic_settings.sources.providers.yaml import YamlConfigSettingsSource
+
+from berg_agents.config.jsonc import loads as jsonc_loads
 
 #: Matches ``${env:VAR}`` or ``${VAR}`` placeholders for env substitution.
 _ENV_PLACEHOLDER_RE = re.compile(r"\$\{(?:env:)?([A-Za-z_][A-Za-z0-9_]*)}")

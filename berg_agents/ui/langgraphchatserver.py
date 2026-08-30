@@ -24,28 +24,28 @@ The full migration is in progress. Below text is should be removed as soon as ap
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
 import datetime
 import logging
+import uuid
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
-import uuid
 
-from berg_agents.agents.codeagent import build_agent, create_default_tools
-from berg_agents.capabilities.envelope import InvocationRequest
-from berg_agents.capabilities.registry import CapabilityRegistry
-from berg_agents.config.settings import get_settings
-from berg_agents.main import create_llm, load_config
-from berg_agents.providers.registry import build_llm, resolve_model
-from berg_agents.providers.registry import list_models as registry_list_models
-from berg_agents.ui.protocol import translate_resume, translate_stream
-from berg_agents.utils.checkpointer import build_checkpointer
 from langchain.chat_models import BaseChatModel
 from langchain.messages import HumanMessage
 from langchain.tools import BaseTool
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+from berg_agents.agents.codeagent import build_agent, create_default_tools
+from berg_agents.capabilities.envelope import InvocationRequest
+from berg_agents.capabilities.registry import CapabilityRegistry
+from berg_agents.config.settings import get_settings
+from berg_agents.main import create_llm, load_config
+from berg_agents.providers.registry import build_llm, list_models as registry_list_models, resolve_model
+from berg_agents.ui.protocol import translate_resume, translate_stream
+from berg_agents.utils.checkpointer import build_checkpointer
 
 logger = logging.getLogger(__name__)
 
@@ -1187,9 +1187,8 @@ class LangGraphChatServer:  # ruff: ignore[too-many-public-methods]
 _server: LangGraphChatServer | None = None
 
 
-def get_server() -> LangGraphChatServer:
-    """Return the singleton LangGraphChatServer instance."""
-    global _server  # ruff: ignore[global-statement]
-    if _server is None:
-        _server = LangGraphChatServer()
-    return _server
+def get_server() -> Any:
+    """Return the singleton ChatServer instance (delegating to chat_server)."""
+    from berg_agents.ui.chat_server import get_server as _get_chat_server
+
+    return _get_chat_server()

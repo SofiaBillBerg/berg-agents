@@ -7,5 +7,6 @@ When run as `python -m berg_agents`, it starts the Typer CLI defined in
 
 from berg_agents.cli import main
 
+
 if __name__ == "__main__":
     main()

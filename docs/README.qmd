@@ -68,8 +68,8 @@ See [docs/CONFIGURATION.qmd](../docs/CONFIGURATION.qmd) for the full reference.
 python -m berg_agents serve --web --web-port 8001
 # → Open http://127.0.0.1:8001
 
-# Development (Vite dev server with proxy + hot reload):
-npm run dev
+# Development (next dev server with proxy + hot reload):
+next dev
 # → Open http://localhost:5173 — proxies API to 8001
 ```
 

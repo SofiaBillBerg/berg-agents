@@ -23,15 +23,7 @@ from berg_agents.core import (
     TaskContext,
 )
 
-__all__ = [
-    "AbstractAgent",
-    "AgentResult",
-    "BergAgentsApp",
-    "LearningGate",
-    "ModelRouter",
-    "Orchestrator",
-    "RiskLevel",
-    "TaskComplexity",
-    "TaskContext",
-    "get_app",
-]
+
+__all__ = ['AbstractAgent', 'AgentResult', 'BergAgentsApp', 'LearningGate',
+ 'ModelRouter', 'Orchestrator', 'RiskLevel', 'TaskComplexity', 'TaskContext',
+ 'get_app']

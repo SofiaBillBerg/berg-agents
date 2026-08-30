@@ -18,6 +18,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+
 def strip_comments(text: str) -> str:
     """Remove ``//`` line comments and ``/* ... */`` block comments.
 

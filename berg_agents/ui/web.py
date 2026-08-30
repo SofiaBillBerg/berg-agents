@@ -1,52 +1,56 @@
-"""FastAPI web UI for the capability layer.
+"""FastAPI web UI for the Berg Agents capability and chat layer.
 
-NOTE, langgraphchatserver.py is to be deprecated, bergagents server is independent of langchain.
-A full migration is in progress. Below text is should be removed as soon as approprite:
+This module is a thin HTTP router over the core business logic that lives
+in :mod:`berg_agents.ui.chat_server` (:class:`ChatServer` singleton) and
+:mod:`berg_agents.ui.orchestrator_routes`. Every route handler delegates to
+the server instance:
 
-    This module is a **thin HTTP adapter** over the business logic that now lives
-    entirely in :mod:`berg_agents.ui.langgraphchatserver` (the
-    :class:`LangGraphChatServer` singleton).  Every route handler acquires the
-    server via ``get_server()`` and delegates to a server method; the handler is
-    responsible only for HTTP concerns:
+* Unpacking Pydantic request bodies
+* Wrapping server-returned dicts into response models
+* Framing streaming generators with SSE (``data:`` prefix) via ``_sse``
+* Translating server-side errors into ``HTTPException`` status codes
 
-    * Unpacking Pydantic request bodies
-    * Wrapping server-returned dicts into response models
-    * Framing streaming generators with SSE (``data:`` prefix) via ``_sse``
-    * Translating server-side errors into ``HTTPException`` status codes
-
-    All mutable state, agent lifecycle, HITL event handling, audit logging, and
-    protocol-v2 event queues live in ``LangGraphChatServer`` - this file has
-    **zero module-level state** beyond the ``app`` object and the static mount.
-
-Security notes:
-
-* Every invocation is validated by the capability's own ``input_model``;
-  invalid params are rejected with HTTP 400 before any tool runs.
-* Requests, params and results are never logged, so secrets and API keys
-  cannot leak through the web server.
-* When ``BERG_AGENT_AUTH_TOKEN`` is set, every request must include a matching
-  ``X-CodeAgent-Auth-Token`` header. Without it, the server returns HTTP 401.
+All mutable state, thread lifecycle, HITL event handling, and event queues
+live in ``ChatServer``.
 """
 
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Any, Literal
-import uuid
+from typing import Any
 
-from berg_agents.capabilities.envelope import InvokeBody
-from berg_agents.config.settings import get_settings
-from berg_agents.ui.langgraphchatserver import get_server
-from berg_agents.ui.protocol import _sse
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
-from berg_agents.ui.requests import AuthMiddleware, RequestLoggingMiddleware, ProviderListResponse, ProviderConfig, ActiveProviderResponse, ActiveProviderRequest, ResumeRequest, ChatRequest, ChatResponse, CancelRequest, HistoryResponse, AuditRequest, AuditResponse, AuditListResponse, SwitchModelRequest, ProtocolStreamRequest, ProtocolCommand, ThreadCreatePayload
+from berg_agents.capabilities.envelope import InvokeBody
+from berg_agents.config.settings import get_settings
+from berg_agents.ui.chat_server import get_server
+from berg_agents.ui.protocol import _sse
+from berg_agents.ui.requests import (
+    ActiveProviderRequest,
+    ActiveProviderResponse,
+    AuditListResponse,
+    AuditRequest,
+    AuditResponse,
+    AuthMiddleware,
+    CancelRequest,
+    ChatRequest,
+    ChatResponse,
+    HistoryResponse,
+    ProtocolCommand,
+    ProtocolStreamRequest,
+    ProviderConfig,
+    ProviderListResponse,
+    RequestLoggingMiddleware,
+    ResumeRequest,
+    SwitchModelRequest,
+    ThreadCreatePayload,
+)
 
 #: Module logger - used for protocol stream error reporting.
 logger = __import__("logging").getLogger(__name__)
@@ -75,6 +79,12 @@ if get_settings().auth_token is not None:
 app.add_middleware(  # type: ignore[arg-type]
     CORSMiddleware,
     allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:8001",
+        "http://127.0.0.1:8001",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:4173",
@@ -86,6 +96,12 @@ app.add_middleware(  # type: ignore[arg-type]
 )
 
 app.add_middleware(RequestLoggingMiddleware)
+
+# Include the orchestrator router before the SPA mount so `/api/*` routes are
+# resolved instead of falling through to the static webapp handler.
+from berg_agents.ui.orchestrator_routes import router as _orch_router
+
+app.include_router(_orch_router)
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +123,21 @@ async def get_active_provider() -> ActiveProviderResponse:
     server = get_server()
     raw = server.get_active_provider()
     return ActiveProviderResponse(**raw)
+
+
+@app.get("/api/providers")
+async def api_list_providers() -> ProviderListResponse:
+    return await list_providers()
+
+
+@app.get("/api/providers/active")
+async def api_get_active_provider() -> ActiveProviderResponse:
+    return await get_active_provider()
+
+
+@app.post("/api/providers/active")
+async def api_set_active_provider(request: ActiveProviderRequest) -> dict[str, str]:
+    return await set_active_provider(request)
 
 
 @app.post("/providers/active")
@@ -145,7 +176,7 @@ async def chat_resume(request: ResumeRequest) -> dict[str, str]:
 async def chat(request: ChatRequest) -> ChatResponse:
     """Send a chat message to the agent and return the response (legacy)."""
     server = get_server()
-    result = server.chat(request.message, request.thread_id)
+    result = await server.chat(request.message, request.thread_id)
     return ChatResponse(**result)
 
 
@@ -398,6 +429,11 @@ def list_models_endpoint() -> dict[str, Any]:
     return {"models": server.list_models()}
 
 
+@app.get("/api/models")
+def api_list_models_endpoint() -> dict[str, Any]:
+    return list_models_endpoint()
+
+
 @app.get("/threads/{thread_id}/export")
 async def export_thread(thread_id: str, format: str = "md") -> Any:
     """Export a thread's conversation as a downloadable file."""
@@ -487,11 +523,3 @@ if _DIST_DIR.is_dir():
         name="webapp",
     )
 
-    # Include orchestrator routes (new multi-agent system)
-    # Deferred import to avoid circular imports at module level
-    from berg_agents.ui.orchestrator_routes import router as _orch_router
-
-    # include_router doesn't work in this context due to import ordering,
-    # so we append routes directly
-    for _route in _orch_router.routes:
-        app.routes.append(_route)

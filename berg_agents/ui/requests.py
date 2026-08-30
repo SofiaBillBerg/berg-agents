@@ -33,8 +33,10 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Literal
-from berg_agents.config.settings import get_settings
+
 from pydantic import BaseModel
+
+from berg_agents.config.settings import get_settings
 
 #: Module logger - used for protocol stream error reporting.
 logger = __import__("logging").getLogger(__name__)

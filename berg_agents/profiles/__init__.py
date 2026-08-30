@@ -13,9 +13,5 @@ from berg_agents.profiles.router import (
     register_profiles_from_settings,
 )
 
-__all__ = [
-    "DEFAULT_PROFILES_CONFIG",
-    "load_profiles_from_config_file",
-    "register_profiles_from_config_file",
-    "register_profiles_from_settings",
-]
+__all__ = ['DEFAULT_PROFILES_CONFIG', 'load_profiles_from_config_file',
+ 'register_profiles_from_config_file', 'register_profiles_from_settings']

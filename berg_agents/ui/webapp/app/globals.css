@@ -4,8 +4,9 @@
  * Only includes variables users need to customize
  * @see https://heroui.com/docs/react/getting-started/theming
  */
-@import "../node_modules/tailwindcss/dist/lib.d.mts";
-@import "styles.css";
+@import "tailwindcss";
+@import "./styles.css";
+@import "./theme.css";
 :root,
 .light,
 .default,

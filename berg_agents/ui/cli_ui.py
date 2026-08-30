@@ -14,10 +14,15 @@ leaked to the user.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import json
-from typing import Any
 import uuid
+from collections.abc import Callable
+from typing import Any
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 from berg_agents.capabilities.audit import Receipt
 from berg_agents.capabilities.envelope import (
@@ -25,10 +30,7 @@ from berg_agents.capabilities.envelope import (
     InvocationResponse,
 )
 from berg_agents.capabilities.registry import CapabilityRegistry
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
+
 
 def _risk_style(risk_class: str) -> str:
     """Return a rich style token for a risk class.

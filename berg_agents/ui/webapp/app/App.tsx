@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Button, Chip } from "@heroui/react";
 import { useCustomStream } from "./useCustomStream.js";
 import { useOrchestrator } from "./useOrchestrator.js";
 import ToolCallRow, { toolTarget } from "./components/ToolCallRow.tsx";
@@ -8,6 +9,7 @@ import SubagentProgress from "./components/SubagentProgress.tsx";
 import HitlSurface from "./components/HitlSurface.tsx";
 import InputBar from "./components/InputBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
+import ProviderSelector from "./components/ProviderSelector.tsx";
 import AgentPanel from "./components/AgentPanel.tsx";
 import SubtaskPanel from "./components/SubtaskPanel.tsx";
 import LearningPanel from "./components/LearningPanel.tsx";
@@ -15,7 +17,7 @@ import SlashCommandPicker from "./components/SlashCommandPicker.tsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import BuildAgentProxy from "../envConfig.ts";
+import BuildAgentProxy, { apiFetch } from "../envConfig.ts";
 
 const AGENT_URL = BuildAgentProxy;
 
@@ -53,9 +55,7 @@ function AppContent() {
   useEffect(() => {
     async function loadModels() {
       try {
-        const resp = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/models`,
-        );
+        const resp = await apiFetch("/models");
         if (resp.ok) {
           const data = await resp.json();
           setModels(data.models || []);
@@ -80,36 +80,34 @@ function AppContent() {
       // Optimistically reflect the choice even before a thread exists;
       // the actual server-side switch happens once a thread is created.
       setActiveModel(newModel);
-      setModels((prev) =>
-        prev.map((m) => ({
+      setModels((prev) => {
+        return prev.map((m) => ({
           ...m,
           is_active:
-            m.model === newModel.model && m.provider === newModel.provider,
-        })),
-      );
+            m.model === (newModel as any)?.model &&
+            m.provider === (newModel as any)?.provider,
+        }));
+      });
       if (!threadId) {
         console.log(
           "No thread yet; model switch deferred to first message:",
-          newModel.model,
+          (newModel as any)?.model,
         );
         pendingSwitchRef.current = newModel;
         return;
       }
       await switchThreadModel(threadId, newModel);
     },
-    [threadId, switchingModel, AGENT_URL],
+    [threadId, switchingModel],
   );
 
   // POST the model switch for an existing thread.
   const switchThreadModel = useCallback(
-    async (
-      tid: any,
-      newModel: { provider: any; model: any; base_url: any },
-    ) => {
+    async (tid: any, newModel: any) => {
       if (switchingModel) return;
       setSwitchingModel(true);
       try {
-        const resp = await fetch(`${AGENT_URL}/threads/${tid}/model`, {
+        const resp = await apiFetch(`/threads/${tid}/model`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -132,7 +130,7 @@ function AppContent() {
         setSwitchingModel(false);
       }
     },
-    [switchingModel, AGENT_URL],
+    [switchingModel],
   );
 
   // A model chosen before/at message time is switched as soon as the thread
@@ -393,9 +391,9 @@ function AppContent() {
   );
 
   const onKeyDown = useCallback(
-    (event: { key: string; shiftKey: any; preventDefault: () => void }) => {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
+    (event: any) => {
+      if (event?.key === "Enter" && !event?.shiftKey) {
+        if (event.preventDefault) event.preventDefault();
         handleSend()
           .then((r) => console.log("[DEBUG] handleSend completed:", r))
           .catch((e) => console.error("[DEBUG] handleSend failed:", e));
@@ -467,45 +465,50 @@ function AppContent() {
             The agent that learns with you.
           </p>
         </div>
-        <div className="header-actions" style={{ flexWrap: "wrap" }}>
-          {/* Mode toggle: switch between LangGraph chat and multi-agent orchestrator */}
-          <button
+        <div className="header-actions flex items-center gap-2 flex-wrap">
+          {/* Mode toggle: switch between standard chat and multi-agent orchestrator */}
+          <Button
+            size="sm"
+            variant={mode === "orchestrator" ? "primary" : "secondary"}
             className={`btn-secondary ${mode === "orchestrator" ? "active" : ""}`}
-            onClick={() => setMode(mode === "chat" ? "orchestrator" : "chat")}
-            title={
+            onPress={() => setMode(mode === "chat" ? "orchestrator" : "chat")}
+            aria-label={
               mode === "chat"
                 ? "Switch to multi-agent orchestrator"
                 : "Switch to chat mode"
             }
           >
             {mode === "chat" ? "🤖 Orchestrate" : "💬 Chat"}
-          </button>
-          {/* New chat: reset the conversation (fresh thread, empty
-                        history) so degraded context from a previous task never
-                        bleeds into the next one. */}
-          <button
+          </Button>
+
+          {/* New chat: reset the conversation so degraded context never bleeds into the next */}
+          <Button
+            size="sm"
+            variant="secondary"
             className="btn-secondary"
-            onClick={() => {
+            onPress={() => {
               pendingSwitchRef.current = null;
               setActiveModel(null);
               setRecap(null);
               newChat();
             }}
-            disabled={isLoading}
+            isDisabled={isLoading}
           >
             + New chat
-          </button>
+          </Button>
+
           {/* Export the current thread as a Markdown transcript. */}
           {threadId && (
             <a
-              className="btn-secondary"
+              className="btn-secondary inline-flex items-center text-xs"
               href={`${AGENT_URL}/threads/${threadId}/export`}
             >
               ⬇ Export
             </a>
           )}
           <ThemeToggle />
-          {/* Thread ID - hidden by default, shown on hover via CSS */}
+
+          {/* Thread ID - shown in header */}
           {threadId && (
             <span
               className="thread-id"
@@ -525,40 +528,66 @@ function AppContent() {
               {threadId.slice(0, 8)}...
             </span>
           )}
+
+          {/* Active Provider and Model Selector Toolbar */}
+          <ProviderSelector
+            onSwitch={() => {
+              apiFetch("/models")
+                .then((r) => r.ok && r.json())
+                .then((data) => {
+                  if (data?.models) {
+                    setModels(data.models);
+                    const active = data.models.find((m: any) => m.is_active);
+                    if (active) setActiveModel(active);
+                  }
+                })
+                .catch(() => {});
+            }}
+          />
+
           {models.length > 0 && (
-            <select
-              className="provider-select"
-              value={
-                activeModel
-                  ? `${activeModel.provider}:${activeModel.model}`
-                  : ""
-              }
-              onChange={(e) => {
-                // NOTE: model ids may contain ":" (e.g. "qwen3.5:9b"),
-                // so match on the full composite value, never split(":").
-                const selected = models.find(
-                  (m) => `${m.provider}:${m.model}` === e.target.value,
-                );
-                if (selected)
-                  handleModelChange(selected)
-                    .then((r) => console.log("Model change handled:", r))
-                    .catch((e) => console.error("Model change failed:", e));
-              }}
-              disabled={switchingModel || isLoading}
-            >
-              <option value="">Select model...</option>
-              {models.map((m) => (
-                <option
-                  key={`${m.provider}:${m.model}`}
-                  value={`${m.provider}:${m.model}`}
-                >
-                  {m.display_name} {m.is_active && "✓"}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-semibold text-muted">Model:</span>
+              <select
+                className="provider-select text-xs bg-bg text-text border border-border rounded px-2 py-1"
+                value={
+                  activeModel
+                    ? `${activeModel.provider}:${activeModel.model}`
+                    : ""
+                }
+                onChange={(e) => {
+                  const selected = models.find(
+                    (m: any) => `${m.provider}:${m.model}` === e.target.value,
+                  );
+                  if (selected) {
+                    handleModelChange(selected)
+                      .then((r) => console.log("Model change handled:", r))
+                      .catch((e) => console.error("Model change failed:", e));
+                  }
+                }}
+                disabled={switchingModel || isLoading}
+              >
+                <option value="">Select thread model...</option>
+                {models.map((m: any) => (
+                  <option
+                    key={`${m.provider}:${m.model}`}
+                    value={`${m.provider}:${m.model}`}
+                  >
+                    {m.display_name || `${m.provider}: ${m.model}`}{" "}
+                    {m.is_active && "✓"}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
           {switchingModel && (
-            <span className="status-badge in_progress">⟳ Switching...</span>
+            <Chip
+              size="sm"
+              variant="secondary"
+              className="status-badge in_progress"
+            >
+              ⟳ Switching...
+            </Chip>
           )}
         </div>
       </div>
@@ -708,9 +737,9 @@ function AppContent() {
             </div>
           </details>
         )}
-        {subagents && subagents.length > 0 && (
+        {subagentArray && subagentArray.length > 0 && (
           <div className="subagent-list">
-            {subagents.map((sa: unknown) => (
+            {subagentArray.map((sa: any) => (
               <SubagentCard key={sa.id} subagent={sa} />
             ))}
           </div>
@@ -800,9 +829,11 @@ function AppContent() {
           setInput={(val: React.SetStateAction<string>) => {
             setInput(val);
             // Show picker when input starts with / and is just the slash
-            setShowSlashPicker(
-              val === "/" || (val.startsWith("/") && !val.includes(" ")),
-            );
+            if (typeof val === "string") {
+              setShowSlashPicker(
+                val === "/" || (val.startsWith("/") && !val.includes(" ")),
+              );
+            }
           }}
           onSend={handleSend}
           disabled={

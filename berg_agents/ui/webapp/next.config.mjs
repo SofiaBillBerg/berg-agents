@@ -4,7 +4,9 @@ const nextConfig = {
   output: "export",
   distDir: "./dist",
   reactStrictMode: false,
-  turbopack: {},
+  turbopack: {
+    root: "/Users/sofiabillger/work/berg-agents/berg_agents/ui/webapp",
+  },
   allowedDevOrigins: ["10.255.255.254"],
   compiler: {
     styledJsx: true,
@@ -18,10 +20,10 @@ const nextConfig = {
       // Enabled by default.
       transpileTemplateLiterals: true,
       // Empty by default.
-      namespace: "berg-agents-web",
+      namespace: "berg-agents-app",
       // Enabled by default.
       cssProp: true,
     },
   },
 };
-module.exports = nextConfig;
+export default nextConfig;

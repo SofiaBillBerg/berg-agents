@@ -12,10 +12,10 @@ This module does NOT depend on LangGraph, LangChain, or any LLM framework.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 import logging
-from typing import Any
 import uuid
+from collections.abc import Iterable
+from typing import Any
 
 from berg_agents.agents.curator import Curator
 from berg_agents.agents.guardian import Guardian
@@ -91,6 +91,7 @@ class Orchestrator:
         for plugin_path in self._plugins:
             try:
                 import json
+
                 from pathlib import Path
 
                 reg_file = Path(plugin_path) / "registry.json"

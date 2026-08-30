@@ -1,12 +1,46 @@
 import React, { useEffect, useState } from "react";
 
+export interface SubagentToolCall {
+  tool?: string;
+  name?: string;
+  input?: any;
+  output?: any;
+}
+
+export interface SubagentData {
+  id?: string;
+  name?: string;
+  status?: "running" | "completed" | "failed" | "pending" | string;
+  toolCalls?: SubagentToolCall[];
+  output?: string;
+}
+
+export interface SubagentCardProps {
+  subagent?: SubagentData | null;
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  running: "#f9a825",
+  completed: "#2e7d32",
+  failed: "#b00020",
+  pending: "#666666",
+};
+
+const STATUS_ICONS: Record<string, string> = {
+  running: "⟳",
+  completed: "✓",
+  failed: "✗",
+  pending: "○",
+};
+
 /**
- * SubagentCard component
- * Displays subagent card with name, status, and tool call info
- * Shows spinner while running, elapsed time, and tool call count
- * Collapsible and compact
+ * SubagentCard component.
+ * Displays subagent execution progress, live timer, and invoked tool calls.
+ *
+ * @param props - Component properties
+ * @returns JSX element rendering the subagent status card
  */
-function SubagentCard({ subagent }) {
+export function SubagentCard({ subagent }: SubagentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
@@ -23,141 +57,63 @@ function SubagentCard({ subagent }) {
 
   if (!subagent) return null;
 
-  const statusIcons = {
-    running: "⟳",
-    completed: "✓",
-    failed: "✗",
-    pending: "○",
-  };
-
-  const statusColors = {
-    running: "#f9a825",
-    completed: "#2e7d32",
-    failed: "#b00020",
-    pending: "#666",
-  };
-
-  const icon = statusIcons[subagent.status] || "○";
-  const color = statusColors[subagent.status] || "#666";
+  const statusKey = subagent.status || "pending";
+  const icon = STATUS_ICONS[statusKey] || "○";
+  const color = STATUS_COLORS[statusKey] || "#666666";
 
   return (
-    <div
-      style={{
-        marginTop: "0.5rem",
-        border: "1px solid #e0e0e0",
-        borderRadius: "6px",
-        overflow: "hidden",
-      }}
-    >
+    <div className="subagent-card-container mt-2 border border-border rounded-lg overflow-hidden bg-surface">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
-        style={{
-          width: "100%",
-          padding: "0.5rem 0.75rem",
-          background: "transparent",
-          border: "none",
-          textAlign: "left",
-          cursor: "pointer",
-          fontSize: "0.85rem",
-          fontFamily: "inherit",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "0.5rem",
-        }}
+        className="w-full px-3 py-2 bg-transparent border-none text-left cursor-pointer text-xs font-sans flex justify-between items-center gap-2"
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <div className="flex items-center gap-2">
           <span
-            style={{
-              color: color,
-              fontWeight: "500",
-              display: "inline-block",
-              width: "1.2em",
-              textAlign: "center",
-            }}
+            style={{ color }}
+            className="font-medium inline-block w-4 text-center"
           >
-            {subagent.status === "running" && (
-              <span
-                style={{
-                  animation: "spin 1s linear infinite",
-                  display: "inline-block",
-                }}
-              >
-                ⟳
-              </span>
+            {subagent.status === "running" ? (
+              <span className="inline-block animate-spin">⟳</span>
+            ) : (
+              icon
             )}
-            {subagent.status !== "running" && icon}
           </span>
-          <span>{subagent.name || "Subagent"}</span>
+          <span className="font-semibold text-text">
+            {subagent.name || "Subagent"}
+          </span>
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            color: "#666",
-            fontSize: "0.8rem",
-          }}
-        >
+        <div className="flex items-center gap-2 text-muted text-xs">
           {subagent.status === "running" && <span>{elapsed.toFixed(1)}s</span>}
-          <span style={{ color: color }}>{subagent.status}</span>
+          <span style={{ color }}>{subagent.status}</span>
           <span>{expanded ? "▼" : "▶"}</span>
         </div>
       </button>
+
       {expanded && (
-        <div
-          style={{
-            padding: "0.75rem",
-            background: "#fafafa",
-            borderTop: "1px solid #e0e0e0",
-            fontSize: "0.8rem",
-            color: "#666",
-          }}
-        >
+        <div className="p-3 bg-bg border-t border-border text-xs text-text">
           {subagent.toolCalls && subagent.toolCalls.length > 0 ? (
             <div>
-              <div style={{ marginBottom: "0.5rem", fontWeight: "500" }}>
+              <div className="mb-2 font-semibold">
                 Tool calls ({subagent.toolCalls.length}):
               </div>
-              {subagent.toolCalls.map(
-                (
-                  tc: { tool: any; name: any },
-                  idx: React.Key | null | undefined,
-                ) => (
-                  <div
-                    key={idx}
-                    style={{
-                      padding: "0.25rem 0",
-                      borderBottom: "1px solid #eee",
-                      fontFamily: "monospace",
-                    }}
-                  >
-                    {tc.tool || tc.name || `Tool ${idx + 1}`}
-                  </div>
-                ),
-              )}
+              {subagent.toolCalls.map((tc, idx) => (
+                <div
+                  key={`tool-call-${idx}`}
+                  className="py-1 border-b border-border font-mono text-xs"
+                >
+                  {tc.tool || tc.name || `Tool ${idx + 1}`}
+                </div>
+              ))}
             </div>
           ) : (
-            <div>No tool calls recorded</div>
+            <div className="text-muted">No tool calls recorded</div>
           )}
+
           {subagent.output && (
-            <div style={{ marginTop: "0.5rem" }}>
-              <div style={{ fontWeight: "500", marginBottom: "0.25rem" }}>
-                Output:
-              </div>
-              <div
-                style={{
-                  padding: "0.5rem",
-                  background: "#f5f5f5",
-                  borderRadius: "4px",
-                  fontFamily: "monospace",
-                  fontSize: "0.75rem",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  maxHeight: "150px",
-                  overflowY: "auto",
-                }}
-              >
+            <div className="mt-2">
+              <div className="font-semibold mb-1">Output:</div>
+              <div className="p-2 bg-surface rounded font-mono text-xs whitespace-pre-wrap break-all max-h-36 overflow-y-auto">
                 {subagent.output}
               </div>
             </div>

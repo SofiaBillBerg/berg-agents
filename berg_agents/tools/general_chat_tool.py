@@ -7,6 +7,7 @@ from langchain.messages import HumanMessage
 from langchain.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
+
 class GeneralChatArgs(BaseModel):
     """Arguments for a general chat query.
 

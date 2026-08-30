@@ -95,7 +95,7 @@
       "name": "omniroute",
       "options": {
         "baseURL": "${env:BERG_AGENT_OPENAI_BASE_URL}",
-        "apiKey": "${env:BERG_AGENT_OPENAI_API_KEY}",
+        "apiKey": "${env:BERG_AGENT_OMNIROUTE_API_KEY}",
         "timeout": 6000000
       },
       "models": {

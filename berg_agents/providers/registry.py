@@ -50,7 +50,7 @@ from typing import Any
 
 from langchain.chat_models import BaseChatModel, init_chat_model
 
-__all__ = ["build_llm", "list_models", "load_providers", "resolve_model"]
+__all__ = ['build_llm', 'list_models', 'load_providers', 'resolve_model']
 
 #: camelCase JSONC option names -> python constructor kwarg names.
 _OPTION_KEY_ALIASES: dict[str, str] = {

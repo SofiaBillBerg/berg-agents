@@ -18,12 +18,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from berg_agents.providers.registry import build_llm, resolve_model
 from langchain.agents.middleware import (
     ModelRequest,
     ModelResponse,
     wrap_model_call,
 )
+
+from berg_agents.providers.registry import build_llm, resolve_model
+
 
 @dataclass
 class ModelContext:

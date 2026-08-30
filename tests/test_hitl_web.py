@@ -6,18 +6,22 @@ Tests for the /chat/resume endpoint and related HITL functionality.
 from __future__ import annotations
 
 import asyncio
+
 from collections.abc import Generator
 from typing import Literal
+
+import hypothesis
+import pytest
+
+from fastapi.testclient import TestClient
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from berg_agents.ui.langgraphchatserver import (
     get_server,  # ruff: ignore[import-private-name]
 )
 from berg_agents.ui.web import app  # ruff: ignore[import-private-name]
-from fastapi.testclient import TestClient
-import hypothesis
-from hypothesis import given, settings
-from hypothesis import strategies as st
-import pytest
+
 
 # Tag: Feature: agent-core-enhancement, Property 6: HITL resume signals the pending event
 # Tag: Feature: agent-core-enhancement, Property 7: Resume returns 409 for non-pending threads

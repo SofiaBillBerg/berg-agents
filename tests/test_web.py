@@ -8,19 +8,21 @@ do not require Node or a built frontend: the static SPA test is skipped when
 
 from __future__ import annotations
 
+import shutil
+
 from collections.abc import Iterator
 from pathlib import Path
-import shutil
 from unittest import mock
 
-from berg_agents import cli
-from berg_agents.ui.web import (
-    _DIST_DIR,  # ruff: ignore[import-private-name]
-    app,  # ruff: ignore[import-private-name]
-)
+import pytest
+
 from fastapi.testclient import TestClient
 from langchain.messages import AIMessage, HumanMessage
-import pytest
+
+from berg_agents import cli
+from berg_agents.ui.web import _DIST_DIR  # ruff: ignore[import-private-name]
+from berg_agents.ui.web import app  # ruff: ignore[import-private-name]
+
 
 # Path to the React SPA build dir, derived from the CLI module so it stays in
 # sync with where ``serve --web`` actually looks for it.
