@@ -1,0 +1,140 @@
+language:
+  search-text-placeholder: Search
+project:
+  resources:
+    - docs/docs_web/search-index.json
+    - docs/docs_web/docs/404.html
+  type: website
+  output-dir: docs/docs_web
+  pre-render:
+    - "project_utils/run_apidocs.sh"
+    - "project_utils/run_diagrams.sh"
+  render:
+    - "docs/*.qmd"
+    - "docs/README.qmd"
+    - "!docs/docs_web/**/*.*"
+    - "!pdf_docs/*.qmd"
+    - "!.*/*.*"
+    - "!notes/*.*"
+    - "!apidocs/**/*.*"
+    - "decisions/decisions-log.md"
+   # - "CHANGELOG.qmd"
+  post-render:
+    - "project_utils/render_readme.sh"
+website:
+  title: "Berg Agents"
+  back-to-top-navigation: true
+  llms-txt: true
+  page-navigation: true
+  search:
+    keyboard-shortcut: [ "?", "H" ]
+    copy-button: true
+    type: textbox
+
+  navbar:
+    left:
+      - text: "Home"
+        href: docs/README.qmd
+      - text: "API Reference"
+        href: docs/API.qmd
+      - text: "Guides"
+        href: docs/USAGE.qmd
+      - text: "Community"
+        href: docs/CONTRIBUTING.qmd
+    right:
+      - icon: github
+        href: "https://github.com/SofiaBillBerg/berg-agents"
+        text: "GitHub"
+  sidebar:
+    - title: "Introduction"
+      style: "docked"
+      contents:
+        - text: "Quick Start"
+          href: docs/QUICKSTART.qmd
+    - title: "Guides"
+      contents:
+        - text: "Example Usage"
+          href: docs/USAGE.qmd
+        - text: "Tools"
+          href: docs/TOOLS.qmd
+        - text: "Configuration"
+          href: docs/CONFIGURATION.qmd
+    - title: "Reference"
+      contents:
+        - text: "API Reference Overview"
+          href: docs/API.qmd
+        - text: "API Reference"
+          href: apidocs/apidocs-help.html
+    - title: "Community"
+      contents:
+        - text: "Contributing"
+          href: docs/CONTRIBUTING.qmd
+        - text: "News & Changelog"
+          href: decisions/decisions-log.md
+        - text: "FAQ & Troubleshooting"
+          href: docs/FAQ.qmd
+
+
+format:
+  html:
+    theme:
+      - docs/styles/custom.css
+    css:
+      - docs/styles/quartz-contrast.css
+      - docs/styles/dt-wrap.css
+    highlight-style: pygments
+    toc: true
+    toc-depth: 3
+    code-fold: true
+    code-tools: true
+    code-overflow: wrap
+    code-annotations: select
+    code-copy: true
+    toc-title: "On this page"
+    lightbox: true
+    citations-hover: true
+    # self-contained: true
+    code-summary: "Show/Hide Code"
+    date: "2025-11-02"
+    date-format: "iso"
+    code-links: true
+    author: "Sofia Billger Bergström"
+    date-modified: last-modified
+    embed-resources: true
+    fig-cap-location: bottom
+    fig-format: svg
+    tbl-cap-location: top
+    subtitle: "Documentation for The berg_agents - an interactive, locally maintained LLM-powered assistant"
+    description: "The berg_agents is a local, LLM-driven code assistant that can scaffold projects, edit files, generate tests, and produce documentation. It is built on top of LangChain and uses a local Ollama instance as the LLM backend."
+    fig-env: figure
+    cache: true
+    includesource: true
+    wrap: auto
+    touch: true
+    search: true
+    fig-responsive: true
+    resource-path:
+      - LICENSE
+      - docs/visualizations/png/
+#  - apidocs/09
+
+filters:
+  - include-code-files
+  - inline-svg
+  - lua-env
+extensions:
+  badge:
+    - key: BergAgentsrenv::snap
+      colour: orchid
+      icon: chat-right-quote-fill
+    - key: experimental
+      colour: lime
+      icon: flask
+    - key: deprecated
+      colour: gray
+      icon: archive-fill
+    - key: docs
+      colour: rebeccapurple
+      href: docs/README.qmd
+      icon: icon
+      target: _self

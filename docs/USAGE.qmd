@@ -1,0 +1,127 @@
+---
+title: "Usage Examples"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+# Usage Examples
+
+BergAgents has three surfaces over the same Harness engine: the TUI, the Python API, and the web UI.
+
+## TUI
+
+```bash
+python -m berg_agents --tui
+```
+
+Bare text runs a `generic` task; `/harness` (alias `/task`) runs it with explicit `harness` task type:
+
+```
+harness> refactor the login flow to use sessions
+harness> /harness add retry logic to the sync worker
+harness> /agents
+harness> /stats
+harness> /help
+```
+
+Slash commands (identical list and order in the web picker):
+
+| Command | What it does |
+|---------|--------------|
+| `/help` | Show all slash commands |
+| `/agents` | List registered agents |
+| `/models` | Show available models (web UI) |
+| `/stats` | Learning statistics |
+| `/tools` | List available tools (web UI) |
+| `/health` | System health check (web UI) |
+| `/history` | Show session task transcript |
+| `/memory` | Memory information (web UI) |
+| `/context` | Show current context (web UI) |
+| `/settings` | Show settings (web UI) |
+| `/plugins` | List plugins (web UI) |
+| `/skills` | List skills (web UI) |
+| `/mcps` | MCP server status (web UI) |
+| `/harness` | Run a task through the harness |
+| `/task` | Same as `/harness` |
+| `/clear` | Clear the session |
+
+Commands marked "web UI" are listed in the TUI for parity but answered there with a web-only notice — the TUI only executes commands the Harness API can answer honestly. Unknown commands warn and continue.
+
+## Python API
+
+```python
+from berg_agents.app import BergAgentsApp
+
+app = BergAgentsApp.create()
+
+# Run a task
+result = app.execute("Summarize the auth module", task_type="standard")
+assert result["status"] in ("completed", "needs_human_review", "failed")
+
+# Inspect the system
+app.list_agents()        # agent catalog
+app.get_learning_stats() # task → model → outcome stats
+
+# Custom config (highest precedence; falls back to bergagents.jsonc)
+app = BergAgentsApp.create({"harness": {"enable_learning": False}})
+```
+
+Result shapes:
+
+- `completed` — carries `selected_agent`, `model`, `tier`, `complexity`, `risk_level`, `confidence`
+- `needs_human_review` — carries `review_reasons`; approve to resume with `hitl_decision` in task metadata
+- `failed` — carries `error`, rendered inline (never a traceback)
+
+## Web UI
+
+```bash
+python -m berg_agents --web --port 8001
+# → http://127.0.0.1:8001
+```
+
+Type `/` to open the slash-command picker (same 16 commands as the TUI). Agent, HITL, and learning panels update from the same task lifecycle the TUI renders.
+
+### Frontend development
+
+For UI work, run the backend and the Next.js dev server separately. The
+dev server is cross-origin, so it needs the backend URL at startup
+(inlined by Next.js) — without it all `/api/*` calls 404 against
+Next.js itself. The backend allows CORS from `localhost`/`127.0.0.1`
+ports 3000–3001.
+
+```bash
+python -m berg_agents --web --port 8001   # backend API
+cd berg_agents/ui/webapp && NEXT_PUBLIC_API_BASE_URL=http://localhost:8001 npm run dev
+# → http://localhost:3001 (3000 if free)
+```
+
+Production needs none of this: `python -m berg_agents --web` serves the
+API and the static export from the same origin.
+
+### API endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/harness` | Run a task, return the result dict |
+| POST | `/api/harness/{thread_id}/stream` | Start a streaming worker |
+| GET | `/api/harness/{thread_id}/events` | SSE stream (`data-*` parts, AI SDK UI-message-stream v1) |
+| POST | `/api/harness/{thread_id}/respond` | Answer a HITL pause (approve / reject / edit) |
+| GET | `/api/learning-stats` | Learning/outcome statistics |
+| GET/POST | `/api/providers`, `/api/providers/active` | Provider registry |
+| GET | `/api/agents`, `/api/agents/{name}` | Agent catalog |
+| POST/GET | `/api/threads`, `/api/threads/{id}/cancel`, `/threads/{id}/export` | Threads |
+
+## Human-in-the-Loop
+
+When a task needs review, the Harness returns `needs_human_review`:
+
+- **TUI**: the result panel shows the review reasons, then `Approve and resume? [y/N]:` — approval re-executes with `hitl_decision: approve` in metadata, anything else fails the task as rejected.
+- **Web**: the HITL surface shows tool name + arguments with Approve / Reject / Edit (edit rewrites the args before the tool runs).
+
+See [Tools](TOOLS.qmd) for which tools pause by default.
+
+## See Also
+
+- [Configuration](CONFIGURATION.qmd) — providers, routing, HITL rules
+- [Tools](TOOLS.qmd) — built-in tools, capabilities, MCP
+- [Quick Start](QUICKSTART.qmd) — installation and first run

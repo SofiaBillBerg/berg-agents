@@ -1,0 +1,72 @@
+---
+title: "API Reference"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+# API Reference
+
+Module map for the codebase. Generated API pages (pydoctor) and package diagrams are rendered with the project toolchain — this page describes what each module owns.
+
+## Entry points
+
+| Module | Owns |
+|--------|------|
+| `berg_agents.app` | `BergAgentsApp` — creates the Harness, serves the web UI, runs tasks |
+| `berg_agents.__main__` | `python -m berg_agents --tui` / `--web` (`--host`, `--port`) |
+| `berg_agents.main` | `load_config` — shared config-file loader |
+
+## Core (`berg_agents.core`)
+
+| Module | Owns |
+|--------|------|
+| `harness` | `Harness` — guardian → planner → implementation → curator engine, `execute_task`, result dicts |
+| `loop` | `BergLoop` — framework-free LLM↔tool cycle, typed `LoopEvent` stream, HITL pause/resume, cancel, `max_steps` |
+| `tool_spec` | `ToolSpec` / `ToolRegistry` — native tool contract, wire shapes, risk inference |
+| `mcp` | stdio + HTTP MCP transports, `McpClient`, tool-name prefixing |
+| `hitl` | `HitlDecision` / `HitlRequest`, interrupt policy, decision application |
+| `chat_server` | `ChatServer` protocol + `ChatServerBase` — the surface every UI implements |
+| `stream` | `StreamAdapter` — loop events → protocol envelopes |
+| `checkpoint` | Snapshot persist / re-hydrate for cross-process resume |
+| `learning_gate` | Task → model → outcome stats |
+
+## Agents (`berg_agents.agents`)
+
+Guardian (risk gate), Planner (breakdown), Implementation (edits), Curator (review), Learning (stats) — plus `factory.build_loop` / `build_agent` / `create_tools`.
+
+## Surrounding systems
+
+| Module | Owns |
+|--------|------|
+| `providers` | `registry` (`load_providers`, `resolve_model`, `list_models`), `base`, `models` — provider-centric resolution, no hardcoded providers |
+| `capabilities` | `tool_adapter` (`tool_to_capability`), audited capability registry |
+| `config` | `settings` (typed `Settings`, `BERG_AGENT_*` env), `mcp` (server lists), `jsonc` loader |
+| `profiles` | Per-provider / per-model prompt and tool-visibility tuning |
+| `tools` | `_io` file helpers (atomic write, target normalization) |
+| `backends` | Framework adapter surface (implementations plug in here) |
+| `ui` | `server` + `routes` (FastAPI, `/api/harness*`, SSE), `sessions` (threads, HITL waiters), `schemas`, `cli_ui` (Rich TUI) |
+| `utils`, `ci`, `exceptions` | Shared helpers, CI tooling, error types |
+
+## Generated class and function diagrams
+
+![Berg-Agents Overview](visualizations/png/packages_berg_agents.png)
+
+![Berg-Agents Agents](visualizations/png/packages_berg_agents.agents.png)
+
+![Berg-Agents Core](visualizations/png/packages_berg_agents.core.png)
+
+![Berg-Agents Providers](visualizations/png/packages_berg_agents.providers.png)
+
+![Berg-Agents UI](visualizations/png/packages_berg_agents.ui.png)
+
+![Berg-Agents Config](visualizations/png/packages_berg_agents.config.png)
+
+![Berg-Agents Tools](visualizations/png/packages_berg_agents.tools.png)
+
+![Berg-Agents Backends](visualizations/png/packages_berg_agents.backends.png)
+
+![Berg-Agents Profiles](visualizations/png/packages_berg_agents.profiles.png)
+
+![Berg-Agents Utils](visualizations/png/packages_berg_agents.utils.png)
+
+![Berg-Agents Capabilities](visualizations/png/packages_berg_agents.capabilities.png)

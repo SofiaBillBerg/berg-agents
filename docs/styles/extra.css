@@ -1,0 +1,502 @@
+/* Custom CSS Styles for Semantic Research Dashboard Documentation */
+/*-- scss:defaults --*/
+@custom;
+body {
+	font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+	line-height: 1.6;
+	color: #2c3e50;
+	background-color: rgba(248, 237, 248, 0.76);
+}
+
+.background-color {
+	background-color: #3b528b;
+}
+
+.quarto-title-banner {
+	background: linear-gradient(135deg, #7d029c 0%, #3b528b 50%, #21908c 100%);
+	color: white;
+	padding: 2rem 0;
+}
+
+.quarto-title-banner .title {
+	color: white;
+	font-weight: 700;
+	text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	font-size: 2.5em;
+	margin-bottom: 1rem;
+}
+
+.quarto-title-banner .subtitle {
+	color: rgba(255, 255, 255, 0.9);
+	font-size: 1.2em;
+	font-weight: 300;
+}
+
+/* Code Blocks and Syntax Highlighting */
+pre {
+	background-color: #f8f9fa;
+	border: 1px solid #e9ecef;
+	border-radius: 6px;
+	padding: 1rem;
+	margin: 1rem 0;
+	overflow-x: auto;
+	font-size: 0.9em;
+}
+
+/* #790596, #3b528b,21908c*/
+code {
+	background-color: #f1f3f4;
+	color: #d79;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 0.9em;
+	font-family: "Fira Code", "Monaco", "Consolas", monospace;
+}
+
+pre code {
+	background-color: transparent;
+	color: inherit;
+	padding: 0;
+}
+
+/* Tables */
+table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 1rem 0;
+	font-size: 0.95em;
+}
+
+table th {
+	background: linear-gradient(135deg, #3358b5, #f285d5);
+	color: white;
+	padding: 0.75rem;
+	text-align: left;
+	font-weight: 900;
+	font-size: 1.2em;
+	border-bottom: 2px solid #9bafe0;
+}
+
+table td {
+	padding: 0.75rem;
+	border-bottom: 1px solid #e9ecef;
+	vertical-align: top;
+}
+
+table tbody tr:nth-child(even) {
+	background-color: #f8f9fa;
+}
+
+/*scss:variables*/
+
+/* Callout Boxes */
+.callout {
+	border-left: 4px solid #21908c;
+	padding: 1rem;
+	margin: 1rem 0;
+	border-radius: 0 6px 6px 0;
+}
+
+.callout-note {
+	border-left-color: #3b528b;
+	background-color: rgba(59, 82, 139, 0.1);
+}
+
+.callout-important {
+	border-left-color: #fde725;
+	background-color: rgba(253, 231, 37, 0.1);
+}
+
+.callout-warning {
+	border-left-color: #fd9f07;
+	background-color: rgba(253, 159, 7, 0.1);
+}
+
+.callout-caution {
+	border-left-color: #d73027;
+	background-color: rgba(215, 48, 39, 0.1);
+}
+
+/* Navigation and TOC */
+.navbar {
+	background: linear-gradient(90deg, #e841c7, #9fb2e3);
+	border: none;
+}
+
+.navbar-brand,
+.nav-link {
+	color: white !important;
+}
+
+.nav-link:hover {
+	color: #fde725 !important;
+}
+
+#TOC {
+	background-color: #f8f9fa;
+	border: 1px solid #e9ecef;
+	border-radius: 6px;
+	padding: 1rem;
+	margin-bottom: 2rem;
+}
+
+#TOC ul {
+	list-style-type: none;
+	padding-left: 0;
+}
+
+#TOC li {
+	margin: 0.5rem 0;
+	color: #62abe3;
+}
+
+#TOC a {
+	color: #1640ab;
+	text-decoration: none;
+	font-weight: 500;
+}
+
+#TOC a:hover {
+	color: #8603a6;
+	text-decoration: underline;
+}
+
+/* Headers */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	color: #1c456f;
+	font-weight: 600;
+	margin-top: 2rem;
+	margin-bottom: 1rem;
+}
+
+h1 {
+	color: #440154;
+	border-bottom: 3px solid #21908c;
+	padding-bottom: 0.5rem;
+}
+
+h2 {
+	color: #3a65d1;
+	border-bottom: 2px solid rgba(33, 144, 140, 0.3);
+	padding-bottom: 0.3rem;
+}
+
+h3 {
+	color: #21908c;
+	border-left: 4px solid #fde725;
+	padding-left: 1rem;
+}
+
+/* Links */
+a {
+	color: #3b528b;
+	text-decoration: none;
+}
+
+a:hover {
+	color: #440154;
+	text-decoration: underline;
+}
+
+/* Buttons and Interactive Elements */
+.btn {
+	border-radius: 6px;
+	font-weight: 500;
+	padding: 0.5rem 1rem;
+	transition: all 0.3s ease;
+}
+
+.btn-primary {
+	background: linear-gradient(135deg, #770394, #3b528b);
+	border: none;
+	color: white;
+}
+
+.btn-primary:hover {
+	background: linear-gradient(135deg, #3b528b, #21908c);
+	transform: translateY(-1px);
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-secondary {
+	background-color: #65b;
+	border: none;
+	color: white;
+}
+
+.btn-secondary:hover {
+	background-color: #3b5280;
+}
+
+/* Code Folding */
+.code-fold-btn {
+	background: linear-gradient(135deg, #440154, #3b528b);
+	color: white;
+	border: none;
+	border-radius: 4px;
+	padding: 0.25rem 0.5rem;
+	font-size: 0.8em;
+	cursor: pointer;
+	margin-bottom: 0.5rem;
+}
+
+.code-fold-btn:hover {
+	background: linear-gradient(135deg, #3b528b, #21908c);
+}
+
+/* Figures and Images */
+figure {
+	margin: 2rem 0;
+	text-align: center;
+}
+
+figure img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 6px;
+	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+figcaption {
+	font-style: italic;
+	color: #6c757d;
+	margin-top: 0.5rem;
+	font-size: 0.9em;
+}
+
+/* Blockquotes */
+blockquote {
+	border-left: 4px solid #21908c;
+	background-color: #3b52cccc;
+	padding: 1rem;
+	margin: 1rem 0;
+	font-style: italic;
+	color: #495057;
+}
+
+/* Lists */
+ul,
+ol {
+	padding-left: 1.5rem;
+}
+
+li {
+	margin-bottom: 0.5rem;
+}
+
+/* Definition Lists */
+dt {
+	font-weight: 600;
+	color: #3b528b;
+	margin-top: 1rem;
+}
+
+dd {
+	margin-left: 1rem;
+	margin-bottom: 1rem;
+}
+
+/* Footnotes */
+.footnote-ref {
+	font-size: 0.8em;
+	vertical-align: super;
+	color: #3b528b;
+}
+
+.footnotes {
+	border-top: 1px solid #e9ecef;
+	margin-top: 3rem;
+	padding-top: 1rem;
+	font-size: 0.9em;
+}
+
+/* Print Styles */
+@media print {
+	body {
+		font-size: 12pt;
+		line-height: 1.4;
+		color: black;
+	}
+
+	.quarto-title-banner {
+		background: none;
+		color: black;
+		border-bottom: 2px solid black;
+	}
+
+	pre {
+		background-color: #f5f5f5;
+		border: 1px solid #ccc;
+	}
+
+	a {
+		color: black;
+		text-decoration: underline;
+	}
+
+	.navbar,
+	#TOC {
+		display: none;
+	}
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+	body {
+		font-size: 14px;
+	}
+
+	.quarto-title-banner {
+		padding: 1rem 0;
+	}
+
+	table {
+		font-size: 0.8em;
+	}
+
+	pre {
+		font-size: 0.8em;
+		padding: 0.5rem;
+	}
+
+	h1 {
+		font-size: 1.5em;
+	}
+
+	h2 {
+		font-size: 1.3em;
+	}
+
+	h3 {
+		font-size: 1.1em;
+	}
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+	body {
+		background-color: rgba(51, 1, 51, 0.68);
+		color: #e9ecef;
+	}
+
+	pre {
+		background-color: #8080f1;
+		border-color: #404040;
+		color: #e9ecef;
+	}
+
+	table th {
+		background: linear-gradient(135deg, #80059f, #3b528b);
+	}
+
+	table td {
+		border-bottom-color: #8080f1;
+	}
+
+	table tbody tr:nth-child(even) {
+		background-color: #3b5280;
+	}
+
+	#TOC {
+		background-color: rgba(66, 59, 128, 0.28);
+		border-color: #404040;
+	}
+
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		color: rgba(253, 218, 253, 0.99);
+	}
+
+	h1 {
+		color: #fde725;
+	}
+
+	h2 {
+		color: #5dc863;
+	}
+
+	h3 {
+		color: #21908c;
+	}
+}
+
+/* Accessibility Improvements */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Focus indicators for keyboard navigation */
+a:focus,
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 2px solid #21908c;
+	outline-offset: 2px;
+}
+
+/* Smooth scrolling */
+html {
+	scroll-behavior: Smooth;
+}
+
+/* Animation for interactive elements */
+.btn,
+.code-fold-btn {
+	transition: all 0.3s ease;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: more) {
+	body {
+		background-color: #f8edf8;
+		color: rgba(5, 32, 80, 0.96);
+	}
+
+	a {
+		color: #0000ff;
+	}
+
+	a:visited {
+		color: #800080;
+	}
+
+	.btn-primary {
+		background-color: #000080;
+		color: white;
+	}
+
+	.btn-primary:hover {
+		background-color: #000060;
+	}
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+	* {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+
+	html {
+		scroll-behavior: auto;
+	}
+}

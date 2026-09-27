@@ -1,0 +1,111 @@
+"""FastAPI application factory for berg_agents.
+
+Builds the web application around one injected harness: routes in
+:mod:`berg_agents.ui.routes`, session state in
+:mod:`berg_agents.ui.sessions`, schemas in :mod:`berg_agents.ui.schemas`.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Any
+
+from berg_agents.config.settings import get_settings
+from berg_agents.core.harness import Harness
+from berg_agents.ui.routes import create_router
+from berg_agents.ui.sessions import SessionManager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+logger = logging.getLogger(__name__)
+
+# Static export of the Next.js webapp: ``bun run next build`` writes
+# ``berg_agents/ui/webapp/dist/`` (see ``next.config.mjs`` distDir).
+_WEB_DIST = Path(__file__).resolve().parent / "webapp" / "dist"
+
+
+def create_app(
+    harness: Harness | None = None,
+    *,
+    providers: list[dict[str, Any]] | None = None,
+    active_provider: str | None = None,
+    active_model: str | None = None,
+) -> FastAPI:
+    """Create the BergAgents FastAPI application.
+
+    :param harness: Shared harness; a default one is built when
+        None so the app also works standalone.
+    :param providers: Provider/model pairs; resolved from settings when None.
+    :param active_provider: Active provider override.
+    :param active_model: Active model override.
+    :return: Configured FastAPI application.
+    """
+    settings = get_settings()
+    resolved_harness = harness or Harness(enable_inference=True)
+    resolved_provider = active_provider or settings.provider or "ollama"
+    # Default model: first model under the active provider, else empty.
+    if active_model is not None:
+        resolved_model = active_model
+    else:
+        block = (settings.providers or {}).get(resolved_provider) or {}
+        models = block.get("models") or {}
+        resolved_model = next(iter(models)) if models else ""
+    # Provider list: explicit override wins, else every registry pair.
+    if providers is not None:
+        resolved_providers = providers
+    elif settings.provider_list:
+        resolved_providers = [
+            {"name": item.get("name", ""), "model": item.get("model", "")}
+            for item in settings.provider_list
+        ]
+    else:
+        from berg_agents.providers.registry import list_models
+
+        pairs = list_models(settings.model_dump())
+        resolved_providers = (
+            [{"name": m["provider"], "model": m["model"]} for m in pairs]
+            if pairs
+            else [{"name": resolved_provider, "model": resolved_model}]
+        )
+    sessions = SessionManager(
+        active_provider=resolved_provider, active_model=resolved_model
+    )
+
+    app = FastAPI(title="BergAgents")
+    # Local dev CORS: `next dev` (any localhost port) talks to this
+    # backend directly when NEXT_PUBLIC_API_BASE_URL is set.
+    # Production serves the static export same-origin, so this is
+    # a no-op there.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.state.harness = resolved_harness
+    app.state.sessions = sessions
+    app.include_router(
+        create_router(resolved_harness, sessions, providers=resolved_providers)
+    )
+
+    @app.get("/api/health")
+    async def health() -> dict[str, str]:
+        """Liveness probe."""
+        return {"status": "ok"}
+
+    if _WEB_DIST.joinpath("index.html").is_file():
+        # Production UI on the same origin (single :8001).
+        # Mounted after the API router so /api/* always wins.
+        app.mount(
+            "/", StaticFiles(directory=_WEB_DIST, html=True), name="webapp"
+        )
+    else:
+        logger.warning(
+            "Web UI not built (%s missing); API only. Run "
+            "'bun run next build' in berg_agents/ui/webapp/.",
+            _WEB_DIST / "index.html",
+        )
+
+    return app

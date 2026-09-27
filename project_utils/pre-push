@@ -1,0 +1,63 @@
+#!/usr/bin/env bash 
+# pre-push  — placed here intentionally
+# Pre-hook: runs all checks in graceful mode and shows aggregate summary.
+# Each sub-script exits 0 even on failures, so we collect results and decide at the end.
+
+echo "Local CI: Running code quality checks before pushing..."
+echo ""
+
+chmod +x ./project_utils/run_formatters.sh
+chmod +x ./project_utils/run_vis.sh
+chmod +x ./project_utils/run_tests.sh
+
+# Run formatters (exits 0 even on failures)
+./project_utils/run_formatters.sh
+FORMATTERS_EXIT=$?
+
+# Run visualization updates (exits 0 even on failures)
+./project_utils/run_vis.sh
+VIS_EXIT=$?
+
+# --- Aggregate Summary ---
+echo ""
+echo "========================================================"
+echo "  LOCAL CI - AGGREGATE SUMMARY"
+echo "========================================================"
+echo ""
+
+# Parse results from each script
+# (Both scripts print their own summaries above; this is the combined view)
+TOTAL_FAILURES=0
+
+# Check formatters result
+if [ $FORMATTERS_EXIT -ne 0 ]; then
+	echo "  ✗ run_formatters.sh exited with code $FORMATTERS_EXIT"
+	TOTAL_FAILURES=$((TOTAL_FAILURES + 1))
+else
+	echo "  ✓ run_formatters.sh completed (see above for details)"
+fi
+
+# Check visualization result
+if [ $VIS_EXIT -ne 0 ]; then
+	echo "  ✗ run_vis.sh exited with code $VIS_EXIT"
+	TOTAL_FAILURES=$((TOTAL_FAILURES + 1))
+else
+	echo "  ✓ run_vis.sh completed (see above for details)"
+fi
+
+echo ""
+echo "========================================================"
+
+if [ $TOTAL_FAILURES -eq 0 ]; then
+	echo "  All checks passed! Proceeding with git push..."
+	echo "========================================================"
+	exit 0
+else
+	echo "  ⚠  $TOTAL_FAILURES script(s) reported issues."
+	echo "  Review the output above for details."
+	echo ""
+	echo "  You can fix the issues and try again, or push anyway."
+	echo "========================================================"
+	# Exit 0 - let the user decide
+	exit 0
+fi

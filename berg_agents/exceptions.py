@@ -1,0 +1,10 @@
+"""Custom exception hierarchy for the berg_agents package.
+
+All public functions raise :class:`CodeAgentError` (or a subclass) so
+that callers can catch a single exception type.  This also allows the
+CLI to catch all exceptions and print a user-friendly message.
+"""
+
+
+class CodeAgentError(RuntimeError):
+    """Base exception for all berg_agents related errors."""

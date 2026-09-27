@@ -1,0 +1,89 @@
+---
+title: "Quick Start"
+format: html
+---
+
+This guide gets BergAgents installed and running on your local machine.
+
+## 1. Prerequisites
+
+- **Python 3.12+**
+- **`uv`** (recommended) or `pip`
+- **An OpenAI-compatible provider** — e.g. Ollama running locally with a pulled model:
+
+  ```bash
+  ollama pull qwen3.5:9b
+  ```
+
+## 2. Installation
+
+```bash
+git clone https://github.com/your-username/berg-agents.git
+cd berg-agents
+
+uv venv
+source .venv/bin/activate
+uv pip install -e .
+```
+
+## 3. Configuration
+
+Copy the example config and point it at your provider:
+
+```bash
+cp config/bergagents.jsonc config/bergagents.local.jsonc
+```
+
+Minimal `providers` block (Ollama):
+
+```jsonc
+{
+  "providers": {
+    "ollama": {
+      "options": { "baseURL": "http://localhost:11434/v1", "apiKey": "" },
+      "models": { "qwen3.5:9b": {} }
+    }
+  }
+}
+```
+
+Secrets go in `.env` and are referenced as `${env:VAR_NAME}`:
+
+```dotenv
+OPENAI_API_KEY=sk-...
+```
+
+Full reference: [Configuration](CONFIGURATION.qmd).
+
+## 4. Run it
+
+Interactive terminal UI:
+
+```bash
+python -m berg_agents --tui
+# harness> /help
+# harness> /harness refactor the login flow to use sessions
+```
+
+Web UI (FastAPI serves API + static UI on one origin):
+
+```bash
+python -m berg_agents --web --port 8001
+# → http://127.0.0.1:8001
+```
+
+Python API:
+
+```python
+from berg_agents.app import BergAgentsApp
+
+app = BergAgentsApp.create()
+result = app.execute("Add retry logic to the sync worker", task_type="standard")
+print(result["status"])  # completed | needs_human_review | failed
+```
+
+## Next Steps
+
+- [**Usage**](USAGE.qmd) — TUI commands, Python API, and web workflows
+- [**Tools**](TOOLS.qmd) — what the agent can touch and how approval works
+- [**Configuration**](CONFIGURATION.qmd) — providers, routing, HITL rules

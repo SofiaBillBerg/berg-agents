@@ -1,0 +1,69 @@
+/* Berg Agents — single import for the webapp.
+ *
+ * This file is the only one the webapp needs to reference. It pulls in
+ * tokens and components in the correct order, and applies the default
+ * (light) preset last so it can be overridden.
+ */
+@import url("./components/base.css");
+@import url("./tokens/colors.css");
+@import url("./tokens/typography.css");
+@import url("./tokens/spacing.css");
+
+@import url("./components/banner.css");
+@import url("./components/footer.css");
+
+/* Default: Light Theme (applied when no preset is set) */
+:root {
+  --berg-text:           #010a13;
+  --berg-bg:             #fbf7fb;
+  --berg-surface:        #fffafa;
+  --berg-surface-tint:   #f1f3f4;
+  --berg-surface-soft:   rgba(248, 237, 248, 0.76);
+  --berg-code-bg:        rgba(248, 237, 248, 0.76);
+  --berg-code-text:      #551a8b;
+  --berg-border:         #e9ecef;
+  --berg-muted:          #551a8b;
+}
+
+/* Explicit Light Override */
+:root[data-berg-preset="light"],
+[data-berg-preset="light"] {
+  --berg-text:           #010a13;
+  --berg-bg:             #fbf7fb;
+  --berg-surface:        #fffafa;
+  --berg-surface-tint:   #f1f3f4;
+  --berg-surface-soft:   rgba(248, 237, 248, 0.76);
+  --berg-code-bg:        rgba(248, 237, 248, 0.76);
+  --berg-code-text:      #551a8b;
+  --berg-border:         #e9ecef;
+  --berg-muted:          #551a8b;
+}
+
+/* Dark Theme Override */
+:root[data-berg-preset="dark"],
+[data-berg-preset="dark"] {
+  --berg-text:           #e8e6e3;
+  --berg-bg:             #1a1d23;
+  --berg-surface:        #242830;
+  --berg-surface-tint:   #2d323b;
+  --berg-surface-soft:   rgba(36, 40, 48, 0.85);
+  --berg-code-bg:        #1e2128;
+  --berg-code-text:      #c4a8e8;
+  --berg-border:         #3a3f4b;
+  --berg-muted:          #9ca3af;
+}
+
+/* System Preference Detection (only when no explicit preset is set) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-berg-preset="light"]) {
+    --berg-text:           #e8e6e3;
+    --berg-bg:             #1a1d23;
+    --berg-surface:        #242830;
+    --berg-surface-tint:   #2d323b;
+    --berg-surface-soft:   rgba(36, 40, 48, 0.85);
+    --berg-code-bg:        #1e2128;
+    --berg-code-text:      #c4a8e8;
+    --berg-border:         #3a3f4b;
+    --berg-muted:          #9ca3af;
+  }
+}

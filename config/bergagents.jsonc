@@ -1,0 +1,233 @@
+{
+  //# BergAgents Configuration file (JSONC format, comments allowed).
+  "COHERE_API_KEY": "${env:COHERE_API_KEY}",
+  "COHERE_BASE_URL": "${env:COHERE_BASE_URL}",
+  "COHERE_MODEL": "${env:COHERE_MODEL}",
+  "COHERE_SERVER_PORT": "${env:COHERE_SERVER_PORT}",
+  "BERG_AGENT_OPENAI_API_KEY": "${env:BERG_AGENT_OPENAI_API_KEY}",
+  "BERG_AGENT_OPENAI_MODEL": "${env:BERG_AGENT_OPENAI_MODEL}",
+  "BERG_AGENT_OPENAI_BASE_URL": "${env:BERG_AGENT_OPENAI_BASE_URL}",
+  "BERG_AGENT_OLLAMA_SCHEME": "${env:BERG_AGENT_OLLAMA_SCHEME}",
+  "BERG_AGENT_OLLAMA_HOST": "${env:BERG_AGENT_OLLAMA_HOST}",
+  "BERG_AGENT_OLLAMA_PORT": "${env:BERG_AGENT_OLLAMA_PORT}",
+  "BERG_AGENT_OLLAMA_MODEL": "${env:BERG_AGENT_OLLAMA_MODEL}",
+  "BERG_AGENT_TEMPERATURE": 0.7,
+  "BERG_AGENT_STREAM": true,
+  "BERG_AGENT_ROOT_DIR": "${env:BERG_AGENT_ROOT_DIR}",
+  "BERG_AGENT_VERBOSE": true,
+  "BERG_AGENT_LOG_LEVEL": "info",
+  "BERG_AGENT_MCP_SERVERS": "config/mcp.json",
+  //# BergAgents skills: JSON array of paths (or [path, label] pairs) to
+  //# SKILL.md directories, loaded progressively by the harness.
+  //# Paths must live under the mounted workspace (BERG_AGENT_ROOT_DIR).
+  //"BERG_AGENT_SKILLS": "[\"skills/code-conventions\"]",
+
+  //# BergAgents memory: JSON array of AGENTS.md file paths, always loaded.
+  //"BERG_AGENT_MEMORY": "[\"AGENTS.md\"]",
+
+  //# BergAgents todo list: when true (default) the agent gets a write_todos
+  //# tool to maintain a structured task list during execution.
+  "BERG_AGENT_TODOS_ENABLED": true,
+  //# BergAgents summarization trigger (context offloading threshold).
+  //# One of: ["messages", 100] | ["tokens", 60000] | ["fraction", 0.85]
+  //#         [["fraction", 0.8], ["messages", 100]] (OR list) |
+  //#         [{"tokens": 4000, "messages": 10}] (AND clause)
+  "BERG_AGENT_SUMMARIZATION_TRIGGER": "[\"messages\", 100]",
+  //# Context retention after summarization, e.g. ["messages", 20].
+  "BERG_AGENT_SUMMARIZATION_KEEP": "[\"messages\", 20]",
+  //# Provider-agnostic configuration. Use BERG_AGENT_PROVIDER to select
+  //# the backend ("openai" or "ollama"). When "ollama" is selected, the
+  //# harness transparently routes to ChatOpenAI against http://localhost:11434/v1.
+  //# Example: "BERG_AGENT_PROVIDER": "openai"
+  "BERG_AGENT_PROVIDER": "ollama",
+  //# Optional explicit base URL for OpenAI-compatible endpoints.
+  //# When unset, the provider's default applies (OpenAI: https://api.openai.com/v1).
+  "BERG_AGENT_BASE_URL": "${env:BERG_AGENT_BASE_URL}",
+  //# Optional explicit model name override.
+  //"BERG_AGENT_MODEL": "${env:BERG_AGENT_MODEL}",
+
+  //# ---------------------------------------------------------------------------
+  //# PROVIDER/MODEL REGISTRY (preferred — replaces the flat keys above).
+  //# Each model belongs to a provider: selecting a model id automatically
+  //# resolves its provider, baseURL and apiKey. Any OpenAI-compatible
+  //# endpoint can be added here with zero code changes. "{env:VAR}" strings
+  //# expand from the environment at load time. "defaultModel" selects the
+  //# startup model; when omitted the first declared model is used.
+  //# ---------------------------------------------------------------------------
+  "providers": {
+    "unsloth": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "${env:UNSLOTH_BASE_URL}",
+        "apiKey": "${env:UNSLOTH_STUDIO_AUTH_TOKEN}",
+        "timeout": 6000000
+      },
+      "models": {
+        "unsloth/Qwen3.8-27B-GGUF:UD-IQ3_S": {
+          "name": "unsloth/Qwen3.8-27B-GGUF:UD-IQ3_S"
+        },
+        "zacaj/Ornith-1.0-35B-unsloth_UD-IQ3_XXS-MTP-gguf:UD-IQ3_XXS": {
+          "name": "zacaj/Ornith-1.0-35B-unsloth_UD-IQ3_XXS-MTP-gguf:UD-IQ3_XXS"
+        },
+        "unsloth/Qwen-AgentWorld-35B-A3B-GGUF:UD-IQ2_XXS": {
+          "name": "unsloth/Qwen-AgentWorld-35B-A3B-GGUF:UD-IQ2_XXS"
+        },
+        "unsloth/Qwen3.5-4B-MTP-GGUF:UD-Q4_K_XL": {
+          "name": "unsloth/Qwen3.5-4B-MTP-GGUF:UD-Q4_K_XL_K_M"
+        }
+      }
+    },
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://localhost:11434/v1",
+        "timeout": 6000000
+      },
+      "models": {
+        "hf.co/saaeiitaan/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q4_K_M": {
+          "name": "hf.co/saaeiitaan/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q4_K_M"
+        },
+        "midnightcoderagent/MidnightCoder-30B:latest": {
+          "name": "midnightcoderagent/MidnightCoder-30B:latest"
+        },
+        "hf.co/unsloth/LFM2.5-8B-A1B-GGUF:UD-Q4_K_M": {
+          "name": "hf.co/unsloth/LFM2.5-8B-A1B-GGUF:UD-Q4_K_M"
+        },
+        "gemma4:cloud": {
+          "name": "gemma4:cloud"
+        },
+        "nemotron-3-nano:30b-cloud": {
+          "name": "nemotron-3-nano:30b-cloud"
+        }
+      }
+    },
+    "omniroute": {
+      "name": "omniroute",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "${env:BERG_AGENT_OMNIROUTE_BASE_URL}",
+        "apiKey": "${env:BERG_AGENT_OMNIROUTE_API_KEY}",
+        "timeout": 6000000
+      },
+      "models": {
+        "auto": {
+          "name": "auto"
+        },
+        "best-free": {
+          "name": "auto/best-free"
+        }
+      }
+    }
+  },
+  "defaultModel": "hf.co/unsloth/LFM2.5-8B-A1B-GGUF:UD-Q4_K_M",
+  //# MCP server secrets (git-ignored; referenced as ${VAR} in .mcp.json)
+  //# "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}",
+  "CONTEXT7_API_KEY": "${env:CONTEXT7_API_KEY}",
+  //# ---------------------------------------------------------------------------
+  //# BERGAGENTS HARNESS (multi-agent engine)
+  //# ---------------------------------------------------------------------------
+
+  // Harness as host (framework-agnostic core)
+  "harness": {
+    "enable_learning": true,
+    "enable_hitl": true
+  },
+  // Model routing: one model list per complexity level (single axis)
+  "model_routing": {
+    "models": {
+      "trivial": {
+        "models": [
+          "hf.co/unsloth/LFM2.5-8B-A1B-GGUF:UD-Q4_K_M"
+        ],
+        "max_tokens": 40000
+      },
+      "standard": {
+        "models": [
+          "hf.co/unsloth/LFM2.5-8B-A1B-GGUF:UD-Q4_K_M"
+        ],
+        "max_tokens": 60000
+      },
+      "complex": {
+        "models": [
+          "midnightcoderagent/MidnightCoder-30B:latest"
+        ],
+        "max_tokens": 60000
+      },
+      "critical": {
+        "models": [
+          "nemotron-3-nano:30b-cloud"
+        ],
+        "max_tokens": 124000
+      }
+    }
+  },
+  // HITL rules: Guardian decides when to ask human
+  "hitl_rules": {
+    "auto_execute": [
+      "read_file",
+      "list_files",
+      "search_code"
+    ],
+    "notify_after": [
+      "edit_file",
+      "new_file",
+      "generate_test"
+    ],
+    "ask_before": [
+      "delete_file",
+      "execute_command",
+      "refactor"
+    ],
+    "human_leads": [
+      "security_change",
+      "production_deploy",
+      "data_migration"
+    ]
+  },
+  // Agent overrides (optional)
+  "agents": {
+    "guardian": {
+      "preferred_complexity": "standard"
+    },
+    "planner": {
+      "preferred_complexity": "complex"
+    },
+    "implementation": {
+      "preferred_complexity": "standard"
+    },
+    "curator": {
+      "preferred_complexity": "trivial"
+    },
+    "learning": {
+      "preferred_complexity": "standard"
+    }
+  }
+  //# ---------------------------------------------------------------------------
+  //# PRESETS (config-driven toolsets/capabilities — optional, all additive).
+  //# Uncomment and adapt. Schema: berg_agents/capabilities/specs.py.
+  //# NOTE: when uncommenting the block below, add a trailing comma to the
+  //# closing "}" of "agents" above (JSONC allows comments, not stray commas).
+  //# ---------------------------------------------------------------------------
+  //# "toolsets": {
+  //#   "default": ["read-only"],
+  //#   "builtin": {
+  //#     "read-only": {"includes": ["read_file", "list_files", "search_code"]},
+  //#   },
+  //#   "custom": {},
+  //# },
+  //# "capabilities": {
+  //#   "default": ["filesystem"],
+  //#   "custom": {
+  //#     "shell": {"default_timeout": 30.0},
+  //#   },
+  //# },
+  //# "presets": [
+  //#   {
+  //#     "name": "small-readonly",
+  //#     "models": ["*qwen*"],
+  //#     "agents": ["implementation"],
+  //#     "toolsets": ["read-only"],
+  //#     "capabilities": ["filesystem"],
+  //#   },
+  //# ],
+}

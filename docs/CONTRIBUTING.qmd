@@ -1,0 +1,52 @@
+---
+title: "Contributing to Berg Agents"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+# Contributing
+
+Bug fixes, features, and docs improvements are all welcome. The rules below keep the architecture coherent — please follow them.
+
+## Development Setup
+
+```bash
+git clone https://github.com/your-username/berg_agents.git
+cd berg_agents
+uv venv
+source .venv/bin/activate
+uv pip install -e .
+```
+
+## Architecture Principles (NEVER DRIFT)
+
+- `berg_agents/core/` is framework-free — no LangChain, no LangGraph, no web imports. Adapters live in `backends/`.
+- All tasks route through `Harness`, never directly to agents.
+- No shims, wrappers, redirects, or backcompat layers. Delete dead code; don't bridge it.
+- New agents implement `AbstractAgent`; new tools are `ToolSpec` values in the `ToolRegistry`.
+
+## Code Style & Linting
+
+`ruff` for lint and format. Before pushing:
+
+```bash
+ruff check --select F .
+ruff format --check .
+```
+
+Public functions, classes, and methods get docstrings. PEP 8 naming.
+
+## Testing
+
+```bash
+pytest   # full suite, offline: mocks only, never live models
+```
+
+Rules: no live-model tests (`ALLOW_MODEL_REQUESTS=False` in `conftest.py` is never bypassed); strengthen assertions in lockstep with behavior changes, never weaken them to fit. Add tests for every fix and feature.
+
+## Submitting Changes
+
+1. Branch from main (`git checkout -b my-change`).
+2. Keep the change to one logical piece; update the plan tracker if one exists.
+3. Run the full suite + lint; report failures before fixing, then fix.
+4. Open a PR describing what changed and why, with test evidence.

@@ -1,0 +1,76 @@
+/* Berg Agents — base component primitives. */
+
+body {
+  font-family: var(--berg-font-sans);
+  font-size: var(--berg-fs-base);
+  line-height: var(--berg-lh-base);
+  color: var(--berg-text);
+  background-color: var(--berg-bg);
+  margin: 0;
+}
+
+a {
+  color: var(--berg-brand-blue);
+  text-decoration: none;
+}
+a:hover { color: var(--berg-brand-purple); text-decoration: underline; }
+
+button,
+.btn {
+  font-family: var(--berg-font-sans);
+  font-size: var(--berg-fs-sm);
+  font-weight: var(--berg-fw-medium);
+  padding: var(--berg-sp-2) var(--berg-sp-4);
+  border: 1px solid var(--berg-border);
+  border-radius: var(--berg-radius);
+  background: var(--berg-surface);
+  color: var(--berg-text);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+button:hover, .btn:hover {
+  background: var(--berg-surface-tint);
+  border-color: var(--berg-brand-blue);
+}
+button.primary, .btn.primary {
+  background: var(--berg-gradient-brand);
+  color: white;
+  border-color: transparent;
+}
+button.primary:hover, .btn.primary:hover { filter: brightness(1.1); }
+
+.card {
+  background: var(--berg-surface);
+  border: 1px solid var(--berg-border);
+  border-radius: var(--berg-radius);
+  padding: var(--berg-sp-5);
+  box-shadow: var(--berg-shadow-sm);
+}
+
+input, textarea, select {
+  font-family: var(--berg-font-sans);
+  font-size: var(--berg-fs-sm);
+  padding: var(--berg-sp-2) var(--berg-sp-3);
+  border: 1px solid var(--berg-border);
+  border-radius: var(--berg-radius-sm);
+  background: var(--berg-surface);
+  color: var(--berg-text);
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--berg-brand-blue);
+  box-shadow: 0 0 0 3px rgba(59, 82, 139, 0.2);
+}
+
+code, pre {
+  font-family: var(--berg-font-mono);
+  background: var(--berg-code-bg);
+  color: var(--berg-code-text);
+  border-radius: var(--berg-radius-sm);
+  padding: 0.1em 0.35em;
+}
+pre {
+  padding: var(--berg-sp-4);
+  overflow-x: auto;
+  border: 1px solid var(--berg-border);
+}
