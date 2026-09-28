@@ -1,6 +1,5 @@
 """Core agent interfaces and harness components."""
 
-from berg_agents.core.bookkeeper import Bookkeeper
 from berg_agents.core.chat_server import (
     ChatServer,
     ChatServerBase,
@@ -22,7 +21,6 @@ from berg_agents.core.learning_gate import LearningGate
 __all__ = [
     "AbstractAgent",
     "AgentResult",
-    "Bookkeeper",
     "ChatServer",
     "ChatServerBase",
     "Harness",

@@ -80,7 +80,9 @@ def excluded_tools_for_model(model_id: str) -> list[str]:
     ]
     try:
         profiles = load_profiles_from_config_file()
-    except Exception:  # ruff: ignore[blind-except] - bad profile file must not kill tool assembly
+    except (
+        Exception
+    ):  # ruff: ignore[blind-except] - bad profile file must not kill tool assembly
         profiles = {}
     for key, profile in profiles.items():
         if key in candidates:

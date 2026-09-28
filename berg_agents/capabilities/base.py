@@ -1,99 +1,24 @@
-"""Core capability contract for the OAP-inspired layer.
+"""Risk classification vocabulary for tools and capabilities.
 
-Defines the ``Capability`` protocol (the public interface every capability
-must satisfy) and ``CapabilityBase`` (a convenient ABC that implements the
-protocol's ``invoke`` dispatch and validation). ``RiskClass`` provides the
-canonical risk levels used to gate high-risk capabilities.
+This is the single source of truth for risk levels — used by
+:class:`~berg_agents.core.tool_spec.ToolSpec` and the harness routing
+layer to decide whether a tool call requires human-in-the-loop approval.
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import ClassVar, Literal, Protocol, runtime_checkable
+from typing import Literal
 
-from pydantic import BaseModel
-
-#: Canonical risk levels for capabilities.
-#: Used to gate invocation: high-risk capabilities require explicit
-#: approval before execution.
+#: Canonical risk levels.
+#: ``high`` → requires explicit approval; ``"medium"`` → context-dependent;
+#: ``"low"`` → safe to run without review.
 RiskClass = Literal["low", "medium", "high"]
 
-#: Risk level constants for backward-compatible attribute access.
-RISK_LOW: str = "low"
-RISK_MEDIUM: str = "medium"
-RISK_HIGH: str = "high"
+
+#: Named constants for convenient comparison and assignment.
+RISK_LOW: RiskClass = "low"
+RISK_MEDIUM: RiskClass = "medium"
+RISK_HIGH: RiskClass = "high"
 
 
-@runtime_checkable
-class Capability(Protocol):
-    """Structural contract every capability must satisfy.
-
-    Attributes:
-        id: Stable identifier, e.g. ``"read-file"``.
-        intent: Human description of what the capability does.
-        input_model: Pydantic model validating the invocation params.
-        output_model: Pydantic model describing the invocation result.
-        risk_class: One of :data:`RiskClass` values.
-    """
-
-    id: str
-    intent: str
-    input_model: type[BaseModel]
-    output_model: type[BaseModel]
-    risk_class: RiskClass
-
-    def invoke(self, params: BaseModel) -> BaseModel:
-        """Execute the capability against validated ``params``.
-
-        :param params: Validated invocation parameters.
-        :return: The capability result.
-        """
-        ...
-
-
-@dataclass
-class CapabilityBase(ABC):
-    """Base class for capabilities. Subclass and implement ``_execute``.
-
-    Subclasses must set the ``id``, ``intent``, ``input_model`` and
-    ``output_model`` class attributes. ``invoke`` validates that ``params``
-    is an instance of ``input_model`` before delegating to ``_execute``.
-
-    See :class:`Capability` for the structural contract.
-    Note that this is an ABC, so subclasses must implement ``_execute``.
-
-    Attributes:
-        id: Stable identifier, e.g. ``"read-file"``.
-        intent: Human description of what the capability does.
-        input_model: Pydantic model validating the invocation params.
-        output_model: Pydantic model describing the invocation result.
-        risk_class: One of :data:`RiskClass` values.
-    """
-
-    id: ClassVar[str]
-    intent: ClassVar[str]
-    input_model: ClassVar[type[BaseModel]]
-    output_model: ClassVar[type[BaseModel]]
-    risk_class: RiskClass = RISK_LOW
-
-    def invoke(self, params: BaseModel) -> BaseModel:
-        """Validate ``params`` and delegate to ``_execute``.
-
-        :param params: The invocation parameters, an instance of ``input_model``.
-        :return: The capability result, an instance of ``output_model``.
-        :raises TypeError: If ``params`` is not an instance of ``input_model``.
-        """
-        if not isinstance(params, self.input_model):
-            raise TypeError(f"expected {self.input_model.__name__}")
-        return self._execute(params)
-
-    @abstractmethod
-    def _execute(self, params: BaseModel) -> BaseModel:
-        """Implement the capability's actual behavior.
-
-        :param params: Validated invocation parameters.
-
-        :return: The capability result.
-        """
-        ...
+__all__ = ["RISK_HIGH", "RISK_LOW", "RISK_MEDIUM", "RiskClass"]

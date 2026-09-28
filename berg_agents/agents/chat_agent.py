@@ -16,55 +16,7 @@ import json
 import logging
 from typing import Any
 
-from berg_agents.core.harness import Harness
-from berg_agents.core.tool_spec import ToolSpec
-
 logger = logging.getLogger(__name__)
-
-
-async def run_task_impl(
-    ctx: Any,  # RunContext — typed as Any to avoid forward-ref issues
-    description: str,
-    task_type: str = "generic",
-) -> str:
-    """Execute a complex task through the full BergAgents harness pipeline.
-
-    Use this for tasks that need planning, subagents, file changes, HITL
-    review, or multi-step execution. For simple conversation, reply directly
-    without calling this tool.
-
-    Args:
-        description: What the user wants done.
-        task_type: Type of task (generic, code, research, etc.).
-    """
-    harness = ctx.deps  # type: ignore[attr-defined]
-    task: dict[str, Any] = {
-        "description": description,
-        "task_type": task_type,
-        "metadata": {},
-    }
-    result = await asyncio.to_thread(
-        harness.execute_task, task, task_id=f"chat-{id(description)}"
-    )
-
-    # If the harness needs human review, surface it so the caller
-    # (VercelAIAdapter) emits the HITL event to the frontend.
-    if isinstance(result, dict) and result.get("status") == "needs_human_review":
-        return json.dumps(
-            {
-                "status": "needs_human_review",
-                "review_reasons": result.get("review_reasons", []),
-                "risk_level": result.get("risk_level"),
-                "action_requests": result.get("action_requests", []),
-                "answer": result.get("implementation", {}).get("answer", ""),
-            }
-        )
-
-    if isinstance(result, str):
-        return result
-    if isinstance(result, list) and result:
-        result = result[0] if isinstance(result[0], dict) else {}
-    return json.dumps(result) if isinstance(result, dict) else str(result)
 
 
 def build_chat_agent(
@@ -75,13 +27,13 @@ def build_chat_agent(
     """Build a pydantic_ai ``Agent`` for the streaming chat endpoint.
 
     The agent receives:
-    - File-operation tools (read_file, edit_file, write_file) — registered
+    - File-operation tools (read_file, edit_file, write_file) - registered
       from :func:`~berg_agents.agents.factory.create_tools` via ``tool_plain``.
     - A ``run_task`` tool that delegates to the full BergAgents harness when
       the model decides complex work is needed.
 
     System prompt, model, and temperature all come from configuration
-    (``config/bergagents.jsonc`` and ``config/profiles.yaml``) — never
+    (``config/bergagents.jsonc`` and ``config/profiles.yaml``) - never
     hardcoded.
 
     :param model_id: Model identifier to resolve; falls back to the session's
@@ -89,22 +41,24 @@ def build_chat_agent(
     :param root_dir: Workspace root for file tools.
     :return: A configured ``Agent`` ready for ``VercelAIAdapter``.
     """
-    from pydantic_ai import Agent, RunContext
-
     from berg_agents.agents.factory import create_tools
     from berg_agents.config.settings import get_settings
+    from berg_agents.core.harness import Harness
     from berg_agents.providers.models import resolve_model_instance
+    from pydantic_ai import Agent
 
-    # Resolve the model from config — resolve_model_instance reads
+    # Resolve the model from config - resolve_model_instance reads
     # bergagents.jsonc and returns a fully-configured OpenAIChatModel.
     model = resolve_model_instance(model_id or "")
     tools = create_tools(root_dir=root_dir)
 
     # Build the system prompt from settings (config-driven, not hardcoded).
     settings = get_settings()
-    system_prompt = settings.system_prompt.format(
-        root_dir=root_dir
-    ) if "{root_dir}" in settings.system_prompt else settings.system_prompt
+    system_prompt = (
+        settings.system_prompt.format(root_dir=root_dir)
+        if "{root_dir}" in settings.system_prompt
+        else settings.system_prompt
+    )
 
     agent = Agent(
         model,
@@ -116,7 +70,9 @@ def build_chat_agent(
     # tool_plain introspects the function signature to build the JSON schema.
     for spec in tools:
         if spec.execute is None:
-            logger.warning("ToolSpec '%s' has no execute callable; skipping", spec.name)
+            logger.warning(
+                "ToolSpec '%s' has no execute callable; skipping", spec.name
+            )
             continue
 
         agent.tool_plain(
@@ -126,20 +82,15 @@ def build_chat_agent(
             requires_approval=(spec.risk_class or "medium") != "low",
         )
 
-    # Register run_task — uses deps to access the shared harness.
+    # Shared harness for the run_task tool - delegates to the full pipeline
+    # (planning, subagents, HITL, implementation).
     harness = Harness(enable_inference=True)
-
-    # We need to make run_task_impl pick up the harness as deps.
-    # Since the function reads ctx.deps, we pass the harness via deps_type.
-    # But agent is already constructed; we need to create a new one with deps.
-    # Actually, the simpler approach: register run_task with its own harness
-    # reference captured in a closure, not relying on ctx.deps.
 
     async def _run_task(description: str, task_type: str = "generic") -> str:
         """Execute a complex task through the full BergAgents harness pipeline.
 
         Use this for tasks that need planning, subagents, file changes,
-        HITL review, or multi-step execution — e.g. 'write a Python script',
+        HITL review, or multi-step execution - e.g. 'write a Python script',
         'refactor this module', or 'analyze the codebase'.
 
         For simple questions or conversation, reply directly without calling
@@ -149,48 +100,45 @@ def build_chat_agent(
             description: What the user wants done.
             task_type: Type of task (generic, code, research, etc.).
         """
-        return await run_task_impl_with_harness(
-            harness, description, task_type
+        task: dict[str, Any] = {
+            "description": description,
+            "task_type": task_type,
+            "metadata": {},
+        }
+        result = await asyncio.to_thread(
+            harness.execute_task, task, task_id=f"chat-{id(description)}"
         )
+
+        # If the harness needs human review, surface it so the caller
+        # (VercelAIAdapter) emits the HITL event to the frontend.
+        if (
+            isinstance(result, dict)
+            and result.get("status") == "needs_human_review"
+        ):
+            return json.dumps(
+                {
+                    "status": "needs_human_review",
+                    "review_reasons": result.get("review_reasons", []),
+                    "risk_level": result.get("risk_level"),
+                    "action_requests": result.get("action_requests", []),
+                    "answer": result.get("implementation", {}).get(
+                        "answer", ""
+                    ),
+                }
+            )
+
+        if isinstance(result, str):
+            return result
+        if isinstance(result, list) and result:
+            result = result[0] if isinstance(result[0], dict) else {}
+        return json.dumps(result) if isinstance(result, dict) else str(result)
 
     agent.tool_plain(
         _run_task,
         name="run_task",
-        description=_run_task.__doc__ or "Execute a complex task through the full BergAgents pipeline.",
+        description=_run_task.__doc__
+        or "Execute a complex task through the full BergAgents pipeline.",
         requires_approval=True,
     )
 
     return agent
-
-
-async def run_task_impl_with_harness(
-    harness: Any,
-    description: str,
-    task_type: str = "generic",
-) -> str:
-    """Run a task through the harness, returning a JSON string result."""
-    task: dict[str, Any] = {
-        "description": description,
-        "task_type": task_type,
-        "metadata": {},
-    }
-    result = await asyncio.to_thread(
-        harness.execute_task, task, task_id=f"chat-{id(description)}"
-    )
-
-    if isinstance(result, dict) and result.get("status") == "needs_human_review":
-        return json.dumps(
-            {
-                "status": "needs_human_review",
-                "review_reasons": result.get("review_reasons", []),
-                "risk_level": result.get("risk_level"),
-                "action_requests": result.get("action_requests", []),
-                "answer": result.get("implementation", {}).get("answer", ""),
-            }
-        )
-
-    if isinstance(result, str):
-        return result
-    if isinstance(result, list) and result:
-        result = result[0] if isinstance(result[0], dict) else {}
-    return json.dumps(result) if isinstance(result, dict) else str(result)

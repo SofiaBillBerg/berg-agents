@@ -7,13 +7,13 @@ Harness, and from `berg_agents.ui.schemas` for API schema types.
 from berg_agents.core.harness.orchestrator import Harness
 from berg_agents.ui.schemas import (
     ActiveProvider,
+    HarnessRequest,
     HitlAckResponse,
     HitlDecision,
     ProviderInfo,
     ProviderListResponse,
     ThreadResponse,
     ThreadStatusResponse,
-    HarnessRequest,
 )
 
 __all__ = [

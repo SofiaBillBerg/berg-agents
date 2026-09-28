@@ -17,14 +17,13 @@ from typing import Any
 from berg_agents.core.harness import Harness
 from berg_agents.ui.schemas import (
     ActiveProvider,
-    ChatRequest,
+    HarnessRequest,
     HitlAckResponse,
     HitlDecision,
     ProviderInfo,
     ProviderListResponse,
     ThreadResponse,
     ThreadStatusResponse,
-    HarnessRequest,
 )
 from berg_agents.ui.sessions import SessionManager
 from fastapi import APIRouter, HTTPException, Request
@@ -258,21 +257,25 @@ def _thread_markdown(thread_id: str, sessions: SessionManager) -> str:
     """
     lines = [f"# Thread {thread_id}", ""]
     for event in sessions.event_log(thread_id):
-        lines.extend([
-            f"## {event.get('type', 'event')}",
-            "```json",
-            json.dumps(event.get("data", {}), indent=2, default=str),
-            "```",
-            "",
-        ])
+        lines.extend(
+            [
+                f"## {event.get('type', 'event')}",
+                "```json",
+                json.dumps(event.get("data", {}), indent=2, default=str),
+                "```",
+                "",
+            ]
+        )
     result = sessions.get_result(thread_id)
     if result is not None:
-        lines.extend([
-            "## result",
-            "```json",
-            json.dumps(result, indent=2, default=str),
-            "```",
-        ])
+        lines.extend(
+            [
+                "## result",
+                "```json",
+                json.dumps(result, indent=2, default=str),
+                "```",
+            ]
+        )
     return "\n".join(lines)
 
 
@@ -490,8 +493,12 @@ def create_router(
         from berg_agents.agents.chat_agent import build_chat_agent
 
         # Model override via query param (the body is consumed by the adapter).
-        model_id = request.query_params.get("model") or sessions.active_model or ""
-        agent = build_chat_agent(model_id, root_dir=sessions._harness_root_dir())
+        model_id = (
+            request.query_params.get("model") or sessions.active_model or ""
+        )
+        agent = build_chat_agent(
+            model_id, root_dir=sessions._harness_root_dir()
+        )
 
         # sdk_version=6 enables tool-approval streaming (human-in-the-loop).
         # VercelAIAdapter.dispatch_request handles all SSE encoding and

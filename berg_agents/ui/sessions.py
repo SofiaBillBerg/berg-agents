@@ -31,7 +31,10 @@ class SessionManager:
     """Per-thread session state for streaming, HITL, and cancellation."""
 
     def __init__(
-        self, *, active_provider: str = "ollama", active_model: str = "",
+        self,
+        *,
+        active_provider: str = "ollama",
+        active_model: str = "",
         root_dir: str = ".",
     ) -> None:
         """Initialize empty session state.

@@ -288,7 +288,9 @@ class ChatServer(Protocol):
         """
         ...
 
-    def export_thread(self, thread_id: str, format: str = "md") -> str:  # ruff: ignore[builtin-argument-shadowing]
+    def export_thread(
+        self, thread_id: str, format: str = "md"
+    ) -> str:  # ruff: ignore[builtin-argument-shadowing]
         """Export current conversation by thread.
 
         :param thread_id:
@@ -471,7 +473,9 @@ class ChatServerBase(ABC):
         ...
 
     @abstractmethod
-    def export_thread(self, thread_id: str, format: str = "md") -> str:  # ruff: ignore[builtin-argument-shadowing]
+    def export_thread(
+        self, thread_id: str, format: str = "md"
+    ) -> str:  # ruff: ignore[builtin-argument-shadowing]
         """Export a thread in a specific format.
 
         :param thread_id:

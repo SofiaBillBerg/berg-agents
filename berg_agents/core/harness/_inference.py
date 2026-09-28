@@ -136,10 +136,12 @@ async def _await_inference(
 
 
 #: Tool names whose calls count as touching a file.
-_FILE_TOUCHING_TOOLS: frozenset[str] = frozenset({
-    "write_file",
-    "edit_file",
-})
+_FILE_TOUCHING_TOOLS: frozenset[str] = frozenset(
+    {
+        "write_file",
+        "edit_file",
+    }
+)
 
 #: Tool-argument keys carrying the touched path, in priority order.
 _FILE_PATH_ARG_KEYS: tuple[str, ...] = ("file_path", "path")

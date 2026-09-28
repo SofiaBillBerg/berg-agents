@@ -34,17 +34,19 @@ DEFAULT_WORKSPACE_PREFIX = "/workspace/"
 
 #: Tools provided out of the box by BergAgents, so callers can refer to the
 #: same tool names when building permission rules.
-FS_BUILTIN_TOOLS: frozenset[str] = frozenset({
-    "ls",
-    "read_file",
-    "write_file",
-    "edit_file",
-    "glob",
-    "grep",
-    "delete",
-    "execute",
-    "task",
-})
+FS_BUILTIN_TOOLS: frozenset[str] = frozenset(
+    {
+        "ls",
+        "read_file",
+        "write_file",
+        "edit_file",
+        "glob",
+        "grep",
+        "delete",
+        "execute",
+        "task",
+    }
+)
 
 #: Built-in tools that modify state and therefore default to HITL review.
 DEFAULT_INTERRUPT_ON: dict[str, bool] = {

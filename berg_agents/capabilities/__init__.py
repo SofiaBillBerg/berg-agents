@@ -1,32 +1,12 @@
-"""Capability layer: protocol, base class, risk classes and preset specs.
+"""Capability layer — tool routing and catalog.
 
-Exposes the public names of the OAP-inspired capability contract plus the
-config-driven preset schema (:mod:`berg_agents.capabilities.specs`) and
-its resolver (:mod:`berg_agents.capabilities.spec_loader`).
+Only :class:`ToolCatalog` is actively used (by the harness routing layer).
+The old capability-registry / envelope / audit / tool-adapter modules were
+removed as dead code (no callers after the VercelAIAdapter rewrite).
 """
 
 from __future__ import annotations
 
-from .base import Capability, CapabilityBase, RiskClass
-from .spec_loader import (
-    harness_capability_from_spec,
-    load_capability_specs,
-    load_presets,
-    load_toolset_specs,
-    resolve_preset,
-)
-from .specs import CapabilitySpec, PresetSpec, ToolsetSpec
+from .registry import ToolCatalog
 
-__all__ = [
-    "Capability",
-    "CapabilityBase",
-    "CapabilitySpec",
-    "PresetSpec",
-    "RiskClass",
-    "ToolsetSpec",
-    "harness_capability_from_spec",
-    "load_capability_specs",
-    "load_presets",
-    "load_toolset_specs",
-    "resolve_preset",
-]
+__all__ = ["ToolCatalog"]

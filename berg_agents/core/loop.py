@@ -38,7 +38,7 @@ The current :class:`BackendAdapter` returns a *complete* chat-completion
 dict (``adapter.chat(...)``).  When streaming lands in Phase 2-4,
 the loop will switch to ``adapter.stream_chat(...)`` and emit
 ``ContentDelta`` events as tokens arrive.  For now the loop emits
-*one* ``MessageFinish`` per assistant message and no deltas — the
+*one* ``MessageFinish`` per assistant message and no deltas - the
 adapter simply has no delta source.
 """
 
@@ -66,7 +66,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# LoopEvent dataclasses (16 variants — see design-contract §2)
+# LoopEvent dataclasses (16 variants - see design-contract §2)
 # ---------------------------------------------------------------------------
 
 
@@ -547,7 +547,7 @@ class BergLoop:
                 step=steps,
             )
         except Exception as exc:  # ruff: ignore[blind-except]
-            # Last-ditch catch — anything that escaped the inner try.
+            # Last-ditch catch - anything that escaped the inner try.
             _LOGGER.exception("BergLoop.run failed")
             yield RunError(
                 thread_id=thread_id,

@@ -100,7 +100,8 @@ def load(path: str, table: str, limit: int = 500) -> list[dict[str, Any]]:
                 parsed = json.loads(data)
                 if isinstance(parsed, dict):
                     rows.append(parsed)
-            except Exception:
+            except Exception as e:
+                logger.debug("outcome db load row failed (%s): %s", table, e)
                 continue
         con.close()
     except Exception as exc:

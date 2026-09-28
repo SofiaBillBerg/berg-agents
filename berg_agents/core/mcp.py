@@ -1,17 +1,17 @@
-"""BergAgents MCP (Model Context Protocol) client — framework-agnostic.
+"""BergAgents MCP (Model Context Protocol) client - framework-agnostic.
 
 This module defines the interface for how BergAgents talks to external MCP servers.
 It provides a framework-agnostic way to interact with MCP servers, without relying on any specific web framework or library.
 
 What lives here
 ---------------
-* **Naming helpers** — :data:`MCP_TOOL_PREFIX`, :data:`SERVER_SEP`,
+* **Naming helpers** - :data:`MCP_TOOL_PREFIX`, :data:`SERVER_SEP`,
   :func:`prefix_tool_name`, :func:`server_from_prefixed`,
   :func:`is_sensitive_server`, :func:`is_readonly_server`.
-* **Transports** — :class:`McpTransport` (Protocol), :class:`StdioMcpTransport`
+* **Transports** - :class:`McpTransport` (Protocol), :class:`StdioMcpTransport`
   (subprocess + newline-delimited JSON-RPC), :class:`HttpMcpTransport`
   (urllib + SSE listen thread; no third-party deps).
-* **Client** — :class:`McpClient` and :class:`McpServerConfig` wrap a
+* **Client** - :class:`McpClient` and :class:`McpServerConfig` wrap a
   transport and present a one-line ``list_tools()`` / ``call_tool()``
   surface that returns :class:`~berg_agents.core.tool_spec.ToolSpec`
   objects the  loop can drop into its registry unchanged.
@@ -48,7 +48,7 @@ from typing import Any, Protocol
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
-from berg_agents.config.mcp import prefix_tool_name
+from berg_agents.config.mcp_utils import prefix_tool_name
 from berg_agents.core.tool_spec import ToolParam, ToolSpec
 
 # ---------------------------------------------------------------------------
@@ -69,10 +69,12 @@ SERVER_SEP = "__"
 SENSITIVE_SERVERS: frozenset[str] = frozenset({"github", "memory"})
 
 #: Servers that are strictly read-only and safe to call autonomously.
-READONLY_SERVERS: frozenset[str] = frozenset({
-    "codegraph",
-    "context7",
-})
+READONLY_SERVERS: frozenset[str] = frozenset(
+    {
+        "codegraph",
+        "context7",
+    }
+)
 
 
 # Matches ``mcp_<server>__<tool>`` and captures the server segment.
@@ -264,7 +266,9 @@ class StdioMcpTransport:
                 if not line:
                     continue
                 self.logger.warning("mcp stderr: %s", line)
-        except Exception as exc:  # ruff: ignore[blind-except] — drainer never raises
+        except (
+            Exception
+        ) as exc:  # ruff: ignore[blind-except] - drainer never raises
             self.logger.debug("mcp stderr drainer exited: %s", exc)
 
     def request(
@@ -317,7 +321,7 @@ class StdioMcpTransport:
                 )
             line = self._proc.stdout.readline()
             if not line:
-                # EOF — server closed stdout
+                # EOF - server closed stdout
                 raise McpError("MCP subprocess closed stdout unexpectedly")
             line = line.strip()
             if line:
@@ -386,7 +390,7 @@ class HttpMcpTransport:
     :param headers: Optional extra HTTP headers (e.g. auth tokens).
     :param listen_url: Optional URL of the SSE listen stream.  When
         ``None`` the transport sends one ``POST`` per request and
-        expects the response in the POST body — that is the common case
+        expects the response in the POST body - that is the common case
         for ``mcp-streamablehttp``.  When supplied the transport opens
         a long-lived ``GET`` for server-pushed messages.
     :param timeout_s: Per-request HTTP timeout.
@@ -460,7 +464,9 @@ class HttpMcpTransport:
             method="POST",
         )
         try:
-            with urllib_request.urlopen(req, timeout=self.timeout_s) as resp:  # ruff: ignore[suspicious-url-open-usage]
+            with urllib_request.urlopen(
+                req, timeout=self.timeout_s
+            ) as resp:  # ruff: ignore[suspicious-url-open-usage]
                 raw = resp.read()
         except urllib_error.URLError as exc:
             self._drop(request_id)
@@ -496,15 +502,16 @@ class HttpMcpTransport:
             method="GET",
         )
         try:  # ruff: ignore[too-many-statements-in-try-clause]
-            with urllib_request.urlopen(req, timeout=None) as resp:  # ruff: ignore[suspicious-url-open-usage]
+            with urllib_request.urlopen(
+                req, timeout=None
+            ) as resp:  # ruff: ignore[suspicious-url-open-usage]
                 event_type = "message"
                 data_lines: list[str] = []
                 for raw in iter(resp.readline, b""):
                     if self._closed:
                         return
                     line = (
-                        raw
-                        .decode("utf-8", errors="replace")
+                        raw.decode("utf-8", errors="replace")
                         .rstrip("\n")
                         .rstrip("\r")
                     )
@@ -797,7 +804,7 @@ def _params_from_schema(schema: Mapping[str, Any]) -> tuple[ToolParam, ...]:
 
     Only the subset MCP servers actually use is supported: ``type``,
     ``description``, ``enum``, and ``default``.  Unknown properties
-    (``$ref``, ``oneOf``, ...) are silently dropped — the model only
+    (``$ref``, ``oneOf``, ...) are silently dropped - the model only
     needs enough info to call the tool correctly.
     """
     properties = schema.get("properties", {})

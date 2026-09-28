@@ -28,7 +28,7 @@ LM Studio, ...) is just an entry in the ``providers`` block of
 
 Resolution rules (the "pure constructor" pattern):
 
-* The provider is derived **from the model id** — never from a global flag.
+* The provider is derived **from the model id** - never from a global flag.
 * A provider's ``options`` map 1:1 onto chat-model constructor kwargs
   (``baseURL`` → ``base_url``, ``apiKey`` → ``api_key``; unknown keys pass
   through verbatim).  Per-model entries may override individual options.
@@ -43,6 +43,7 @@ dynamic-model middleware) go through :func:`resolve_model`.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from typing import Any
@@ -90,8 +91,11 @@ def _expand_value(value: Any) -> Any:
                 vals = dotenv_values(root / ".env") or {}
                 if vals.get(var) is not None:
                     return vals[var]
-            except Exception:
-                pass
+            except Exception as e:
+                lgogger = logging.getLogger(__name__)
+                lgogger.warning(
+                    "Failed to read .env file for variable expansion: %s", e
+                )
             return ""
         return value
     if isinstance(value, dict):
@@ -181,7 +185,7 @@ def resolve_model(
     """Resolve a model id into concrete chat-model constructor kwargs.
 
     Every OpenAI-compatible backend speaks the same wire protocol, so the
-    resolved ``model_provider`` is always ``"openai"`` — the provider block
+    resolved ``model_provider`` is always ``"openai"`` - the provider block
     only supplies connection options (base_url, api_key, timeouts, ...).
 
     :param model_id: Model identifier exactly as declared under a provider's
@@ -239,10 +243,12 @@ def list_models(cfg: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     models: list[dict[str, Any]] = []
     for (pname, mid), kwargs in _iter_model_kwargs(providers).items():
         display = kwargs.pop("_display_name", None)
-        models.append({
-            "provider": pname,
-            "model": mid,
-            "base_url": kwargs.get("base_url"),
-            "display_name": display or f"{pname}: {mid}",
-        })
+        models.append(
+            {
+                "provider": pname,
+                "model": mid,
+                "base_url": kwargs.get("base_url"),
+                "display_name": display or f"{pname}: {mid}",
+            }
+        )
     return models

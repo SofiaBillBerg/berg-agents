@@ -4,13 +4,11 @@ It parses Python files to extract classes, functions, and their calls, then crea
 """
 
 import ast
-import os
-
 from ast import AST
 from collections import defaultdict
+import os
 from pathlib import Path
 from typing import Any
-
 
 MERMAID_THEME_FLOWCHART = """
     %% Plasma Pastel Theme Configuration %%
@@ -69,10 +67,12 @@ def parse_python_components(
             for item in child.body:
                 if isinstance(item, ast.FunctionDef):
                     method_calls = find_calls(item)
-                    class_methods.append({
-                        "name": item.name,
-                        "calls": method_calls,
-                    })
+                    class_methods.append(
+                        {
+                            "name": item.name,
+                            "calls": method_calls,
+                        }
+                    )
                     class_calls.extend(method_calls)
                 elif isinstance(item, ast.AnnAssign) and isinstance(
                     item.target, ast.Name
@@ -83,27 +83,31 @@ def parse_python_components(
                         if isinstance(t, ast.Name):
                             class_vars.append(t.id)
 
-            components.append({
-                "type": "class",
-                "name": child.name,
-                "submodule": submodule,
-                "variables": class_vars,
-                "methods": class_methods,
-                "calls": list(set(class_calls)),
-                "bases": [ast.unparse(b) for b in child.bases],
-            })
+            components.append(
+                {
+                    "type": "class",
+                    "name": child.name,
+                    "submodule": submodule,
+                    "variables": class_vars,
+                    "methods": class_methods,
+                    "calls": list(set(class_calls)),
+                    "bases": [ast.unparse(b) for b in child.bases],
+                }
+            )
 
         elif isinstance(child, ast.FunctionDef):
             func_calls = find_calls(child)
-            components.append({
-                "type": "function",
-                "name": child.name,
-                "submodule": submodule,
-                "calls": func_calls,
-                "variables": [],
-                "methods": [],
-                "bases": [],
-            })
+            components.append(
+                {
+                    "type": "function",
+                    "name": child.name,
+                    "submodule": submodule,
+                    "calls": func_calls,
+                    "variables": [],
+                    "methods": [],
+                    "bases": [],
+                }
+            )
 
     return components
 
@@ -150,10 +154,12 @@ def generate_mermaid() -> None:  # ruff: ignore[complex-structure]
         external_dependencies = set()
         internal_nodes = []
 
-        mmd_lines.extend((
-            f"    subgraph Internal_Structures [berg_agents.{mod_name} components]",
-            "        direction TB",
-        ))
+        mmd_lines.extend(
+            (
+                f"    subgraph Internal_Structures [berg_agents.{mod_name} components]",
+                "        direction TB",
+            )
+        )
 
         for c in mod_comps:
             if c["type"] == "class":
@@ -168,9 +174,9 @@ def generate_mermaid() -> None:  # ruff: ignore[complex-structure]
                     body_parts.extend([f"  - {v}" for v in c["variables"][:5]])
                 if c["methods"]:
                     body_parts.append("Methods:")
-                    body_parts.extend([
-                        f"  + {m['name']}()" for m in c["methods"][:6]
-                    ])
+                    body_parts.extend(
+                        [f"  + {m['name']}()" for m in c["methods"][:6]]
+                    )
 
                 # Double quotes and clean string compilation prevents rendering dropouts
                 full_label = "\\n".join(body_parts)
