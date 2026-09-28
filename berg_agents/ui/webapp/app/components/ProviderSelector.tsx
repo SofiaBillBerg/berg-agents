@@ -18,8 +18,8 @@ export interface ProviderSelectorProps {
  * Allows users to inspect and switch active LLM providers and models dynamically.
  * Styled with HeroUI components and Berg Agents theme tokens.
  *
- * Uses Next.js Server Actions for provider switching — API keys never
- * touch the client bundle. Data fetched server-side via getProviderData action.
+ * Uses the provider actions layer for secure API communication.
+ * In dev mode, this can be upgraded to true Server Actions.
  *
  * @param props - Component properties
  * @returns JSX element rendering the provider/model selector toolbar
@@ -60,7 +60,7 @@ export function ProviderSelector({
     }
   }
 
-  // Fetch providers and active status via Server Action if not provided via props
+  // Fetch providers and active status via actions layer if not provided via props
   const fetchProviderData = useCallback(async () => {
     try {
       const data = await getProviderData();
@@ -100,8 +100,8 @@ export function ProviderSelector({
   }, [notice]);
 
   /**
-   * Dispatches provider/model change to the backend server via Server Action.
-   * Server Actions keep API keys server-side; client only receives the result.
+ * Dispatches provider/model change via the actions layer.
+   * The actions layer handles API communication server-side.
    *
    * @param provider - Target provider name (e.g. "ollama", "openai")
    * @param model - Target model identifier (e.g. "gpt-oss:20b", "gpt-4o")
@@ -116,7 +116,7 @@ export function ProviderSelector({
 
     setIsSwitching(true);
     try {
-      // Use Server Action for secure server-side provider switching
+      // Use provider action layer for secure API switching
       const result = await switchProvider(provider, model);
 
       if (result.success) {

@@ -1,6 +1,14 @@
 /**
- * Server Actions: Provider management for LLM switching.
- * Uses Next.js App Router Server Actions for secure, server-side API calls.
+ * Provider Actions: Client-side action layer for LLM provider management.
+ *
+ * Current: Uses apiFetch for API calls (works with static export).
+ * Future: Can be upgraded to true Server Actions when the project moves
+ *         off static export ('use server' at module level).
+ *
+ * This layer provides:
+ * - Combined data fetching (providers + active in one round-trip)
+ * - Validation of provider/model pairs
+ * - Centralized error handling
  */
 
 import { apiFetch } from '@/envConfig';
@@ -28,14 +36,13 @@ export interface ProviderData {
 
 /**
  * Switch the active LLM provider and model.
- * Server Action — runs on the server, never exposes API keys to the client.
+ * Calls the backend API via apiFetch — in production this hits the FastAPI
+ * proxy endpoint; in dev mode it can be upgraded to a true Server Action.
  */
 export async function switchProvider(
   provider: string,
   model: string,
 ): Promise<SwitchProviderResult> {
-  'use server';
-
   try {
     const response = await apiFetch('/api/providers/active', {
       method: 'POST',
@@ -60,12 +67,10 @@ export async function switchProvider(
 }
 
 /**
- * Fetch available providers and current selection in a single server-side call.
- * Server Action — safe to call from client components.
+ * Fetch available providers.
+ * Returns provider list from the backend API.
  */
-export async function getProviders() {
-  'use server';
-
+export async function getProviders(): Promise<{ providers: ProviderItem[] }> {
   try {
     const response = await apiFetch('/api/providers');
     if (!response.ok) throw new Error('Failed to fetch providers');
@@ -77,12 +82,10 @@ export async function getProviders() {
 }
 
 /**
- * Fetch both providers list and active provider in one round-trip.
- * Server Action — reduces client-side waterfall requests.
+ * Fetch both providers list and active provider in one combined round-trip.
+ * Reduces client-side waterfall requests vs fetching separately.
  */
 export async function getProviderData(): Promise<ProviderData> {
-  'use server';
-
   try {
     const [listRes, activeRes] = await Promise.all([
       apiFetch('/api/providers'),
@@ -114,14 +117,12 @@ export async function getProviderData(): Promise<ProviderData> {
 
 /**
  * Check if a provider/model pair is valid and get recommended alternatives.
- * Server Action — validation happens server-side for security.
+ * Validation happens server-side via the backend API.
  */
 export async function validateProvider(
   provider: string,
   model: string,
 ): Promise<{ valid: boolean; alternatives: ProviderItem[] }> {
-  'use server';
-
   try {
     const response = await apiFetch('/api/providers');
     if (!response.ok) {

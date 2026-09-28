@@ -32,11 +32,10 @@ const nextConfig = {
     },
   },
 
-  // Experimental features (enabled in dev mode where Server Actions work)
-  experimental: {
-    // Partial Prerendering for selective hydration (Next.js 16.3+)
-    // ppr: 'auto', // Enable once stable
-  },
+  // Cache Components (Next.js 16.3+): enables Partial Prerendering (PPR)
+  // In dev mode, enables PPR for selective hydration testing.
+  // In production (static export), disabled since PPR is incompatible with export mode.
+  cacheComponents: process.env.NODE_ENV !== 'production',
 
   // Webpack configuration for bundle optimization
   webpack: (config, { dev, isServer }) => {
@@ -64,19 +63,20 @@ const nextConfig = {
 
   // Image optimization for agent avatars and UI elements
   images: {
-    domains: ['localhost'],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '*.heroui.com',
       },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
     ],
   },
 
-  // ESLint configuration for code quality
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
+  // ESLint configuration — moved to .eslintrc.json for Next.js 16 compatibility
+  // eslint config now in separate file
 };
 
 export default withBundleAnalyzer(nextConfig);
