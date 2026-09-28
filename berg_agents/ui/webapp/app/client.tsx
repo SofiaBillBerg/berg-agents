@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import dynamic from "next/dynamic";
 
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
-
-// Dynamically load the main App component with SSR disabled to avoid browser API mismatches
-const App = dynamic(() => import("./App.tsx"), { ssr: false });
+import App from "./App.tsx";
 
 /**
  * ClientOnly wrapper component.

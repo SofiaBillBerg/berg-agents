@@ -1,13 +1,20 @@
-/**
- * AI SDK integration hook for the harness.
- * Bridges the harness event stream with AI SDK's useChat for real-time streaming.
+/*
+ * Chat hook — wraps AI SDK v7's useChat to talk to the streaming backend.
+ *
+ * The backend (/api/chat/stream) uses pydantic_ai's VercelAIAdapter to emit
+ * native Vercel AI protocol SSE. This hook provides a clean interface for
+ * the App component.
+ *
+ * Simple messages ("hello") get a direct LLM reply. Complex messages trigger
+ * tool calls (file operations + run_task), which run the full BergAgents harness.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-
-import type { HarnessEvent } from './webhook';
-import { useHarness } from './harness-provider';
-import { eventToAISDKPart, createHarnessEncoder } from './ai-sdk-streaming';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+import type { UIMessage, TextUIPart } from 'ai';
+import { useState } from 'react';
+import type { SetStateAction } from 'react';
+import { API_BASE } from '@/envConfig';
 
 export interface ChatMessage {
   id: string;
@@ -16,89 +23,109 @@ export interface ChatMessage {
   parts?: Array<Record<string, unknown>>;
 }
 
-export function useAISDKChat() {
-  const { harness, isConnected } = useHarness();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export interface UseAISDKChatReturn {
+  messages: ChatMessage[];
+  input: string;
+  /** Direct state setter — compatible with InputBar's setInput prop. */
+  setInput: (value: SetStateAction<string>) => void;
+  /** Change handler — also compatible with InputBar. */
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  /** Send the current input message. */
+  handleSend: () => void;
+  isStreaming: boolean;
+  error: string | null;
+  isConnected: boolean;
+  setMessages: (msgs: ChatMessage[]) => void;
+  clearMessages: () => void;
+  stop: () => void;
+  sendMessage: (content: string) => Promise<void>;
+}
 
-  useEffect(() => {
-    if (!harness) return;
+/**
+ * Extract text content from a UIMessage's parts (v7 API).
+ * In v7, UIMessage has `parts` instead of `content`.
+ */
+function messageText(msg: UIMessage): string {
+  return msg.parts
+    .filter((p): p is TextUIPart => p.type === 'text')
+    .map((p) => p.text)
+    .join('');
+}
 
-    const handleEvent = (event: HarnessEvent) => {
-      const part = eventToAISDKPart(event);
-      if (!part) return;
+/**
+ * Main chat hook — wraps AI SDK v7's useChat to talk to /api/chat/stream.
+ *
+ * Simple messages ("hello") get a direct LLM reply. Complex messages
+ * trigger tool calls (file operations + run_task), which run the full
+ * BergAgents harness. HITL approval requests surface as tool approval
+ * parts in the AI SDK message stream.
+ */
+export function useAISDKChat(): UseAISDKChatReturn {
+  // useChat v7 returns: messages, sendMessage, status, error, setMessages, stop
+  // It does NOT return input/handleInputChange/handleSubmit — we manage input
+  // state separately and call sendMessage directly.
+  const [input, setInput] = useState('');
 
-      setMessages((prev) => {
-        const newMessages = [...prev];
-        switch (part.type) {
-          case 'messageStart': {
-            const msgId = part.data.messageId as string;
-            if (!newMessages.find((m) => m.id === msgId)) {
-              newMessages.push({ id: msgId, role: 'assistant', content: '', parts: [] });
-            }
-            setIsStreaming(true);
-            break;
-          }
-          case 'textDelta': {
-            const msgId = part.data.messageId as string;
-            const lastMsg = newMessages[newMessages.length - 1];
-            if (lastMsg && lastMsg.id === msgId && lastMsg.role === 'assistant') {
-              lastMsg.content += part.data.delta as string;
-            } else {
-              newMessages.push({ id: msgId, role: 'assistant', content: part.data.delta as string, parts: [] });
-            }
-            break;
-          }
-          case 'error': {
-            setError(part.data.message as string);
-            setIsStreaming(false);
-            break;
-          }
-          case 'finish': {
-            setIsStreaming(false);
-            break;
-          }
-          default:
-            break;
-        }
-        return newMessages;
-      });
-    };
+  const {
+    messages: uiMessages,
+    sendMessage: sdkSendMessage,
+    status,
+    error,
+    setMessages: setUIMessages,
+    stop,
+  } = useChat({
+    transport: new DefaultChatTransport({
+      api: `${API_BASE}/api/chat/stream`,
+    }),
+  });
 
-    const unsubscribe = harness.subscribeToEvents(handleEvent);
-    const existingEvents = harness.getCurrentEvents();
-    existingEvents.forEach(handleEvent);
+  const isStreaming = status === 'streaming' || status === 'submitted';
 
-    return () => unsubscribe();
-  }, [harness]);
+  // Convert AI SDK UIMessage[] to the simpler ChatMessage[] our UI expects.
+  const messages: ChatMessage[] = uiMessages.map((msg) => ({
+    id: msg.id,
+    role: msg.role as 'user' | 'assistant' | 'system',
+    content: messageText(msg),
+    parts: [],
+  }));
 
-  const sendMessage = useCallback(async (content: string, taskType: string = 'generic') => {
-    if (!harness) throw new Error('Harness not connected');
+  const setMessages = (msgs: ChatMessage[]) => {
+    setUIMessages(msgs as unknown as UIMessage[]);
+  };
 
-    setMessages((prev) => [...prev, { id: `user-${Date.now()}`, role: 'user', content }]);
-    setIsStreaming(true);
-    setError(null);
+  const clearMessages = () => {
+    setUIMessages([]);
+  };
 
-    try {
-      await harness.executeTask(content, taskType);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Task execution failed';
-      setError(msg);
-      setIsStreaming(false);
-      setMessages((prev) => [...prev, { id: `error-${Date.now()}`, role: 'assistant', content: `Error: ${msg}` }]);
-    }
-  }, [harness]);
+  // handleInputChange for a textarea/input — reads e.target.value.
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+  };
 
-  const clearMessages = useCallback(() => {
-    setMessages([]);
-    setError(null);
-  }, []);
+  // handleSend sends the current input via AI SDK's sendMessage.
+  const handleSend = () => {
+    if (!input.trim() || isStreaming) return;
+    void sdkSendMessage({ text: input });
+  };
 
-  const stop = useCallback(() => {
-    if (harness?.reconnect) harness.reconnect();
-    setIsStreaming(false);
-  }, [harness]);
+  // Programmatic send (used by App's slash-command handler).
+  const sendMessage = async (content: string) => {
+    if (!content.trim()) return;
+    await sdkSendMessage({ text: content });
+  };
 
-  return { messages, isStreaming, error, isConnected, sendMessage, clearMessages, stop };
+  return {
+    messages,
+    input,
+    setInput,
+    handleInputChange,
+    handleSend,
+    isStreaming,
+    error: error ? String(error) : null,
+    isConnected: true,
+    setMessages,
+    clearMessages,
+    stop,
+    sendMessage,
+  };
 }

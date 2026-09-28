@@ -70,7 +70,8 @@ def create_app(
             else [{"name": resolved_provider, "model": resolved_model}]
         )
     sessions = SessionManager(
-        active_provider=resolved_provider, active_model=resolved_model
+        active_provider=resolved_provider, active_model=resolved_model,
+        root_dir=settings.root_dir,
     )
 
     app = FastAPI(title="BergAgents")

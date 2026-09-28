@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+import json
 import logging
 from typing import Any
 
 from berg_agents.core.harness import Harness
 from berg_agents.ui.schemas import (
     ActiveProvider,
+    ChatRequest,
     HitlAckResponse,
     HitlDecision,
     ProviderInfo,
@@ -25,8 +27,9 @@ from berg_agents.ui.schemas import (
     HarnessRequest,
 )
 from berg_agents.ui.sessions import SessionManager
-from fastapi import HTTPException
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
+from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -460,6 +463,46 @@ def create_router(
             raise HTTPException(
                 status_code=404, detail=f"Agent '{name}' not found"
             ) from None
+
+    @router.post("/api/chat/stream")
+    async def chat_stream(
+        request: Request,
+    ) -> Response:
+        """Agentic streaming chat — native Vercel AI protocol via pydantic_ai.
+
+        Uses :class:`~pydantic_ai.ui.vercel_ai.VercelAIAdapter` to handle all
+        event transformation: frontend messages → agent run input, agent
+        events → Vercel AI SSE chunks (text deltas, tool calls, tool results,
+        HITL approval requests).
+
+        Simple messages like "hello" get a direct LLM reply — no tool calls.
+        Complex requests (e.g. "write a file") trigger the model's tools
+        (file operations + ``run_task``), which run the full BergAgents pipeline.
+
+        The agent, model, and system prompt all come from configuration
+        (``config/bergagents.jsonc`` and ``config/profiles.yaml``) — never
+        hardcoded. An optional ``?model=`` query param overrides the model.
+
+        :param request: FastAPI request — VercelAIAdapter inspects the body
+            and ``accept`` header to pick the protocol and parse messages.
+        :return: StreamingResponse with SSE chunks in Vercel AI protocol.
+        """
+        from berg_agents.agents.chat_agent import build_chat_agent
+
+        # Model override via query param (the body is consumed by the adapter).
+        model_id = request.query_params.get("model") or sessions.active_model or ""
+        agent = build_chat_agent(model_id, root_dir=sessions._harness_root_dir())
+
+        # sdk_version=6 enables tool-approval streaming (human-in-the-loop).
+        # VercelAIAdapter.dispatch_request handles all SSE encoding and
+        # protocol transformation natively — we don't need manual event loops.
+        return await VercelAIAdapter.dispatch_request(
+            request,
+            agent=agent,
+            sdk_version=6,
+            on_complete=None,
+            on_cancel=None,
+        )
 
     @router.post("/api/harness")
     async def run_harness(request: HarnessRequest) -> dict[str, Any]:

@@ -65,3 +65,10 @@ class ActiveProvider(BaseModel):
 
     provider: str
     model: str
+
+
+class ChatRequest(BaseModel):
+    """Simple chat request — no task pipeline, just LLM conversation."""
+
+    message: str = Field(min_length=1)
+    model: str | None = None

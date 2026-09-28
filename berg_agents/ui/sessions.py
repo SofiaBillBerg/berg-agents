@@ -31,12 +31,14 @@ class SessionManager:
     """Per-thread session state for streaming, HITL, and cancellation."""
 
     def __init__(
-        self, *, active_provider: str = "ollama", active_model: str = ""
+        self, *, active_provider: str = "ollama", active_model: str = "",
+        root_dir: str = ".",
     ) -> None:
         """Initialize empty session state.
 
         :param active_provider: Initially selected provider name.
         :param active_model: Initially selected model identifier.
+        :param root_dir: Workspace root directory for file tools.
         """
         self._threads: set[str] = set()
         self._queues: dict[str, asyncio.Queue] = {}
@@ -48,6 +50,7 @@ class SessionManager:
         self._decisions: dict[str, asyncio.Event] = {}
         self.active_provider = active_provider
         self.active_model = active_model
+        self._root_dir = root_dir
 
     def create_thread(self) -> str:
         """Create a thread and return its id."""
@@ -211,6 +214,13 @@ class SessionManager:
         event = self._decisions.get(thread_id)
         if event is not None:
             event.set()
+
+    def _harness_root_dir(self) -> str:
+        """Return the workspace root directory for file tools.
+
+        :return: Root directory path string.
+        """
+        return self._root_dir
 
     def get_hitl_decision(self, thread_id: str) -> str | None:
         """Return a thread's recorded HITL decision, if any.
