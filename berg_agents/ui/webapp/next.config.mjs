@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 
 // Bundle analyzer for Phase 2 performance monitoring
-// Enable with: ANALYZE=true npm run build
+// Enable with: ANALYZE=true bun run build
 const withBundleAnalyzer = process.env.ANALYZE === 'true'
   ? (await import('@next/bundle-analyzer')).default({
       enabled: process.env.ANALYZE === 'true',

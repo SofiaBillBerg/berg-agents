@@ -13,16 +13,19 @@ from collections.abc import AsyncIterator
 import logging
 from typing import Any
 
-from berg_agents.core.harness import (
-    Harness,
+from berg_agents.core.harness import Harness
+from berg_agents.ui.schemas import (
+    ActiveProvider,
     HitlAckResponse,
     HitlDecision,
     ProviderInfo,
     ProviderListResponse,
     ThreadResponse,
     ThreadStatusResponse,
+    HarnessRequest,
 )
 from berg_agents.ui.sessions import SessionManager
+from fastapi import HTTPException
 from fastapi.responses import PlainTextResponse, StreamingResponse
 
 logger = logging.getLogger(__name__)
@@ -351,8 +354,8 @@ def _register_thread_routes(
         :return: Dictionary indicating the status of the deletion and the thread id.
         """
         _require_thread(sessions, thread_id)
-        # Sessions has no delete yet - just finish and clear logs
-        sessions.finish(thread_id)
+        # Fully clean up all thread state
+        sessions.delete(thread_id)
         return {"status": "deleted", "thread_id": thread_id}
 
 
@@ -550,7 +553,6 @@ def create_router(
         :return: StreamingResponse yielding events as Server-Sent Events (SSE) in the
         """
         _require_thread(sessions, thread_id)
-        """Stream a thread's events as AI SDK UI-message-stream parts."""
 
         async def event_body() -> AsyncIterator[str]:
             """Generate the event body for the streaming response.

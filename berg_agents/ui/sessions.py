@@ -114,6 +114,25 @@ class SessionManager:
         if queue is not None:
             queue.put_nowait(_STREAM_DONE)
 
+    def delete(self, thread_id: str) -> None:
+        """Fully remove a thread and all its state.
+
+        Clears event queue, logs, results, HITL decisions, and
+        cancels any running background task for the thread.
+
+        :param thread_id: Thread id to remove completely.
+        """
+        self._threads.discard(thread_id)
+        self._queues.pop(thread_id, None)
+        self._logs.pop(thread_id, None)
+        self._results.pop(thread_id, None)
+        self._hitl.pop(thread_id, None)
+        self._decisions.pop(thread_id, None)
+        # Cancel any running background task for this thread
+        task = self._tasks.get(thread_id)
+        if task and not task.done():
+            task.cancel()
+
     async def events(self, thread_id: str) -> AsyncIterator[dict[str, Any]]:
         """Yield live events for a thread until it finishes.
 
