@@ -1,18 +1,20 @@
 /*
- * Simplified App component using the new harness interface.
- * This is a major reduction from the original 900+ line version (~190 lines).
+ * App component using the new harness interface with AI SDK streaming.
  * Utility functions extracted to utils/utils.ts for maintainability.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button, Card } from "@heroui/react";
 
 import { HarnessProvider } from "@/harness/harness-provider";
-import { useTaskExecution, useHarnessState, useHitl, useAgents } from "@/harness/hooks";
-import type { HarnessEvent } from "@/harness/webhook";
-import { toAssistantAnswer, toTranscriptHistory, buildExportMarkdown } from "@/utils/utils";
-import HitlSurface, { type HitlDecision } from "./components/HitlSurface.tsx";
+import { useHarnessState, useHitl, useAgents, useAISDKChat, useTaskExecution } from "@/harness";
+import type { HarnessEvent, HitlDecisionInput } from "@/harness/webhook";
+import { toAssistantAnswer, buildExportMarkdown } from "@/utils/utils";
+
+// Lazy load heavy components for code splitting with React.Suspense
+const HitlSurface = lazy(() => import("./components/HitlSurface.tsx"));
+
 import InputBar from "./components/InputBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
@@ -28,6 +30,7 @@ function AppContentRaw() {
   const { executeTask, isExecuting, result, error: taskError } = useTaskExecution();
   const { respondToHitl } = useHitl();
   const { agents, isLoading: agentsLoading } = useAgents();
+  const aiChat = useAISDKChat(); // Real-time streaming from harness events
 
   // Transcript state (persisted to localStorage)
   const [transcript, setTranscript] = useState<Array<{ role: string; content: string }>>(() => {
@@ -122,33 +125,29 @@ function AppContentRaw() {
     if (isExecuting) return;
 
     try {
-      const taskResult = await executeTask(message, "generic");
-      const newEntries = toTranscriptHistory(taskResult || null, message);
-      setTranscript((prev) => [...prev, ...newEntries]);
+      // Use AI SDK streaming for real-time response
+      await aiChat.sendMessage(message, "generic");
     } catch (err) {
       console.error("Task failed:", err);
     }
   }, [input, isExecuting, executeTask, processSlashCommand]);
 
-  // Handle HITL decision
-  const handleHitlDecision = useCallback(async (decision: HitlDecision | HitlDecision[]) => {
+  // Handle HITL decision — uses harness HitlDecisionInput type
+  const handleHitlDecision = useCallback(async (decision: HitlDecisionInput | HitlDecisionInput[]) => {
     const threadId = (harnessState.hitl as any)?.task_id || (result as any)?.task_id || "";
 
-    if (Array.isArray(decision)) {
-      const kind = decision[0]?.decision;
-      if (kind !== "approve" && kind !== "edit") {
-        setTranscript((prev) => [...prev, {
-          role: "assistant",
-          content: "⛔ Rejected — nothing was written or changed."
-        }]);
-      }
-    } else {
-      if (decision.decision !== "approve" && decision.decision !== "edit") {
-        setTranscript((prev) => [...prev, {
-          role: "assistant",
-          content: "⛔ Rejected — nothing was written or changed."
-        }]);
-      }
+    // Normalize to array and get first decision
+    const decisions = Array.isArray(decision) ? decision : [decision];
+    const firstDecision = decisions[0] as { decision: string } | string;
+    const decisionStr = typeof firstDecision === 'string'
+      ? firstDecision
+      : firstDecision?.decision;
+
+    if (decisionStr !== "approve" && decisionStr !== "edit") {
+      setTranscript((prev) => [...prev, {
+        role: "assistant",
+        content: "⛔ Rejected — nothing was written or changed."
+      }]);
     }
 
     const finalResult = await respondToHitl(threadId, decision as any);
@@ -190,12 +189,13 @@ function AppContentRaw() {
     }
   }, [showSlashPicker, input, slashIndex, handleSend]);
 
-  // Status determination
+  // Status determination — includes AI SDK streaming status
   const status = useMemo(() => {
     if (harnessState.hitl) return { label: "Awaiting your approval", color: "#ff9800", pulse: false };
+    if (aiChat.isStreaming) return { label: "Thinking...", color: "#1976d2", pulse: true };
     if (isExecuting) return { label: "Working...", color: "#1976d2", pulse: true };
     return { label: "Idle", color: "#9e9e9e", pulse: false };
-  }, [harnessState.hitl, isExecuting]);
+  }, [harnessState.hitl, aiChat.isStreaming, isExecuting]);
 
   return (
     <div className="app-container p-4 w-full max-w-[95vw] mx-auto">
@@ -234,13 +234,23 @@ function AppContentRaw() {
         connectionError={harnessState.connection.error}
       />
 
-      <ChatTranscript transcript={transcript} isExecuting={isExecuting} hitlRequest={harnessState.hitl || undefined} />
+      {/* Chat Transcript — combines local transcript + AI SDK streaming messages */}
+      <ChatTranscript
+        isExecuting={aiChat.isStreaming || isExecuting}
+        hitlRequest={harnessState.hitl || undefined}
+        transcript={[
+          ...transcript,
+          ...aiChat.messages.map((msg) => ({ role: msg.role, content: msg.content })),
+        ]}
+      />
 
       {harnessState.hitl && (
-        <HitlSurface
-          pending={harnessState.hitl as unknown as Record<string, unknown>}
-          onDecision={handleHitlDecision}
-        />
+        <Suspense fallback={<Card variant="default"><Card.Content>Loading HITL interface...</Card.Content></Card>}>
+          <HitlSurface
+            pending={harnessState.hitl as unknown as Record<string, unknown>}
+            onDecision={handleHitlDecision}
+          />
+        </Suspense>
       )}
 
       <div className="relative">

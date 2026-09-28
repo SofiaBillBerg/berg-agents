@@ -1,5 +1,14 @@
 /** @type {import('next').NextConfig} */
 
+// Bundle analyzer for Phase 2 performance monitoring
+// Enable with: ANALYZE=true npm run build
+const withBundleAnalyzer = process.env.ANALYZE === 'true'
+  ? (await import('@next/bundle-analyzer')).default({
+      enabled: process.env.ANALYZE === 'true',
+      compression: false,
+    })
+  : (config) => config;
+
 const nextConfig = {
   // Static export only in production (FastAPI mounts dist/). In dev, Next needs server mode for HMR + API proxy.
   output: process.env.NODE_ENV === "production" ? "export" : undefined,
@@ -8,26 +17,66 @@ const nextConfig = {
   turbopack: {
     // Project root — prevents Next.js from using /home/nvidia as root
     root: import.meta.dirname,
-    // Additional safeguard: enforce lookup from this directory
     resolveAlias: {},
   },
   allowedDevOrigins: ["localhost", "127.0.0.1"],
   compiler: {
     styledJsx: true,
-    // see https://styled-components.com/docs/tooling#babel-plugin for more info on the options.
     styledComponents: {
       ssr: true,
-      // Enabled by default.
       fileName: true,
-      // Enabled by default.
       minify: true,
-      // Enabled by default.
       transpileTemplateLiterals: true,
-      // Empty by default.
       namespace: "berg-agents-app",
-      // Enabled by default.
       cssProp: true,
     },
   },
+
+  // Experimental features (enabled in dev mode where Server Actions work)
+  experimental: {
+    // Partial Prerendering for selective hydration (Next.js 16.3+)
+    // ppr: 'auto', // Enable once stable
+  },
+
+  // Webpack configuration for bundle optimization
+  webpack: (config, { dev, isServer }) => {
+    // Production optimizations (non-dev, client-side)
+    if (!dev && !isServer) {
+      config.optimization = {
+        ...config.optimization,
+        usedExports: true,
+        sideEffects: false,
+      };
+    }
+
+    // Ignore node: protocol imports for browser compatibility
+    config.resolve = {
+      ...config.resolve,
+      alias: {
+        ...config.resolve.alias,
+        'node:events': 'events',
+        'node:stream': 'stream',
+      },
+    };
+
+    return config;
+  },
+
+  // Image optimization for agent avatars and UI elements
+  images: {
+    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.heroui.com',
+      },
+    ],
+  },
+
+  // ESLint configuration for code quality
+  eslint: {
+    ignoreDuringBuilds: false,
+  },
 };
-export default nextConfig;
+
+export default withBundleAnalyzer(nextConfig);
