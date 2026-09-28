@@ -1,0 +1,95 @@
+
+project_utils/check_config.py
+# editiors
+/.idea/
+/.vscode/
+/.jbeval/
+
+**/*.bk
+**/*.bak
+cspell.json
+/.venv/
+# R
+/renv/
+**/*.RData
+
+
+# quarto
+docs/docs_web/
+/.quarto/
+**/*.quarto_ipynb
+
+# node
+**/node_modules
+**/.pnp
+**/.pnp.*
+**/.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+
+# next.js
+**/.next/
+**/out/
+**/dist/
+
+# production
+**/build
+**/dist
+
+# misc
+**/.DS_Store
+**/*.pem
+**/package-lock.json
+
+# debug
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+
+# local env files
+**/.env*.local
+**/.env
+
+# typescript
+**/*.tsbuildinfo
+**/next-env.d.ts
+
+# python
+.venv/
+**/*cache*/
+/stubs/
+/apidocs/
+**/**/.ruff*
+**/*egg*/
+# testing
+**/coverage
+coverage.lcov
+**/.hypothesis/
+
+
+# code quality
+/.code_quality_outputs/
+
+
+# berg-agents app outputs
+/outputs_from_bergagents
+
+
+# user stuff
+/notes/
+/docs/visualizations/*.mmd
+/work_notes/
+
+# temps and logs
+**/tmp/
+**/*temp/
+**/*.log
+/.logs/
+
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json

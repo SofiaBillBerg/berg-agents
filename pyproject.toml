@@ -236,7 +236,7 @@ detect-same-package = true # This will allow isort to detect when imports are fr
 # NOTE: no `lines-after-imports` on purpose. isort owns import ORDER/GROUPING;
 # `ruff format` owns BLANK LINES. Setting lines-after-imports to either 1 or 2
 # contradicts the formatter on some file shape (1 breaks imports->def/class
-# which needs 2 blanks; 2 breaks imports->assignment/comment which needs 1) —
+# which needs 2 blanks; 2 breaks imports->assignment/comment which needs 1) -
 # measured 2026-09-06 (2 vs 84 I001s). Leaving it unset lets both tools agree.
 force-sort-within-sections = true # This will force isort to sort imports within each section (standard library, third-party, and local).
 section-order = [
@@ -316,7 +316,7 @@ line-length = 80
 
 
 [tool.black]
-target-version = ["py312", "py313", "py314", "py15"]
+target-version = ["py312", "py313", "py314", "py315"]
 line-length = 80
 
 [tool.ruff.analyze]

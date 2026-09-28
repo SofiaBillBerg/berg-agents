@@ -59,6 +59,7 @@ class TaskContext:
 @dataclass
 class AgentResult:
     """Standardized result from agent execution with structured-output contract (Pydantic-AI / AI SDK pattern)."""
+
     """Standardized result from agent execution."""
 
     success: bool

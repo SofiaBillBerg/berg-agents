@@ -6,9 +6,10 @@ const nextConfig = {
   distDir: "./dist",
   reactStrictMode: false,
   turbopack: {
-    // Workspace root for module resolution. Set explicitly because
-    // a stray lockfile above the repo makes Next.js guess wrong.
+    // Project root — prevents Next.js from using /home/nvidia as root
     root: import.meta.dirname,
+    // Additional safeguard: enforce lookup from this directory
+    resolveAlias: {},
   },
   allowedDevOrigins: ["localhost", "127.0.0.1"],
   compiler: {

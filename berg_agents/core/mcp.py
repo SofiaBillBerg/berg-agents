@@ -91,7 +91,9 @@ def server_from_prefixed(tool_name: str) -> str | None:
     return match.group("server") if match else None
 
 
-def is_sensitive_server(server_name: str, enabled_servers: frozenset[str] | None = None) -> bool:
+def is_sensitive_server(
+    server_name: str, enabled_servers: frozenset[str] | None = None
+) -> bool:
     """Return ``True`` if *server_name* is sensitive (approval-required).
 
     When *enabled_servers* is provided (from loaded MCP server config),
@@ -107,7 +109,9 @@ def is_sensitive_server(server_name: str, enabled_servers: frozenset[str] | None
     return server_name in SENSITIVE_SERVERS
 
 
-def is_readonly_server(server_name: str, enabled_servers: frozenset[str] | None = None) -> bool:
+def is_readonly_server(
+    server_name: str, enabled_servers: frozenset[str] | None = None
+) -> bool:
     """Return ``True`` if *server_name* is read-only (autonomous).
 
     When *enabled_servers* is provided (from loaded MCP server config),
@@ -888,7 +892,7 @@ def load_mcp_server_configs(
 
         cfg = get_settings().model_dump()
 
-    raw = (cfg.get("mcp_servers") if cfg else None)
+    raw = cfg.get("mcp_servers") if cfg else None
     if not raw:
         return []
 

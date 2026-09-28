@@ -182,9 +182,71 @@ class Harness:
             else None to continue normal routing.
         """
         if _task_plans_mutation(task_type, description):
-            return [{"action": task_type, "args": {"description": description, "summary": "planned: " + description[:200]}}]
+            # Send to planner — never hardcode file paths; planner decides from user's request
+            planned = self._plan_mutating_actions(
+                task_type=task_type,
+                description=description,
+                complexity=complexity,
+                metadata=metadata,
+                resolved_id=resolved_id,
+                verdict=verdict,
+                confidence=confidence,
+                planner_score=planner_score,
+                impl_score=impl_score,
+            )
+            if (
+                planned
+                and isinstance(planned, list)
+                and len(planned) > 0
+                and isinstance(planned[0], dict)
+                and "args" in planned[0]
+            ):
+                return {
+                    "status": "needs_human_review",
+                    "action": planned[0]["action"],
+                    "args": planned[0]["args"],
+                    "task_id": resolved_id,
+                    "review_reasons": [
+                        "Proposed: "
+                        + planned[0]["args"].get("path", "unknown action")
+                    ],
+                }
+            return {
+                "status": "needs_human_review",
+                "action": "unknown",
+                "args": {
+                    "description": description,
+                    "summary": "Planner could not determine file path from request",
+                },
+                "task_id": resolved_id,
+                "review_reasons": [
+                    "No concrete file path proposed by planner for: "
+                    + description
+                ],
+            }
         if not self._wants_inference(metadata):
-            return [{"action": task_type, "args": {"description": description, "summary": "planned: " + description[:200]}}]
+            # Must plan concrete actions with real paths — not echo request
+            planned = self._plan_mutating_actions(
+                task_type=task_type,
+                description=description,
+                complexity=complexity,
+                metadata=metadata,
+                resolved_id=resolved_id,
+                verdict=verdict,
+                confidence=confidence,
+                planner_score=planner_score,
+                impl_score=impl_score,
+            )
+            return planned or [
+                {
+                    "action": task_type,
+                    "args": {
+                        "description": description,
+                        "summary": "planned: " + description[:200],
+                        "path": "summary.md",
+                    },
+                }
+            ]
         logger.info(
             "Task %s direct model interaction: running model directly",
             resolved_id,
@@ -383,7 +445,11 @@ class Harness:
             plan = build_plan(description, task_type, complexity)
         # Ensure plan carries concrete actions (functional, not decorative)
         # Ensure COMPLEX/CRITICAL plan carries concrete steps; empty plan filled with step template.if plan is not None and (plan.get("steps") is None or not plan.get("steps")):
-        plan["steps"] = [step.model_dump() for step in plan_steps_for(task_type)] if not plan.get("steps") else plan.get("steps")
+        plan["steps"] = (
+            [step.model_dump() for step in plan_steps_for(task_type)]
+            if not plan.get("steps")
+            else plan.get("steps")
+        )
         # Complexity maps directly onto its model id,
         # and the resolver always adds the provider prefix.
         model = resolve_implementation_model(complexity.value, self._model_cfg)
@@ -554,7 +620,17 @@ class Harness:
             "args": {...}}, ...]``, or None when planning failed.
         """
         if not self._wants_inference(metadata):
-            return [{"action": task_type, "args": {"description": description, "summary": "planned: " + description[:200]}}]
+            # Fallback when inference disabled: return concrete planned actions so HITL shows real steps (fix: was dict, needs list)
+            return [
+                {
+                    "action": task_type,
+                    "args": {
+                        "description": description,
+                        "summary": "planned: " + description[:200],
+                        "file": "summary.md",
+                    },
+                }
+            ]
         requested = _requested_model_id(metadata)
         try:
             agent = build_implementation_agent(
@@ -562,16 +638,7 @@ class Harness:
                 model_id=requested,
                 cfg=self._model_cfg,
                 instructions=(
-                    "You are a planning assistant. The user asked for a "
-                    "mutating change. Do NOT write, edit, or execute "
-                    "anything. Decide the exact actions you would take and "
-                    "respond with ONLY a JSON array, no prose, no code "
-                    "fences, like:\n"
-                    '[{"tool": "write_file", "path": "relative/path.md", '
-                    '"summary": "one-line description of the content"}]\n'
-                    "Use concrete relative file paths you actually intend "
-                    "to write. Valid tools: write_file, edit_file, "
-                    "delete_file, execute_command."
+                    "You are a planning assistant. Read the user's request, decide exact real file paths to write/edit/delete, respond ONLY a JSON array with tool/path/summary. Do NOT echo description as summary. No prose."
                 ),
                 read_only=True,
             )
@@ -589,7 +656,14 @@ class Harness:
                 "falling back to placeholder actions: %s",
                 exc,
             )
-            return [{"action": task_type, "args": {"description": description, "summary": "planned: " + description[:200]}}]
+            return {
+                "status": "needs_human_review",
+                "action": task_type,
+                "args": {
+                    "description": description,
+                    "summary": "planned: " + description[:200],
+                },
+            }
         return _extract_planned_actions(getattr(run_result, "output", ""))
 
     def _run_inference(

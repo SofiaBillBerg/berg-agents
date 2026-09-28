@@ -264,9 +264,9 @@ def build_implementation_agent(
         # schema would risk `UnexpectedModelBehavior` retry
         # exhaustion when the model cannot serialize the schema.
         retries={"output": OUTPUT_RETRIES},
-        instructions=instructions
-        if instructions is not None
-        else default_instructions,
+        instructions=(
+            instructions if instructions is not None else default_instructions
+        ),
     )
 
     @agent.tool

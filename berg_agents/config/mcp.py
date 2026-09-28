@@ -87,7 +87,9 @@ READONLY_SERVERS: frozenset[str] = frozenset({
 })
 
 
-def is_sensitive_server(server_name: str, enabled_servers: frozenset[str] | None = None) -> bool:
+def is_sensitive_server(
+    server_name: str, enabled_servers: frozenset[str] | None = None
+) -> bool:
     """Return ``True`` if *server_name* is a sensitive (approval-required) server.
 
     When *enabled_servers* is provided (from loaded MCP server config),
@@ -103,7 +105,9 @@ def is_sensitive_server(server_name: str, enabled_servers: frozenset[str] | None
     return server_name in SENSITIVE_SERVERS
 
 
-def is_readonly_server(server_name: str, enabled_servers: frozenset[str] | None = None) -> bool:
+def is_readonly_server(
+    server_name: str, enabled_servers: frozenset[str] | None = None
+) -> bool:
     """Return ``True`` if *server_name* is a read-only (autonomous) server.
 
     When *enabled_servers* is provided (from loaded MCP server config),

@@ -10,14 +10,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
-import json
 import logging
 from typing import Any
 
-from berg_agents.core.harness import Harness
-from berg_agents.ui.schemas import (
-    ActiveProvider,
-    HarnessRequest,
+from berg_agents.core.harness import (
+    Harness,
     HitlAckResponse,
     HitlDecision,
     ProviderInfo,
@@ -26,7 +23,6 @@ from berg_agents.ui.schemas import (
     ThreadStatusResponse,
 )
 from berg_agents.ui.sessions import SessionManager
-from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse, StreamingResponse
 
 logger = logging.getLogger(__name__)
@@ -50,7 +46,7 @@ def _to_ui_message_parts(event: dict[str, Any]) -> list[dict[str, Any]]:
 
     Lifecycle events travel as AI SDK ``data-*`` parts so a
     ``useChat`` client consumes them via ``onData``; failures use the
-    protocol ``error`` part. Internal store shapes are unchanged —
+    protocol ``error`` part. Internal store shapes are unchanged -
     translation happens at the SSE boundary only.
 
     :param event: Internal event with ``type`` and ``data`` keys.
@@ -237,7 +233,8 @@ async def _run_stream_task(
             {"type": "task_cancelled", "data": {"thread_id": thread_id}},
         )
         raise
-    except Exception as exc:  # ruff: ignore[blind-except] — surfaced as UI event
+    # ruff: ignore[blind-except] - surfaced as UI event
+    except Exception as exc:
         logger.exception("Stream task failed for thread %s", thread_id)
         sessions.push_event(
             thread_id, {"type": "task_failed", "data": {"error": str(exc)}}
@@ -284,19 +281,45 @@ def _register_thread_routes(
 
     @router.post("/api/threads")
     async def create_thread() -> ThreadResponse:
-        """Create a thread and return its id."""
+        """
+        Create thread.
+
+        :return: Description of return value.
+
+        Example::
+
+            >>> result = create_thread()
+        """
         return ThreadResponse(thread_id=sessions.create_thread())
 
     @router.post("/api/threads/{thread_id}/cancel")
     async def cancel_task(thread_id: str) -> ThreadStatusResponse:
-        """Cancel a thread's running task."""
+        """
+        Cancel task.
+
+        :param thread_id: Thread id to cancel.
+        :return: The thread id and status of the cancelled task.
+
+        Example::
+
+            >>> result = cancel_task(thread_id="example_thread_id")
+        """
         _require_thread(sessions, thread_id)
         sessions.cancel(thread_id)
         return ThreadStatusResponse(thread_id=thread_id, status="cancelled")
 
     @router.get("/threads/{thread_id}/export")
     async def export_thread(thread_id: str) -> PlainTextResponse:
-        """Export a thread's events and result as Markdown."""
+        """
+        Export thread.
+
+        :param thread_id: Thread id to export.
+        :return: Plain text response containing the thread's events and result in Markdown format.
+
+        Example::
+
+            >>> result = export_thread(thread_id="example_thread_id")
+        """
         _require_thread(sessions, thread_id)
         return PlainTextResponse(
             _thread_markdown(thread_id, sessions), media_type="text/markdown"
@@ -304,7 +327,15 @@ def _register_thread_routes(
 
     @router.get("/api/threads/{thread_id}")
     async def get_thread_json(thread_id: str) -> dict[str, Any]:
-        """JSON export for live clients — replaces markdown parse hack."""
+        """JSON export for live clients - replaces markdown parse hack.
+
+        :param thread_id: Thread id to export.
+        :return: Dictionary containing the thread's events and result.
+
+        Example::
+
+            >>> result = get_thread_json(thread_id="example_thread_id")
+        """
         _require_thread(sessions, thread_id)
         return {
             "thread_id": thread_id,
@@ -314,9 +345,13 @@ def _register_thread_routes(
 
     @router.delete("/api/threads/{thread_id}")
     async def delete_thread(thread_id: str) -> dict[str, str]:
-        """Delete a thread's history."""
+        """Delete a thread's history.
+
+        :param thread_id: Thread id to delete.
+        :return: Dictionary indicating the status of the deletion and the thread id.
+        """
         _require_thread(sessions, thread_id)
-        # Sessions has no delete yet — just finish and clear logs
+        # Sessions has no delete yet - just finish and clear logs
         sessions.finish(thread_id)
         return {"status": "deleted", "thread_id": thread_id}
 
@@ -335,21 +370,46 @@ def _register_provider_routes(
 
     @router.get("/api/providers")
     async def list_providers() -> ProviderListResponse:
-        """List configured provider/model pairs."""
+        """
+        List providers.
+
+        :return: A ProviderListResponse object containing a list of available providers and their information.
+
+        Example::
+
+            >>> result = list_providers()
+        """
         return ProviderListResponse(
             providers=[ProviderInfo(**item) for item in providers]
         )
 
     @router.get("/api/providers/active")
     async def get_active_provider() -> ActiveProvider:
-        """Return the currently active provider/model pair."""
+        """
+        Get active provider.
+
+
+        :return: An ActiveProvider object containing the currently active provider and model.
+
+        Example::
+
+            >>> result = get_active_provider()
+        """
         return ActiveProvider(
             provider=sessions.active_provider, model=sessions.active_model
         )
 
     @router.post("/api/providers/active")
     async def set_active_provider(selection: ActiveProvider) -> ActiveProvider:
-        """Switch the active provider/model pair."""
+        """Switch the active provider/model pair.
+
+        :param selection: An ActiveProvider object containing the provider and model to set as active.
+        :return: The ActiveProvider object that was set as active.
+
+        Example::
+
+            >>> result = set_active_provider(ActiveProvider(provider="openai", model="gpt-3.5"))
+        """
         sessions.active_provider = selection.provider
         sessions.active_model = selection.model
         return selection
@@ -372,12 +432,25 @@ def create_router(
 
     @router.get("/api/agents")
     async def list_agents() -> list[dict[str, Any]]:
-        """List all registered agents."""
+        """
+        List all registered agents.
+
+        :return: A list of dictionaries containing information about each agent.
+
+        Example::
+
+            >>> result = list_agents()
+        """
         return harness.get_agent_info()
 
     @router.get("/api/agents/{name}")
     async def get_agent(name: str) -> dict[str, Any]:
-        """Return info for one agent by name."""
+        """
+        Return info for one agent by name.
+
+        :param name: The name of the agent to retrieve.
+        :return: A dictionary containing information about the specified agent.
+        """
         try:
             return harness.get_agent(name).get_info()
         except KeyError:
@@ -392,6 +465,9 @@ def create_router(
         A gated result adopts its task id into the session store
         and resumes in the background, so approve/reject via
         ``/respond`` finds the thread instead of 404ing.
+
+        :param request: Validated harness request.
+        :return: Result of the task execution, or a gated result indicating human review is needed
         """
         task: dict[str, Any] = {
             "description": request.description,
@@ -399,7 +475,13 @@ def create_router(
             "metadata": _requested_model_metadata(request, sessions),
         }
         result = await asyncio.to_thread(harness.execute_task, task)
-        if result.get("status") == "needs_human_review":
+        # Defensive: upstream may still return a list; normalize to dict
+        if isinstance(result, list) and result:
+            result = result[0] if isinstance(result[0], dict) else {}
+        if (
+            isinstance(result, dict)
+            and result.get("status") == "needs_human_review"
+        ):
             thread_id = str(result.get("task_id") or "")
             if thread_id:
                 # Adopt the harness-made id: the UI answers it via
@@ -414,9 +496,9 @@ def create_router(
                             "reasons": result.get("review_reasons", []),
                             "risk_level": result.get("risk_level"),
                             "complexity": result.get("complexity"),
-                            "action_requests": result.get(
-                                "action_requests", []
-                            ),
+                            "action_requests": result.get("action_requests")
+                            or result.get("planned_actions")
+                            or [],
                         },
                     },
                 )
@@ -430,7 +512,13 @@ def create_router(
     async def submit_task_stream(
         thread_id: str, request: HarnessRequest
     ) -> ThreadStatusResponse:
-        """Start background execution for a thread (SSE via /events)."""
+        """Start background execution for a thread (SSE via /events).
+
+
+        :param thread_id: Thread id to execute.
+        :param request: Validated harness request.
+        :return: ThreadStatusResponse indicating the thread has started.
+        """
         _require_thread(sessions, thread_id)
         sessions.push_event(
             thread_id,
@@ -457,10 +545,18 @@ def create_router(
         keep-alive headers keep buffering proxies from holding back
         the stream; the frontend client needs each ``data:`` line as
         it is published.
+
+        :param thread_id: Thread id to stream.
+        :return: StreamingResponse yielding events as Server-Sent Events (SSE) in the
         """
         _require_thread(sessions, thread_id)
+        """Stream a thread's events as AI SDK UI-message-stream parts."""
 
         async def event_body() -> AsyncIterator[str]:
+            """Generate the event body for the streaming response.
+
+            :yield: Each event as a JSON-encoded string in the format of Server-Sent Events (SSE).
+            """
             async for event in sessions.events(thread_id):
                 for part in _to_ui_message_parts(event):
                     yield f"data: {json.dumps(part, default=str)}\n\n"
@@ -491,7 +587,10 @@ def create_router(
 
     @router.get("/api/learning-stats")
     async def learning_stats() -> dict[str, Any]:
-        """Return learning/outcome statistics."""
+        """Return learning/outcome statistics.
+
+        :return: A dictionary containing learning statistics.
+        """
         return harness.get_learning_stats()
 
     _register_thread_routes(router, sessions)

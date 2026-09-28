@@ -78,7 +78,7 @@
         "timeout": 6000000
       },
       "models": {
-        "ornith:9b-q4_K_M ": {
+        "ornith:9b-q4_K_M": {
           "name": "ornith:9b-q4_K_M"
         },
         "gemma4:cloud": {
