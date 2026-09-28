@@ -1,4 +1,6 @@
 
+/.tmp/
+/notes/
 project_utils/check_config.py
 # editiors
 /.idea/
