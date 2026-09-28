@@ -6,6 +6,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Button, Card } from "@heroui/react";
+
 import { HarnessProvider } from "@/harness/harness-provider";
 import { useTaskExecution, useHarnessState, useHitl, useAgents } from "@/harness/hooks";
 import type { HarnessEvent } from "@/harness/webhook";
@@ -19,6 +21,7 @@ import SubtaskPanel from "./components/SubtaskPanel.tsx";
 import LearningPanel from "./components/LearningPanel.tsx";
 import ChatTranscript from "./components/ChatTranscript.tsx";
 import SlashCommandPicker, { COMMANDS, filterCommands } from "./components/SlashCommandPicker.tsx";
+import StatusCard from "./components/StatusCard.tsx";
 
 function AppContentRaw() {
   const harnessState = useHarnessState();
@@ -204,10 +207,10 @@ function AppContentRaw() {
         <div className="header-actions flex items-center gap-2 flex-wrap">
           <ThemeToggle />
           <ProviderSelector />
-          <button
+          <Button
             aria-label="Export conversation as markdown"
-            className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200"
-            onClick={() => {
+            className="border border-primary text-primary hover:bg-primary/10"
+            onPress={() => {
               const md = buildExportMarkdown(transcript, harnessState.events, harnessState.hitl, null);
               const blob = new Blob([md], { type: "text/markdown" });
               const url = URL.createObjectURL(blob);
@@ -217,16 +220,19 @@ function AppContentRaw() {
               link.click();
               URL.revokeObjectURL(url);
             }}
+            size="sm"
           >
             ⬇ Export
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div className="working-status mb-4">
-        <span className={`working-dot ${status.pulse ? "pulse" : ""}`} style={{ background: status.color }} />
-        <span style={{ color: status.color }}>{status.label}</span>
-      </div>
+      {/* Working Status — HeroUI v3 Card compound component */}
+      <StatusCard
+        status={status}
+        isConnected={harnessState.connection.isConnected}
+        connectionError={harnessState.connection.error}
+      />
 
       <ChatTranscript transcript={transcript} isExecuting={isExecuting} hitlRequest={harnessState.hitl || undefined} />
 
@@ -261,36 +267,52 @@ function AppContentRaw() {
         />
       </div>
 
-      <details className="harness-chrome mt-4">
-        <summary>Details & activity</summary>
+      {/* Activity Details — HeroUI v3 Card compound components */}
+      <Card className="mt-4" variant="default">
+        <Card.Header>
+          <Card.Title>Details & Activity</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <AgentPanel compact={false} agents={agents || []} activeAgent={null} />
+          <SubtaskPanel isPlanning={isExecuting} subtasks={(result as any)?.plan || []} />
+          <LearningPanel compact={false} stats={harnessState.learning.stats} />
 
-        <AgentPanel compact agents={agents || []} activeAgent={null} />
-        <SubtaskPanel isPlanning={isExecuting} subtasks={(result as any)?.plan || []} />
-        <LearningPanel compact stats={harnessState.learning.stats} />
+          {result && (
+            <Card className="mt-3" variant="secondary">
+              <Card.Header>
+                <Card.Title className="text-sm">Full Result JSON</Card.Title>
+              </Card.Header>
+              <Card.Content>
+                <pre className="font-mono text-xs whitespace-pre-wrap break-words">
+                  {JSON.stringify(result, null, 2)}
+                </pre>
+              </Card.Content>
+            </Card>
+          )}
 
-        {result && (
-          <details>
-            <summary>Show full result JSON</summary>
-            <pre className="mt-2 p-2 bg-surface-tint rounded-sm text-xs whitespace-pre-wrap break-words">
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          </details>
-        )}
-
-        {harnessState.events.length > 0 && (
-          <details className="tool-activity">
-            <summary>Harness activity ({harnessState.events.length} events)</summary>
-            <div className="mt-1 max-h-[50vh] overflow-y-auto">
-              {harnessState.events.map((ev: HarnessEvent, idx: number) => (
-                <div key={idx} className="harness-event">
-                  <code>{ev.type ?? "event"}</code>
-                  <pre>{JSON.stringify(ev.data ?? ev, null, 2)}</pre>
+          {harnessState.events.length > 0 && (
+            <Card className="mt-3" variant="secondary">
+              <Card.Header>
+                <Card.Title className="text-sm">
+                  Harness Activity ({harnessState.events.length} events)
+                </Card.Title>
+              </Card.Header>
+              <Card.Content>
+                <div className="max-h-64 overflow-y-auto space-y-2">
+                  {harnessState.events.map((ev: HarnessEvent, idx: number) => (
+                    <div key={idx} className="harness-event font-mono text-xs">
+                      <code className="text-blue-600">{ev.type ?? "event"}</code>
+                      <pre className="mt-1 overflow-auto">
+                        {JSON.stringify(ev.data ?? ev, null, 2)}
+                      </pre>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </details>
-        )}
-      </details>
+              </Card.Content>
+            </Card>
+          )}
+        </Card.Content>
+      </Card>
 
       {taskError && <div className="text-red-500 mt-4">Error: {taskError}</div>}
     </div>
