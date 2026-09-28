@@ -42,6 +42,12 @@ export function eventToAISDKPart(event: HarnessEvent): {
       return { type: 'messageEnd', data: { messageId: `msg-${Date.now()}` } };
     }
 
+    case 'text_delta':
+      return {
+        type: 'textDelta',
+        data: (data as Record<string, unknown>),
+      };
+
     case 'task_failed':
       return {
         type: 'error',

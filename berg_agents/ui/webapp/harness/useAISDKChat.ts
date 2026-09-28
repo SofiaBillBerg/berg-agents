@@ -37,6 +37,7 @@ export function useAISDKChat() {
             if (!newMessages.find((m) => m.id === msgId)) {
               newMessages.push({ id: msgId, role: 'assistant', content: '', parts: [] });
             }
+            setIsStreaming(true);
             break;
           }
           case 'textDelta': {

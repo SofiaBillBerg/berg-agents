@@ -10,7 +10,10 @@
     "lint": "eslint --fix",
     "analyze": "ANALYZE=true npm run build",
     "test": "node app/__tests__/integration.test.tsx 2>/dev/null || echo \"Run tests via test runner\"",
-    "test:integration": "node -e \"require(\"./app/__tests__/integration.test.tsx\").runIntegrationTests().then(r => process.exit(r.failed > 0 ? 1 : 0))\" 2>/dev/null || echo \"Install tsx for direct test execution\""
+    "test:integration": "node -e \"require(\"./app/__tests__/integration.test.tsx\").runIntegrationTests().then(r => process.exit(r.failed > 0 ? 1 : 0))\" 2>/dev/null || echo \"Install tsx for direct test execution\"",
+    "test:visual": "npx playwright test app/__tests__/visual.test.ts",
+    "test:visual:update": "npx playwright test app/__tests__/visual.test.ts --update-snapshots",
+    "test:visual:report": "npx playwright show-report"
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.103",
@@ -42,7 +45,9 @@
     "@eslint/compat": "1.2.8",
     "@eslint/eslintrc": "^3.3.7",
     "@eslint/js": "^10.0.1",
+    "@next/bundle-analyzer": "^16.3.6",
     "@next/eslint-plugin-next": "^16.3.4",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.4.1",
     "@types/react": "latest",
     "@types/react-dom": "latest",

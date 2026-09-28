@@ -11,10 +11,6 @@ import { HarnessProvider } from "@/harness/harness-provider";
 import { useHarnessState, useHitl, useAgents, useAISDKChat, useTaskExecution } from "@/harness";
 import type { HarnessEvent, HitlDecisionInput } from "@/harness/webhook";
 import { toAssistantAnswer, buildExportMarkdown } from "@/utils/utils";
-
-// Lazy load heavy components for code splitting with React.Suspense
-const HitlSurface = lazy(() => import("./components/HitlSurface.tsx"));
-
 import InputBar from "./components/InputBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
@@ -24,6 +20,50 @@ import LearningPanel from "./components/LearningPanel.tsx";
 import ChatTranscript from "./components/ChatTranscript.tsx";
 import SlashCommandPicker, { COMMANDS, filterCommands } from "./components/SlashCommandPicker.tsx";
 import StatusCard from "./components/StatusCard.tsx";
+
+// Lazy load heavy components with error boundaries
+const HitlSurface = lazy(() => import("./components/HitlSurface.tsx"));
+
+/**
+ * Error boundary for lazy-loaded components.
+ * Shows a helpful message when a component fails to load or render.
+ */
+class LazyComponentErrorBoundary extends React.Component<
+  { children: React.ReactNode; componentName: string },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; componentName: string }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error(`${this.props.componentName} failed to load:`, error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Card variant="default" className="m-4 border-danger">
+          <Card.Header>
+            <Card.Title className="text-danger">Failed to load {this.props.componentName}</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <p className="text-sm">The {this.props.componentName} component encountered an error.</p>
+            <pre className="text-xs mt-2 bg-surface-tint p-2 rounded">
+              {this.state.error?.message}
+            </pre>
+          </Card.Content>
+        </Card>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function AppContentRaw() {
   const harnessState = useHarnessState();
@@ -245,11 +285,19 @@ function AppContentRaw() {
       />
 
       {harnessState.hitl && (
-        <Suspense fallback={<Card variant="default"><Card.Content>Loading HITL interface...</Card.Content></Card>}>
-          <HitlSurface
-            pending={harnessState.hitl as unknown as Record<string, unknown>}
-            onDecision={handleHitlDecision}
-          />
+        <Suspense fallback={
+          <Card variant="default" className="m-4">
+            <Card.Content className="flex items-center gap-2 p-3">
+              <span className="text-sm">Loading HITL interface...</span>
+            </Card.Content>
+          </Card>
+        }>
+          <LazyComponentErrorBoundary componentName="HITL Surface">
+            <HitlSurface
+              pending={harnessState.hitl as unknown as Record<string, unknown>}
+              onDecision={handleHitlDecision}
+            />
+          </LazyComponentErrorBoundary>
         </Suspense>
       )}
 

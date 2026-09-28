@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Label, ListBox, Select, Spinner } from "@heroui/react";
 
-import { apiFetch } from "@/envConfig";
-
-export interface ProviderItem {
-  name: string;
-  model: string;
-}
-
-export interface ActiveProviderState {
-  provider: string;
-  model: string;
-}
+import { getProviderData, switchProvider } from "../actions/providers";
+import type {
+  ProviderItem,
+  ActiveProviderState,
+} from "../actions/providers";
 
 export interface ProviderSelectorProps {
   activeProvider?: ActiveProviderState | null;
@@ -23,6 +17,9 @@ export interface ProviderSelectorProps {
  * ProviderSelector component.
  * Allows users to inspect and switch active LLM providers and models dynamically.
  * Styled with HeroUI components and Berg Agents theme tokens.
+ *
+ * Uses Next.js Server Actions for provider switching — API keys never
+ * touch the client bundle. Data fetched server-side via getProviderData action.
  *
  * @param props - Component properties
  * @returns JSX element rendering the provider/model selector toolbar
@@ -43,10 +40,7 @@ export function ProviderSelector({
     type: "success" | "error";
   } | null>(null);
 
-  // Sync with prop updates if provided. Adjusted during render (React
-  // discards this pass and re-renders immediately) instead of in effects, to
-  // avoid synchronous setState cascades — same pattern as HitlSurface and
-  // SlashCommandPicker.
+  // Sync with prop updates if provided (same pattern as other components)
   const [prevInitialProviders, setPrevInitialProviders] =
     useState(initialProviders);
   if (prevInitialProviders !== initialProviders) {
@@ -66,33 +60,15 @@ export function ProviderSelector({
     }
   }
 
-  // Fetch providers and active status on initial mount if not provided via props
+  // Fetch providers and active status via Server Action if not provided via props
   const fetchProviderData = useCallback(async () => {
     try {
-      const [listRes, activeRes] = await Promise.all([
-        apiFetch("/api/providers"),
-        apiFetch("/api/providers/active"),
-      ]);
-
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        if (listData.providers && Array.isArray(listData.providers)) {
-          setProviders(listData.providers);
-        }
-      }
-
-      if (activeRes.ok) {
-        const activeData = await activeRes.json();
-        if (activeData.provider && activeData.model) {
-          setActiveProvider({
-            provider: activeData.provider,
-            model: activeData.model,
-          });
-        }
+      const data = await getProviderData();
+      setProviders(data.providers);
+      if (data.active) {
+        setActiveProvider(data.active);
       }
     } catch (err) {
-      // Surface fetch failures in the UI notice (auto-dismissed after 4s by
-      // the existing timer) instead of logging to the console.
       const detail = err instanceof Error ? err.message : "Network error";
       setNotice({
         text: `Failed to load providers list from backend API: ${detail}`,
@@ -108,8 +84,7 @@ export function ProviderSelector({
       !initialActiveProvider
     ) {
       // Deferred to a microtask so the fetch's state updates land outside
-      // the effect body (react-hooks/set-state-in-effect). Same timing
-      // semantics: fires once per prop change when props are absent.
+      // the effect body to avoid synchronous setState cascades.
       queueMicrotask(() => {
         void fetchProviderData();
       });
@@ -125,7 +100,8 @@ export function ProviderSelector({
   }, [notice]);
 
   /**
-   * Dispatches provider/model change to the backend server.
+   * Dispatches provider/model change to the backend server via Server Action.
+   * Server Actions keep API keys server-side; client only receives the result.
    *
    * @param provider - Target provider name (e.g. "ollama", "openai")
    * @param model - Target model identifier (e.g. "gpt-oss:20b", "gpt-4o")
@@ -140,14 +116,11 @@ export function ProviderSelector({
 
     setIsSwitching(true);
     try {
-      const res = await apiFetch("/api/providers/active", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, model }),
-      });
+      // Use Server Action for secure server-side provider switching
+      const result = await switchProvider(provider, model);
 
-      if (res.ok) {
-        const newState = { provider, model };
+      if (result.success) {
+        const newState = result.active || { provider, model };
         setActiveProvider(newState);
         setNotice({
           text: `Switched to ${provider} (${model})`,
@@ -157,15 +130,15 @@ export function ProviderSelector({
           onSwitch(newState);
         }
       } else {
-        const body = await res.json().catch(() => ({}));
         setNotice({
-          text: `Failed to switch: ${body?.detail || res.statusText}`,
+          text: `Failed to switch: ${result.error || "Unknown error"}`,
           type: "error",
         });
       }
-    } catch (err: any) {
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "Network error";
       setNotice({
-        text: `Error switching provider: ${err?.message || "Network error"}`,
+        text: `Error switching provider: ${detail}`,
         type: "error",
       });
     } finally {
@@ -200,7 +173,7 @@ export function ProviderSelector({
             if (colonIdx !== -1) {
               const provider = val.substring(0, colonIdx);
               const model = val.substring(colonIdx + 1);
-              handleSwitch(provider, model).then((r) => {});
+              handleSwitch(provider, model);
             }
           }}
         >

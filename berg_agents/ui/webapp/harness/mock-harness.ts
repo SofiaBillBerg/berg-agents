@@ -105,112 +105,158 @@ export class MockHarness implements IHarness {
     this.scenario = scenario;
   }
 
+  /** Stream text chunks in real-time to simulate AI response */
+  private async streamAnswer(
+    taskId: string,
+    answer: string,
+    onComplete: () => void,
+  ): Promise<void> {
+    // Break answer into words for streaming effect
+    const words = answer.split(/(\s+)/);
+    const chunkSize = 3; // Emit 3 words at a time
+
+    for (let i = 0; i < words.length; i += chunkSize) {
+      const chunk = words.slice(i, i + chunkSize).join("");
+      if (chunk) {
+        this.events.push({
+          type: "text_delta",
+          data: { messageId: taskId, delta: chunk },
+        });
+        this.emitter.emit("event", {
+          type: "text_delta",
+          data: { messageId: taskId, delta: chunk },
+        });
+      }
+      // Small delay between chunks for realistic streaming
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    onComplete();
+  }
+
   async executeTask(description: string, taskType: string = "generic"): Promise<TaskResult> {
+    const taskId = `task-${Date.now()}`;
     this.isRunning = true;
     this.events.push({ type: "task_started", data: { description, task_type: taskType } });
+    this.emitter.emit("event", { type: "task_started", data: { description, task_type: taskType } });
 
     // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     let result: TaskResult;
+    const streamAnswer = this.streamAnswer.bind(this);
 
     switch (this.scenario) {
-      case 'success':
+      case 'success': {
+        const fullAnswer = `Successfully completed task: ${description}\n\nResult: Generated analysis report with key insights and recommendations.`;
         result = {
           status: "completed",
-          task_id: `task-${Date.now()}`,
+          task_id: taskId,
           complexity: TASK_COMPLEXITIES.standard,
-          implementation: {
-            answer: `Successfully completed task: ${description}\n\nResult: Generated analysis report with key insights and recommendations.`
-          },
+          implementation: { answer: fullAnswer },
           plan: [
             { step: 1, description: "Analyze task requirements" },
             { step: 2, description: "Research relevant information" },
-            { step: 3, description: "Generate structured output" }
+            { step: 3, description: "Generate structured output" },
           ],
           curation: { status: "approved" },
           subagents: ["researcher"],
-          background_tasks: []
+          background_tasks: [],
         } as TaskResult;
+
+        // Stream the answer in real-time
+        await streamAnswer(taskId, fullAnswer, () => {
+          this.currentResult = result;
+          this.events.push({ type: "task_completed", data: result });
+          this.emitter.emit("event", { type: "task_completed", data: result });
+        });
         break;
+      }
 
       case 'failure':
+        await new Promise((resolve) => setTimeout(resolve, 400));
         result = {
           status: "failed",
-          task_id: `task-${Date.now()}`,
+          task_id: taskId,
           complexity: TASK_COMPLEXITIES.simple,
           implementation: {
-            answer: "Task execution failed due to insufficient permissions."
+            answer: "Task execution failed due to insufficient permissions.",
           },
-          curation: { status: "rejected" }
+          curation: { status: "rejected" },
         } as TaskResult;
+        this.currentResult = result;
+        this.events.push({ type: "task_failed", data: { error: "Insufficient permissions" } });
+        this.emitter.emit("event", { type: "task_failed", data: { error: "Insufficient permissions" } });
         break;
 
       case 'hitl_required':
-        // Simulate a task that requires human review
+        await new Promise((resolve) => setTimeout(resolve, 500));
         result = {
           status: "needs_human_review",
-          task_id: `task-${Date.now()}`,
+          task_id: taskId,
           complexity: TASK_COMPLEXITIES.complex,
           implementation: {
-            answer: "Generated response but requires human review due to potential risks."
+            answer: "Generated response but requires human review due to potential risks.",
           },
-          curation: { status: "pending_review" }
+          curation: { status: "pending_review" },
         } as TaskResult;
         this.hitlRequest = {
-          task_id: result.task_id,
+          task_id: taskId,
           description,
           review_reasons: [
             "Potential security implications",
             "Privacy-sensitive data handling",
-            "Compliance verification required"
+            "Compliance verification required",
           ],
           risk_level: "high",
-          complexity: TASK_COMPLEXITIES.complex
+          complexity: TASK_COMPLEXITIES.complex,
         };
+        this.currentResult = result;
+        this.events.push({ type: "data-hitl-requested", data: this.hitlRequest });
+        this.emitter.emit("event", { type: "data-hitl-requested", data: this.hitlRequest });
         break;
 
-      case 'long_running':
-        // Simulate a task that takes time to complete
-        await new Promise(resolve => setTimeout(resolve, 2000));
+      case 'long_running': {
+        const fullAnswer =
+          "Starting long-running analysis...\n\nStep 1: Initializing complex analysis...\n" +
+          "Step 2: Processing large dataset...\nStep 3: Generating detailed report...\n" +
+          "Step 4: Quality assurance review...\n\n" +
+          "Long-running task completed successfully.\n\nFinal report generated with comprehensive analysis.";
         result = {
           status: "completed",
-          task_id: `task-${Date.now()}`,
+          task_id: taskId,
           complexity: TASK_COMPLEXITIES.complex,
-          implementation: {
-            answer: "Long-running task completed successfully.\n\nFinal report generated with comprehensive analysis."
-          },
+          implementation: { answer: fullAnswer },
           plan: [
             { step: 1, description: "Initialize complex analysis" },
             { step: 2, description: "Process large dataset" },
             { step: 3, description: "Generate detailed report" },
-            { step: 4, description: "Quality assurance review" }
+            { step: 4, description: "Quality assurance review" },
           ],
-          curation: { status: "approved" }
+          curation: { status: "approved" },
         } as TaskResult;
+        await streamAnswer(taskId, fullAnswer, () => {
+          this.currentResult = result;
+          this.events.push({ type: "task_completed", data: result });
+          this.emitter.emit("event", { type: "task_completed", data: result });
+        });
         break;
+      }
 
       default:
         result = {
           status: "completed",
-          task_id: `task-${Date.now()}`,
+          task_id: taskId,
           complexity: TASK_COMPLEXITIES.standard,
-          implementation: {
-            answer: `Task completed: ${description}`
-          }
+          implementation: { answer: `Task completed: ${description}` },
         } as TaskResult;
+        this.currentResult = result;
+        this.events.push({ type: "task_completed", data: result });
+        this.emitter.emit("event", { type: "task_completed", data: result });
         break;
     }
 
-    this.currentResult = result;
-    this.events.push({ type: "task_completed", data: result });
     this.isRunning = false;
-
-    // Simulate event streaming
-    setTimeout(() => {
-      this.emitter.emit('event', { type: "task_completed", data: result });
-    }, 100);
-
     return result;
   }
 

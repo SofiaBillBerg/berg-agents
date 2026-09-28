@@ -5,9 +5,25 @@
 
 import { apiFetch } from '@/envConfig';
 
+export interface ProviderItem {
+  name: string;
+  model: string;
+}
+
+export interface ActiveProviderState {
+  provider: string;
+  model: string;
+}
+
 export interface SwitchProviderResult {
   success: boolean;
   error?: string;
+  active?: ActiveProviderState;
+}
+
+export interface ProviderData {
+  providers: ProviderItem[];
+  active: ActiveProviderState | null;
 }
 
 /**
@@ -31,7 +47,10 @@ export async function switchProvider(
       return { success: false, error: `HTTP ${response.status}` };
     }
 
-    return { success: true };
+    return {
+      success: true,
+      active: { provider, model },
+    };
   } catch (error) {
     return {
       success: false,
@@ -41,7 +60,7 @@ export async function switchProvider(
 }
 
 /**
- * Fetch available providers and current selection.
+ * Fetch available providers and current selection in a single server-side call.
  * Server Action — safe to call from client components.
  */
 export async function getProviders() {
@@ -54,5 +73,73 @@ export async function getProviders() {
   } catch (error) {
     console.error('Error fetching providers:', error);
     return { providers: [] };
+  }
+}
+
+/**
+ * Fetch both providers list and active provider in one round-trip.
+ * Server Action — reduces client-side waterfall requests.
+ */
+export async function getProviderData(): Promise<ProviderData> {
+  'use server';
+
+  try {
+    const [listRes, activeRes] = await Promise.all([
+      apiFetch('/api/providers'),
+      apiFetch('/api/providers/active'),
+    ]);
+
+    let providers: ProviderItem[] = [];
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      if (listData.providers && Array.isArray(listData.providers)) {
+        providers = listData.providers;
+      }
+    }
+
+    let active: ActiveProviderState | null = null;
+    if (activeRes.ok) {
+      const activeData = await activeRes.json();
+      if (activeData.provider && activeData.model) {
+        active = { provider: activeData.provider, model: activeData.model };
+      }
+    }
+
+    return { providers, active };
+  } catch (error) {
+    console.error('Error fetching provider data:', error);
+    return { providers: [], active: null };
+  }
+}
+
+/**
+ * Check if a provider/model pair is valid and get recommended alternatives.
+ * Server Action — validation happens server-side for security.
+ */
+export async function validateProvider(
+  provider: string,
+  model: string,
+): Promise<{ valid: boolean; alternatives: ProviderItem[] }> {
+  'use server';
+
+  try {
+    const response = await apiFetch('/api/providers');
+    if (!response.ok) {
+      return { valid: false, alternatives: [] };
+    }
+
+    const data = await response.json();
+    const allProviders: ProviderItem[] = data.providers || [];
+    const isValid = allProviders.some(
+      (p) => p.name === provider && p.model === model,
+    );
+    const alternatives = allProviders
+      .filter((p) => p.name === provider && p.model !== model)
+      .slice(0, 5);
+
+    return { valid: isValid, alternatives };
+  } catch (error) {
+    console.error('Error validating provider:', error);
+    return { valid: false, alternatives: [] };
   }
 }
