@@ -1,124 +1,201 @@
 /*
  * Test component to verify the new harness interface works correctly.
- * This is a minimal test version using the new simplified harness API.
+ * Uses HeroUI v3 components with compound patterns.
  */
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
+
+import { Button, Card, Chip, Spinner, TextArea } from '@heroui/react';
 
 import { HarnessProvider } from '@/harness/harness-provider';
-import { useTaskExecution, useAgents, useHarnessState } from '@/harness/hooks';
+import { useTaskExecution, useAgents, useLearningStats, useHarnessState, useAISDKChat } from '@/harness';
 
-export function TestHarnessSimple() {
-  // Use the new simplified harness state hook
+const SCENARIOS = [
+  { key: 'success', label: 'Success' },
+  { key: 'failure', label: 'Failure' },
+  { key: 'hitl_required', label: 'HITL Required' },
+  { key: 'long_running', label: 'Long Running' },
+];
+
+function TestHarnessContent() {
   const harnessState = useHarnessState();
   const { executeTask, isExecuting, result, error } = useTaskExecution();
-  const { agents, isLoading: agentsLoading, error: agentsError } = useAgents();
-  const [input, setInput] = React.useState('');
-  
+  const { agents } = useAgents();
+  const { stats } = useLearningStats();
+  const { messages, sendMessage } = useAISDKChat();
+  const [input, setInput] = useState('Test task: Build a simple web page');
+  const [scenario, setScenario] = useState('success');
+
+  const runTest = useCallback(async () => {
+    try {
+      await executeTask(input, 'generic');
+    } catch (err) {
+      console.error('Test failed:', err);
+    }
+  }, [input, executeTask]);
+
   return (
-    <HarnessProvider initialMode="mock" initialScenario="success">
-      <div className="p-6 max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Harness Test - Simplified Version</h1>
-        
-        {/* Connection Status */}
-        <div className="bg-gray-100 p-4 rounded-lg mb-6">
-          <h2 className="text-lg font-semibold mb-2">Connection Status</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <span className="font-medium">Connected:</span> {harnessState.connection.isConnected ? '✅' : '❌'}
-            </div>
-            <div>
-              <span className="font-medium">Loading:</span> {harnessState.connection.isLoading ? '⏳' : '✅'}
-            </div>
-            <div>
-              <span className="font-medium">Error:</span> {harnessState.connection.error || 'None'}
-            </div>
+    <div className="p-6 max-w-4xl mx-auto space-y-4">
+      {/* Header Card */}
+      <Card variant="default">
+        <Card.Header>
+          <Card.Title>Harness Test Interface</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <p className="text-sm text-muted-foreground">
+            Test all harness scenarios and verify integration.
+          </p>
+        </Card.Content>
+      </Card>
+
+      {/* Connection Status */}
+      <Card variant="default">
+        <Card.Header>
+          <Card.Title>Connection Status</Card.Title>
+        </Card.Header>
+        <Card.Content className="flex items-center gap-3">
+          <Spinner color="accent" size="sm" />
+          <span>{harnessState.connection.isConnected ? 'Connected' : 'Disconnected'}</span>
+          {harnessState.connection.error && (
+            <Chip color="danger" size="sm" variant="soft">
+              {harnessState.connection.error}
+            </Chip>
+          )}
+        </Card.Content>
+      </Card>
+
+      {/* Scenario Selector + Test Input */}
+      <Card variant="default">
+        <Card.Header>
+          <Card.Title>Test Configuration</Card.Title>
+        </Card.Header>
+        <Card.Content className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {SCENARIOS.map((s) => (
+              <Chip
+                key={s.key}
+                color={scenario === s.key ? 'accent' : 'default'}
+                onClick={() => setScenario(s.key)}
+                variant={scenario === s.key ? 'soft' : 'secondary'}
+              >
+                {s.label}
+              </Chip>
+            ))}
           </div>
-        </div>
-        
-        {/* Task Execution */}
-        <div className="bg-blue-50 p-4 rounded-lg mb-6">
-          <h2 className="text-lg font-semibold mb-2">Task Execution</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Task Description:</label>
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Enter task description..."
-                className="w-full p-2 border rounded"
-                disabled={isExecuting}
-              />
-            </div>
-            
-            <button
-              onClick={() => executeTask(input)}
-              disabled={!input || isExecuting}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300"
+
+          <TextArea
+            className="w-full"
+            placeholder="Enter task description..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+          />
+
+          <Button
+            className="mt-2 bg-accent text-white hover:bg-accent/90"
+            isDisabled={isExecuting || !input.trim()}
+            onPress={runTest}
+            variant="secondary"
+          >
+            {isExecuting ? 'Running...' : 'Run Test'}
+          </Button>
+        </Card.Content>
+      </Card>
+
+      {/* Results */}
+      {result && (
+        <Card variant="default">
+          <Card.Header>
+            <Card.Title>Result</Card.Title>
+            <Chip
+              color={result.status === 'completed' ? 'success' : result.status === 'failed' ? 'danger' : 'warning'}
+              size="sm"
+              variant="soft"
             >
-              {isExecuting ? 'Executing...' : 'Execute Task'}
-            </button>
-            
-            {error && (
-              <div className="bg-red-100 p-3 rounded text-red-700">
-                Error: {error}
-              </div>
-            )}
-            
-            {result && (
-              <div className="bg-green-100 p-3 rounded">
-                <h3 className="font-semibold mb-2">Result:</h3>
-                <pre className="text-sm overflow-auto">
-                  {JSON.stringify(result, null, 2)}
-                </pre>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Agents List */}
-        <div className="bg-green-50 p-4 rounded-lg mb-6">
-          <h2 className="text-lg font-semibold mb-2">Available Agents</h2>
-          {agentsLoading ? (
-            <div>Loading agents...</div>
-          ) : agentsError ? (
-            <div className="text-red-700">Error: {agentsError}</div>
-          ) : (
-            <div className="grid gap-2">
-              {(agents || []).map((agent: Record<string, unknown>) => (
-                <div key={agent.name as string} className="bg-white p-3 rounded border">
-                  <div className="font-medium">{agent.name as string}</div>
-                  <div className="text-sm text-gray-600">
-                    Model: {agent.model as string} | Complexity: {agent.preferred_complexity as string}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {agent.description as string}
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    Capabilities: {(agent.capabilities as string[] | undefined)?.join(', ')}
-                  </div>
+              {result.status}
+            </Chip>
+          </Card.Header>
+          <Card.Content>
+            <pre className="text-xs whitespace-pre-wrap bg-surface-tint p-3 rounded">
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          </Card.Content>
+        </Card>
+      )}
+
+      {/* Error */}
+      {error && (
+        <Card variant="default" className="border-danger">
+          <Card.Header>
+            <Card.Title className="text-danger">Error</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <pre className="text-xs text-danger">{error}</pre>
+          </Card.Content>
+        </Card>
+      )}
+
+      {/* AI SDK Messages */}
+      {messages.length > 0 && (
+        <Card variant="default">
+          <Card.Header>
+            <Card.Title>AI SDK Messages ({messages.length})</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {messages.map((msg) => (
+                <div key={msg.id} className="p-2 rounded bg-surface-tint">
+                  <strong className="capitalize">{msg.role}:</strong> {msg.content}
                 </div>
               ))}
             </div>
-          )}
-        </div>
-        
-        {/* Events Log */}
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h2 className="text-lg font-semibold mb-2">Event Log ({harnessState.events.length} events)</h2>
-          <div className="max-h-64 overflow-auto">
-            {harnessState.events.map((event, index) => (
-              <div key={index} className="text-xs font-mono border-b py-1">
-                <span className="text-blue-600">{event.type}</span>
-                <pre className="mt-1 overflow-auto">
-                  {JSON.stringify(event.data, null, 2)}
-                </pre>
+          </Card.Content>
+        </Card>
+      )}
+
+      {/* Agent List */}
+      <Card variant="default">
+        <Card.Header>
+          <Card.Title>Available Agents ({harnessState.agents.data.length})</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {(harnessState.agents.data || []).map((agent: Record<string, unknown>) => (
+              <div key={agent.name as string} className="flex justify-between">
+                <span>{agent.name as string}</span>
+                <Chip size="sm" variant="soft">
+                  {agent.preferred_complexity as string}
+                </Chip>
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </Card.Content>
+      </Card>
+
+      {/* Learning Stats */}
+      {harnessState.learning.stats && (
+        <Card variant="default">
+          <Card.Header>
+            <Card.Title>Learning Stats</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <pre className="text-xs whitespace-pre-wrap">
+              {JSON.stringify(harnessState.learning.stats, null, 2)}
+            </pre>
+          </Card.Content>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Test harness component — wraps content in HarnessProvider.
+ * Demonstrates proper usage of the new harness interface.
+ */
+export default function TestHarnessSimple() {
+  return (
+    <HarnessProvider initialMode="mock" initialScenario="success">
+      <TestHarnessContent />
     </HarnessProvider>
   );
 }

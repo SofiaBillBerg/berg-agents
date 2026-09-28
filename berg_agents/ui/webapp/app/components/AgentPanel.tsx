@@ -1,4 +1,4 @@
-import { Card, Chip } from "@heroui/react";
+import { Avatar, Card, Chip } from "@heroui/react";
 
 export interface AgentInfo {
   name: string;
@@ -44,17 +44,25 @@ export function AgentPanel({
         aria-label="Registered agents"
         className="agent-panel compact flex min-h-11 flex-wrap items-center gap-1.5 p-1"
       >
-        {agents.map((agent) =>
-          activeAgent === agent.name ? (
-            <Chip key={agent.name} color="accent" size="sm" variant="primary">
-              {agent.name}
-            </Chip>
-          ) : (
-            <Chip key={agent.name} size="sm" variant="soft">
-              {agent.name}
-            </Chip>
-          ),
-        )}
+        {agents.map((agent) => (
+          <div key={agent.name} className="flex items-center gap-1.5">
+            <Avatar
+              color={activeAgent === agent.name ? "success" : "default"}
+              size="sm"
+            >
+              {agent.name?.substring(0, 2).toUpperCase() || "??"}
+            </Avatar>
+            {activeAgent === agent.name ? (
+              <Chip color="accent" size="sm" variant="soft">
+                {agent.name}
+              </Chip>
+            ) : (
+              <Chip size="sm" variant="secondary">
+                {agent.name}
+              </Chip>
+            )}
+          </div>
+        ))}
       </div>
     );
   }
@@ -77,10 +85,24 @@ export function AgentPanel({
                 key={agent.name}
                 variant={isActive ? "secondary" : "transparent"}
               >
-                <Card.Header>
-                  <Card.Title>{agent.name}</Card.Title>
-                  {agent.description && (
-                    <Card.Description>{agent.description}</Card.Description>
+                <Card.Header className="flex items-start gap-3">
+                  <Avatar
+                    className="mt-0.5"
+                    color={isActive ? "success" : "accent"}
+                    size="md"
+                  >
+                    {agent.name?.substring(0, 2).toUpperCase() || "??"}
+                  </Avatar>
+                  <div className="flex-1">
+                    <Card.Title>{agent.name}</Card.Title>
+                    {agent.description && (
+                      <Card.Description>{agent.description}</Card.Description>
+                    )}
+                  </div>
+                  {isActive && (
+                    <Chip color="success" size="sm" variant="soft">
+                      Active
+                    </Chip>
                   )}
                 </Card.Header>
                 <Card.Content className="flex flex-wrap items-center gap-1.5">

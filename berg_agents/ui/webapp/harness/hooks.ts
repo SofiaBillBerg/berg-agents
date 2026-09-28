@@ -144,13 +144,14 @@ export function useHarnessEvents() {
       setEvents(prev => [...prev, event]);
     };
 
-    harness.subscribeToEvents(handleEvent);
+    // Subscribe to events
+    const unsubscribe = harness.subscribeToEvents(handleEvent);
 
     // Get current events from harness
     setEvents(harness.getCurrentEvents());
 
     return () => {
-      harness.subscribeToEvents(() => {});
+      unsubscribe();
     };
   }, [harness]);
 
