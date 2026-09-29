@@ -347,8 +347,7 @@ class BergLoop:
         | HitlRequired
         | Any,
         Any,
-        None,
-    ]:
+        None]:
         """Drive the cycle.  Yields :class:`LoopEvent` values.
 
         Stops on terminal events (:class:`RunCompleted` /
@@ -978,8 +977,7 @@ def _extract_tool_calls(message: Mapping[str, Any]) -> list[dict[str, Any]]:
                     {
                         "id": str(block.get("id") or uuid.uuid4()),
                         "name": str(block.get("name") or ""),
-                        "args": dict(block.get("input") or {}),
-                    },
+                        "args": dict(block.get("input") or {})},
                 )
     return out
 
@@ -996,8 +994,7 @@ def _tool_result_message(
         "role": "tool",
         "tool_call_id": call_id,
         "name": name,
-        "content": output,
-    }
+        "content": output}
 
 
 def _tool_error_message(
@@ -1027,5 +1024,4 @@ __all__ = [
     "ToolCallResult",
     "ToolEnd",
     "ToolError",
-    "ToolStart",
-]
+    "ToolStart"]

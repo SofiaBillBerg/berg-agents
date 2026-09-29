@@ -120,9 +120,7 @@ class ToolSpec:
             "function": {
                 "name": self.name,
                 "description": self.description,
-                "parameters": self._json_schema(),
-            },
-        }
+                "parameters": self._json_schema()}}
 
     def to_anthropic_tool(self) -> dict[str, Any]:
         """Render the spec as an Anthropic ``tools[]`` entry.
@@ -135,8 +133,7 @@ class ToolSpec:
         return {
             "name": self.name,
             "description": self.description,
-            "input_schema": self._json_schema(),
-        }
+            "input_schema": self._json_schema()}
 
     def _json_schema(self) -> dict[str, Any]:
         """Render the params as a JSON-Schema ``object``.
@@ -235,8 +232,7 @@ def _json_type_to_python(json_type: str) -> Any:
         "boolean": bool,
         "array": list,
         "object": dict,
-        "null": type(None),
-    }.get(json_type, str)
+        "null": type(None)}.get(json_type, str)
 
 
 def _python_type_to_json(annotation: Any) -> str:

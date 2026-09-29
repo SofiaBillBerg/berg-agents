@@ -71,8 +71,7 @@ SENSITIVE_SERVERS: frozenset[str] = frozenset({"github", "memory"})
 READONLY_SERVERS: frozenset[str] = frozenset(
     {
         "codegraph",
-        "context7",
-    }
+        "context7"}
 )
 
 
@@ -677,8 +676,7 @@ class McpClient:
         params = {
             "protocolVersion": "2024-11-05",
             "capabilities": {},
-            "clientInfo": {"name": "berg-agents", "version": "0.2.0"},
-        }
+            "clientInfo": {"name": "berg-agents", "version": "0.2.0"}}
         response = self.config.transport.request("initialize", params)
         self._initialized = True
         return response.get("result", {})
@@ -965,5 +963,4 @@ __all__ = [
     "iter_servers_to_clients",
     "load_mcp_server_configs",
     "prefix_tool_name",
-    "server_from_prefixed",
-]
+    "server_from_prefixed"]

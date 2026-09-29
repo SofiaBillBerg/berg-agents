@@ -31,5 +31,4 @@ __all__ = [
     "render_stats",
     "run_cli_ui",
     "run_harness_task",
-    "run_tui",
-]
+    "run_tui"]

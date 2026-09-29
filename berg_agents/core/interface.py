@@ -52,8 +52,7 @@ class TaskContext:
             "task_type": self.task_type,
             "complexity": self.complexity.value,
             "risk_level": self.risk_level.value,
-            "metadata": self.metadata,
-        }
+            "metadata": self.metadata}
 
 
 @dataclass
@@ -81,8 +80,7 @@ class AgentResult:
             "review_reasons": self.review_reasons,
             "model_used": self.model_used,
             "tokens_used": self.tokens_used,
-            "metadata": self.metadata,
-        }
+            "metadata": self.metadata}
 
 
 class AbstractAgent(ABC):
@@ -139,5 +137,4 @@ class AbstractAgent(ABC):
             "name": self.name,
             "description": self.description,
             "preferred_complexity": self.preferred_complexity,
-            "capabilities": self.capabilities,
-        }
+            "capabilities": self.capabilities}

@@ -1,14 +1,2 @@
 * text=auto
 * text=auto eol=lf
-*.md filter=strip-local
-*.qmd filter=strip-local
-*.py filter=strip-local
-*.toml filter=strip-local
-.gitignore filter=strip-local
-*.js filter=strip-local
-*.ts filter=strip-local
-*.jsx filter=strip-local
-*.tsx filter=strip-local
-*.yml filter=strip-local
-*.yaml filter=strip-local
-*.json filter=strip-local

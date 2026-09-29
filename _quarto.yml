@@ -18,7 +18,7 @@ project:
     - "!notes/*.*"
     - "!apidocs/**/*.*"
     - "decisions/decisions-log.md"
-   # - "CHANGELOG.qmd"
+    # - "CHANGELOG.qmd"
   post-render:
     - "project_utils/render_readme.sh"
 website:
@@ -27,7 +27,7 @@ website:
   llms-txt: true
   page-navigation: true
   search:
-    keyboard-shortcut: [ "?", "H" ]
+    keyboard-shortcut: ["?", "H"]
     copy-button: true
     type: textbox
 
@@ -73,7 +73,6 @@ website:
           href: decisions/decisions-log.md
         - text: "FAQ & Troubleshooting"
           href: docs/FAQ.qmd
-
 
 format:
   html:

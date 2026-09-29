@@ -42,8 +42,7 @@ __all__ = [
     "estimate_complexity",
     "order_subtasks",
     "plan_depth",
-    "planner_agent",
-]
+    "planner_agent"]
 
 #: Explicit Pydantic AI agent name (labels Logfire run spans).
 PLANNER_NAME = "planner"
@@ -94,8 +93,7 @@ class Subtask:
             "task_type": self.task_type,
             "complexity": self.complexity.value,
             "dependencies": self.dependencies,
-            "estimated_complexity": self.estimated_complexity,
-        }
+            "estimated_complexity": self.estimated_complexity}
 
     @classmethod
     def simple(
@@ -174,8 +172,7 @@ def _decompose_refactor() -> list[Subtask]:
             task_type="generate_test",
             complexity=TaskComplexity.STANDARD,
             dependencies=["3"],
-        ),
-    ]
+        )]
 
 
 def _decompose_implement() -> list[Subtask]:
@@ -201,8 +198,7 @@ def _decompose_implement() -> list[Subtask]:
             task_type="generate_test",
             complexity=TaskComplexity.STANDARD,
             dependencies=["2"],
-        ),
-    ]
+        )]
 
 
 def _decompose_fix() -> list[Subtask]:
@@ -228,8 +224,7 @@ def _decompose_fix() -> list[Subtask]:
             task_type="generate_test",
             complexity=TaskComplexity.STANDARD,
             dependencies=["2"],
-        ),
-    ]
+        )]
 
 
 def _decompose_test() -> list[Subtask]:
@@ -248,8 +243,7 @@ def _decompose_test() -> list[Subtask]:
             task_type="generate_test",
             complexity=TaskComplexity.STANDARD,
             dependencies=["1"],
-        ),
-    ]
+        )]
 
 
 def decompose(description: str, task_type: str = "generic") -> list[Subtask]:
@@ -350,15 +344,13 @@ def suggest_planning_hint(
         return {
             "capability": "Planning",
             "enable_subtasks": True,
-            "reason": "complex/critical",
-        }
+            "reason": "complex/critical"}
     multi_step_threshold = 2
     if plan.get("total_subtasks", 0) > multi_step_threshold:
         return {
             "capability": "Planning",
             "enable_subtasks": True,
-            "reason": f"multi-step ({plan.get('total_subtasks')})",
-        }
+            "reason": f"multi-step ({plan.get('total_subtasks')})"}
     return None
 
 
@@ -394,8 +386,7 @@ def build_plan(
         "subtasks": [s.to_dict() for s in ordered],
         "total_subtasks": len(ordered),
         "estimated_complexity": complexity.value,
-        "plan_depth": plan_depth(ordered),
-    }
+        "plan_depth": plan_depth(ordered)}
 
 
 def build_planner_agent(
@@ -494,8 +485,7 @@ class Planner(AbstractAgent):
     capabilities: ClassVar[list[str]] = [
         "task_decomposition",
         "complexity_estimation",
-        "dependency_analysis",
-    ]
+        "dependency_analysis"]
 
     # Instance method required by the AbstractAgent contract;
     # scoring is a pure function of the task dict.
@@ -519,8 +509,7 @@ class Planner(AbstractAgent):
         complexity = estimate_complexity(task.get("description", ""), task_type)
         if complexity in {
             TaskComplexity.COMPLEX,
-            TaskComplexity.CRITICAL,
-        }:
+            TaskComplexity.CRITICAL}:
             return 0.8
         if complexity == TaskComplexity.TRIVIAL:
             return 0.2
@@ -557,7 +546,6 @@ class Planner(AbstractAgent):
             output={
                 "subtasks": plan["subtasks"],
                 "total_subtasks": plan["total_subtasks"],
-                "estimated_complexity": plan["estimated_complexity"],
-            },
+                "estimated_complexity": plan["estimated_complexity"]},
             metadata={"plan_depth": plan["plan_depth"]},
         )

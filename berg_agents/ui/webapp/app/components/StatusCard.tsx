@@ -19,7 +19,10 @@ export interface StatusCardProps {
  * StatusCard component using HeroUI v3 Card compound components.
  * Shows connection status with proper visual hierarchy.
  */
-export function StatusCard({ status, isConnected, connectionError }: StatusCardProps) {
+export function StatusCard({
+  status,
+  isConnected,
+  connectionError}: StatusCardProps) {
   if (isConnected && !connectionError) {
     return (
       <Card className="mb-4" variant="default">
@@ -46,10 +49,12 @@ export function StatusCard({ status, isConnected, connectionError }: StatusCardP
             style={{ background: status.color }}
           />
           <span className="text-sm text-yellow-700">
-            Running in {isConnected ? 'mock' : 'limited'} mode
+            Running in {isConnected ? "mock" : "limited"} mode
           </span>
           {connectionError && (
-            <span className="text-xs text-red-600">Error: {connectionError}</span>
+            <span className="text-xs text-red-600">
+              Error: {connectionError}
+            </span>
           )}
         </div>
       </Card.Content>

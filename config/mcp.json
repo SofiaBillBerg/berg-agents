@@ -10,19 +10,11 @@
     },
     "codegraph": {
       "type": "local",
-      "command": [
-        "codegraph",
-        "serve",
-        "--mcp"
-      ],
+      "command": ["codegraph", "serve", "--mcp"],
       "enabled": true
     },
     "github": {
-      "command": [
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-github"
-      ],
+      "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
       "enabled": false,
       "environment": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
@@ -30,11 +22,7 @@
       "type": "local"
     },
     "memory": {
-      "command": [
-        "npx",
-        "-y",
-        "@modelcontextprotocol/server-memory"
-      ],
+      "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
       "enabled": true,
       "type": "local"
     }

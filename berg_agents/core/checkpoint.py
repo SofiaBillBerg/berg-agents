@@ -25,6 +25,8 @@ Design goals
    :class:`threading.Lock` map to serialize the disk write.
 5. **Generator-friendly.** ``list()`` yields thread ids in lexicographic
    order; ``get()`` returns ``None`` when the thread has no snapshot.
+
+
 """
 
 from __future__ import annotations
@@ -348,8 +350,7 @@ def make_snapshot(
             dict(pending_hitl) if pending_hitl is not None else None
         ),
         "metadata": dict(metadata) if metadata is not None else {},
-        "schema_version": 1,
-    }
+        "schema_version": 1}
 
 
 def iter_snapshots(
@@ -417,5 +418,4 @@ __all__ = [
     "FileCheckpointer",
     "InMemoryCheckpointer",
     "iter_snapshots",
-    "make_snapshot",
-]
+    "make_snapshot"]

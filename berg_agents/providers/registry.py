@@ -53,8 +53,7 @@ __all__ = ["list_models", "load_providers", "resolve_model"]
 #: camelCase JSONC option names -> python constructor kwarg names.
 _OPTION_KEY_ALIASES: dict[str, str] = {
     "baseURL": "base_url",
-    "apiKey": "api_key",
-}
+    "apiKey": "api_key"}
 
 #: Matches a whole-string ``{env:VAR}`` / ``${env:VAR}`` placeholder.
 _ENV_PATTERN = re.compile(r"\$\{(?:env:)?([A-Za-z_][A-Za-z0-9_]*)}$")
@@ -207,8 +206,7 @@ def resolve_model(
                     "model_provider": "openai",
                     "_provider": pname,
                     "_display_name": display or f"{pname}: {mid}",
-                    **kwargs,
-                }
+                    **kwargs}
         known = ", ".join(sorted({mid for _, mid in table}))
         raise KeyError(
             f"Model '{model_id}' is not declared in any provider block. "
@@ -224,8 +222,7 @@ def resolve_model(
             "model_provider": "openai",
             "_provider": pname,
             "_display_name": display or f"{pname}: {mid}",
-            **kwargs,
-        }
+            **kwargs}
     raise KeyError(
         "No models configured. Declare a 'providers' block with at least "
         "one model in config/bergagents.jsonc."
@@ -248,7 +245,6 @@ def list_models(cfg: dict[str, Any] | None = None) -> list[dict[str, Any]]:
                 "provider": pname,
                 "model": mid,
                 "base_url": kwargs.get("base_url"),
-                "display_name": display or f"{pname}: {mid}",
-            }
+                "display_name": display or f"{pname}: {mid}"}
         )
     return models

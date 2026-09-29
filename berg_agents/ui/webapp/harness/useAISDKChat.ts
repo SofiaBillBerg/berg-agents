@@ -9,16 +9,16 @@
  * tool calls (file operations + run_task), which run the full BergAgents harness.
  */
 
-import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
-import type { UIMessage, TextUIPart } from 'ai';
-import { useState } from 'react';
-import type { SetStateAction } from 'react';
-import { API_BASE } from '@/envConfig';
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import type { UIMessage, TextUIPart } from "ai";
+import { useState } from "react";
+import type { SetStateAction } from "react";
+import { API_BASE } from "@/envConfig";
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   content: string;
   parts?: Array<Record<string, unknown>>;
 }
@@ -29,7 +29,9 @@ export interface UseAISDKChatReturn {
   /** Direct state setter — compatible with InputBar's setInput prop. */
   setInput: (value: SetStateAction<string>) => void;
   /** Change handler — also compatible with InputBar. */
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  handleInputChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => void;
   /** Send the current input message. */
   handleSend: () => void;
   isStreaming: boolean;
@@ -47,9 +49,9 @@ export interface UseAISDKChatReturn {
  */
 function messageText(msg: UIMessage): string {
   return msg.parts
-    .filter((p): p is TextUIPart => p.type === 'text')
+    .filter((p): p is TextUIPart => p.type === "text")
     .map((p) => p.text)
-    .join('');
+    .join("");
 }
 
 /**
@@ -64,7 +66,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
   // useChat v7 returns: messages, sendMessage, status, error, setMessages, stop
   // It does NOT return input/handleInputChange/handleSubmit — we manage input
   // state separately and call sendMessage directly.
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
 
   const {
     messages: uiMessages,
@@ -72,22 +74,18 @@ export function useAISDKChat(): UseAISDKChatReturn {
     status,
     error,
     setMessages: setUIMessages,
-    stop,
-  } = useChat({
+    stop} = useChat({
     transport: new DefaultChatTransport({
-      api: `${API_BASE}/api/chat/stream`,
-    }),
-  });
+      api: `${API_BASE}/api/chat/stream`})});
 
-  const isStreaming = status === 'streaming' || status === 'submitted';
+  const isStreaming = status === "streaming" || status === "submitted";
 
   // Convert AI SDK UIMessage[] to the simpler ChatMessage[] our UI expects.
   const messages: ChatMessage[] = uiMessages.map((msg) => ({
     id: msg.id,
-    role: msg.role as 'user' | 'assistant' | 'system',
+    role: msg.role as "user" | "assistant" | "system",
     content: messageText(msg),
-    parts: [],
-  }));
+    parts: []}));
 
   const setMessages = (msgs: ChatMessage[]) => {
     setUIMessages(msgs as unknown as UIMessage[]);
@@ -98,7 +96,9 @@ export function useAISDKChat(): UseAISDKChatReturn {
   };
 
   // handleInputChange for a textarea/input — reads e.target.value.
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     setInput(e.target.value);
   };
 
@@ -126,6 +126,5 @@ export function useAISDKChat(): UseAISDKChatReturn {
     setMessages,
     clearMessages,
     stop,
-    sendMessage,
-  };
+    sendMessage};
 }

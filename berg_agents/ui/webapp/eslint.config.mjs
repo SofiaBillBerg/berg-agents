@@ -25,20 +25,17 @@ export default defineConfig(...nextVitals, [
     "!**/jest.config.js",
     "!**/plopfile.js",
     "!**/react-shim.js",
-    "!**/tsup.config.ts",
-  ]),
+    "!**/tsup.config.ts"]),
   {
     plugins: {
-      "unused-imports": unusedImports,
-    },
+      "unused-imports": unusedImports},
 
     languageOptions: {
       globals: {
         ...Object.fromEntries(
           Object.entries(globals.browser).map(([key]) => [key, "off"]),
         ),
-        ...globals.node,
-      },
+        ...globals.node},
 
       parser: tsParser,
       ecmaVersion: 12,
@@ -46,16 +43,11 @@ export default defineConfig(...nextVitals, [
 
       parserOptions: {
         ecmaFeatures: {
-          jsx: true,
-        },
-      },
-    },
+          jsx: true}}},
 
     settings: {
       react: {
-        version: "detect",
-      },
-    },
+        version: "detect"}},
 
     files: ["**/*.ts", "**/*.tsx"],
 
@@ -76,9 +68,7 @@ export default defineConfig(...nextVitals, [
         {
           args: "after-used",
           ignoreRestSiblings: false,
-          argsIgnorePattern: "^_.*?$",
-        },
-      ],
+          argsIgnorePattern: "^_.*?$"}],
 
       "import/order": [
         "warn",
@@ -91,20 +81,15 @@ export default defineConfig(...nextVitals, [
             "internal",
             "parent",
             "sibling",
-            "index",
-          ],
+            "index"],
 
           pathGroups: [
             {
               pattern: "~/**",
               group: "external",
-              position: "after",
-            },
-          ],
+              position: "after"}],
 
-          "newlines-between": "always",
-        },
-      ],
+          "newlines-between": "always"}],
 
       "react/self-closing-comp": "warn",
 
@@ -114,9 +99,4 @@ export default defineConfig(...nextVitals, [
           callbacksLast: true,
           shorthandFirst: true,
           noSortAlphabetically: false,
-          reservedFirst: true,
-        },
-      ],
-    },
-  },
-]);
+          reservedFirst: true}]}}]);

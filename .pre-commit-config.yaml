@@ -1,4 +1,4 @@
-exclude: '^packrat(/|$)'  # Exclude the packrat folder
+exclude: "^packrat(/|$)" # Exclude the packrat folder
 repos:
   # Local hooks must be defined inline (repo: local does not read
   # .pre-commit-hooks.yaml); the script entries live in project_utils/.
@@ -18,22 +18,22 @@ repos:
         name: run-formatters
         entry: project_utils/run_formatters.sh
         language: script
-        stages: [ manual ]
+        stages: [manual]
       - id: run-diagrams
         name: run-diagrams
         entry: project_utils/run_diagrams.sh
         language: script
-        stages: [ manual ]
+        stages: [manual]
       - id: run-analyzers
         name: run-analyzers
         entry: project_utils/run_analyzers.sh
         language: script
-        stages: [ manual ]
+        stages: [manual]
       - id: pre-push
         name: pre-push
         entry: pre-push
         language: script
-        stages: [ pre-push ]
+        stages: [pre-push]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -60,4 +60,4 @@ repos:
     rev: v3.21.2
     hooks:
       - id: pyupgrade
-        args: [ --py311-plus ]
+        args: [--py311-plus]

@@ -103,8 +103,7 @@ def build_chat_agent(
         task: dict[str, Any] = {
             "description": description,
             "task_type": task_type,
-            "metadata": {},
-        }
+            "metadata": {}}
         result = await asyncio.to_thread(
             harness.execute_task, task, task_id=f"chat-{id(description)}"
         )
@@ -123,8 +122,7 @@ def build_chat_agent(
                     "action_requests": result.get("action_requests", []),
                     "answer": result.get("implementation", {}).get(
                         "answer", ""
-                    ),
-                }
+                    )}
             )
 
         if isinstance(result, str):

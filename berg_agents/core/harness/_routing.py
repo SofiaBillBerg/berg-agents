@@ -52,8 +52,7 @@ class _AgentCard:
             "name": self.name,
             "description": self.description,
             "preferred_complexity": self.preferred_complexity,
-            "capabilities": list(self.capabilities),
-        }
+            "capabilities": list(self.capabilities)}
 
 
 def _tool_is_mutating(tool_name: str) -> bool:
@@ -144,8 +143,7 @@ def _confidence_gate_bypassed(
     """
     if verdict.risk_level in {
         RiskLevel.HIGH.value,
-        RiskLevel.CRITICAL.value,
-    }:
+        RiskLevel.CRITICAL.value}:
         return False
     if verdict.complexity == TaskComplexity.CRITICAL.value:
         return False
@@ -189,15 +187,13 @@ def _failed_result(
         "risk_level": verdict.risk_level,
         "model": model,
         "error": error,
-        "inference_attempted": True,
-    }
+        "inference_attempted": True}
     if learning_gate is not None:
         failed["learning"] = learning_gate.record(
             {
                 "task_type": task_type,
                 "complexity": complexity.value,
-                "description": description,
-            },
+                "description": description},
             {"success": False, "inference_attempted": True},
             model_used=model,
             success=False,
@@ -284,9 +280,7 @@ def _apply_mutation_guard(
             update={
                 "needs_human_review": True,
                 "reasons": [
-                    f"Mutating action required: task '{description[:60]}...' (type: {task_type}) requires human approval before file/tool mutation",
-                ],
-            }
+                    f"Mutating action required: task '{description[:60]}...' (type: {task_type}) requires human approval before file/tool mutation"]}
         )
     return verdict
 
@@ -364,5 +358,4 @@ def _review_gate_result(
         "review_reasons": list(verdict.reasons),
         "confidence": confidence,
         "action_requests": action_requests,
-        "inference_attempted": False,
-    }
+        "inference_attempted": False}

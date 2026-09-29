@@ -41,7 +41,11 @@ class LazyComponentErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error(`${this.props.componentName} failed to load:`, error, errorInfo);
+    console.error(
+      `${this.props.componentName} failed to load:`,
+      error,
+      errorInfo,
+    );
   }
 
   render() {
@@ -111,9 +115,22 @@ function ChatContent() {
       const cmd = parts[0].toLowerCase();
 
       const localCommands = [
-        "help", "exit", "quit", "clear", "agents", "stats",
-        "health", "models", "tools", "history", "memory", "context",
-        "settings", "skills", "mcps", "export"];
+        "help",
+        "exit",
+        "quit",
+        "clear",
+        "agents",
+        "stats",
+        "health",
+        "models",
+        "tools",
+        "history",
+        "memory",
+        "context",
+        "settings",
+        "skills",
+        "mcps",
+        "export"];
 
       if (localCommands.includes(cmd)) {
         switch (cmd) {
@@ -140,11 +157,17 @@ function ChatContent() {
               handled: true,
               card: `/health\nOK · ${messages.length} messages`};
           case "models":
-            return { handled: true, card: "/models\nSwitch via the header selector" };
+            return {
+              handled: true,
+              card: "/models\nSwitch via the header selector"};
           case "tools":
-            return { handled: true, card: "/tools\nFile tools + run_task. Use naturally in conversation." };
+            return {
+              handled: true,
+              card: "/tools\nFile tools + run_task. Use naturally in conversation."};
           default:
-            return { handled: true, card: `${cmd}\n(Type your message to send)` };
+            return {
+              handled: true,
+              card: `${cmd}\n(Type your message to send)`};
         }
       }
 
@@ -200,8 +223,12 @@ function ChatContent() {
       <div className="app-container p-4 w-full max-w-[95vw] mx-auto">
         <div className="berg-title-banner mb-4 flex justify-between items-center flex-wrap gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="m-0 whitespace-nowrap text-2xl font-bold">Berg Agents Chat</h1>
-            <p className="mt-1 text-sm text-muted-foreground">The agent that learns with you.</p>
+            <h1 className="m-0 whitespace-nowrap text-2xl font-bold">
+              Berg Agents Chat
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              The agent that learns with you.
+            </p>
           </div>
           <div className="header-actions flex items-center gap-2 flex-wrap">
             <ThemeToggle />
@@ -259,7 +286,11 @@ function ChatContent() {
             <AgentPanel compact={false} agents={agents} activeAgent={null} />
             <LearningPanel compact={false} stats={learningStats} />
 
-            {chatError && <div className="text-red-500 mt-4">Error: {String(chatError)}</div>}
+            {chatError && (
+              <div className="text-red-500 mt-4">
+                Error: {String(chatError)}
+              </div>
+            )}
           </Card.Content>
         </Card>
       </div>

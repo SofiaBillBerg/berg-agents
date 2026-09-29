@@ -20,8 +20,7 @@ export function ChatTranscript({
   transcript,
   isExecuting,
   hitlRequest,
-  onExport,
-}: ChatTranscriptProps) {
+  onExport}: ChatTranscriptProps) {
   return (
     <>
       <Card className="mb-4" variant="default">
@@ -33,9 +32,7 @@ export function ChatTranscript({
             {hitlRequest != null && (
               <Alert className="mt-3" status="warning">
                 <Alert.Indicator />
-                <Alert.Title>
-                  ⏸️ Waiting for your approval
-                </Alert.Title>
+                <Alert.Title>⏸️ Waiting for your approval</Alert.Title>
                 <Alert.Description>
                   A task is pending your review above. Please check the HITL
                   surface below to approve, reject, or edit the proposed action.

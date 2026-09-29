@@ -57,18 +57,20 @@ export function buildExportMarkdown(
     `_Exported ${new Date().toLocaleString()}_`,
     "",
     "---",
-    "",
-  ];
+    ""];
 
   // 1. Conversation transcript
   if (transcript.length > 0) {
     lines.push("## Conversation", "");
     transcript.forEach((msg) => {
       const header =
-        msg.role === "assistant" ? "🤖 **Assistant**"
-        : msg.role === "user" ? "🧑 **You**"
-        : msg.role === "system" ? "⚙️ **System**"
-        : msg.role;
+        msg.role === "assistant"
+          ? "🤖 **Assistant**"
+          : msg.role === "user"
+            ? "🧑 **You**"
+            : msg.role === "system"
+              ? "⚙️ **System**"
+              : msg.role;
       lines.push(header, "", msg.content || "", "", "---", "");
     });
   }
@@ -99,7 +101,11 @@ export function buildExportMarkdown(
       "**Status:** Awaiting approval",
       "",
       "**Reasons:**",
-      ...((Array.isArray(hitl.review_reasons) ? hitl.review_reasons : []) as string[]).map((r: string) => `- ${r}`),
+      ...(
+        (Array.isArray(hitl.review_reasons)
+          ? hitl.review_reasons
+          : []) as string[]
+      ).map((r: string) => `- ${r}`),
       "",
       `**Risk Level:** ${hitl.risk_level || "N/A"}`,
       "",
@@ -128,5 +134,10 @@ export function hasExportableContent(
   hitlRequest: unknown,
   cmdOutput: string | null,
 ): boolean {
-  return result != null || events.length > 0 || hitlRequest != null || cmdOutput != null;
+  return (
+    result != null ||
+    events.length > 0 ||
+    hitlRequest != null ||
+    cmdOutput != null
+  );
 }

@@ -35,8 +35,7 @@ class _ToolCatalogImpl:
         "delete_file": ["delete_file"],
         "generate_test": ["read_file", "new_file"],
         "format_code": ["read_file", "edit_file"],
-        "execute_command": ["execute_command"],
-    }
+        "execute_command": ["execute_command"]}
 
     @classmethod
     def tools_for(cls, task_type: str, description: str = "") -> list[str]:

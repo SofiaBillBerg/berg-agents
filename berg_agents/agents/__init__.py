@@ -8,6 +8,14 @@ import bites at module load time.
 
 from __future__ import annotations
 
+from berg_agents.agents.curator import (
+    build_update_plan,
+    curate_task,
+    curation_confidence,
+    determine_actions,
+    should_run_curator,
+)
+
 # Order: factory first (pre-loads core.interface via core.__init__),
 # then guardian, implementation, planner, curator.
 from berg_agents.agents.factory import (
@@ -49,13 +57,6 @@ from berg_agents.agents.planner import (
     plan_depth,
     planner_agent,
 )
-from berg_agents.agents.curator import (
-    build_update_plan,
-    curate_task,
-    curation_confidence,
-    determine_actions,
-    should_run_curator,
-)
 
 __all__ = [
     "DEFAULT_SYSTEM_PROMPT",
@@ -93,5 +94,4 @@ __all__ = [
     "plan_steps_for",
     "planner_agent",
     "resolve_implementation_model",
-    "should_run_curator",
-]
+    "should_run_curator"]

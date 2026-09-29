@@ -15,8 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.15",
-    "Operating System :: OS Independent",
-]
+    "Operating System :: OS Independent"]
 dependencies = [
 
 ] # use dependency groups
@@ -43,8 +42,7 @@ notebooks = [
     "jupyterlab>=4.6.3",
     "matplotlib-inline>=0.2.2",
     "nbformat>=5.11.1",
-    "notebook>=7.6.2",
-]
+    "notebook>=7.6.2"]
 agent-deps = [
     "click>=8.1.7",
     "fastapi",
@@ -70,12 +68,10 @@ agent-deps = [
     "pydantic-ai-harness[acp]>=0.27.0",
     "ai>=0.5.2",
     "a2a-sdk[all]>=0.3.21",
-    "pydantic-ai-slim>=2.35.3",
-]
+    "pydantic-ai-slim>=2.35.3"]
 docs = [
     "pydoctor>=25.10.1",
-    "quarto>=0.1.0",
-]
+    "quarto>=0.1.0"]
 dev = [
     "black>=24.3.0",
     "flake8>=7.3.0",
@@ -92,8 +88,7 @@ dev = [
     "ty>=0.0.71",
     "uv>=0.12.9",
     "pytype>=2024.10.11",
-    "pyanalyze>=0.13.1",
-]
+    "pyanalyze>=0.13.1"]
 tests = [
     "coverage>=7.16.0",
     "hypothesis>=6.165.10",
@@ -102,8 +97,7 @@ tests = [
     "pytest-cov>=7.1.0",
     "pytest-mock>=3.15.1",
     "pytest-twisted>=1.14.3",
-    "twisted>=26.4.0",
-]
+    "twisted>=26.4.0"]
 
 
 # [project.scripts]
@@ -125,12 +119,10 @@ nvidia-nccl-cu13 = { index = "nvidia" }
 rmm-cu13 = { index = "nvidia" }
 torch = [
     { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
-    { index = "pytorch-cu130", marker = "sys_platform == 'linux'" },
-]
+    { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }]
 torchvision = [
     { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
-    { index = "pytorch-cu130", marker = "sys_platform == 'linux'" },
-]
+    { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }]
 
 
 
@@ -152,8 +144,7 @@ name = "default"
 
 [tool.uv.pip]
 extra-index-url = [
-    "https://download.pytorch.org/whl/cu130",
-] # This will add the PyTorch index as an additional source for packages, which can help ensure that you have access to the latest versions of PyTorch and related packages.
+    "https://download.pytorch.org/whl/cu130"] # This will add the PyTorch index as an additional source for packages, which can help ensure that you have access to the latest versions of PyTorch and related packages.
 index-strategy = "unsafe-best-match"
 
 
@@ -183,8 +174,7 @@ extend-fixable = [
     "doc-line-too-long",
     "line-too-long",
     "PTH",
-    "D",
-] # This will allow Ruff to apply fixes for import-related issues.
+    "D"] # This will allow Ruff to apply fixes for import-related issues.
 ignore = [
     "line-too-long",
     "unused-noqa",
@@ -193,8 +183,7 @@ ignore = [
     "missing-todo-author",
     "missing-copyright-notice",
     "line-contains-todo",
-    "any-type",
-] # This will ignore the RUF100 error to enable the noga rule for Ruff.
+    "any-type"] # This will ignore the RUF100 error to enable the noga rule for Ruff.
 preview = true
 future-annotations = true
 extend-select = [
@@ -217,8 +206,7 @@ extend-select = [
     "TID",
     "PTH",
     "A",
-    "FBT",
-]
+    "FBT"]
 task-tags = ["TODO", "FIX", "BUG", "CHECK", "CONTROL"]
 extend-ignore = [
     "too-many-blank-lines", # Blank-line count is the formatter's job; E303 fights `ruff format` under preview.
@@ -228,8 +216,7 @@ extend-ignore = [
     "missing-blank-line-after-summary",
     "import-outside-top-level",
     "too-many-locals",
-    "too-many-statements",
-]
+    "too-many-statements"]
 
 [tool.ruff.lint.isort]
 detect-same-package = true # This will allow isort to detect when imports are from the same package and group them together.
@@ -244,8 +231,7 @@ section-order = [
     "standard-library",
     "first-party",
     "local-folder",
-    "third-party",
-]
+    "third-party"]
 known-third-party = ["berg_agents"]
 split-on-trailing-comma = false
 
@@ -267,8 +253,7 @@ skip_glob = [
     "dist",
     "build",
     ".ipynb_checkpoints",
-    "*support-libs",
-] # This will tell isort to skip these directories when sorting imports.
+    "*support-libs"] # This will tell isort to skip these directories when sorting imports.
 sort_reexports = true # This will sort re-exports (e.g., `from . import module`) separately from regular imports,.
 src_paths = ["berg_agents"]
 
@@ -285,8 +270,7 @@ skip-magic-trailing-comma = false
 
 [tool.ruff]
 src = [
-    "berg_agents",
-]
+    "berg_agents"]
 extend-exclude = [
     "_build",
     ".venv",
@@ -298,8 +282,7 @@ extend-exclude = [
     "dist",
     "build",
     ".ipynb_checkpoints",
-    "*support-libs",
-]
+    "*support-libs"]
 line-length = 80
 #fix = true # This will enable Ruff's automatic fixing feature, `--fix` option.
 
@@ -309,8 +292,7 @@ line-length = 80
     "unused-import",
     "undefined-local-with-import-star",
     "line-too-long",
-    "T20",
-] # Ignore unused imports and wildcard imports in Jupyter notebooks.
+    "T20"] # Ignore unused imports and wildcard imports in Jupyter notebooks.
 "*test*.py" = ["assert", "magic-value-comparison", "ARG", "implicit-namespace-package", "no-self-use"]
 "project_utils/*.py" = ["unused-import", "non-pep604-annotation-union", "non-pep604-annotation-optional", "non-pep585-annotation", "line-too-long"]
 
@@ -380,8 +362,7 @@ ignore-words-list = [
     "artifact",
     "mlflow*",
     "Jupyter",
-    "gr",
-]
+    "gr"]
 
 [tool.spacy.cli]
 "en-core-web-sm==3.8.0" = "@ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
@@ -458,8 +439,7 @@ project-excludes = [
     "**/*cache*",
     "**/support-libs",
     "**/outputs",
-    "**/artifacts",
-]
+    "**/artifacts"]
 use-ignore-files = true
 
 check-unannotated-defs = true
@@ -494,8 +474,7 @@ exclude = [
     ".*/",
     "**/*cache*",
     ".*",
-    "**/**/node_modules",
-]
+    "**/**/node_modules"]
 # Space-separated list of files or directories to process.
 inputs = ['.']
 # Keep going past errors to analyze as many files as possible.
@@ -565,8 +544,7 @@ exclude = [
     "**/node_modules",
     "**/data",
     ".venv",
-    "notes",
-]
+    "notes"]
 ignore = ["SKY-S101", "SKY-L021", "SKY-U005"]
 
 [tool.skylos.masking]

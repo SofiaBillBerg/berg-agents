@@ -121,8 +121,7 @@ class Harness:
                 capabilities=[
                     "model_resolution",
                     "step_planning",
-                    "tool_requirements",
-                ],
+                    "tool_requirements"],
             ),
             "curator": _AgentCard(
                 name="curator",
@@ -138,10 +137,8 @@ class Harness:
                 preferred_complexity="standard",
                 capabilities=[
                     "outcome_tracking",
-                    "routing_advice",
-                ],
-            ),
-        }
+                    "routing_advice"],
+            )}
 
     def _chat_bypass_result(
         self,
@@ -209,21 +206,18 @@ class Harness:
                     "review_reasons": [
                         "Proposed: "
                         + planned[0]["args"].get("path", "unknown action")
-                    ],
-                }
+                    ]}
             return {
                 "status": "needs_human_review",
                 "action": "unknown",
                 "args": {
                     "description": description,
-                    "summary": "Planner could not determine file path from request",
-                },
+                    "summary": "Planner could not determine file path from request"},
                 "task_id": resolved_id,
                 "review_reasons": [
                     "No concrete file path proposed by planner for: "
                     + description
-                ],
-            }
+                ]}
         if not self._wants_inference(metadata):
             # Must plan concrete actions with real paths — not echo request
             planned = self._plan_mutating_actions(
@@ -243,9 +237,7 @@ class Harness:
                     "args": {
                         "description": description,
                         "summary": "planned: " + description[:200],
-                        "path": "summary.md",
-                    },
-                }
+                        "path": "summary.md"}}
             ]
         logger.info(
             "Task %s direct model interaction: running model directly",
@@ -280,8 +272,7 @@ class Harness:
             {
                 "task_type": task_type,
                 "description": description,
-                "complexity": complexity.value,
-            },
+                "complexity": complexity.value},
             _merge_files_changed(
                 metadata, model_run.get("files_changed") or []
             ),
@@ -300,18 +291,15 @@ class Harness:
                 "steps": steps,
                 "tools": ToolCatalog.tools_for(task_type),
                 "answer": answer,
-                "model_run": model_run,
-            },
+                "model_run": model_run},
             "curation": curation,
-            "inference_attempted": True,
-        }
+            "inference_attempted": True}
         if self._enable_learning:
             result["learning"] = self._learning_gate.record(
                 {
                     "task_type": task_type,
                     "complexity": complexity.value,
-                    "description": description,
-                },
+                    "description": description},
                 {"success": True, "inference_attempted": True},
                 model_used=model_run.get("model_id", model),
                 success=True,
@@ -440,8 +428,7 @@ class Harness:
         plan: dict[str, Any] | None = None
         if complexity in {
             TaskComplexity.COMPLEX,
-            TaskComplexity.CRITICAL,
-        }:
+            TaskComplexity.CRITICAL}:
             plan = build_plan(description, task_type, complexity)
         # Ensure plan carries concrete actions (functional, not decorative)
         # Ensure COMPLEX/CRITICAL plan carries concrete steps; empty plan filled with step template.if plan is not None and (plan.get("steps") is None or not plan.get("steps")):
@@ -459,8 +446,7 @@ class Harness:
         steps = [step.model_dump() for step in plan_steps_for(task_type)]
         implementation = {
             "steps": steps,
-            "tools": ToolCatalog.tools_for(task_type),
-        }
+            "tools": ToolCatalog.tools_for(task_type)}
         # Synchronous model inference. The gate path returned
         # above, so reaching here means completed-or-failed,
         # never a re-gate: approved resumes and ungated runs
@@ -529,8 +515,7 @@ class Harness:
             {
                 "task_type": task_type,
                 "description": description,
-                "complexity": complexity.value,
-            },
+                "complexity": complexity.value},
             _merge_files_changed(
                 metadata, model_run.get("files_changed") or []
             ),
@@ -547,8 +532,7 @@ class Harness:
             "plan": plan,
             "implementation": implementation,
             "curation": curation,
-            "inference_attempted": inference_attempted,
-        }
+            "inference_attempted": inference_attempted}
         if requested_override is not None:
             # Routing label kept beside the truthful one:
             # what complexity routing chose before the
@@ -561,12 +545,10 @@ class Harness:
                 {
                     "task_type": task_type,
                     "complexity": complexity.value,
-                    "description": description,
-                },
+                    "description": description},
                 {
                     "success": True,
-                    "inference_attempted": inference_attempted,
-                },
+                    "inference_attempted": inference_attempted},
                 model_used=effective_model,
                 success=True,
             )
@@ -627,9 +609,7 @@ class Harness:
                     "args": {
                         "description": description,
                         "summary": "planned: " + description[:200],
-                        "file": "summary.md",
-                    },
-                }
+                        "file": "summary.md"}}
             ]
         requested = _requested_model_id(metadata)
         try:
@@ -661,9 +641,7 @@ class Harness:
                 "action": task_type,
                 "args": {
                     "description": description,
-                    "summary": "planned: " + description[:200],
-                },
-            }
+                    "summary": "planned: " + description[:200]}}
         return _extract_planned_actions(getattr(run_result, "output", ""))
 
     def _run_inference(
@@ -803,8 +781,7 @@ class Harness:
                 "usage": {},
                 "finish_reason": "output_retry_exhausted",
                 "fallback": "plain_text",
-                "files_changed": [],
-            }
+                "files_changed": []}
             return answer, model_run
         raw_output = getattr(run_result, "output", run_result)
         # Separator-tolerant normalization before validation:
@@ -827,8 +804,7 @@ class Harness:
             "usage": _usage_dict(run_result),
             "finish_reason": _finish_reason(run_result),
             "files_changed": _files_changed_from_run(run_result)
-            or _files_changed_from_text(answer),
-        }
+            or _files_changed_from_text(answer)}
         return answer, model_run
 
     @staticmethod
@@ -856,8 +832,7 @@ class Harness:
         scores = {
             "planner": planner_score,
             "implementation": impl_score,
-            "curator": curation_confidence(task),
-        }
+            "curator": curation_confidence(task)}
         best = max(scores.values())
         winners = [name for name, s in scores.items() if s == best]
         # Ties mean no executor clearly owns the task, so the

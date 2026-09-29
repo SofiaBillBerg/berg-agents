@@ -39,7 +39,7 @@ the webapp imports `theme.css` directly, and the CLI/server import
 Webapp — in `styles.css` replace the current `var(--color-*)` block with:
 
 ```css
-@import './theme/theme.css';
+@import "./theme/theme.css";
 ```
 
 CLI/server:

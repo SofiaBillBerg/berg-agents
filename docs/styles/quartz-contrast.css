@@ -3,10 +3,10 @@
 /* Logic for DT::datatable */
 @defaults;
 .dataTable td {
-    line-height: 1.4;
-    max-width: 700px;
-    white-space: pre-wrap !important;
-    word-break: break-word !important;
+  line-height: 1.4;
+  max-width: 700px;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
 }
 
 /* Extra CSS for better quartz-contrast */
@@ -16,11 +16,11 @@
 .tocify-subheader,
 .quarto-code-tools,
 .quarto-code-tools .btn {
-    background: #f8edf8 !important;
-    border-radius: 4px;
-    color: #222 !important;
-    font-size: 1em !important;
-    font-weight: 600;
+  background: #f8edf8 !important;
+  border-radius: 4px;
+  color: #222 !important;
+  font-size: 1em !important;
+  font-weight: 600;
 }
 
 /* background and text color */
@@ -29,29 +29,29 @@ pre,
 code,
 .code,
 .quarto-code-cell {
-    background: rgba(248, 237, 248, 0.76) !important;
-    color: #191970 !important;
-    font-size: 1em;
+  background: rgba(248, 237, 248, 0.76) !important;
+  color: #191970 !important;
+  font-size: 1em;
 }
 
 /* For better visibility on dark background */
 .quarto-code-tools .btn {
-    background: #eee !important;
-    border: 1px solid #fcf1f8;
-    color: #222 !important;
+  background: #eee !important;
+  border: 1px solid #fcf1f8;
+  color: #222 !important;
 }
 
 /* Improved contrast for plots and tables */
 table,
 th,
 td {
-    background: #fff !important;
-    color: #222 !important;
+  background: #fff !important;
+  color: #222 !important;
 }
 
 /* Improved contrast for plotly and DT widgets */
 .js-plotly-plot,
 .dataTable {
-    background: #fff !important;
-    color: #222 !important;
+  background: #fff !important;
+  color: #222 !important;
 }

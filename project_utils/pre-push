@@ -1,5 +1,5 @@
 #!/usr/bin/env bash 
-# pre-push  — placed here intentionally
+# pre-push  - placed here intentionally
 # Pre-hook: runs all checks in graceful mode and shows aggregate summary.
 # Each sub-script exits 0 even on failures, so we collect results and decide at the end.
 
@@ -7,7 +7,7 @@ echo "Local CI: Running code quality checks before pushing..."
 echo ""
 
 chmod +x ./project_utils/run_formatters.sh
-chmod +x ./project_utils/run_vis.sh
+chmod +x ./project_utils/run_diagrams.sh
 chmod +x ./project_utils/run_tests.sh
 
 # Run formatters (exits 0 even on failures)
@@ -15,7 +15,7 @@ chmod +x ./project_utils/run_tests.sh
 FORMATTERS_EXIT=$?
 
 # Run visualization updates (exits 0 even on failures)
-./project_utils/run_vis.sh
+./project_utils/run_diagrams.sh
 VIS_EXIT=$?
 
 # --- Aggregate Summary ---
@@ -39,10 +39,10 @@ fi
 
 # Check visualization result
 if [ $VIS_EXIT -ne 0 ]; then
-	echo "  ✗ run_vis.sh exited with code $VIS_EXIT"
+	echo "  ✗ run_diagrams.sh exited with code $VIS_EXIT"
 	TOTAL_FAILURES=$((TOTAL_FAILURES + 1))
 else
-	echo "  ✓ run_vis.sh completed (see above for details)"
+	echo "  ✓ run_diagrams.sh completed (see above for details)"
 fi
 
 echo ""

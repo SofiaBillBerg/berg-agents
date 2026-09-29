@@ -46,8 +46,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
                 </code>
               </pre>
             );
-          },
-        }}
+          }}}
         rehypePlugins={[rehypeHighlight]}
         remarkPlugins={[remarkGfm]}
       >

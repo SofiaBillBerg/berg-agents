@@ -24,8 +24,7 @@ export interface AgentPanelProps {
 export function AgentPanel({
   agents = [],
   activeAgent,
-  compact = false,
-}: AgentPanelProps) {
+  compact = false}: AgentPanelProps) {
   if (!agents || agents.length === 0) {
     return (
       <section aria-label="Registered agents" className="agent-panel empty">

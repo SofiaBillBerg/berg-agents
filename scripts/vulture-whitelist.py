@@ -1,7 +1,7 @@
-# Vulture whitelist — false positives and intentionally-public APIs
+# Vulture whitelist - false positives and intentionally-public APIs
 
 # Dataclass field annotations (pydantic/vulture can't distinguish from variables)
-ignore-names = [
+ignore_names = [
     # dataclass field annotations
     "note",
     "contents",
@@ -65,5 +65,5 @@ ignore-names = [
     "filter_by_model",
     # pydantic_ai provider protocol methods
     "complete",
-    "bind_capabilities",
-]
+    "bind_capabilities"]
+_total_ignore_names = len(ignore_names)

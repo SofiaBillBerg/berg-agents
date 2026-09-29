@@ -13,7 +13,10 @@ a {
   color: var(--berg-brand-blue);
   text-decoration: none;
 }
-a:hover { color: var(--berg-brand-purple); text-decoration: underline; }
+a:hover {
+  color: var(--berg-brand-purple);
+  text-decoration: underline;
+}
 
 button,
 .btn {
@@ -26,18 +29,26 @@ button,
   background: var(--berg-surface);
   color: var(--berg-text);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
-button:hover, .btn:hover {
+button:hover,
+.btn:hover {
   background: var(--berg-surface-tint);
   border-color: var(--berg-brand-blue);
 }
-button.primary, .btn.primary {
+button.primary,
+.btn.primary {
   background: var(--berg-gradient-brand);
   color: white;
   border-color: transparent;
 }
-button.primary:hover, .btn.primary:hover { filter: brightness(1.1); }
+button.primary:hover,
+.btn.primary:hover {
+  filter: brightness(1.1);
+}
 
 .card {
   background: var(--berg-surface);
@@ -47,7 +58,9 @@ button.primary:hover, .btn.primary:hover { filter: brightness(1.1); }
   box-shadow: var(--berg-shadow-sm);
 }
 
-input, textarea, select {
+input,
+textarea,
+select {
   font-family: var(--berg-font-sans);
   font-size: var(--berg-fs-sm);
   padding: var(--berg-sp-2) var(--berg-sp-3);
@@ -56,13 +69,16 @@ input, textarea, select {
   background: var(--berg-surface);
   color: var(--berg-text);
 }
-input:focus, textarea:focus, select:focus {
+input:focus,
+textarea:focus,
+select:focus {
   outline: none;
   border-color: var(--berg-brand-blue);
   box-shadow: 0 0 0 3px rgba(59, 82, 139, 0.2);
 }
 
-code, pre {
+code,
+pre {
   font-family: var(--berg-font-mono);
   background: var(--berg-code-bg);
   color: var(--berg-code-text);

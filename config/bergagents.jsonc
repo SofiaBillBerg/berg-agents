@@ -60,53 +60,36 @@
       "options": {
         "baseURL": "${env:UNSLOTH_BASE_URL}",
         "apiKey": "${env:UNSLOTH_STUDIO_AUTH_TOKEN}",
-        "timeout": 120000
-      },
+        "timeout": 120000},
       "models": {
         "unsloth/Jan-nano-128k-GGUF:Q8_0S": {
-          "name": "unsloth/Jan-nano-128k-GGUF:Q8_0"
-        },
+          "name": "unsloth/Jan-nano-128k-GGUF:Q8_0"},
         "unsloth/LFM2.5-8B-A1B-GGUF:UD-IQ4_NL": {
-          "name": "unsloth/LFM2.5-8B-A1B-GGUF:UD-IQ4_NL"
-        }
-      }
-    },
+          "name": "unsloth/LFM2.5-8B-A1B-GGUF:UD-IQ4_NL"}}},
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "http://localhost:11434/v1",
-        "timeout": 120000
-      },
+        "timeout": 120000},
       "models": {
         "ornith:9b-q4_K_M": {
-          "name": "ornith:9b-q4_K_M"
-        },
+          "name": "ornith:9b-q4_K_M"},
         "gemma4:cloud": {
-          "name": "gemma4:cloud"
-        },
+          "name": "gemma4:cloud"},
         "nemotron-3-nano:30b-cloud": {
-          "name": "nemotron-3-nano:30b-cloud"
-        }
-      }
-    },
+          "name": "nemotron-3-nano:30b-cloud"}}},
     "omniroute": {
       "name": "omniroute",
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "${env:BERG_AGENT_OMNIROUTE_BASE_URL}",
         "apiKey": "${env:BERG_AGENT_OMNIROUTE_API_KEY}",
-        "timeout": 120000
-      },
+        "timeout": 120000},
       "models": {
         "auto": {
-          "name": "auto"
-        },
+          "name": "auto"},
         "best-free": {
-          "name": "auto/best-free"
-        }
-      }
-    }
-  },
+          "name": "auto/best-free"}}}},
   "defaultModel": "ornith:9b-q4_K_M",
   //# MCP server secrets (git-ignored; referenced as ${VAR} in .mcp.json)
   //# "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}",
@@ -118,78 +101,40 @@
   // Harness as host (framework-agnostic core)
   "harness": {
     "enable_learning": true,
-    "enable_hitl": true
-  },
+    "enable_hitl": true},
   // Model routing: one model list per complexity level (single axis)
   "model_routing": {
     "models": {
       "trivial": {
-        "models": [
-          "ornith:9b-q4_K_M"
-        ],
-        "max_tokens": 40000
-      },
+        "models": ["ornith:9b-q4_K_M"],
+        "max_tokens": 40000},
       "standard": {
-        "models": [
-          "ornith:9b-q4_K_M"
-        ],
-        "max_tokens": 60000
-      },
+        "models": ["ornith:9b-q4_K_M"],
+        "max_tokens": 60000},
       "complex": {
-        "models": [
-          "nemotron-3-nano:30b-cloud"
-        ],
-        "max_tokens": 60000
-      },
+        "models": ["nemotron-3-nano:30b-cloud"],
+        "max_tokens": 60000},
       "critical": {
-        "models": [
-          "nemotron-3-nano:30b-cloud"
-        ],
-        "max_tokens": 124000
-      }
-    }
-  },
+        "models": ["nemotron-3-nano:30b-cloud"],
+        "max_tokens": 124000}}},
   // HITL rules: Guardian decides when to ask human
   "hitl_rules": {
-    "auto_execute": [
-      "read_file",
-      "list_files",
-      "search_code"
-    ],
-    "notify_after": [
-      "edit_file",
-      "new_file",
-      "generate_test"
-    ],
-    "ask_before": [
-      "delete_file",
-      "execute_command",
-      "refactor"
-    ],
-    "human_leads": [
-      "security_change",
-      "production_deploy",
-      "data_migration"
-    ]
-  },
+    "auto_execute": ["read_file", "list_files", "search_code"],
+    "notify_after": ["edit_file", "new_file", "generate_test"],
+    "ask_before": ["delete_file", "execute_command", "refactor"],
+    "human_leads": ["security_change", "production_deploy", "data_migration"]},
   // Agent overrides (optional)
   "agents": {
     "guardian": {
-      "preferred_complexity": "standard"
-    },
+      "preferred_complexity": "standard"},
     "planner": {
-      "preferred_complexity": "complex"
-    },
+      "preferred_complexity": "complex"},
     "implementation": {
-      "preferred_complexity": "standard"
-    },
+      "preferred_complexity": "standard"},
     "curator": {
-      "preferred_complexity": "trivial"
-    },
+      "preferred_complexity": "trivial"},
     "learning": {
-      "preferred_complexity": "standard"
-    }
-  }
+      "preferred_complexity": "standard"}},
   //# ---------------------------------------------------------------------------
   //# PRESETS (config-driven toolsets/capabilities — optional, all additive).
   //# Uncomment and adapt. Schema: berg_agents/capabilities/specs.py.

@@ -99,8 +99,7 @@ def _inference_prompt(
     """
     lines = [
         f"Task: {description}",
-        f"task_type={task_type} complexity={complexity.value}",
-    ]
+        f"task_type={task_type} complexity={complexity.value}"]
     if plan:
         lines.append(f"plan={plan}")
     if steps:
@@ -139,8 +138,7 @@ async def _await_inference(
 _FILE_TOUCHING_TOOLS: frozenset[str] = frozenset(
     {
         "write_file",
-        "edit_file",
-    }
+        "edit_file"}
 )
 
 #: Tool-argument keys carrying the touched path, in priority order.

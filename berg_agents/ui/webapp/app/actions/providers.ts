@@ -11,7 +11,7 @@
  * - Centralized error handling
  */
 
-import { apiFetch } from '@/envConfig';
+import { apiFetch } from "@/envConfig";
 
 export interface ProviderItem {
   name: string;
@@ -44,11 +44,10 @@ export async function switchProvider(
   model: string,
 ): Promise<SwitchProviderResult> {
   try {
-    const response = await apiFetch('/api/providers/active', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, model }),
-    });
+    const response = await apiFetch("/api/providers/active", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider, model })});
 
     if (!response.ok) {
       return { success: false, error: `HTTP ${response.status}` };
@@ -56,13 +55,11 @@ export async function switchProvider(
 
     return {
       success: true,
-      active: { provider, model },
-    };
+      active: { provider, model }};
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+      error: error instanceof Error ? error.message : "Unknown error"};
   }
 }
 
@@ -72,11 +69,11 @@ export async function switchProvider(
  */
 export async function getProviders(): Promise<{ providers: ProviderItem[] }> {
   try {
-    const response = await apiFetch('/api/providers');
-    if (!response.ok) throw new Error('Failed to fetch providers');
+    const response = await apiFetch("/api/providers");
+    if (!response.ok) throw new Error("Failed to fetch providers");
     return response.json();
   } catch (error) {
-    console.error('Error fetching providers:', error);
+    console.error("Error fetching providers:", error);
     return { providers: [] };
   }
 }
@@ -88,9 +85,8 @@ export async function getProviders(): Promise<{ providers: ProviderItem[] }> {
 export async function getProviderData(): Promise<ProviderData> {
   try {
     const [listRes, activeRes] = await Promise.all([
-      apiFetch('/api/providers'),
-      apiFetch('/api/providers/active'),
-    ]);
+      apiFetch("/api/providers"),
+      apiFetch("/api/providers/active")]);
 
     let providers: ProviderItem[] = [];
     if (listRes.ok) {
@@ -110,7 +106,7 @@ export async function getProviderData(): Promise<ProviderData> {
 
     return { providers, active };
   } catch (error) {
-    console.error('Error fetching provider data:', error);
+    console.error("Error fetching provider data:", error);
     return { providers: [], active: null };
   }
 }
@@ -124,7 +120,7 @@ export async function validateProvider(
   model: string,
 ): Promise<{ valid: boolean; alternatives: ProviderItem[] }> {
   try {
-    const response = await apiFetch('/api/providers');
+    const response = await apiFetch("/api/providers");
     if (!response.ok) {
       return { valid: false, alternatives: [] };
     }
@@ -140,7 +136,7 @@ export async function validateProvider(
 
     return { valid: isValid, alternatives };
   } catch (error) {
-    console.error('Error validating provider:', error);
+    console.error("Error validating provider:", error);
     return { valid: false, alternatives: [] };
   }
 }

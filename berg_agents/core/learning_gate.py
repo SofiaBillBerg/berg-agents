@@ -16,10 +16,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from berg_agents.agents.learning import (
-    get_outcome_stats,
-    record_outcome,
-)
+from berg_agents.agents.learning import get_outcome_stats, record_outcome
 from berg_agents.core.outcome_db import ensure, insert, load
 
 logger = logging.getLogger(__name__)
@@ -128,8 +125,7 @@ class LearningGate:
                     f"{adjustment.get('task_type', 'unknown')} "
                     f"(reason: {adjustment.get('reason', 'stats')})"
                 ),
-                "topic": "learning_gate",
-            }
+                "topic": "learning_gate"}
             _store_in_mempalace(adj_insight)
 
         return insight
@@ -163,8 +159,7 @@ class LearningGate:
                 "complexity": complexity,
                 "model": model,
                 "action": "upgrade_complexity",
-                "message": f"User correction for {task_type} with {model}. Consider higher complexity.",
-            }
+                "message": f"User correction for {task_type} with {model}. Consider higher complexity."}
         elif not success:
             insight = {
                 "type": "failure",
@@ -172,8 +167,7 @@ class LearningGate:
                 "complexity": complexity,
                 "model": model,
                 "action": "review",
-                "message": f"{task_type} failed with {model}. Review approach.",
-            }
+                "message": f"{task_type} failed with {model}. Review approach."}
         else:
             insight = {
                 "type": "success",
@@ -181,8 +175,7 @@ class LearningGate:
                 "complexity": complexity,
                 "model": model,
                 "action": "reinforce",
-                "message": f"{model} succeeded at {task_type} ({complexity}).",
-            }
+                "message": f"{model} succeeded at {task_type} ({complexity})."}
         self._insights.append(insight)
         # Persist to SQLite for restart survival — the single source of truth.
         try:
@@ -236,8 +229,7 @@ class LearningGate:
                 "rule": "complexity_upgrade",
                 "task_type": task_type,
                 "current_rate": success_rate,
-                "action": f"Upgrade complexity for {task_type} tasks (success rate: {success_rate:.0%})",
-            }
+                "action": f"Upgrade complexity for {task_type} tasks (success rate: {success_rate:.0%})"}
         elif (
             success_rate > HIGH_SUCCESS_RATE
             and total >= MIN_OUTCOMES_FOR_DOWNGRADE
@@ -246,8 +238,7 @@ class LearningGate:
                 "rule": "complexity_downgrade",
                 "task_type": task_type,
                 "current_rate": success_rate,
-                "action": f"Consider downgrading complexity for {task_type} (success rate: {success_rate:.0%})",
-            }
+                "action": f"Consider downgrading complexity for {task_type} (success rate: {success_rate:.0%})"}
         return None
 
     @staticmethod
@@ -273,5 +264,4 @@ class LearningGate:
             "total_insights": len(self._insights),
             "rule_adjustments": len(self._rule_adjustments),
             "recent_insights": self._insights[-10:],
-            "recent_adjustments": self._rule_adjustments[-5:],
-        }
+            "recent_adjustments": self._rule_adjustments[-5:]}

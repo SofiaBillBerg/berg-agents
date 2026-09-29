@@ -4,7 +4,7 @@
  */
 
 import "./theme.js";
-import {ClientOnly} from "./client.tsx";
+import { ClientOnly } from "./client.tsx";
 
 /**
  * Root Page component for Next.js App Router.
@@ -12,5 +12,5 @@ import {ClientOnly} from "./client.tsx";
  * @returns JSX element rendering the client-only application.
  */
 export default function Page() {
-    return <ClientOnly/>;
+  return <ClientOnly />;
 }

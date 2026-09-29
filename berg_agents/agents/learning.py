@@ -36,16 +36,15 @@ UPGRADE_RATE_BELOW = 0.5
 DOWNGRADE_RATE_ABOVE = 0.9
 
 __all__ = [
+    "DOWNGRADE_RATE_ABOVE",
     "MIN_SAMPLES_FOR_DOWNGRADE",
     "MIN_SAMPLES_FOR_RECOMMENDATION",
-    "DOWNGRADE_RATE_ABOVE",
     "UPGRADE_RATE_BELOW",
     "OutcomeStore",
     "build_learning_entry",
     "get_outcome_stats",
     "recommendation_from_stats",
-    "record_outcome",
-]
+    "record_outcome"]
 
 
 @dataclass
@@ -111,8 +110,7 @@ class OutcomeStore:
             "task_type": task_type,
             "model": model,
             "success": success,
-            "user_corrected": user_corrected,
-        }
+            "user_corrected": user_corrected}
         self.outcomes.append(outcome)
         # Build the structured entry from the same evidence.
         entry = build_learning_entry(
@@ -136,8 +134,7 @@ class OutcomeStore:
             "status": "recorded",
             "learning": entry,
             "stats": stats,
-            "recommendation": recommendation_from_stats(task_type, stats),
-        }
+            "recommendation": recommendation_from_stats(task_type, stats)}
 
     def get_outcome_stats(self) -> dict[str, Any]:
         """Aggregate success-failure counters per scope.
@@ -171,8 +168,7 @@ class OutcomeStore:
         return {
             "total": len(self.outcomes),
             "by_task_type": by_task,
-            "by_model": by_model,
-        }
+            "by_model": by_model}
 
 
 def build_learning_entry(
@@ -203,8 +199,7 @@ def build_learning_entry(
         "complexity": complexity,
         "model": model,
         "success": success,
-        "user_corrected": user_corrected,
-    }
+        "user_corrected": user_corrected}
     # A user correction outweighs the success flag: the
     # complexity was too low even when the task "succeeded".
     if user_corrected:

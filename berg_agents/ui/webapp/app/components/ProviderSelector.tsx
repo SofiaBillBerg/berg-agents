@@ -2,10 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Label, ListBox, Select, Spinner } from "@heroui/react";
 
 import { getProviderData, switchProvider } from "../actions/providers";
-import type {
-  ProviderItem,
-  ActiveProviderState,
-} from "../actions/providers";
+import type { ProviderItem, ActiveProviderState } from "../actions/providers";
 
 export interface ProviderSelectorProps {
   activeProvider?: ActiveProviderState | null;
@@ -27,8 +24,7 @@ export interface ProviderSelectorProps {
 export function ProviderSelector({
   activeProvider: initialActiveProvider,
   providers: initialProviders,
-  onSwitch,
-}: ProviderSelectorProps) {
+  onSwitch}: ProviderSelectorProps) {
   const [providers, setProviders] = useState<ProviderItem[]>(
     initialProviders || [],
   );
@@ -72,8 +68,7 @@ export function ProviderSelector({
       const detail = err instanceof Error ? err.message : "Network error";
       setNotice({
         text: `Failed to load providers list from backend API: ${detail}`,
-        type: "error",
-      });
+        type: "error"});
     }
   }, []);
 
@@ -100,7 +95,7 @@ export function ProviderSelector({
   }, [notice]);
 
   /**
- * Dispatches provider/model change via the actions layer.
+   * Dispatches provider/model change via the actions layer.
    * The actions layer handles API communication server-side.
    *
    * @param provider - Target provider name (e.g. "ollama", "openai")
@@ -124,23 +119,20 @@ export function ProviderSelector({
         setActiveProvider(newState);
         setNotice({
           text: `Switched to ${provider} (${model})`,
-          type: "success",
-        });
+          type: "success"});
         if (onSwitch) {
           onSwitch(newState);
         }
       } else {
         setNotice({
           text: `Failed to switch: ${result.error || "Unknown error"}`,
-          type: "error",
-        });
+          type: "error"});
       }
     } catch (err) {
       const detail = err instanceof Error ? err.message : "Network error";
       setNotice({
         text: `Error switching provider: ${detail}`,
-        type: "error",
-      });
+        type: "error"});
     } finally {
       setIsSwitching(false);
     }

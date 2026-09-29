@@ -39,8 +39,7 @@ __all__ = [
     "estimate_confidence",
     "implementation_agent",
     "plan_steps_for",
-    "resolve_implementation_model",
-]
+    "resolve_implementation_model"]
 
 # Explicit output retry budget for the implementation agent.
 # Spec name: ``output_retries (2)``. Pydantic AI v2 exposes it
@@ -69,8 +68,7 @@ EXECUTABLE_TASK_TYPES: frozenset[str] = frozenset(
         "execute_command",
         "refactor",
         "implement",
-        "fix",
-    }
+        "fix"}
 )
 
 # Step-by-step execution plans per task type.
@@ -79,32 +77,26 @@ _PLAN_STEPS: dict[str, list[dict[str, str]]] = {
         {"action": "read_file", "description": "Read file content"},
         {"action": "analyze", "description": "Analyze changes"},
         {"action": "apply_edit", "description": "Apply the edit"},
-        {"action": "verify", "description": "Verify the change"},
-    ],
+        {"action": "verify", "description": "Verify the change"}],
     "new_file": [
         {"action": "check_exists", "description": "Check file exists"},
         {"action": "create_file", "description": "Create new file"},
-        {"action": "populate", "description": "Write content"},
-    ],
+        {"action": "populate", "description": "Write content"}],
     "delete_file": [
         {"action": "confirm", "description": "Confirm safe deletion"},
         {"action": "backup_check", "description": "Check dependencies"},
-        {"action": "delete", "description": "Delete the file"},
-    ],
+        {"action": "delete", "description": "Delete the file"}],
     "generate_test": [
         {"action": "read_source", "description": "Read source code"},
         {"action": "analyze_coverage", "description": "Find gaps"},
         {"action": "generate", "description": "Generate test cases"},
-        {"action": "write_test", "description": "Write test file"},
-    ],
-}
+        {"action": "write_test", "description": "Write test file"}]}
 
 # Fallback plan for task types without a dedicated template.
 _GENERIC_PLAN: list[dict[str, str]] = [
     {"action": "analyze", "description": "Analyze the task"},
     {"action": "execute", "description": "Execute the operation"},
-    {"action": "verify", "description": "Verify the result"},
-]
+    {"action": "verify", "description": "Verify the result"}]
 
 
 @dataclass

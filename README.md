@@ -1,8 +1,8 @@
 # Berg Agents
+
 Sofia Billger Bergström
 
 <!-- README.md is generated from README.qmd. Please edit that file -->
-
 
 <!-- badges: start -->
 
@@ -13,7 +13,7 @@ Sofia Billger Bergström
 
 ## Quick Start
 
-``` bash
+```bash
 # Install dependencies (uv is recommended)
 uv venv .venv
 source .venv/bin/activate
@@ -51,32 +51,32 @@ examples.
 
 ## Configuration
 
-``` bash
+```bash
 config/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
 .env                      # secrets referenced as ${env:VAR_NAME}
 ```
 
-| Layer | Source |
-|----|----|
-| Config file | `config/bergagents.jsonc` — `providers` block + `harness`/`model_routing`/`hitl_rules` |
-| Secrets | `.env` file, referenced with `${env:VAR_NAME}` |
-| Overrides | `BERG_AGENT_*` environment variables |
-| External tools | `mcp.json` for MCP server configuration |
+| Layer          | Source                                                                                 |
+| -------------- | -------------------------------------------------------------------------------------- |
+| Config file    | `config/bergagents.jsonc` — `providers` block + `harness`/`model_routing`/`hitl_rules` |
+| Secrets        | `.env` file, referenced with `${env:VAR_NAME}`                                         |
+| Overrides      | `BERG_AGENT_*` environment variables                                                   |
+| External tools | `mcp.json` for MCP server configuration                                                |
 
 See [docs/CONFIGURATION.qmd](docs/CONFIGURATION.qmd) for the full
 reference.
 
 ## Documentation
 
-| Page | Description |
-|----|----|
-| [QUICKSTART](docs/QUICKSTART.qmd) | Installation and first run |
-| [USAGE](docs/USAGE.qmd) | TUI, Python API, and web workflows |
-| [API](docs/API.qmd) | Module map for the codebase |
-| [TOOLS](docs/TOOLS.qmd) | Built-in tools, capabilities, and MCP |
+| Page                                    | Description                                   |
+| --------------------------------------- | --------------------------------------------- |
+| [QUICKSTART](docs/QUICKSTART.qmd)       | Installation and first run                    |
+| [USAGE](docs/USAGE.qmd)                 | TUI, Python API, and web workflows            |
+| [API](docs/API.qmd)                     | Module map for the codebase                   |
+| [TOOLS](docs/TOOLS.qmd)                 | Built-in tools, capabilities, and MCP         |
 | [CONFIGURATION](docs/CONFIGURATION.qmd) | Provider-centric config, `.env`, and env vars |
-| [CONTRIBUTING](docs/CONTRIBUTING.qmd) | Guidelines for contributing |
-| [FAQ](docs/FAQ.qmd) | Common questions and troubleshooting |
+| [CONTRIBUTING](docs/CONTRIBUTING.qmd)   | Guidelines for contributing                   |
+| [FAQ](docs/FAQ.qmd)                     | Common questions and troubleshooting          |
 
 ## Getting Help
 
@@ -86,6 +86,6 @@ reference.
   capabilities
 - Review [FAQ](docs/FAQ.qmd) for troubleshooting tips
 
-------------------------------------------------------------------------
+---
 
 **Version**: 0.2.0 \| **License**: MIT

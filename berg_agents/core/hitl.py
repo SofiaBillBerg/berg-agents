@@ -240,5 +240,4 @@ __all__ = [
     "HitlRequest",
     "apply_decision",
     "default_interrupt_on",
-    "is_valid_decision",
-]
+    "is_valid_decision"]

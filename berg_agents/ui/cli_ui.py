@@ -30,8 +30,7 @@ __all__ = [
     "render_stats",
     "run_cli_ui",
     "run_harness_task",
-    "run_tui",
-]
+    "run_tui"]
 
 # Canonical slash commands. Names, descriptions, and categories mirror the
 # web UI picker (``webapp/app/components/SlashCommandPicker.tsx``) so both
@@ -40,63 +39,51 @@ SLASH_COMMANDS: list[dict[str, str]] = [
     {
         "name": "/help",
         "description": "Show available commands",
-        "category": "system",
-    },
+        "category": "system"},
     {
         "name": "/agents",
         "description": "List registered agents",
-        "category": "agents",
-    },
+        "category": "agents"},
     {
         "name": "/models",
         "description": "Show available models",
-        "category": "models",
-    },
+        "category": "models"},
     {
         "name": "/stats",
         "description": "Learning statistics",
-        "category": "stats",
-    },
+        "category": "stats"},
     {
         "name": "/tools",
         "description": "List available tools",
-        "category": "tools",
-    },
+        "category": "tools"},
     {
         "name": "/health",
         "description": "System health check",
-        "category": "system",
-    },
+        "category": "system"},
     {
         "name": "/history",
         "description": "Show conversation history",
-        "category": "context",
-    },
+        "category": "context"},
     {
         "name": "/memory",
         "description": "Memory information",
-        "category": "context",
-    },
+        "category": "context"},
     {
         "name": "/context",
         "description": "Show current context",
-        "category": "context",
-    },
+        "category": "context"},
     {"name": "/settings", "description": "Show settings", "category": "config"},
     {"name": "/skills", "description": "List skills", "category": "config"},
     {"name": "/mcps", "description": "MCP server status", "category": "config"},
     {
         "name": "/harness",
         "description": "Run task through harness",
-        "category": "agents",
-    },
+        "category": "agents"},
     {"name": "/task", "description": "Same as /harness", "category": "agents"},
     {
         "name": "/clear",
         "description": "Clear conversation",
-        "category": "system",
-    },
-]
+        "category": "system"}]
 
 # Commands the TUI executes against the Harness. The rest are listed in
 # /help for parity with the web UI but answered with a web-only notice:
@@ -110,8 +97,7 @@ _TUI_HANDLED = frozenset(
         "/task",
         "/stats",
         "/history",
-        "/clear",
-    }
+        "/clear"}
 )
 
 _APPROVE_WORDS = frozenset({"y", "yes", "approve"})
@@ -187,8 +173,7 @@ def render_result(
             f"task_id: {result.get('task_id', '—')}",
             f"agent: {result.get('selected_agent', '—')}",
             f"model: {result.get('model', '—')}",
-            f"complexity: {result.get('complexity', '—')}",
-        ]
+            f"complexity: {result.get('complexity', '—')}"]
         plan = result.get("plan")
         if isinstance(plan, dict):
             lines.append(f"plan steps: {len(plan.get('subtasks', []))}")
@@ -343,8 +328,7 @@ def run_harness_task(
             {
                 "description": description,
                 "task_type": task_type,
-                "metadata": base_metadata,
-            }
+                "metadata": base_metadata}
         )
     except Exception as exc:
         failed = {"status": "failed", "task_type": task_type, "error": str(exc)}
@@ -368,8 +352,7 @@ def run_harness_task(
         failed = {
             "status": "failed",
             "task_type": task_type,
-            "error": "HITL rejected; task not resumed",
-        }
+            "error": "HITL rejected; task not resumed"}
         render_result(failed, console)
         return failed
     try:
@@ -377,8 +360,7 @@ def run_harness_task(
             {
                 "description": description,
                 "task_type": task_type,
-                "metadata": {**base_metadata, "hitl_decision": "approve"},
-            }
+                "metadata": {**base_metadata, "hitl_decision": "approve"}}
         )
     except Exception as exc:
         failed = {"status": "failed", "task_type": task_type, "error": str(exc)}

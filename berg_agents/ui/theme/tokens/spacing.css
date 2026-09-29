@@ -1,21 +1,21 @@
 /* Berg Agents spacing scale. Canonical. */
 
 :root {
-    --berg-sp-0: 0;
-    --berg-sp-1: 0.25rem; /* 4px  */
-    --berg-sp-2: 0.5rem; /* 8px  */
-    --berg-sp-3: 0.75rem; /* 12px */
-    --berg-sp-4: 1rem; /* 16px */
-    --berg-sp-5: 1.5rem; /* 24px */
-    --berg-sp-6: 2rem; /* 32px */
-    --berg-sp-7: 3rem; /* 48px */
-    --berg-sp-8: 4rem; /* 64px */
+  --berg-sp-0: 0;
+  --berg-sp-1: 0.25rem; /* 4px  */
+  --berg-sp-2: 0.5rem; /* 8px  */
+  --berg-sp-3: 0.75rem; /* 12px */
+  --berg-sp-4: 1rem; /* 16px */
+  --berg-sp-5: 1.5rem; /* 24px */
+  --berg-sp-6: 2rem; /* 32px */
+  --berg-sp-7: 3rem; /* 48px */
+  --berg-sp-8: 4rem; /* 64px */
 
-    --berg-radius-sm: 4px;
-    --berg-radius: 6px;
-    --berg-radius-lg: 12px;
+  --berg-radius-sm: 4px;
+  --berg-radius: 6px;
+  --berg-radius-lg: 12px;
 
-    --berg-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --berg-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.10);
-    --berg-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --berg-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --berg-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --berg-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
 }

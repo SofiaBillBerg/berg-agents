@@ -38,5 +38,4 @@ __all__ = [
     "RiskLevel",
     "TaskComplexity",
     "TaskContext",
-    "get_app",
-]
+    "get_app"]

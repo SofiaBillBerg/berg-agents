@@ -1,12 +1,13 @@
 /* Light preset — the default. */
 
-:root[data-berg-preset="light"], :root {
-  --berg-text:           #010a13;
-  --berg-bg:             #fbf7fb;
-  --berg-surface:        #fffafa;
-  --berg-surface-tint:   #f1f3f4;
-  --berg-code-bg:        rgba(248, 237, 248, 0.76);
-  --berg-code-text:      #551a8b;
-    --berg-border: #e9ecef;
-    --berg-muted: #551a8b;
+:root[data-berg-preset="light"],
+:root {
+  --berg-text: #010a13;
+  --berg-bg: #fbf7fb;
+  --berg-surface: #fffafa;
+  --berg-surface-tint: #f1f3f4;
+  --berg-code-bg: rgba(248, 237, 248, 0.76);
+  --berg-code-text: #551a8b;
+  --berg-border: #e9ecef;
+  --berg-muted: #551a8b;
 }

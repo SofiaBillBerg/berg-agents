@@ -74,5 +74,4 @@ PALETTE: dict[str, str] = {
     "code_bg": CODE_BG,
     "code_text": CODE_TEXT,
     "gradient_brand": GRADIENT_BRAND,
-    "gradient_soft": GRADIENT_SOFT,
-}
+    "gradient_soft": GRADIENT_SOFT}

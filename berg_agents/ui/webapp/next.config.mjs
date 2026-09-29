@@ -2,12 +2,12 @@
 
 // Bundle analyzer for Phase 2 performance monitoring
 // Enable with: ANALYZE=true bun run build
-const withBundleAnalyzer = process.env.ANALYZE === 'true'
-  ? (await import('@next/bundle-analyzer')).default({
-      enabled: process.env.ANALYZE === 'true',
-      compression: false,
-    })
-  : (config) => config;
+const withBundleAnalyzer =
+  process.env.ANALYZE === "true"
+    ? (await import("@next/bundle-analyzer")).default({
+        enabled: process.env.ANALYZE === "true",
+        compression: false})
+    : (config) => config;
 
 const nextConfig = {
   // Static export only in production (FastAPI mounts dist/). In dev, Next needs server mode for HMR + API proxy.
@@ -17,8 +17,7 @@ const nextConfig = {
   turbopack: {
     // Project root — prevents Next.js from using /home/nvidia as root
     root: import.meta.dirname,
-    resolveAlias: {},
-  },
+    resolveAlias: {}},
   allowedDevOrigins: ["localhost", "127.0.0.1"],
   compiler: {
     styledJsx: true,
@@ -28,14 +27,12 @@ const nextConfig = {
       minify: true,
       transpileTemplateLiterals: true,
       namespace: "berg-agents-app",
-      cssProp: true,
-    },
-  },
+      cssProp: true}},
 
   // Cache Components (Next.js 16.3+): enables Partial Prerendering (PPR)
   // In dev mode, enables PPR for selective hydration testing.
   // In production (static export), disabled since PPR is incompatible with export mode.
-  cacheComponents: process.env.NODE_ENV !== 'production',
+  cacheComponents: process.env.NODE_ENV !== "production",
 
   // Webpack configuration for bundle optimization
   webpack: (config, { dev, isServer }) => {
@@ -44,8 +41,7 @@ const nextConfig = {
       config.optimization = {
         ...config.optimization,
         usedExports: true,
-        sideEffects: false,
-      };
+        sideEffects: false};
     }
 
     // Ignore node: protocol imports for browser compatibility
@@ -53,10 +49,8 @@ const nextConfig = {
       ...config.resolve,
       alias: {
         ...config.resolve.alias,
-        'node:events': 'events',
-        'node:stream': 'stream',
-      },
-    };
+        "node:events": "events",
+        "node:stream": "stream"}};
 
     return config;
   },
@@ -65,15 +59,11 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: '*.heroui.com',
-      },
+        protocol: "https",
+        hostname: "*.heroui.com"},
       {
-        protocol: 'http',
-        hostname: 'localhost',
-      },
-    ],
-  },
+        protocol: "http",
+        hostname: "localhost"}]},
 
   // ESLint configuration — moved to .eslintrc.json for Next.js 16 compatibility
   // eslint config now in separate file

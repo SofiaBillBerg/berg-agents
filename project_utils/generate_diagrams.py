@@ -70,8 +70,7 @@ def parse_python_components(
                     class_methods.append(
                         {
                             "name": item.name,
-                            "calls": method_calls,
-                        }
+                            "calls": method_calls}
                     )
                     class_calls.extend(method_calls)
                 elif isinstance(item, ast.AnnAssign) and isinstance(
@@ -91,8 +90,7 @@ def parse_python_components(
                     "variables": class_vars,
                     "methods": class_methods,
                     "calls": list(set(class_calls)),
-                    "bases": [ast.unparse(b) for b in child.bases],
-                }
+                    "bases": [ast.unparse(b) for b in child.bases]}
             )
 
         elif isinstance(child, ast.FunctionDef):
@@ -105,8 +103,7 @@ def parse_python_components(
                     "calls": func_calls,
                     "variables": [],
                     "methods": [],
-                    "bases": [],
-                }
+                    "bases": []}
             )
 
     return components
@@ -148,8 +145,7 @@ def generate_mermaid() -> None:  # ruff: ignore[complex-structure]
     for mod_name, mod_comps in modules_map.items():
         mmd_lines = [
             "flowchart LR",
-            f"    %% Rich Component map focused on berg_agents.{mod_name} %%",
-        ]
+            f"    %% Rich Component map focused on berg_agents.{mod_name} %%"]
 
         external_dependencies = set()
         internal_nodes = []
@@ -227,8 +223,7 @@ def generate_mermaid() -> None:  # ruff: ignore[complex-structure]
     # ====================================================================
     global_lines = [
         "flowchart LR",
-        "    %% High-Level Subdirectory Overview %%",
-    ]
+        "    %% High-Level Subdirectory Overview %%"]
 
     for mod_name in modules_map:
         global_lines.append(f'    mod_{mod_name}["berg_agents.{mod_name}"]')

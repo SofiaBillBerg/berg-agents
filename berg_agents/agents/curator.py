@@ -25,8 +25,7 @@ __all__ = [
     "curate_task",
     "curation_confidence",
     "determine_actions",
-    "should_run_curator",
-]
+    "should_run_curator"]
 
 # Task types the curator handles with full confidence.
 # Mirrors the curation_types set of the old Curator class.
@@ -38,8 +37,7 @@ CURATION_TASK_TYPES: frozenset[str] = frozenset(
         "document",
         "memory_update",
         "summarize",
-        "update_docs",
-    }
+        "update_docs"}
 )
 
 # Keywords matching documentation/memory work in a free-text
@@ -148,8 +146,7 @@ def determine_actions(
                     {
                         "action": "update_docs",
                         "target": path,
-                        "type": "code_documentation",
-                    }
+                        "type": "code_documentation"}
                 )
 
     # One record action per distilled pattern.
@@ -161,8 +158,7 @@ def determine_actions(
                     "action": "record_pattern",
                     "content": pattern,
                     "target": PATTERN_TARGET,
-                    "type": "pattern",
-                }
+                    "type": "pattern"}
             )
 
     # One append action per architecture decision.
@@ -174,8 +170,7 @@ def determine_actions(
                     "action": "record_decision",
                     "content": decision,
                     "target": DECISION_TARGET,
-                    "type": "decision",
-                }
+                    "type": "decision"}
             )
 
     # Fallback: complex tasks with no concrete metadata still
@@ -185,8 +180,7 @@ def determine_actions(
             {
                 "action": "update_context",
                 "target": KNOWLEDGE_TARGET,
-                "type": "knowledge_update",
-            }
+                "type": "knowledge_update"}
         )
 
     return actions
@@ -216,8 +210,7 @@ def build_update_plan(
                 "action": action,
                 "description": description,
                 "step": len(plan) + 1,
-                "target": target,
-            }
+                "target": target}
         )
 
     # Docs first: keep generated references in sync early.
@@ -287,8 +280,7 @@ def curate_task(
             "files_to_update": [],
             "reason": "no files_changed in task metadata",
             "status": "skipped",
-            "update_plan": [],
-        }
+            "update_plan": []}
 
     # Gate is open; metadata is a non-empty mapping here.
     assert metadata is not None
@@ -300,5 +292,4 @@ def curate_task(
         "files_to_update": [str(item.get("target", "")) for item in actions],
         "status": "curated",
         "task_type": task.get("task_type", "generic"),
-        "update_plan": update_plan,
-    }
+        "update_plan": update_plan}

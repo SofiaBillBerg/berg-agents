@@ -17,5 +17,4 @@ __all__ = [
     "LearningGate",
     "RiskLevel",
     "TaskComplexity",
-    "TaskContext",
-]
+    "TaskContext"]

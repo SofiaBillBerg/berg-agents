@@ -58,8 +58,7 @@ HIGH_RISK_PATTERNS: list[str] = [
     r"auth",
     r"permission",
     r"database\s+migration",
-    r"irreversible",
-]
+    r"irreversible"]
 
 # Risk patterns for automatic medium-risk classification.
 MEDIUM_RISK_PATTERNS: list[str] = [
@@ -73,8 +72,7 @@ MEDIUM_RISK_PATTERNS: list[str] = [
     r"configure",
     r"settings?",
     r"environment",
-    r"env\s+var",
-]
+    r"env\s+var"]
 
 # Default HITL task-type gates. Mirror the ``hitl_rules``
 # block of ``config/bergagents.jsonc`` (the config is the
@@ -83,23 +81,19 @@ MEDIUM_RISK_PATTERNS: list[str] = [
 AUTO_EXECUTE: list[str] = [
     "read_file",
     "list_files",
-    "search_code",
-]
+    "search_code"]
 NOTIFY_AFTER: list[str] = [
     "edit_file",
     "new_file",
-    "generate_test",
-]
+    "generate_test"]
 ASK_BEFORE: list[str] = [
     "delete_file",
     "execute_command",
-    "refactor",
-]
+    "refactor"]
 HUMAN_LEADS: list[str] = [
     "security_change",
     "production_deploy",
-    "data_migration",
-]
+    "data_migration"]
 
 # Confidence below this forces human review, whatever
 # the risk level says.
@@ -179,16 +173,14 @@ def assess_risk(
         "deploy",
         "security",
         "production",
-        "migration",
-    }:
+        "migration"}:
         return RiskLevel.HIGH
     if normalized in {
         "refactor",
         "install",
         "configure",
         "upgrade",
-        "rewrite",
-    }:
+        "rewrite"}:
         return RiskLevel.MEDIUM
 
     # Default: nothing matched, so low risk.
@@ -434,5 +426,4 @@ __all__ = [
     "build_guardian_agent",
     "decide_hitl",
     "guard_review",
-    "guardian_agent",
-]
+    "guardian_agent"]

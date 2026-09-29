@@ -8,7 +8,9 @@ format: html
 BergAgents uses a **provider-centric configuration** pattern. Each model
 belongs to a provider; provider/baseURL/apiKey resolve FROM the model id -
 never from a global provider flag.
-# 
+
+Layers (increasing precedence):
+
 
 1. **Config file**: `config/bergagents.jsonc` - `providers` + `harness`/`model_routing`/`hitl_rules`/`plugins`/`agents`
 2. **`.env` file**: values referenced from config with `${env:VAR_NAME}` or `{env:VAR}`
