@@ -1,29 +1,9 @@
-"""Harness package — re-exports for backward compatibility.
+"""Harness package — re-exports.
 
-New code should import from `berg_agents.core.harness.orchestrator` for
-Harness, and from `berg_agents.ui.schemas` for API schema types.
+The public surface is :class:`Harness` from the orchestrator module.
+API schema types live in :mod:`berg_agents.ui.schemas`.
 """
 
 from berg_agents.core.harness.orchestrator import Harness
-from berg_agents.ui.schemas import (
-    ActiveProvider,
-    HarnessRequest,
-    HitlAckResponse,
-    HitlDecision,
-    ProviderInfo,
-    ProviderListResponse,
-    ThreadResponse,
-    ThreadStatusResponse,
-)
 
-__all__ = [
-    "ActiveProvider",
-    "Harness",
-    "HarnessRequest",
-    "HitlAckResponse",
-    "HitlDecision",
-    "ProviderInfo",
-    "ProviderListResponse",
-    "ThreadResponse",
-    "ThreadStatusResponse",
-]
+__all__ = ["Harness"]

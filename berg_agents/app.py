@@ -243,14 +243,6 @@ class BergAgentsApp:
         task = {"description": description, "task_type": task_type}
         return self.harness.execute_task(task)
 
-    def list_agents(self) -> list[dict[str, Any]]:
-        """List all registered agents.
-
-        Returns:
-            List of agent info dicts.
-        """
-        return self.harness.get_agent_info()
-
     def get_learning_stats(self) -> dict[str, Any]:
         """Get learning/outcome statistics.
 

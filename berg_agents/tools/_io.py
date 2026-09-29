@@ -14,21 +14,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from types import ModuleType
 
 from berg_agents.exceptions import CodeAgentError
-
-#: Optional Jupyter notebook dependency; ``None`` when unavailable.
-nbformat: ModuleType | None
-try:  # Optional dependency - used only for the notebook path.
-    # SKYLOS DEADCODE START (lines 27-27)
-    # SKYLOS DEADCODE END
-    pass
-except Exception as e:  # pragma: no cover - handled at runtime
-    # noinspection PyGlobalVariableRedeclarationInNotebook
-    print(f"Warning: nbformat not available ({e})")
-    # noinspection PyGlobalVariableRedeclarationInNotebook
-    nbformat = None
 
 __all__ = ["FileObject", "_atomic_write", "create_from_template"]
 

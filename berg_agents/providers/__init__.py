@@ -1,10 +1,14 @@
-"""Provider layer: protocol and base class for LLM providers.
+"""Provider layer — model resolution.
 
-Exposes the public names of the provider-agnostic LLM contract.
+The only public surface is :func:`resolve_model_instance`, which reads
+``config/bergagents.jsonc`` and returns a fully-configured
+:class:`~pydantic_ai.models.openai.OpenAIChatModel`. The old ``LLMProvider``
+protocol / ``ProviderBase`` ABC were removed as dead code (nobody subclasses
+or instantiates them).
 """
 
 from __future__ import annotations
 
-from .base import LLMProvider, ProviderBase
+from .models import resolve_model_instance, resolve_model_string
 
-__all__ = ["LLMProvider", "ProviderBase"]
+__all__ = ["resolve_model_instance", "resolve_model_string"]

@@ -1,14 +1,15 @@
-"""Subagent implementations for berg_agents."""
+"""Subagent implementations for berg_agents.
+
+Import order matters here: ``factory`` must load before ``guardian`` so that
+``core.interface`` is fully initialised before the orchestrator (loaded via
+``core.harness``) imports from ``agents.guardian`` — otherwise a circular
+import bites at module load time.
+"""
 
 from __future__ import annotations
 
-from berg_agents.agents.curator import (
-    build_update_plan,
-    curate_task,
-    curation_confidence,
-    determine_actions,
-    should_run_curator,
-)
+# Order: factory first (pre-loads core.interface via core.__init__),
+# then guardian, implementation, planner, curator.
 from berg_agents.agents.factory import (
     DEFAULT_SYSTEM_PROMPT,
     build_agent,
@@ -36,25 +37,6 @@ from berg_agents.agents.implementation import (
     plan_steps_for,
     resolve_implementation_model,
 )
-from berg_agents.agents.learning import (
-    LearningDeps,
-    OutcomeStore,
-    best_model_from_stats,
-    build_learning_agent,
-    build_learning_entry,
-    fetch_best_model,
-    fetch_outcome_stats,
-    fetch_routing_recommendation,
-    generate_recommendation,
-    get_best_model_for_task,
-    get_default_store,
-    get_learnings,
-    get_outcome_stats,
-    learning_agent,
-    recommendation_from_stats,
-    record_outcome,
-    record_task_outcome,
-)
 from berg_agents.agents.planner import (
     Planner,
     PlannerDeps,
@@ -67,6 +49,13 @@ from berg_agents.agents.planner import (
     plan_depth,
     planner_agent,
 )
+from berg_agents.agents.curator import (
+    build_update_plan,
+    curate_task,
+    curation_confidence,
+    determine_actions,
+    should_run_curator,
+)
 
 __all__ = [
     "DEFAULT_SYSTEM_PROMPT",
@@ -76,19 +65,14 @@ __all__ = [
     "GuardianDecision",
     "GuardianDeps",
     "ImplementationDeps",
-    "LearningDeps",
-    "OutcomeStore",
     "PlanStep",
     "Planner",
     "PlannerDeps",
     "Subtask",
     "assess_risk",
-    "best_model_from_stats",
     "build_agent",
     "build_guardian_agent",
     "build_implementation_agent",
-    "build_learning_agent",
-    "build_learning_entry",
     "build_loop",
     "build_plan",
     "build_planner_agent",
@@ -101,25 +85,13 @@ __all__ = [
     "determine_actions",
     "estimate_complexity",
     "estimate_confidence",
-    "fetch_best_model",
-    "fetch_outcome_stats",
-    "fetch_routing_recommendation",
-    "generate_recommendation",
-    "get_best_model_for_task",
-    "get_default_store",
-    "get_learnings",
-    "get_outcome_stats",
     "guard_review",
     "guardian_agent",
     "implementation_agent",
-    "learning_agent",
     "order_subtasks",
     "plan_depth",
     "plan_steps_for",
     "planner_agent",
-    "recommendation_from_stats",
-    "record_outcome",
-    "record_task_outcome",
     "resolve_implementation_model",
     "should_run_curator",
 ]

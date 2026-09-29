@@ -13,6 +13,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from berg_agents.config.settings import DEFAULT_SYSTEM_PROMPT
 from berg_agents.core.checkpoint import Checkpointer
 from berg_agents.core.loop import BergLoop
 from berg_agents.core.tool_spec import ToolRegistry, ToolSpec, make_tool_spec
@@ -24,14 +25,6 @@ __all__ = [
     "build_loop",
     "create_tools",
 ]
-
-DEFAULT_SYSTEM_PROMPT = (
-    "You are a helpful assistant. "
-    "Workspace files are mounted at /workspace (maps to the project working "
-    "directory). Always use the /workspace prefix with filesystem tools, e.g. "
-    'ls(path="/workspace"), read_file(path="/workspace/README.md"), '
-    'glob(pattern="**/*.py", path="/workspace").'
-)
 
 
 def _resolve_root(root_dir: str | Path) -> Path:

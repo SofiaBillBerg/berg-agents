@@ -17,8 +17,6 @@ import logging
 from typing import Any
 
 from berg_agents.agents.learning import (
-    generate_recommendation,
-    get_best_model_for_task,
     get_outcome_stats,
     record_outcome,
 )
@@ -277,21 +275,3 @@ class LearningGate:
             "recent_insights": self._insights[-10:],
             "recent_adjustments": self._rule_adjustments[-5:],
         }
-
-    @staticmethod
-    def get_best_model(task_type: str) -> str | None:
-        """Get the best model for a task type based on learning.
-
-        :param task_type: Type of task.
-        :return: Best model name or None.
-        """
-        return get_best_model_for_task(task_type)
-
-    @staticmethod
-    def get_recommendation(task_type: str) -> str | None:
-        """Get a routing recommendation for a task type.
-
-        :param task_type: Type of task.
-        :return: Recommendation string or None.
-        """
-        return generate_recommendation(task_type)

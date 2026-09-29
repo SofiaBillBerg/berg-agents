@@ -48,7 +48,6 @@ from typing import Any, Protocol
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
-from berg_agents.config.mcp_utils import prefix_tool_name
 from berg_agents.core.tool_spec import ToolParam, ToolSpec
 
 # ---------------------------------------------------------------------------
@@ -81,6 +80,16 @@ READONLY_SERVERS: frozenset[str] = frozenset(
 _PREFIX_RE = re.compile(
     rf"^{re.escape(MCP_TOOL_PREFIX)}_(?P<server>[^_]+){re.escape(SERVER_SEP)}.*$"
 )
+
+
+def prefix_tool_name(server_name: str, tool_name: str) -> str:
+    """Return the agent-facing name for an MCP tool.
+
+    :param server_name: MCP server key (e.g. ``"github"``).
+    :param tool_name: Original tool name advertised by the server.
+    :return: ``"mcp_<server>__<tool>"``.
+    """
+    return f"{MCP_TOOL_PREFIX}_{server_name}{SERVER_SEP}{tool_name}"
 
 
 def server_from_prefixed(tool_name: str) -> str | None:
@@ -764,31 +773,6 @@ class McpClient:
         _execute.__name__ = f"mcp_{self.config.name}_{original_name}"
         return _execute
 
-    def call_tool(
-        self,
-        name: str,
-        arguments: Mapping[str, Any],
-    ) -> Any:
-        """Invoke one tool by its *prefixed* name.
-
-        Looks the tool up in the cache (populated by
-        :meth:`list_tools`); uses the cached executor so the wire name
-        is the original MCP name.  Raises :class:`McpError` if the tool
-        is unknown to this client.
-
-        :param name: The agent-facing prefixed name
-            (``"mcp_<server>__<tool>"``).
-        :param arguments: The keyword arguments to forward to the tool.
-        :return: The decoded ``result.content`` text (or the raw result
-            if it has no ``content`` field).
-        """
-        for spec in self.list_tools():
-            if spec.name == name and spec.execute is not None:
-                return spec.execute(**dict(arguments))
-        raise McpError(
-            f"tool {name!r} is not advertised by MCP server {self.config.name!r}"
-        )
-
     def close(self) -> None:
         """Release the underlying transport."""
         self.config.transport.close()
@@ -961,7 +945,6 @@ def load_mcp_server_configs(
                 readonly=entry.get("readonly"),
             )
         )
-    load_mcp_server_configs._enabled_servers = frozenset(enabled_servers)
     return configs
 
 

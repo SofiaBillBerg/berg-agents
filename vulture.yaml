@@ -1,0 +1,90 @@
+# Vulture whitelist — false positives that cannot be detected as alive.
+# Run: uv tool run vulture berg_agents --min-confidence 80
+
+ignore_names:
+  # --- pydantic-settings dynamic dispatch ---
+  - "_read_file"
+  - "settings_customise_sources"
+  - "model_config"
+  - "file_secret_settings"
+  - "_validate_checkpoint_dir"
+
+  # --- pydantic config fields (runtime-used via env/config files) ---
+  - "backend"
+  - "max_tokens"
+  - "stream"
+  - "auth_token"
+  - "log_level"
+  - "max_execution_time"
+  - "max_iterations"
+  - "verbose"
+  - "stream_enabled"
+  - "default_model"
+  - "mcp_servers"
+  - "toolsets"
+  - "presets"
+  - "skills"
+  - "memory"
+  - "memory_backend"
+  - "memory_autosave"
+  - "summarization_trigger"
+  - "summarization_keep"
+  - "todos_enabled"
+
+  # --- dataclass field annotations ---
+  - "note"
+  - "contents"
+  - "final_message"
+
+  # --- module-level loggers ---
+  - "log"
+
+  # --- FastAPI route handlers (decorators, can't trace) ---
+  - "chat_stream"
+  - "learning_stats"
+  - "list_providers"
+  - "get_active_provider"
+  - "set_active_provider"
+  - "list_agents"
+  - "health"
+
+  # --- @agent.tool functions (called by model at runtime) ---
+  - "assess_task_risk"
+  - "check_hitl_policy"
+  - "build_execution_plan"
+  - "required_tools"
+  - "task_confidence"
+  - "read_file"
+  - "write_file"
+  - "edit_file"
+  - "suggest_planning_hint"
+  - "decompose_task"
+  - "estimate_task_complexity"
+
+  # --- public API methods (called dynamically or via framework dispatch) ---
+  - "to_anthropic_tool"
+  - "to_pydantic_model"
+  - "unregister"
+  - "by_tag"
+  - "by_name_glob"
+  - "by_risk_class"
+  - "filter_by_model"
+  - "filter"
+  - "complete"
+  - "bind_capabilities"
+
+  # --- dynamic dispatch (called via event loop / checkpoint mechanism) ---
+  - "resume"
+  - "cancel"
+  - "delete"
+  - "call_tool"
+
+  # --- CSS theme tokens ---
+  - "SURFACE_SOFT"
+  - "PALETTE"
+
+  # --- MCP attribute ---
+  - "_enabled_servers"
+
+  # --- pydantic-settings internal ---
+  - "file_secret_settings"
