@@ -14,6 +14,8 @@ export interface InputBarProps {
   onSend: () => void;
   /** True while a task runs or an approval is pending (blocks new sends). */
   disabled: boolean;
+  /** Stop handler — cancels an in-flight streaming request. */
+  onStop?: () => void;
   /** Key handler from the parent (Enter-to-send, Escape closes pickers). */
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   /** Placeholder shown when the input is empty. */
@@ -33,9 +35,9 @@ function InputBar({
   setInput,
   onSend,
   disabled,
+  onStop,
   onKeyDown,
-  placeholder = "Type a message...",
-}: InputBarProps) {
+  placeholder = "Type a message..."}: InputBarProps) {
   // Ref to the underlying native textarea (forwarded by HeroUI TextArea).
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -78,6 +80,16 @@ function InputBar({
       >
         {disabled ? "Sending..." : "Send"}
       </Button>
+
+      {disabled && onStop && (
+        <Button
+          className="min-h-11 shrink-0 border border-warning text-warning hover:bg-warning/10"
+          variant="outline"
+          onPress={onStop}
+        >
+          ⏹ Stop
+        </Button>
+      )}
     </div>
   );
 }

@@ -6,12 +6,11 @@ format: html
 # Configuration
 
 BergAgents uses a **provider-centric configuration** pattern. Each model
-belongs to a provider; provider/baseURL/apiKey resolve FROM the model id —
+belongs to a provider; provider/baseURL/apiKey resolve FROM the model id -
 never from a global provider flag.
+# 
 
-Layers (increasing precedence):
-
-1. **Config file**: `config/bergagents.jsonc` — `providers` + `harness`/`model_routing`/`hitl_rules`/`plugins`/`agents`
+1. **Config file**: `config/bergagents.jsonc` - `providers` + `harness`/`model_routing`/`hitl_rules`/`plugins`/`agents`
 2. **`.env` file**: values referenced from config with `${env:VAR_NAME}` or `{env:VAR}`
 3. **Environment variables**: `BERG_AGENT_*` override config and `.env`
 4. **MCP config**: `config/mcp.json` (via `BERG_AGENT_MCP_SERVERS`) for MCP servers
@@ -54,7 +53,7 @@ Resolution (`berg_agents/providers/registry.py`):
   // Harness engine (framework-agnostic core)
   "harness": { "enable_learning": true, "enable_hitl": true },
 
-  // Model routing — one model list per complexity level (single axis)
+  // Model routing - one model list per complexity level (single axis)
   "model_routing": {
     "models": {
       "trivial":  { "models": ["qwen3.5:9b"], "max_tokens": 4096 },
@@ -64,7 +63,7 @@ Resolution (`berg_agents/providers/registry.py`):
     }
   },
 
-  // HITL rules — Guardian decides when to ask
+  // HITL rules - Guardian decides when to ask
   "hitl_rules": {
     "auto_execute": ["read_file", "list_files", "search_code"],
     "notify_after": ["edit_file", "new_file", "generate_test"],
@@ -72,10 +71,10 @@ Resolution (`berg_agents/providers/registry.py`):
     "human_leads": ["security_change", "production_deploy", "data_migration"]
   },
 
-  // Plugins — optional plugin paths (BergAgents works without them)
+  // Plugins - optional plugin paths (BergAgents works without them)
   "plugins": [".opencode"],
 
-  // Per-agent tuning — preferred complexity per subagent
+  // Per-agent tuning - preferred complexity per subagent
   "agents": {
     "guardian":      { "preferred_complexity": "standard" },
     "planner":       { "preferred_complexity": "complex" },
@@ -112,7 +111,7 @@ External MCP servers live in the file pointed at by `BERG_AGENT_MCP_SERVERS` (de
 ]
 ```
 
-Secrets are never stored in the MCP file — only `${env:VAR}` references. Sensitive servers (`github`, `memory`) pause for approval; read-only servers (`context7`, `docs`, `reference`) run without interruption.
+Secrets are never stored in the MCP file - only `${env:VAR}` references. Sensitive servers (`github`, `memory`) pause for approval; read-only servers (`context7`, `docs`, `reference`) run without interruption.
 
 ## Profiles
 
@@ -128,4 +127,4 @@ Secrets are never stored in the MCP file — only `${env:VAR}` references. Sensi
 
 ## Precedence Example
 
-Config file: `BERG_AGENT_TEMPERATURE = 0.7` · `.env`: `BERG_AGENT_TEMPERATURE=0.9` · environment: `BERG_AGENT_TEMPERATURE=0.5` → effective value is `0.5` (environment wins).
+Config file: `BERG_AGENT_TEMPERATURE = 0.7` . `.env`: `BERG_AGENT_TEMPERATURE=0.9` . environment: `BERG_AGENT_TEMPERATURE=0.5` → effective value is `0.5` (environment wins).

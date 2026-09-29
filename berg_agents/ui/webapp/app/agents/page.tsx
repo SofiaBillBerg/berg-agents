@@ -1,0 +1,89 @@
+/*
+ * Agents page — dedicated view for registered agents and their details.
+ * Fetches agent list from /api/agents on the client.
+ */
+
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { Card, Spinner } from "@heroui/react";
+
+import { API_BASE } from "@/envConfig";
+import type { AgentInfo } from "@/harness/webhook";
+import { AgentPanel } from "../components/AgentPanel.tsx";
+import { Navbar } from "../components/Navbar.tsx";
+
+/**
+ * AgentsPage — client component that fetches and displays all registered
+ * agents. Shows a spinner while loading and an empty state if no agents.
+ */
+export default function AgentsPage() {
+  const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/agents`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setAgents(data || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Network error");
+      } finally {
+        setLoading(false);
+      }
+    };
+    void fetchAgents();
+  }, []);
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="p-4">
+          <Card variant="default">
+            <Card.Content className="flex items-center justify-center py-8">
+              <Spinner size="lg" />
+              <span className="ml-2">Loading agents...</span>
+            </Card.Content>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Navbar />
+        <div className="p-4">
+          <Card className="border border-danger" variant="default">
+            <Card.Header>
+              <Card.Title className="text-danger">Error</Card.Title>
+            </Card.Header>
+            <Card.Content>
+              <p className="text-sm">Failed to load agents: {error}</p>
+            </Card.Content>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Navbar />
+      <div className="p-4 max-w-[95vw] mx-auto">
+        <h1 className="text-2xl font-bold mb-4">Registered Agents</h1>
+        <p className="text-sm text-muted-foreground mb-4">
+          {agents.length} agent(s) available — each handles different task types
+          via the BergAgents harness pipeline.
+        </p>
+        <AgentPanel agents={agents} activeAgent={null} />
+      </div>
+    </>
+  );
+}

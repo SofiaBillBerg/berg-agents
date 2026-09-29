@@ -60,7 +60,7 @@
       "options": {
         "baseURL": "${env:UNSLOTH_BASE_URL}",
         "apiKey": "${env:UNSLOTH_STUDIO_AUTH_TOKEN}",
-        "timeout": 6000000
+        "timeout": 120000
       },
       "models": {
         "unsloth/Jan-nano-128k-GGUF:Q8_0S": {
@@ -75,7 +75,7 @@
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "http://localhost:11434/v1",
-        "timeout": 6000000
+        "timeout": 120000
       },
       "models": {
         "ornith:9b-q4_K_M": {
@@ -95,7 +95,7 @@
       "options": {
         "baseURL": "${env:BERG_AGENT_OMNIROUTE_BASE_URL}",
         "apiKey": "${env:BERG_AGENT_OMNIROUTE_API_KEY}",
-        "timeout": 6000000
+        "timeout": 120000
       },
       "models": {
         "auto": {
@@ -217,5 +217,4 @@
   //#     "toolsets": ["read-only"],
   //#     "capabilities": ["filesystem"],
   //#   },
-  //# ],
-}
+  //# ]}

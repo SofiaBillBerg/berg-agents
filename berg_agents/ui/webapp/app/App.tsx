@@ -22,6 +22,7 @@ import AgentPanel from "./components/AgentPanel.tsx";
 import LearningPanel from "./components/LearningPanel.tsx";
 import ChatTranscript from "./components/ChatTranscript.tsx";
 import StatusCard from "./components/StatusCard.tsx";
+import Navbar from "./components/Navbar.tsx";
 
 /**
  * Error boundary for lazy-loaded components.
@@ -80,8 +81,8 @@ function ChatContent() {
     isStreaming,
     error: chatError,
     sendMessage,
-    clearMessages,
-  } = aiChat;
+    stop,
+    clearMessages} = aiChat;
 
   // Local agent list (fetched from /api/agents)
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -112,16 +113,14 @@ function ChatContent() {
       const localCommands = [
         "help", "exit", "quit", "clear", "agents", "stats",
         "health", "models", "tools", "history", "memory", "context",
-        "settings", "skills", "mcps", "export",
-      ];
+        "settings", "skills", "mcps", "export"];
 
       if (localCommands.includes(cmd)) {
         switch (cmd) {
           case "help":
             return {
               handled: true,
-              card: `Type a message to chat with Berg, the AI agent.\nFor complex tasks, the agent will automatically use tools (read_file, write_file, edit_file, run_task).\nUse /task <description> to explicitly trigger the full harness pipeline.`,
-            };
+              card: `Type a message to chat with Berg, the AI agent.\nFor complex tasks, the agent will automatically use tools (read_file, write_file, edit_file, run_task).\nUse /task <description> to explicitly trigger the full harness pipeline.`};
           case "clear":
             clearMessages();
             return { handled: true, card: null };
@@ -131,18 +130,15 @@ function ChatContent() {
           case "agents":
             return {
               handled: true,
-              card: `/agents\n\n${agents.map((a) => `${a.name} — ${a.description || ""}`).join("\n") || "No agents"}`,
-            };
+              card: `/agents\n\n${agents.map((a) => `${a.name} — ${a.description || ""}`).join("\n") || "No agents"}`};
           case "stats":
             return {
               handled: true,
-              card: `/stats\n\n${JSON.stringify(learningStats, null, 2)}`,
-            };
+              card: `/stats\n\n${JSON.stringify(learningStats, null, 2)}`};
           case "health":
             return {
               handled: true,
-              card: `/health\nOK · ${messages.length} messages`,
-            };
+              card: `/health\nOK · ${messages.length} messages`};
           case "models":
             return { handled: true, card: "/models\nSwitch via the header selector" };
           case "tools":
@@ -200,6 +196,7 @@ function ChatContent() {
 
   return (
     <LazyComponentErrorBoundary componentName="Chat">
+      <Navbar />
       <div className="app-container p-4 w-full max-w-[95vw] mx-auto">
         <div className="berg-title-banner mb-4 flex justify-between items-center flex-wrap gap-3">
           <div className="min-w-0 flex-1">
@@ -246,6 +243,7 @@ function ChatContent() {
             disabled={isStreaming}
             input={input}
             onSend={handleSendWrapper}
+            onStop={isStreaming ? stop : undefined}
             placeholder="Type a message... (e.g. 'hello' or 'write a Python script')"
             setInput={setInput}
             onKeyDown={onKeyDown}
