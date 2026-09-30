@@ -332,17 +332,224 @@ def build_implementation_agent(
     ) -> str:
         """Read a file from the workspace.
 
+        Returns a helpful message instead of raising when the
+        path is a directory or does not exist, so the model
+        can recover (e.g. by calling ``list_files``).
+
         Args:
             ctx: Run context carrying implementation deps.
             file_path: Path to the file, relative to workspace root
                 or prefixed with /workspace.
 
         Returns:
-            File contents as a string.
+            File contents as a string, or a guidance message.
         """
         root = ctx.deps.workspace_root or "."
         target = _normalize_target(file_path, root)
-        return target.read_text(encoding="utf-8")
+        if target.is_dir():
+            return (
+                f"{file_path} is a directory, not a file. "
+                f"Call list_files with file_path={file_path!r} "
+                f"to see its contents."
+            )
+        if not target.exists():
+            return (
+                f"File not found: {file_path}. "
+                f"Call list_files on the parent directory to see "
+                f"what exists."
+            )
+        try:
+            return target.read_text(encoding="utf-8")
+        except OSError as exc:
+            return f"Could not read {file_path}: {exc}"
+        except UnicodeDecodeError:
+            return f"Could not read {file_path}: not a UTF-8 text file."
+
+    @agent.tool
+    def list_files(
+        ctx: RunContext[ImplementationDeps],
+        file_path: str = ".",
+    ) -> str:
+        """List files and subdirectories in a workspace directory.
+
+        Use this to explore the project layout before reading
+        files — never guess at paths. Directories end with "/".
+
+        Args:
+            ctx: Run context carrying implementation deps.
+            file_path: Directory to list, relative to workspace
+                root or prefixed with /workspace (default: root).
+
+        Returns:
+            Sorted directory listing, directories first.
+        """
+        root = ctx.deps.workspace_root or "."
+        target = _normalize_target(file_path, root)
+        if not target.exists():
+            return (
+                f"Directory not found: {file_path}. "
+                f"Call list_files with file_path='.' to start "
+                f"from the workspace root."
+            )
+        if not target.is_dir():
+            return (
+                f"{file_path} is a file, not a directory. "
+                f"Call read_file to see its contents."
+            )
+        try:
+            entries = sorted(
+                target.iterdir(), key=lambda p: (p.is_file(), p.name.lower())
+            )
+        except OSError as exc:
+            return f"Could not list {file_path}: {exc}"
+        lines = [
+            f"{p.name}/" if p.is_dir() else p.name for p in entries[:200]
+        ]
+        extra = (
+            f"\n... and {len(entries) - 200} more (listing truncated)"
+            if len(entries) > 200
+            else ""
+        )
+        return "\n".join(lines) + extra if lines else "(empty directory)"
+
+    @agent.tool
+    def bash(
+        ctx: RunContext[ImplementationDeps],
+        command: str,
+        timeout: int = 30,
+    ) -> str:
+        """Run a shell command in the workspace root.
+
+        Use this to run tests, builds, linters, or inspect the
+        system. There is no other shell/terminal tool.
+
+        Args:
+            ctx: Run context carrying implementation deps.
+            command: Shell command to run (via ``bash -c``).
+            timeout: Seconds before the command is killed
+                (clamped to 120).
+
+        Returns:
+            Exit code plus combined output (truncated at 8000 chars).
+        """
+        import logging
+        import subprocess
+
+        root = ctx.deps.workspace_root or "."
+        root_path = _normalize_target(".", root)
+        try:
+            clamped = max(1, min(int(timeout), 120))
+        except (TypeError, ValueError):
+            clamped = 30
+        logging.getLogger(__name__).warning("bash tool: %s", command)
+        try:
+            proc = subprocess.run(
+                command,
+                shell=True,
+                executable="/bin/bash",
+                cwd=root_path,
+                capture_output=True,
+                text=True,
+                timeout=clamped,
+            )
+        except subprocess.TimeoutExpired:
+            return (
+                f"Command timed out after {clamped}s and was killed: "
+                f"{command}"
+            )
+        except OSError as exc:
+            return f"Could not run command: {exc}"
+        combined = (proc.stdout or "") + (
+            f"\n[stderr]\n{proc.stderr}" if proc.stderr else ""
+        )
+        if len(combined) > 8000:
+            combined = (
+                combined[:8000]
+                + f"\n... output truncated "
+                f"({len(combined)} chars total)"
+            )
+        return f"[exit {proc.returncode}]\n{combined}".strip()
+
+    @agent.tool
+    def search_code(
+        ctx: RunContext[ImplementationDeps],
+        pattern: str,
+        directory: str = ".",
+    ) -> str:
+        """Search file contents under a workspace directory.
+
+        Recursive literal-match grep over text files (skips
+        binaries, hidden/vendor dirs, files over 1MB; capped at
+        50 hits). Use this instead of guessing file paths.
+
+        Args:
+            ctx: Run context carrying implementation deps.
+            pattern: Literal text to search for (not a regex).
+            directory: Where to search (default: workspace root).
+
+        Returns:
+            ``path:line: text`` hits, or a no-match message.
+        """
+        root = ctx.deps.workspace_root or "."
+        base = _normalize_target(directory, root)
+        if not base.exists():
+            return (
+                f"Directory not found: {directory}. "
+                f"Call list_files with file_path='.' to start "
+                f"from the workspace root."
+            )
+        if not base.is_dir():
+            return (
+                f"{directory} is a file, not a directory. "
+                f"Call read_file to see its contents."
+            )
+        skip_dirs = {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            ".next",
+            "dist",
+            ".turbo"}
+        root_path = _normalize_target(".", root)
+        hits: list[str] = []
+        scanned = 0
+        for path in sorted(base.rglob("*")):
+            if len(hits) >= 50:
+                break
+            if any(part in skip_dirs for part in path.parts):
+                continue
+            if not path.is_file():
+                continue
+            try:
+                if path.stat().st_size > 1_000_000:
+                    continue
+            except OSError:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError, ValueError):
+                continue
+            scanned += 1
+            if scanned > 2000:
+                break
+            for i, line in enumerate(text.splitlines(), start=1):
+                if pattern in line:
+                    try:
+                        rel = path.relative_to(root_path)
+                    except ValueError:
+                        rel = path
+                    hits.append(f"{rel}:{i}: {line.strip()[:200]}")
+                    if len(hits) >= 50:
+                        break
+        if not hits:
+            return f"No matches for {pattern!r} under {directory}."
+        extra = (
+            "\n... and more (results truncated at 50)"
+            if len(hits) >= 50
+            else ""
+        )
+        return "\n".join(hits) + extra
 
     # Mutating tools are withheld in read-only (chat) mode so
     # the model cannot change files without going through the

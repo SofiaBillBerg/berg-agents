@@ -17,6 +17,7 @@ from berg_agents.ui.routes import create_router
 from berg_agents.ui.sessions import SessionManager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,27 @@ def create_app(
     if _WEB_DIST.joinpath("index.html").is_file():
         # Production UI on the same origin (single :8001).
         # Mounted after the API router so /api/* always wins.
+        #
+        # The static export writes sub-routes as top-level "<route>.html"
+        # files (e.g. dist/agents.html), which Starlette's StaticFiles
+        # will NOT resolve for "/agents" (it only serves index.html inside
+        # a matching directory). Explicit routes cover them — FastAPI
+        # handles HEAD automatically for GET routes.
+        for route_page in ("agents", "stats"):
+            page_file = _WEB_DIST / f"{route_page}.html"
+            if page_file.is_file():
+
+                def _serve_page(
+                    _path: Path = page_file,
+                ) -> FileResponse:
+                    return FileResponse(_path, media_type="text/html")
+
+                app.api_route(
+                    f"/{route_page}",
+                    methods=["GET", "HEAD"],
+                    name=f"webapp-{route_page}",
+                    include_in_schema=False,
+                )(_serve_page)
         app.mount(
             "/", StaticFiles(directory=_WEB_DIST, html=True), name="webapp"
         )

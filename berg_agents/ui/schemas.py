@@ -6,6 +6,8 @@ Single source of truth for the HTTP contract between the FastAPI backend
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -27,3 +29,24 @@ class ActiveProvider(BaseModel):
 
     provider: str
     model: str
+
+
+class ToolExecuteRequest(BaseModel):
+    """Request to execute one tool synchronously.
+
+    Matches what the webapp's ``executeTool`` sends: ``{tool, args}``.
+    ``args`` is normally a mapping (``{"file_path": ...}``), but a
+    bare string is accepted for single-argument tools and treated
+    as ``file_path``.
+    """
+
+    tool: str
+    args: dict[str, Any] | str | None = None
+
+
+class ToolExecuteResponse(BaseModel):
+    """Result of a synchronous tool execution."""
+
+    tool: str
+    output: str
+    status: str = "ok"

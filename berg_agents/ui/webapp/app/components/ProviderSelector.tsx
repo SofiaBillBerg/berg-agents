@@ -141,6 +141,8 @@ export function ProviderSelector({
   // Key of the active provider in "provider:model" form. Null when nothing is
   // active (or the active pair is not a selectable option) so the Select
   // shows its placeholder instead of a stale value.
+  // NOTE: HeroUI v3 Select is React-Aria-based — selection is controlled
+  // via `selectedKey` / `onSelectionChange`, NOT `value` / `onChange`.
   const selectedValue = activeProvider
     ? `${activeProvider.provider}:${activeProvider.model}`
     : null;
@@ -150,6 +152,7 @@ export function ProviderSelector({
       <div className="provider-selector-bar flex items-center gap-2 bg-surface-soft p-1.5 rounded-lg border border-border">
         <Select
           aria-label="Provider"
+          name="provider"
           className="provider-select text-xs"
           isDisabled={isSwitching}
           placeholder={
@@ -157,15 +160,15 @@ export function ProviderSelector({
               ? "No providers configured"
               : "Select provider"
           }
-          value={selectedValue}
-          onChange={(value) => {
-            if (value == null) return;
-            const val = String(value);
+          selectedKey={selectedValue}
+          onSelectionChange={(key) => {
+            if (key == null) return;
+            const val = String(key);
             const colonIdx = val.indexOf(":");
             if (colonIdx !== -1) {
               const provider = val.substring(0, colonIdx);
               const model = val.substring(colonIdx + 1);
-              handleSwitch(provider, model);
+              void handleSwitch(provider, model);
             }
           }}
         >

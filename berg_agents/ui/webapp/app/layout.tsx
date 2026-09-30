@@ -6,7 +6,15 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Berg Agents Web UI",
-  description: "A web interface for the Berg Agents application."};
+  description: "A web interface for the Berg Agents application.",
+  icons: {
+    icon: [
+      { url: "/favicon/favicon.ico" },
+      { url: "/favicon/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+      { url: "/favicon/favicon.svg", type: "image/svg+xml" }],
+    apple: [
+      { url: "/favicon/apple-touch-icon.png", sizes: "180x180" }]},
+  manifest: "/favicon/site.webmanifest"};
 
 /**
  * Pre-hydration theme script: reads the stored theme (`berg-theme`, falling

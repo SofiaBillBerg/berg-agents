@@ -15,10 +15,13 @@ from berg_agents.ui.schemas import (
     ActiveProvider,
     ProviderInfo,
     ProviderListResponse,
+    ToolExecuteRequest,
+    ToolExecuteResponse,
 )
 from berg_agents.ui.sessions import SessionManager
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
+from pydantic_ai import DeferredToolRequests
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 
 logger = logging.getLogger(__name__)
@@ -142,10 +145,20 @@ def create_router(
         # sdk_version=6 enables tool-approval streaming (human-in-the-loop).
         # VercelAIAdapter.dispatch_request handles all SSE encoding and
         # protocol transformation natively — no manual event loops needed.
+        # output_type adds DeferredToolRequests: tools flagged
+        # requires_approval (bash, edit_file, write_file, run_task)
+        # pause the run instead of executing, the adapter streams an
+        # approval request, and the frontend answers it with
+        # addToolApprovalResponse — which re-POSTs here carrying the
+        # approval. The adapter extracts approvals from the incoming
+        # messages and resumes the same run. (The adapter only adds
+        # DeferredToolRequests itself when it contributes a toolset,
+        # which we don't use — hence declaring it explicitly.)
         return await VercelAIAdapter.dispatch_request(
             request,
             agent=agent,
             sdk_version=6,
+            output_type=[str, DeferredToolRequests],
             on_complete=None,
             on_cancel=None,
         )
@@ -157,6 +170,91 @@ def create_router(
         :return: A dictionary containing learning statistics.
         """
         return harness.get_learning_stats()
+
+    @router.post("/api/tool/execute")
+    async def execute_tool(request: ToolExecuteRequest) -> ToolExecuteResponse:
+        """Execute one tool synchronously and return its output.
+
+        Switches on the tool name and runs the matching
+        :class:`~berg_agents.core.tool_spec.ToolSpec` (file tools)
+        or the full harness pipeline (``run_task``). This is the
+        endpoint the webapp's ``executeTool`` (slash commands like
+        ``/read_file``) calls. Tool functions already return
+        human-readable messages instead of raising, so failures
+        arrive as ``status="error"`` output — never tracebacks.
+
+        :param request: Tool name plus arguments (mapping, or a bare
+            string treated as ``file_path``).
+        :return: Tool name, string output, and status.
+        :raises HTTPException: 404 for unknown tool names.
+        """
+        import asyncio
+
+        from berg_agents.agents.factory import create_tools
+
+        name = (request.tool or "").strip()
+        args = request.args
+        if isinstance(args, str):
+            args = {"file_path": args} if args else {}
+        if not isinstance(args, dict):
+            args = {}
+
+        if name == "run_task":
+            task: dict[str, Any] = {
+                "description": str(args.get("description", "")),
+                "task_type": str(args.get("task_type", "generic")),
+                "metadata": {}}
+            if not task["description"]:
+                return ToolExecuteResponse(
+                    tool=name,
+                    output="Missing 'description': tell me what to do, "
+                    "e.g. /run_task {\"description\": \"summarize README\"}.",
+                    status="error",
+                )
+            result = await asyncio.to_thread(
+                harness.execute_task, task, task_id=f"tool-{id(task)}"
+            )
+            if isinstance(result, str):
+                output = result
+            else:
+                import json as _json
+
+                try:
+                    output = _json.dumps(result, indent=2, default=str)
+                except (TypeError, ValueError):
+                    output = str(result)
+            return ToolExecuteResponse(tool=name, output=output)
+
+        specs = {
+            spec.name: spec
+            for spec in create_tools(root_dir=sessions._harness_root_dir())
+        }
+        spec = specs.get(name)
+        if spec is None or spec.execute is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Unknown tool '{name}'. "
+                f"Available: {', '.join(sorted(specs))}, run_task.",
+            )
+        try:
+            result = spec.execute(**args)
+            if asyncio.iscoroutine(result):
+                result = await result
+            output = result if isinstance(result, str) else str(result)
+            return ToolExecuteResponse(tool=name, output=output)
+        except TypeError as exc:
+            # Wrong kwargs (e.g. missing content for write_file).
+            return ToolExecuteResponse(
+                tool=name,
+                output=f"Bad arguments for {name}: {exc}. "
+                f"Send {{\"file_path\": ..., \"content\": ...}} where needed.",
+                status="error",
+            )
+        except Exception as exc:  # Defensive: never leak tracebacks.
+            logger.warning("Tool %s failed: %s", name, exc, exc_info=True)
+            return ToolExecuteResponse(
+                tool=name, output=f"{name} failed: {exc}", status="error"
+            )
 
     _register_provider_routes(router, sessions, providers)
     return router

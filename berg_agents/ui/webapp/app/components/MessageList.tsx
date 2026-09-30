@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Surface } from "@heroui/react";
 
 import { MarkdownRenderer } from "./MarkdownRenderer.tsx";
@@ -7,11 +9,37 @@ export interface MessageItem {
   role?: string;
   content?: string;
   text?: string;
+  reasoning?: string;
   toolCalls?: any[];
 }
 
 export interface MessageListProps {
   history?: MessageItem[];
+}
+
+/**
+ * Collapsible reasoning trace for one assistant message.
+ * The model's chain-of-thought streams in as `reasoning` parts;
+ * shown collapsed by default so long traces don't flood the chat.
+ */
+function ReasoningBlock({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="reasoning-block mt-1">
+      <button
+        aria-label={open ? "Hide reasoning" : "Show reasoning"}
+        className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        {open ? "🧠 Hide thinking" : "🧠 Show thinking"}
+      </button>
+      {open && (
+        <div className="mt-1 border-l-2 border-accent/40 pl-2 text-xs text-muted-foreground">
+          <MarkdownRenderer content={text} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -51,6 +79,7 @@ export function MessageList({ history = [] }: MessageListProps) {
             <div className="text-xs font-semibold tracking-wide uppercase text-muted mb-1">
               {roleLabel}
             </div>
+            {msg.reasoning && <ReasoningBlock text={msg.reasoning} />}
             <div className="message-list-content text-sm">
               <MarkdownRenderer content={text} />
             </div>

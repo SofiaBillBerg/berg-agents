@@ -13,4 +13,7 @@ export type {
 
 // Main chat hook — wraps AI SDK v7's useChat.
 export { useAISDKChat } from "./useAISDKChat";
-export type { ChatMessage, UseAISDKChatReturn } from "./useAISDKChat";
+export type {
+  ChatMessage,
+  PendingApproval,
+  UseAISDKChatReturn} from "./useAISDKChat";

@@ -27,8 +27,9 @@ def build_chat_agent(
     """Build a pydantic_ai ``Agent`` for the streaming chat endpoint.
 
     The agent receives:
-    - File-operation tools (read_file, edit_file, write_file) - registered
-      from :func:`~berg_agents.agents.factory.create_tools` via ``tool_plain``.
+    - File-operation tools (list_files, read_file, search_code, bash,
+      edit_file, write_file) registered from
+      :func:`~berg_agents.agents.factory.create_tools` via ``tool_plain``.
     - A ``run_task`` tool that delegates to the full BergAgents harness when
       the model decides complex work is needed.
 
@@ -64,6 +65,16 @@ def build_chat_agent(
         model,
         system_prompt=system_prompt,
         tool_timeout=30,
+        # Two output retries so one malformed tool call gets a
+        # recovery chance instead of failing the whole turn.
+        # NOTE: no approval-handling capability here on purpose.
+        # Tools flagged requires_approval (bash, edit_file,
+        # write_file, run_task) pause the run as DeferredToolRequests;
+        # the chat endpoint declares that output type so the
+        # VercelAIAdapter streams an approval request, and the
+        # frontend answers it with an approval response. Approving
+        # happens in the UI — never silently.
+        retries={"output": 2},
     )
 
     # Register file-operation tools via tool_plain.

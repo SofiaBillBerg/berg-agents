@@ -16,16 +16,16 @@ echo "✗ Could not find .venv/bin/activate"
 fi
 fi
 # copy rendered docs/docs_web/docs/README.md to root README.md and fix links where prefixed with ../
-#echo "Copying README.md..."
-#cp docs/docs_web/docs/README.md README.md
-#echo "Fixing links in README.md..."
-#sed -i.bak 's|\.\./||g' README.md
-#rm README.md.bak
-#echo "README.md copied and links fixed."
+# echo "Copying README.md..."
+# cp docs/docs_web/docs/README.md README.md
+# echo "Fixing links in README.md..."
+# sed -i.bak 's|\.\./||g' README.md
+# rm README.md.bak
+# echo "README.md copied and links fixed."
 
 echo "Converting docs/README.qmd to README.md with quarto pandoc"
 quarto pandoc docs/README.qmd --to github_document README.md
-# Fix links with ../ in the README.md
+# Postfix links with ../ in the README.md
 echo "Fixing links in README.md..."
 sed -i.bak 's|\.\./||g' README.md
 rm README.md.bak

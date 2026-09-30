@@ -15,6 +15,7 @@ import { useAISDKChat } from "@/harness";
 import type { AgentInfo } from "@/harness/webhook";
 import { API_BASE } from "@/envConfig";
 import { buildExportMarkdown } from "@/utils/utils";
+
 import InputBar from "./components/InputBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
@@ -24,7 +25,12 @@ import ChatTranscript from "./components/ChatTranscript.tsx";
 import StatusCard from "./components/StatusCard.tsx";
 import Navbar from "./components/Navbar.tsx";
 
-/**
+import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
+import { ConversationHistory } from "./components/ConversationHistory";
+import type { Command } from "./components/SlashCommandAutocomplete";
+import type { ToolResult } from "./components/ChatTranscript";
+
+/*
  * Error boundary for lazy-loaded components.
  */
 class LazyComponentErrorBoundary extends React.Component<
@@ -72,7 +78,7 @@ class LazyComponentErrorBoundary extends React.Component<
   }
 }
 
-/**
+/*
  * Main chat UI — receives state from useAISDKChat and renders the interface.
  */
 function ChatContent() {
@@ -81,12 +87,25 @@ function ChatContent() {
     messages,
     input,
     setInput,
-    handleInputChange,
     isStreaming,
     error: chatError,
     sendMessage,
     stop,
-    clearMessages} = aiChat;
+    clearMessages,
+    restoreMessages,
+    pendingApprovals,
+    respondToApproval} = aiChat;
+
+  // Commands for the slash‑autocomplete palette
+  const localCommands: Command[] = [
+    { name: "/help", description: "Show help info" },
+    { name: "/agents", description: "List available agents" },
+    { name: "/stats", description: "Show stats" },
+    { name: "/clear", description: "Clear chat history" },
+    { name: "/exit", description: "Exit chat" },
+    { name: "/read_file", description: "Read a file via the backend" },
+    { name: "/list_files", description: "List a directory via the backend" },
+    { name: "/run_task", description: "Run the harness pipeline" }];
 
   // Local agent list (fetched from /api/agents)
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -106,100 +125,156 @@ function ChatContent() {
       .catch(() => {});
   }, []);
 
-  // Process slash commands — local commands stay in the UI; /task delegates to the LLM
+  // -------------------------------------------------------------------------
+  // Tool‑result handling (used by ChatTranscript)
+  // -------------------------------------------------------------------------
+  const [toolResults, setToolResults] = useState<ToolResult[]>([]);
+
+  /*
+   * Execute a tool via the backend /api/tool/execute endpoint.
+   *
+   * The backend is expected to accept a JSON payload:
+   *   { tool: string, args: any }
+   * and to respond with a JSON object that contains at least an `output` field
+   * (the result of the tool).  Adjust the URL / payload shape to match your
+   * actual API.
+   */
+  const executeTool = async (tool: string, args: any): Promise<ToolResult> => {
+    const resp = await fetch(`${API_BASE}/api/tool/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool, args })});
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(`Tool ${tool} failed: ${err}`);
+    }
+
+    // The exact shape of the response depends on your backend implementation.
+    // We expect an object like { output: <serialisable result> }.
+    const data = await resp.json();
+
+    // Build the result object that ChatTranscript will render.
+    const result: ToolResult = {
+      tool,
+      input: JSON.stringify(args),
+      output: data.output,
+      expanded: false,
+      onToggle: () => {
+        // Toggle the expanded state of the just‑added result.
+        setToolResults((prev) => {
+          const newPrev = [...prev];
+          const last = newPrev[newPrev.length - 1];
+          return [...newPrev.slice(0, newPrev.length - 1), { ...last, expanded: !last.expanded }];
+        });
+      }};
+    return result;
+  };
+
+  // -------------------------------------------------------------------------
+  // Slash‑command handling – now includes real tool commands
+  // -------------------------------------------------------------------------
   const processSlashCommand = useCallback(
     async (text: string) => {
       if (!text.startsWith("/")) return { handled: false };
 
-      const parts = text.trim().split(/\s+/);
-      const cmd = parts[0].toLowerCase();
+      // Split into command token and the rest of the line.
+      const [cmd, ...rest] = text.trim().split(/\s+/);
+      const cmdLower = cmd.toLowerCase();
+      const args = rest.join(" ");
 
-      const localCommands = [
-        "help",
-        "exit",
-        "quit",
-        "clear",
-        "agents",
-        "stats",
-        "health",
-        "models",
-        "tools",
-        "history",
-        "memory",
-        "context",
-        "settings",
-        "skills",
-        "mcps",
-        "export"];
-
-      if (localCommands.includes(cmd)) {
-        switch (cmd) {
-          case "help":
-            return {
-              handled: true,
-              card: `Type a message to chat with Berg, the AI agent.\nFor complex tasks, the agent will automatically use tools (read_file, write_file, edit_file, run_task).\nUse /task <description> to explicitly trigger the full harness pipeline.`};
-          case "clear":
-            clearMessages();
-            return { handled: true, card: null };
-          case "exit":
-          case "quit":
-            return { handled: true, card: null };
-          case "agents":
-            return {
-              handled: true,
-              card: `/agents\n\n${agents.map((a) => `${a.name} — ${a.description || ""}`).join("\n") || "No agents"}`};
-          case "stats":
-            return {
-              handled: true,
-              card: `/stats\n\n${JSON.stringify(learningStats, null, 2)}`};
-          case "health":
-            return {
-              handled: true,
-              card: `/health\nOK · ${messages.length} messages`};
-          case "models":
-            return {
-              handled: true,
-              card: "/models\nSwitch via the header selector"};
-          case "tools":
-            return {
-              handled: true,
-              card: "/tools\nFile tools + run_task. Use naturally in conversation."};
-          default:
-            return {
-              handled: true,
-              card: `${cmd}\n(Type your message to send)`};
+      // -----------------------------------------------------------------
+      // Real tool commands – these hit the backend /api/tool/execute endpoint.
+      // -----------------------------------------------------------------
+      const toolCommands = ["read_file", "write_file", "edit_file", "run_task"];
+      if (toolCommands.includes(cmdLower)) {
+        try {
+          // Parse the argument string as JSON.  If parsing fails we fall back
+          // to sending the raw string as a single‑property argument.
+          let parsedArgs: any;
+          try {
+            parsedArgs = JSON.parse(args);
+          } catch {
+            parsedArgs = args;
+          }
+          const result = await executeTool(cmdLower, parsedArgs);
+          // The `result` object already has an `onToggle` that updates
+          // `toolResults`, so we just return a success flag.
+          return { handled: true, card: `✅ ${cmdLower} executed` };
+        } catch (e) {
+          console.error(e);
+          return { handled: true, card: `❌ ${cmdLower} failed` };
         }
       }
 
-      // /harness and /task — let the message through to the LLM.
-      if (cmd === "harness" || cmd === "task") {
-        return { handled: false };
+      // -----------------------------------------------------------------
+      // Local UI commands – these do NOT hit the backend.
+      // -----------------------------------------------------------------
+      if (cmdLower === "help") {
+        return {
+          handled: true,
+          card: `Type a message to chat with Berg, the AI agent.\nFor complex tasks, the agent will automatically use tools (read_file, write_file, edit_file, run_task).\nUse /task <description> to explicitly trigger the full harness pipeline.`};
+      }
+      if (cmdLower === "clear") {
+        clearMessages();
+        return { handled: true, card: null };
+      }
+      if (cmdLower === "exit" || cmdLower === "quit") {
+        return { handled: true, card: null };
+      }
+      if (cmdLower === "agents") {
+        return {
+          handled: true,
+          card: `/agents\n\n${agents.map((a) => `${a.name} — ${a.description || ""}`).join("\n") || "No agents"}`};
+      }
+      if (cmdLower === "stats") {
+        return {
+          handled: true,
+          card: `/stats\n\n${JSON.stringify(learningStats, null, 2)}`};
+      }
+      if (cmdLower === "health") {
+        return { handled: true, card: `/health\nOK · ${messages.length} messages` };
+      }
+      if (cmdLower === "models") {
+        return { handled: true, card: "/models\nSwitch via the header selector" };
+      }
+      if (cmdLower === "tools") {
+        return { handled: true, card: "/tools\nFile tools + run_task. Use naturally in conversation." };
       }
 
-      return { handled: true, card: `${cmd}\nUnknown command. Type /help.` };
+      // -----------------------------------------------------------------
+      // Anything else – let the message flow to the AI model.
+      // -----------------------------------------------------------------
+      return { handled: false };
     },
-    [agents, learningStats, messages, clearMessages],
+    [agents, clearMessages, input, learningStats, messages],
   );
 
-  // Send handler — intercepts slash commands, otherwise sends via AI SDK.
+  // -------------------------------------------------------------------------
+  // Send handler – intercepts slash commands, otherwise forwards to AI SDK.
+  // -------------------------------------------------------------------------
   const handleSendWrapper = useCallback(() => {
     if (!input.trim()) return;
 
-    // Check for slash commands
+    // Detect a leading slash command.
     const cmdMatch = input.trim().match(/^\/(\w+)\s*(.*)/);
     if (cmdMatch) {
       void processSlashCommand(input.trim()).then((outcome) => {
-        if (outcome.handled) return;
-        void sendMessage(input.trim());
+        if (!outcome.handled) {
+          // Not a recognized command – forward the original text.
+          void sendMessage(input.trim());
+        }
       });
       return;
     }
 
-    // For /task and regular messages, send via AI SDK.
+    // No slash prefix – just send the message to the AI model.
     void sendMessage(input.trim());
   }, [input, processSlashCommand, sendMessage]);
 
-  // Keyboard handling
+  // -------------------------------------------------------------------------
+  // Keyboard handling (Enter → send, Shift+Enter → new line)
+  // -------------------------------------------------------------------------
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -210,7 +285,9 @@ function ChatContent() {
     [handleSendWrapper],
   );
 
-  // Status determination
+  // -------------------------------------------------------------------------
+  // Status determination (error / streaming / idle)
+  // -------------------------------------------------------------------------
   const statusInfo = chatError
     ? { label: "Error", color: "#f44336", pulse: false }
     : isStreaming
@@ -253,18 +330,92 @@ function ChatContent() {
           </div>
         </div>
 
+        {/* Conversation history sidebar */}
+        <ConversationHistory onSelect={(msgs) => restoreMessages(msgs)} />
+
         <StatusCard
           status={statusInfo}
           isConnected={true}
           connectionError={chatError ? String(chatError) : null}
         />
 
+        {/* Slash command palette — only while the input starts with "/" */}
+        {input.startsWith("/") && (
+          <SlashCommandAutocomplete
+            commands={localCommands}
+            onSelect={(cmd) => {
+              // Replace the input with the chosen command plus a space.
+              setInput(`${cmd.name} `);
+            }}
+          />
+        )}
+
+        {/* HITL approval requests — the agent paused and needs a human
+            yes/no before a mutating tool runs. Answering resumes the
+            same run; rejecting tells the model why. */}
+        {pendingApprovals.length > 0 && (
+          <Card className="mb-4 border-warning" variant="default">
+            <Card.Header>
+              <Card.Title>⏸️ Approval needed</Card.Title>
+              <Card.Description>
+                The agent wants to run {pendingApprovals.length} action
+                {pendingApprovals.length > 1 ? "s" : ""}. Nothing executes
+                until you decide.
+              </Card.Description>
+            </Card.Header>
+            <Card.Content className="flex flex-col gap-3">
+              {pendingApprovals.map((approval) => (
+                <div
+                  key={approval.id}
+                  className="flex flex-col gap-2 rounded border border-border p-2"
+                >
+                  <div className="font-mono text-sm">
+                    🔧 {approval.toolName}
+                  </div>
+                  {approval.args && (
+                    <pre className="font-mono bg-surface-soft p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+                      {approval.args}
+                    </pre>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onPress={() =>
+                        respondToApproval(approval.id, true)
+                      }
+                    >
+                      ✅ Approve & run
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onPress={() =>
+                        respondToApproval(
+                          approval.id,
+                          false,
+                          "Rejected by user in chat UI.",
+                        )
+                      }
+                    >
+                      ❌ Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Chat transcript – now receives any tool results */}
         <ChatTranscript
           isExecuting={isStreaming}
           hitlRequest={undefined}
           transcript={messages}
+          toolResults={toolResults}
         />
 
+        {/* Input bar at the bottom */}
         <div className="relative">
           <InputBar
             disabled={isStreaming}
@@ -277,14 +428,15 @@ function ChatContent() {
           />
         </div>
 
-        {/* Activity Details */}
+        {/* Activity details – compact summaries; full views live on
+            the /agents and /stats tabs. */}
         <Card className="mt-4" variant="default">
           <Card.Header>
             <Card.Title>Details & Activity</Card.Title>
           </Card.Header>
           <Card.Content>
-            <AgentPanel compact={false} agents={agents} activeAgent={null} />
-            <LearningPanel compact={false} stats={learningStats} />
+            <AgentPanel compact agents={agents} activeAgent={null} />
+            <LearningPanel compact stats={learningStats} />
 
             {chatError && (
               <div className="text-red-500 mt-4">
@@ -301,6 +453,6 @@ function ChatContent() {
 const ChatContentMemo = React.memo(ChatContent);
 
 export default function App() {
-  // No provider needed — useChat is hook-based with DefaultChatTransport.
+  // No provider needed — useChat is hook‑based with DefaultChatTransport.
   return <ChatContentMemo />;
 }

@@ -37,10 +37,15 @@ export function StatusCard({
     );
   }
 
+  // Error state: the last chat request failed (backend down, model
+  // unreachable, tool error). There is no mock/limited mode — say so
+  // plainly and keep the message so it can be reported.
   return (
     <Card className="mb-4 border-yellow-200" variant="secondary">
       <Card.Header>
-        <Card.Title className="text-yellow-800">Connection Warning</Card.Title>
+        <Card.Title className="text-yellow-800">
+          {connectionError ? "Request Failed" : "Connection Warning"}
+        </Card.Title>
       </Card.Header>
       <Card.Content>
         <div className="flex items-center gap-2">
@@ -49,7 +54,9 @@ export function StatusCard({
             style={{ background: status.color }}
           />
           <span className="text-sm text-yellow-700">
-            Running in {isConnected ? "mock" : "limited"} mode
+            {isConnected
+              ? "The backend answered with an error — see details below."
+              : "Cannot reach the backend at :8001. Is `uv run berg_agents --web` running?"}
           </span>
           {connectionError && (
             <span className="text-xs text-red-600">
