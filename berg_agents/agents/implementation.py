@@ -42,11 +42,11 @@ __all__ = [
     "resolve_implementation_model"]
 
 # Explicit output retry budget for the implementation agent.
-# Spec name: ``output_retries (2)``. Pydantic AI v2 exposes it
+# Spec name: ``output_retries (3)``. Pydantic AI v2 exposes it
 # as the ``output`` entry of ``Agent(retries=...)`` (library
 # default 1 for both budgets); the dict form below sets only
 # the output budget and leaves the tool budget at its default.
-OUTPUT_RETRIES = 2
+OUTPUT_RETRIES = 3
 
 # Explicit agent name: labels this agent's run span in Logfire so
 # traces stay distinguishable when several agents run in one app.
@@ -210,7 +210,7 @@ def build_implementation_agent(
     calls; the model string resolves lazily at run time.
     Harness callers pass :class:`ImplementationDeps` per run via
     ``agent.run(prompt, deps=...)``. The output retry budget is
-    explicit (``OUTPUT_RETRIES``, 2) instead of the library
+    explicit (``OUTPUT_RETRIES``, 3) instead of the library
     default (1), so malformed tool calls get retried before
     the harness falls back to plain text.
 

@@ -74,7 +74,7 @@ def build_chat_agent(
         # VercelAIAdapter streams an approval request, and the
         # frontend answers it with an approval response. Approving
         # happens in the UI — never silently.
-        retries={"output": 2},
+        retries={"output": 3},
     )
 
     # Register file-operation tools via tool_plain.
