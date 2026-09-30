@@ -110,9 +110,11 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
       <Card.Header className="flex items-center gap-2">
         <Card.Title>History</Card.Title>
         <span className="flex-1" />
-        <Button size="sm" variant="secondary" onPress={saveCurrent}>
-          💾 Save chat
-        </Button>
+        <span title="Snapshot this conversation into History (stays in the browser, restorable any time)">
+          <Button size="sm" variant="secondary" onPress={saveCurrent}>
+            💾 Save to history
+          </Button>
+        </span>
       </Card.Header>
       <Card.Content className="flex flex-col gap-1.5">
         {sessions.length === 0 && (

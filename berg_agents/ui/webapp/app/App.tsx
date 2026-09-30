@@ -9,7 +9,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 
-import { Button, Card } from "@heroui/react";
+import { Button, Card, Disclosure } from "@heroui/react";
 
 import { useAISDKChat } from "@/harness";
 import type { AgentInfo } from "@/harness/webhook";
@@ -318,10 +318,11 @@ function ChatContent() {
           <div className="header-actions flex items-center gap-2 flex-wrap">
             <ThemeToggle />
             <ProviderSelector />
-            <Button
-              aria-label="Export conversation as markdown"
-              className="border border-primary text-primary hover:bg-primary/10"
-              onPress={() => {
+            <span title="Download this conversation as a Markdown file">
+              <Button
+                aria-label="Export conversation as markdown"
+                className="border border-primary text-primary hover:bg-primary/10"
+                onPress={() => {
                 const md = buildExportMarkdown(messages, [], null, null);
                 const blob = new Blob([md], { type: "text/markdown" });
                 const url = URL.createObjectURL(blob);
@@ -335,11 +336,25 @@ function ChatContent() {
             >
               ⬇ Export
             </Button>
+            </span>
           </div>
         </div>
 
-        {/* Conversation history sidebar */}
-        <ConversationHistory onSelect={(msgs) => restoreMessages(msgs)} />
+        {/* Saved chats — collapsed by default so the conversation
+            stays front and center. Expands to snapshot/restore. */}
+        <Disclosure defaultExpanded={false} className="mb-4">
+          <Disclosure.Heading>
+            <Disclosure.Trigger>
+              🕘 History
+              <Disclosure.Indicator />
+            </Disclosure.Trigger>
+          </Disclosure.Heading>
+          <Disclosure.Content>
+            <Disclosure.Body>
+              <ConversationHistory onSelect={(msgs) => restoreMessages(msgs)} />
+            </Disclosure.Body>
+          </Disclosure.Content>
+        </Disclosure>
 
         <StatusCard
           status={statusInfo}
@@ -434,23 +449,28 @@ function ChatContent() {
           />
         </div>
 
-        {/* Activity details – compact summaries; full views live on
-            the /agents and /stats tabs. */}
-        <Card className="mt-4" variant="default">
-          <Card.Header>
-            <Card.Title>Details & Activity</Card.Title>
-          </Card.Header>
-          <Card.Content>
-            <AgentPanel compact agents={agents} activeAgent={null} />
-            <LearningPanel compact stats={learningStats} />
+        {/* Activity details – compact summaries collapsed by default;
+            full views live on the /agents and /stats tabs. */}
+        <Disclosure defaultExpanded={false} className="mt-4">
+          <Disclosure.Heading>
+            <Disclosure.Trigger>
+              Details & Activity
+              <Disclosure.Indicator />
+            </Disclosure.Trigger>
+          </Disclosure.Heading>
+          <Disclosure.Content>
+            <Disclosure.Body>
+              <AgentPanel compact agents={agents} activeAgent={null} />
+              <LearningPanel compact stats={learningStats} />
 
-            {chatError && (
-              <div className="text-red-500 mt-4">
-                Error: {String(chatError)}
-              </div>
-            )}
-          </Card.Content>
-        </Card>
+              {chatError && (
+                <div className="text-red-500 mt-4">
+                  Error: {String(chatError)}
+                </div>
+              )}
+            </Disclosure.Body>
+          </Disclosure.Content>
+        </Disclosure>
       </div>
     </LazyComponentErrorBoundary>
   );

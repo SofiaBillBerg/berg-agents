@@ -38,7 +38,7 @@ export function ChatTranscript({
     <>
       <Card className="mb-4" variant="default">
         <Card.Content className="p-2">
-          <div className="conversation-container overflow-y-auto flex-1 min-h-0">
+          <div className="conversation-container overflow-y-auto flex-1 min-h-0 max-h-[55vh]">
             <MessageList history={transcript} />
 
             {/* HITL Pending Notice – HeroUI Alert with compound components */}

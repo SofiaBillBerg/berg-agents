@@ -54,8 +54,10 @@ def build_chat_agent(
     from berg_agents.agents.workspace_toolset import WorkspaceToolset
     from berg_agents.config.settings import get_settings
     from berg_agents.core.harness import Harness
+    from berg_agents.capabilities.skills import load_skill_capabilities
     from berg_agents.providers.models import resolve_model_instance
     from pydantic_ai import Agent
+    from pydantic_ai.capabilities import WebFetch, WebSearch
 
     # Resolve the model from config - resolve_model_instance reads
     # bergagents.jsonc and returns a fully-configured OpenAIChatModel.
@@ -94,6 +96,19 @@ def build_chat_agent(
         # happens in the UI — never silently.
         retries={"output": 3},
         toolsets=[toolset],
+        capabilities=[
+            # Provider-adaptive web tools, LOCAL-only: native tools
+            # need the Responses API + provider-side infrastructure
+            # (absent on Ollama/Unsloth/OpenAI-compatible endpoints),
+            # so force the in-process fallbacks. Identical behavior
+            # on every configured provider. Eager (not deferred):
+            # two small tools the model should always see.
+            WebSearch(native=False, local="duckduckgo"),
+            WebFetch(native=False, local=True),
+            # Repo skills (SKILL.md manuals) as deferred capabilities:
+            # one-line catalog entries until the model loads one.
+            # Point BERG_AGENT_SKILLS at e.g. ".agents/skills".
+            *load_skill_capabilities(settings.skills, root_dir=root_dir)],
     )
 
     return agent

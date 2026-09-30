@@ -21,9 +21,14 @@
       },
       "type": "local"
     },
+    "mempalace-light": {
+      "enabled": true,
+      "type": "local",
+      "command": ["mempalace-light-mcp"]
+    },
     "memory": {
       "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
-      "enabled": true,
+      "enabled": false,
       "type": "local"
     }
   }

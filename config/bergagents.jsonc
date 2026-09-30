@@ -20,7 +20,7 @@
   //# BergAgents skills: JSON array of paths (or [path, label] pairs) to
   //# SKILL.md directories, loaded progressively by the harness.
   //# Paths must live under the mounted workspace (BERG_AGENT_ROOT_DIR).
-  //"BERG_AGENT_SKILLS": "[\"skills/code-conventions\"]",
+  "BERG_AGENT_SKILLS": "[\"./.agents/skills/\"]",
 
   //# BergAgents memory: JSON array of AGENTS.md file paths, always loaded.
   //"BERG_AGENT_MEMORY": "[\"AGENTS.md\"]",
@@ -32,7 +32,7 @@
   //# One of: ["messages", 100] | ["tokens", 60000] | ["fraction", 0.85]
   //#         [["fraction", 0.8], ["messages", 100]] (OR list) |
   //#         [{"tokens": 4000, "messages": 10}] (AND clause)
-  "BERG_AGENT_SUMMARIZATION_TRIGGER": "[\"messages\", 100]",
+  "BERG_AGENT_SUMMARIZATION_TRIGGER": "[[\"fraction\", 0.8], [\"tokens\", 80000], [\"messages\", 100]]",
   //# Context retention after summarization, e.g. ["messages", 20].
   "BERG_AGENT_SUMMARIZATION_KEEP": "[\"messages\", 20]",
   //# Provider-agnostic configuration. Use BERG_AGENT_PROVIDER to select
@@ -121,8 +121,18 @@
   // HITL rules: Guardian decides when to ask human
   "hitl_rules": {
     "auto_execute": ["read_file", "list_files", "search_code"],
-    "notify_after": ["edit_file", "new_file", "generate_test"],
-    "ask_before": ["delete_file", "execute_command", "refactor"],
+    "notify_after": [
+      "edit_file",
+      "new_file",
+      "generate_test",
+      "refactor",
+      "delete_file"],
+    "ask_before": [
+      "delete_file",
+      "execute_command",
+      "refactor",
+      "edit_file",
+      "new_file"],
     "human_leads": ["security_change", "production_deploy", "data_migration"]},
   // Agent overrides (optional)
   "agents": {

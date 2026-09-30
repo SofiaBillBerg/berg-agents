@@ -16,8 +16,10 @@ export interface StatusCardProps {
 }
 
 /**
- * StatusCard component using HeroUI v3 Card compound components.
- * Shows connection status with proper visual hierarchy.
+ * StatusCard component.
+ * Idle/streaming renders as one slim inline row (no card chrome) so
+ * the conversation keeps the vertical space. Errors keep the full
+ * card so the message stays readable and reportable.
  */
 export function StatusCard({
   status,
@@ -25,15 +27,13 @@ export function StatusCard({
   connectionError}: StatusCardProps) {
   if (isConnected && !connectionError) {
     return (
-      <Card className="mb-4" variant="default">
-        <Card.Content className="flex items-center gap-2 p-3">
-          <span
-            className={`w-2 h-2 rounded-full ${status.pulse ? "animate-pulse" : ""}`}
-            style={{ background: status.color }}
-          />
-          <span className="text-sm">{status.label}</span>
-        </Card.Content>
-      </Card>
+      <div className="mb-2 flex items-center gap-2 px-1">
+        <span
+          className={`w-2 h-2 rounded-full ${status.pulse ? "animate-pulse" : ""}`}
+          style={{ background: status.color }}
+        />
+        <span className="text-xs text-muted-foreground">{status.label}</span>
+      </div>
     );
   }
 
