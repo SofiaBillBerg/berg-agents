@@ -168,8 +168,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // plain text) never match, so no spurious re-sends.
     sendAutomaticallyWhen: ({ messages }) => {
       const last = messages[messages.length - 1] as
-        | { role?: unknown; parts?: unknown }
-        | undefined;
+        { role?: unknown; parts?: unknown } | undefined;
       if (!last || last.role !== "assistant" || !Array.isArray(last.parts)) {
         return false;
       }
@@ -183,8 +182,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
       }
       if (!toolStates.some((s) => s === "approval-responded")) return false;
       return toolStates.every((s) =>
-        ["output-available", "output-error", "output-denied",
-         "approval-responded"].includes(s),
+        [
+          "output-available",
+          "output-error",
+          "output-denied",
+          "approval-responded"].includes(s),
       );
     }});
 
@@ -204,10 +206,8 @@ export function useAISDKChat(): UseAISDKChatReturn {
         continue;
       }
       const approval = (p as { approval?: unknown }).approval as
-        | { id?: unknown }
-        | undefined;
-      const approvalId =
-        typeof approval?.id === "string" ? approval.id : null;
+        { id?: unknown } | undefined;
+      const approvalId = typeof approval?.id === "string" ? approval.id : null;
       if (!approvalId) continue;
       const pType = typeof p.type === "string" ? (p.type as string) : "";
       const toolName =
@@ -229,7 +229,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
 
   // Answer an approval request. The SDK marks the part responded and
   // re-POSTs the conversation; the backend resumes the paused run.
-  const respondToApproval = (id: string, approved: boolean, reason?: string) => {
+  const respondToApproval = (
+    id: string,
+    approved: boolean,
+    reason?: string,
+  ) => {
     void addToolApprovalResponse({ id, approved, reason });
   };
 

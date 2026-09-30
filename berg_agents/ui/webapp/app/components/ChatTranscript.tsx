@@ -71,11 +71,7 @@ export function ChatTranscript({
       {toolResults && toolResults.length > 0 && (
         <div className="mt-4 space-y-3">
           {toolResults.map((tr, idx) => (
-            <ToolCard
-              key={idx}
-              {...tr}
-              onToggle={tr.onToggle}
-            />
+            <ToolCard key={idx} {...tr} onToggle={tr.onToggle} />
           ))}
         </div>
       )}

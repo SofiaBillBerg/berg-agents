@@ -70,7 +70,8 @@
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "http://localhost:11434/v1",
-        "timeout": 120000},
+        "timeout": 120000,
+        "apiKey": "${env:OLLAMA_API_KEY}"},
       "models": {
         "ornith:9b-q4_K_M": {
           "name": "ornith:9b-q4_K_M"},
@@ -90,7 +91,7 @@
           "name": "auto"},
         "best-free": {
           "name": "auto/best-free"}}}},
-  "defaultModel": "ornith:9b-q4_K_M",
+  "defaultModel": "nemotron-3-nano:30b-cloud",
   //# MCP server secrets (git-ignored; referenced as ${VAR} in .mcp.json)
   //# "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}",
   "CONTEXT7_API_KEY": "${env:CONTEXT7_API_KEY}",
@@ -106,17 +107,17 @@
   "model_routing": {
     "models": {
       "trivial": {
-        "models": ["ornith:9b-q4_K_M"],
-        "max_tokens": 40000},
+        "models": ["nemotron-3-nano:30b-cloud"],
+        "max_tokens": 6000},
       "standard": {
-        "models": ["ornith:9b-q4_K_M"],
-        "max_tokens": 60000},
+        "models": ["nemotron-3-nano:30b-cloud"],
+        "max_tokens": 90000},
       "complex": {
         "models": ["nemotron-3-nano:30b-cloud"],
-        "max_tokens": 60000},
+        "max_tokens": 230000},
       "critical": {
         "models": ["nemotron-3-nano:30b-cloud"],
-        "max_tokens": 124000}}},
+        "max_tokens": 230000}}},
   // HITL rules: Guardian decides when to ask human
   "hitl_rules": {
     "auto_execute": ["read_file", "list_files", "search_code"],

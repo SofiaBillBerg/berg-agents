@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useEffect, useState } from "react";
 
@@ -94,10 +94,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
 
   const restore = (session: ChatSnapshot) => {
     try {
-      localStorage.setItem(
-        CHAT_MESSAGES_KEY,
-        JSON.stringify(session.messages),
-      );
+      localStorage.setItem(CHAT_MESSAGES_KEY, JSON.stringify(session.messages));
     } catch {
       // Quota exceeded — still restore in memory.
     }

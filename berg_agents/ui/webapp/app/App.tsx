@@ -165,7 +165,9 @@ function ChatContent() {
         setToolResults((prev) => {
           const newPrev = [...prev];
           const last = newPrev[newPrev.length - 1];
-          return [...newPrev.slice(0, newPrev.length - 1), { ...last, expanded: !last.expanded }];
+          return [
+            ...newPrev.slice(0, newPrev.length - 1),
+            { ...last, expanded: !last.expanded }];
         });
       }};
     return result;
@@ -233,13 +235,19 @@ function ChatContent() {
           card: `/stats\n\n${JSON.stringify(learningStats, null, 2)}`};
       }
       if (cmdLower === "health") {
-        return { handled: true, card: `/health\nOK · ${messages.length} messages` };
+        return {
+          handled: true,
+          card: `/health\nOK · ${messages.length} messages`};
       }
       if (cmdLower === "models") {
-        return { handled: true, card: "/models\nSwitch via the header selector" };
+        return {
+          handled: true,
+          card: "/models\nSwitch via the header selector"};
       }
       if (cmdLower === "tools") {
-        return { handled: true, card: "/tools\nFile tools + run_task. Use naturally in conversation." };
+        return {
+          handled: true,
+          card: "/tools\nFile tools + run_task. Use naturally in conversation."};
       }
 
       // -----------------------------------------------------------------
@@ -359,8 +367,8 @@ function ChatContent() {
               <Card.Title>⏸️ Approval needed</Card.Title>
               <Card.Description>
                 The agent wants to run {pendingApprovals.length} action
-                {pendingApprovals.length > 1 ? "s" : ""}. Nothing executes
-                until you decide.
+                {pendingApprovals.length > 1 ? "s" : ""}. Nothing executes until
+                you decide.
               </Card.Description>
             </Card.Header>
             <Card.Content className="flex flex-col gap-3">
@@ -381,9 +389,7 @@ function ChatContent() {
                     <Button
                       size="sm"
                       variant="primary"
-                      onPress={() =>
-                        respondToApproval(approval.id, true)
-                      }
+                      onPress={() => respondToApproval(approval.id, true)}
                     >
                       ✅ Approve & run
                     </Button>

@@ -14,5 +14,3 @@ Make sure your favicon is properly setup:
 https://example.com
 
 Check https://realfavicongenerator.net/logo-maker/your-favicon-is-ready or if your web site runs locally, run npx realfavicon check <port>
-
-
