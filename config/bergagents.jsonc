@@ -22,6 +22,13 @@
   //# Paths must live under the mounted workspace (BERG_AGENT_ROOT_DIR).
   "BERG_AGENT_SKILLS": "[\"./.agents/skills/\"]",
 
+  //# Web search/fetch backends, tried in order (see
+  //# berg_agents/capabilities/web_backends.py). Known names: "ollama"
+  //# (Ollama search index, needs OLLAMA_API_KEY), "duckduckgo" (search,
+  //# no key), "direct" (fetch, no key). Default when commented out:
+  //# ["ollama", "duckduckgo", "direct"].
+  //"BERG_AGENT_WEB_SEARCH_BACKENDS": "[\"ollama\", \"duckduckgo\", \"direct\"]",
+
   //# BergAgents memory: JSON array of AGENTS.md file paths, always loaded.
   //"BERG_AGENT_MEMORY": "[\"AGENTS.md\"]",
 

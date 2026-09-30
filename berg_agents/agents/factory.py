@@ -198,8 +198,6 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
         :param directory: Where to search, relative to the
             workspace root (default: the root itself).
         """
-        import re
-
         base = _normalize_target(directory, root)
         if not base.exists():
             return (

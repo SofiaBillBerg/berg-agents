@@ -174,7 +174,7 @@ function ChatContent() {
   };
 
   // -------------------------------------------------------------------------
-  // Slash‑command handling – now includes real tool commands
+  // Slash‑command handling – including backend-backed tool commands
   // -------------------------------------------------------------------------
   const processSlashCommand = useCallback(
     async (text: string) => {
@@ -186,7 +186,7 @@ function ChatContent() {
       const args = rest.join(" ");
 
       // -----------------------------------------------------------------
-      // Real tool commands – these hit the backend /api/tool/execute endpoint.
+      // Backend-backed tool commands – these hit /api/tool/execute.
       // -----------------------------------------------------------------
       const toolCommands = ["read_file", "write_file", "edit_file", "run_task"];
       if (toolCommands.includes(cmdLower)) {

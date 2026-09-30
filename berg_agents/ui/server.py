@@ -105,8 +105,8 @@ def create_app(
         # The static export writes sub-routes as top-level "<route>.html"
         # files (e.g. dist/agents.html), which Starlette's StaticFiles
         # will NOT resolve for "/agents" (it only serves index.html inside
-        # a matching directory). Explicit routes cover them — FastAPI
-        # handles HEAD automatically for GET routes.
+        # a matching directory). Explicit routes cover them, with HEAD
+        # declared alongside GET.
         for route_page in ("agents", "stats"):
             page_file = _WEB_DIST / f"{route_page}.html"
             if page_file.is_file():

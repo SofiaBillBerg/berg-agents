@@ -160,24 +160,22 @@ RULES:
 - If a request involves reading, searching, creating, editing, formatting, or testing files, call the matching tool now.
 - Do not describe files you have not read. Do not summarize hypothetical contents.
 - Do not write long essays. Give concise, actionable answers.
-- Only use general-chat when the request is clearly outside filesystem/code tasks.
+- For questions clearly outside filesystem/code tasks, reply directly.
 
-TOOL SELECTION (these are the ONLY tools you have — never invent others):
-- list_files: list a directory's contents (ALWAYS call this first to explore — never guess at paths)
+TOOL SELECTION (complete inventory — the agent has exactly these tools):
+- list_files: list a directory's contents (call this first to explore — use the exact paths it returns)
 - read_file: inspect file contents (files only, never directories)
 - search_code: find text across the codebase (literal match, e.g. definitions, references, error strings)
-- bash: run shell commands — tests, builds, linters, inspection (e.g. "pytest -q", "ls"). Has a timeout; output is truncated. There is NO other shell/terminal tool — never ask for one.
+- bash: run shell commands — tests, builds, linters, inspection (e.g. "pytest -q", "ls"). Has a timeout; output is truncated. All shell needs go through bash.
 - write_file: create a new file or overwrite an existing one
 - edit_file: replace the contents of an existing file
 - run_task: delegate complex multi-step work (planning, refactors, analysis)
   to the full harness pipeline (planner, guardian review, implementation)
 
-There is NO str_replace_editor and NO tool besides the list above.
-If you catch yourself wanting something else, you are mistaken:
-explore with list_files/search_code/read_file, run things with bash,
-and send anything multi-step to run_task. Calling a tool that is
-not in the list above fails — do it at most once, then continue
-with a real tool.
+If a task seems to need anything outside this list, use run_task for
+multi-step work — or say plainly it cannot be done with the available
+tools. Calls to unknown tool names fail; on failure, continue with a
+tool from the list above.
 
 WORKFLOW:
 1. If the request names a directory or you don't know exact paths, call list_files first.
@@ -454,6 +452,18 @@ class Settings(BaseSettings):
     #: ``BERG_AGENT_SKILLS`` (JSON array of strings or ``[path, label]``
     #: pairs).
     skills: list[str | list[str]] | None = None
+
+    #: --- Web search/fetch backends ------------------------------------------
+    #: Ordered backend names tried by the chat agent's web tools (see
+    #: :mod:`berg_agents.capabilities.web_backends`). Known names:
+    #: ``"ollama"`` (Ollama search/fetch index, needs ``OLLAMA_API_KEY``),
+    #: ``"duckduckgo"`` (in-process search, no key), ``"direct"``
+    #: (plain HTTPS fetch, no key). Unknown names are skipped with a
+    #: warning. ``None`` (default) means
+    #: ``["ollama", "duckduckgo", "direct"]`` — each capability only
+    #: uses the backends supporting its operation. Maps to
+    #: ``BERG_AGENT_WEB_SEARCH_BACKENDS`` (JSON array of strings).
+    web_search_backends: list[str] | None = None
 
     #: --- BergAgents memory -------------------------------------------------
     #: ``AGENTS.md`` memory file paths, always loaded into the agent's

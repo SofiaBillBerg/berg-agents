@@ -52,6 +52,10 @@ def build_chat_agent(
     :return: A configured ``Agent`` ready for ``VercelAIAdapter``.
     """
     from berg_agents.agents.workspace_toolset import WorkspaceToolset
+    from berg_agents.capabilities.web_backends import (
+        make_web_fetch,
+        make_web_search,
+    )
     from berg_agents.config.settings import get_settings
     from berg_agents.core.harness import Harness
     from berg_agents.capabilities.skills import load_skill_capabilities
@@ -92,19 +96,18 @@ def build_chat_agent(
         # write_file, run_task) pause the run as DeferredToolRequests;
         # the chat endpoint declares that output type so the
         # VercelAIAdapter streams an approval request, and the
-        # frontend answers it with an approval response. Approving
-        # happens in the UI — never silently.
+        # frontend answers it with an approval response. Every
+        # approval is collected through the UI.
         retries={"output": 3},
         toolsets=[toolset],
         capabilities=[
-            # Provider-adaptive web tools, LOCAL-only: native tools
-            # need the Responses API + provider-side infrastructure
-            # (absent on Ollama/Unsloth/OpenAI-compatible endpoints),
-            # so force the in-process fallbacks. Identical behavior
-            # on every configured provider. Eager (not deferred):
-            # two small tools the model should always see.
-            WebSearch(native=False, local="duckduckgo"),
-            WebFetch(native=False, local=True),
+            # Provider-adaptive web tools: provider-native first where
+            # the model supports it, local implementation otherwise.
+            # The local side tries the configured web backends in
+            # order (settings.web_search_backends, default
+            # ollama → duckduckgo → direct).
+            WebSearch(local=make_web_search(settings.web_search_backends)),
+            WebFetch(local=make_web_fetch(settings.web_search_backends)),
             # Repo skills (SKILL.md manuals) as deferred capabilities:
             # one-line catalog entries until the model loads one.
             # Point BERG_AGENT_SKILLS at e.g. ".agents/skills".

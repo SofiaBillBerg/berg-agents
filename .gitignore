@@ -7,7 +7,6 @@ project_utils/check_config.py
 /.vscode/
 /.jbeval/
 project_utils/git_config.sh
-
 project_utils/setup-local-filter.sh
 project_utils/crlf_to_lf.sh
 **/*.bk
