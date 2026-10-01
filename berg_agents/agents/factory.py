@@ -19,6 +19,7 @@ from berg_agents.core.loop import BergLoop
 from berg_agents.core.tool_spec import ToolRegistry, ToolSpec, make_tool_spec
 from berg_agents.tools._io import _atomic_write, _normalize_target
 
+
 __all__ = [
     "DEFAULT_SYSTEM_PROMPT",
     "build_agent",
@@ -165,8 +166,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
             )
         except subprocess.TimeoutExpired:
             return (
-                f"Command timed out after {clamped}s and was killed: "
-                f"{command}"
+                f"Command timed out after {clamped}s and was killed: {command}"
             )
         except OSError as exc:
             return f"Could not run command: {exc}"

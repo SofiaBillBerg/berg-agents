@@ -5,12 +5,13 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import type { AgentInfo } from "@/harness/webhook";
 
+import { useEffect, useState } from "react";
 import { Card, Spinner } from "@heroui/react";
 
 import { API_BASE } from "@/envConfig";
-import type { AgentInfo } from "@/harness/webhook";
+
 import { AgentPanel } from "../components/AgentPanel.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 
@@ -82,7 +83,7 @@ export default function AgentsPage() {
           {agents.length} agent(s) available - each handles different task types
           via the BergAgents harness pipeline.
         </p>
-        <AgentPanel agents={agents} activeAgent={null} />
+        <AgentPanel activeAgent={null} agents={agents} />
       </div>
     </>
   );

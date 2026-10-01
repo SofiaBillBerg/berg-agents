@@ -15,11 +15,13 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from berg_agents.core.harness import Harness
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+
+from berg_agents.core.harness import Harness
+
 
 __all__ = [
     "SLASH_COMMANDS",
@@ -89,16 +91,14 @@ SLASH_COMMANDS: list[dict[str, str]] = [
 # /help for parity with the web UI but answered with a web-only notice:
 # they query server-side state (providers, models, MCP servers) that the
 # Harness API does not expose, and inventing answers would be fake.
-_TUI_HANDLED = frozenset(
-    {
-        "/help",
-        "/agents",
-        "/harness",
-        "/task",
-        "/stats",
-        "/history",
-        "/clear"}
-)
+_TUI_HANDLED = frozenset({
+    "/help",
+    "/agents",
+    "/harness",
+    "/task",
+    "/stats",
+    "/history",
+    "/clear"})
 
 _APPROVE_WORDS = frozenset({"y", "yes", "approve"})
 
@@ -324,12 +324,10 @@ def run_harness_task(
     base_metadata = dict(metadata or {})
     console.print(f"[dim]→ running '{description}' ...[/dim]")
     try:
-        result = harness.execute_task(
-            {
-                "description": description,
-                "task_type": task_type,
-                "metadata": base_metadata}
-        )
+        result = harness.execute_task({
+            "description": description,
+            "task_type": task_type,
+            "metadata": base_metadata})
     except Exception as exc:
         failed = {"status": "failed", "task_type": task_type, "error": str(exc)}
         render_result(failed, console)
@@ -356,12 +354,10 @@ def run_harness_task(
         render_result(failed, console)
         return failed
     try:
-        resumed = harness.execute_task(
-            {
-                "description": description,
-                "task_type": task_type,
-                "metadata": {**base_metadata, "hitl_decision": "approve"}}
-        )
+        resumed = harness.execute_task({
+            "description": description,
+            "task_type": task_type,
+            "metadata": {**base_metadata, "hitl_decision": "approve"}})
     except Exception as exc:
         failed = {"status": "failed", "task_type": task_type, "error": str(exc)}
         render_result(failed, console)

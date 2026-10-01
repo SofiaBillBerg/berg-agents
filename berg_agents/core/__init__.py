@@ -10,6 +10,7 @@ from berg_agents.core.interface import (
 )
 from berg_agents.core.learning_gate import LearningGate
 
+
 __all__ = [
     "AbstractAgent",
     "AgentResult",

@@ -1,5 +1,4 @@
 import React from "react";
-
 import { Alert, Card, Spinner, Surface } from "@heroui/react";
 
 import { MessageList } from "./MessageList.tsx";

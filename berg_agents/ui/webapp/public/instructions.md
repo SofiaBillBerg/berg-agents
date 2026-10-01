@@ -1,4 +1,5 @@
-Extract this package in <web site>/public/. If your site is http://www.example.com, you should be able to access a file named http://www.example.com/public/favicon.ico.
+Extract this package in <web site>/public/.
+If your site is http://www.example.com, you should be able to access a file named http://www.example.com/public/favicon.ico.
 Insert the following code in the <head> section of your pages:
 
 ```

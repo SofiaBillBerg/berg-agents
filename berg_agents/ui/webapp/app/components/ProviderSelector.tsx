@@ -1,8 +1,9 @@
+import type { ProviderItem, ActiveProviderState } from "../actions/providers";
+
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Label, ListBox, Select, Spinner } from "@heroui/react";
 
 import { getProviderData, switchProvider } from "../actions/providers";
-import type { ProviderItem, ActiveProviderState } from "../actions/providers";
 
 export interface ProviderSelectorProps {
   activeProvider?: ActiveProviderState | null;
@@ -152,9 +153,9 @@ export function ProviderSelector({
       <div className="provider-selector-bar flex items-center gap-2 bg-surface-soft p-1.5 rounded-lg border border-border">
         <Select
           aria-label="Provider"
-          name="provider"
           className="provider-select text-xs"
           isDisabled={isSwitching}
+          name="provider"
           placeholder={
             providers.length === 0
               ? "No providers configured"

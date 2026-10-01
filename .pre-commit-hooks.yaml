@@ -5,23 +5,32 @@
   language: python
   stages: [pre-commit, pre-push, manual]
   minimum_pre_commit_version: 3.2.0
+
 - id: check-ast
   name: check python ast
   description: simply checks whether the files parse as valid python.
   entry: check-ast
   language: python
+  files: \.(py|r|qmd|rmd|ipynb|md)\$
   types: [python]
+  stages: [pre-commit, pre-push, manual]
+
 - id: check-builtin-literals
   name: check builtin type constructor use
   description: requires literal syntax when initializing empty or zero python builtin types.
   entry: check-builtin-literals
   language: python
+  files: \.(py|r|qmd|rmd|ipynb|md)\$
   types: [python]
+  stages: [pre-commit, pre-push, manual]
+
 - id: check-case-conflict
   name: check for case conflicts
   description: checks for files that would conflict in case-insensitive filesystems.
   entry: check-case-conflict
   language: python
+  stages: [pre-push, manual]
+
 - id: check-executables-have-shebangs
   name: check that executables have shebangs
   description: ensures that (non-binary) executables have a shebang.
@@ -30,17 +39,25 @@
   types: [text, executable]
   stages: [pre-commit, pre-push, manual]
   minimum_pre_commit_version: 3.2.0
+
 - id: check-illegal-windows-names
   name: check illegal windows names
+  description: checks for files with names that are illegal on Windows.
   entry: Illegal Windows filenames detected
   language: fail
-  files: '(?i)((^|/)(CON|PRN|AUX|NUL|COM[\d¹²³]|LPT[\d¹²³])(\.|/|$)|[<>:\"\\|?*\x00-\x1F]|/[^/]*[\.\s]/|[^/]*[\.\s]$)'
+  pass_filenames: false
+  files: '(?i)((^|/)(CON|PRN|AUX|NUL|COM[\d¹²³]|LPT[\d¹²³])(\.|/|\()\vert{}[<>:\"\Vert{}?*\x00-\x1F]\vert{}/[^/]*[\.\s]/\vert{}[^/]*[\.\s]\))'
+  stages: [pre-commit, pre-push, manual]
+
 - id: check-json
   name: check json
   description: checks json files for parseable syntax.
   entry: check-json
   language: python
+  files: \.(json|jsonc)\$
   types: [json]
+  stages: [pre-commit, pre-push, manual]
+
 - id: check-shebang-scripts-are-executable
   name: check that scripts with shebangs are executable
   description: ensures that (non-binary) files with a shebang are executable.
@@ -49,68 +66,92 @@
   types: [text]
   stages: [pre-commit, pre-push, manual]
   minimum_pre_commit_version: 3.2.0
+
 - id: check-merge-conflict
   name: check for merge conflicts
   description: checks for files that contain merge conflict strings.
   entry: check-merge-conflict
   language: python
   types: [text]
+    stages: [pre-push, manual]
+
+
 - id: check-symlinks
   name: check for broken symlinks
   description: checks for symlinks which do not point to anything.
   entry: check-symlinks
+  files: \.(py|r|qmd|rmd|ipynb|md|txt|env|toml|yaml|yml|json|js|html|css|jsx)\$
   language: python
   types: [symlink]
+  stages: [pre-commit, pre-push, manual]
+
 - id: check-toml
   name: check toml
   description: checks toml files for parseable syntax.
   entry: check-toml
   language: python
+  files: \.(toml)\$
   types: [toml]
+  stages: [pre-commit, pre-push, manual]
+
 - id: check-vcs-permalinks
   name: check vcs permalinks
   description: ensures that links to vcs websites are permalinks.
   entry: check-vcs-permalinks
   language: python
+  files: \.(py|r|qmd|rmd|ipynb|md|txt|env|toml|yaml|yml|json|js|html|css|jsx)\$
   types: [text]
+  stages: [pre-commit, pre-push, manual]
 - id: check-xml
   name: check xml
   description: checks xml files for parseable syntax.
   entry: check-xml
+  files: \.(xml)\$
   language: python
   types: [xml]
+  stages: [pre-commit, pre-push, manual]
+
 - id: check-yaml
   name: check yaml
   description: checks yaml files for parseable syntax.
   entry: check-yaml
+  files: \.(yaml|yml)\$
   language: python
   types: [yaml]
+
 - id: debug-statements
   name: debug statements (python)
   description: checks for debugger imports and py37+ `breakpoint()` calls in python source.
   entry: debug-statement-hook
   language: python
+  files: \.(py)\$
   types: [python]
+  stages: [pre-commit, pre-push, manual]
+
 - id: destroyed-symlinks
   name: detect destroyed symlinks
   description: detects symlinks which are changed to regular files with a content of a path which that symlink was pointing to.
   entry: destroyed-symlinks
   language: python
   types: [file]
+  files: \.(py|r|qmd|rmd|ipynb|md|txt|env|toml|yaml|yml|json|js|html|css|jsx)\$
   stages: [pre-commit, pre-push, manual]
+
 - id: detect-private-key
   name: detect private key
   description: detects the presence of private keys.
   entry: detect-private-key
   language: python
   types: [text]
+  stages: [pre-commit, pre-push, manual]
+
 - id: fix-byte-order-marker
   name: fix utf-8 byte order marker
   description: removes utf-8 byte order marker.
   entry: fix-byte-order-marker
   language: python
   types: [text]
-# pyupgrade https://github.com/asottile/pyupgrade
+  stages: [pre-commit, pre-push, manual]
 
 - id: mixed-line-ending
   name: mixed line ending
@@ -126,31 +167,32 @@
   language: python
   pass_filenames: false
   always_run: true
+  stages: [pre-commit, pre-push, manual]
+
 - id: sort-simple-yaml
   name: sort simple yaml files
   description: sorts simple yaml files which consist only of top-level keys, preserving comments and blocks.
   language: python
   entry: sort-simple-yaml
-  files: "^$"
+  files: \.(yaml|yml)\$
+  types: [yaml]
+  stages: [pre-commit, pre-push, manual]
 
-# - id: run-autofix
-#   name: run-autofix
-#   entry: project_utils/run_autofix.sh
-#   language: script
-#   stages: [pre-commit, manual]
 
-- id: run-vis
-  name: run-vis
-  entry: project_utils/run_vis.sh
-  language: script
-  stages: [pre-push, manual]
-- id: run-formatters
-  name: run-formatters
-  entry: project_utils/run_formatters.sh
-  language: script
-  stages: [pre-push, manual]
-- id: run-analyzers
-  name: run-analyzers
-  entry: project_utils/run_analyzers.sh
-  language: script
-  stages: [manual]
+- id: air-format
+  name: air-format
+  description: Run the Air formatter on all files.
+  entry: air format .
+  files: \.(py|r|qmd|rmd)\$
+  language: python
+  types_or: [r, python, qmd, rmd]
+  args: []
+  require_serial: true
+  additional_dependencies: []
+  minimum_pre_commit_version: "2.9.2"
+  stages: [pre-commit, pre-push, manual]
+
+- id: ty
+  name: ty
+  description: "Run 'ty' for extremely fast Python type checking"
+  entry: uv check --quiet --preview-features=check-command  --ty-version=0.0.84   --all-groups --python .venv/bin/python3

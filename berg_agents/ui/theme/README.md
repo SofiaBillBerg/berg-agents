@@ -25,14 +25,16 @@ berg_agents/ui/theme/
 
 The docs site (Quarto) already has its own `docs/styles/custom.css` that
 defines a "SofiaBillBerg" style - purple→blue→teal gradient, Inter on a
-near-white background, soft borders. Without a shared module the webapp
+near-white background, soft borders.
+Without a shared module the webapp
 ends up looking like a generic Google-blue product and we end up with
 two copies of the same palette drifting apart.
 
 By making `berg_agents/ui/theme/` canonical, the docs site imports from
 it (via `sync.py` regenerating symlinks or copies into `docs/styles/`),
 the webapp imports `theme.css` directly, and the CLI/server import
-`tokens/colors.py`. One palette, one source, no drift.
+`tokens/colors.py`.
+One palette, one source, no drift.
 
 ## Usage
 

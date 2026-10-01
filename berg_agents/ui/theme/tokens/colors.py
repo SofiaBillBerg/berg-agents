@@ -11,6 +11,7 @@ Keep in sync manually after editing colors.css, or run:
 
 from __future__ import annotations
 
+
 # Brand - the signature gradient stops
 BRAND_PURPLE = "#7d029c"
 BRAND_BLUE = "#3b528b"

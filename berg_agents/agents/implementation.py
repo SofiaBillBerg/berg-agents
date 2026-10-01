@@ -15,6 +15,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from pydantic import BaseModel
+from pydantic_ai import Agent, RunContext
+
 from berg_agents.capabilities.registry import ToolCatalog
 from berg_agents.providers.models import (
     resolve_model_instance,
@@ -22,15 +25,14 @@ from berg_agents.providers.models import (
 )
 from berg_agents.providers.tiers import model_for_complexity
 from berg_agents.tools._io import _atomic_write, _normalize_target
-from pydantic import BaseModel
-from pydantic_ai import Agent, RunContext
+
 
 __all__ = [
+    "ComplexityLevel",
     "EXECUTABLE_TASK_TYPES",
     "IMPLEMENTATION_AGENT_NAME",
-    "OUTPUT_RETRIES",
-    "ComplexityLevel",
     "ImplementationDeps",
+    "OUTPUT_RETRIES",
     "PlanStep",
     "build_implementation_agent",
     "estimate_confidence",
@@ -54,19 +56,17 @@ IMPLEMENTATION_AGENT_NAME = "implementation"
 ComplexityLevel = Literal["trivial", "standard", "complex", "critical"]
 
 # Task types this agent executes with high confidence.
-EXECUTABLE_TASK_TYPES: frozenset[str] = frozenset(
-    {
-        "edit_file",
-        "new_file",
-        "read_file",
-        "delete_file",
-        "generate_test",
-        "format_code",
-        "execute_command",
-        "refactor",
-        "implement",
-        "fix"}
-)
+EXECUTABLE_TASK_TYPES: frozenset[str] = frozenset({
+    "edit_file",
+    "new_file",
+    "read_file",
+    "delete_file",
+    "generate_test",
+    "format_code",
+    "execute_command",
+    "refactor",
+    "implement",
+    "fix"})
 
 # Step-by-step execution plans per task type.
 _PLAN_STEPS: dict[str, list[dict[str, str]]] = {
@@ -434,7 +434,8 @@ def build_implementation_agent(
         try:
             proc = subprocess.run(
                 command,
-                check=False, shell=True,
+                check=False,
+                shell=True,
                 executable="/bin/bash",
                 cwd=root_path,
                 capture_output=True,
@@ -443,8 +444,7 @@ def build_implementation_agent(
             )
         except subprocess.TimeoutExpired:
             return (
-                f"Command timed out after {clamped}s and was killed: "
-                f"{command}"
+                f"Command timed out after {clamped}s and was killed: {command}"
             )
         except OSError as exc:
             return f"Could not run command: {exc}"

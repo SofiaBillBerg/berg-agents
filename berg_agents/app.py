@@ -17,12 +17,14 @@ Usage:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
+
+from dataclasses import dataclass
 from typing import Any
 
 from berg_agents.agents.guardian import GuardianDeps
 from berg_agents.core.harness import Harness
+
 
 logger = logging.getLogger(__name__)
 
@@ -219,8 +221,9 @@ class BergAgentsApp:
         :param host: Host to bind to.
         :param port: Port to listen on.
         """
-        from berg_agents.ui.server import create_app
         import uvicorn
+
+        from berg_agents.ui.server import create_app
 
         logger.info("Starting BergAgents server on %s:%d", host, port)
         uvicorn.run(create_app(self.harness), host=host, port=port)

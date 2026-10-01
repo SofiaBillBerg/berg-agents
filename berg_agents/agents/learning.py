@@ -18,11 +18,13 @@ The learning behavior is defined here, in this module:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import logging
+
+from dataclasses import dataclass, field
 from typing import Any
 
 from berg_agents.core.outcome_db import ensure, insert, load
+
 
 # Module logger for diagnostics.
 logger = logging.getLogger(__name__)
@@ -39,8 +41,8 @@ __all__ = [
     "DOWNGRADE_RATE_ABOVE",
     "MIN_SAMPLES_FOR_DOWNGRADE",
     "MIN_SAMPLES_FOR_RECOMMENDATION",
-    "UPGRADE_RATE_BELOW",
     "OutcomeStore",
+    "UPGRADE_RATE_BELOW",
     "build_learning_entry",
     "get_outcome_stats",
     "recommendation_from_stats",

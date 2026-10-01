@@ -8,17 +8,20 @@ Builds the web application around one injected harness: routes in
 from __future__ import annotations
 
 import logging
+
 from pathlib import Path
 from typing import Any
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from berg_agents.config.settings import get_settings
 from berg_agents.core.harness import Harness
 from berg_agents.ui.routes import create_router
 from berg_agents.ui.sessions import SessionManager
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+
 
 logger = logging.getLogger(__name__)
 

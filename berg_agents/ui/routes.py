@@ -8,7 +8,13 @@ for native Vercel AI SSE protocol - no manual event-loop / SSE translation neede
 from __future__ import annotations
 
 import logging
+
 from typing import Any
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
+from pydantic_ai import DeferredToolRequests
+from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 
 from berg_agents.core.harness import Harness
 from berg_agents.ui.schemas import (
@@ -19,10 +25,7 @@ from berg_agents.ui.schemas import (
     ToolExecuteResponse,
 )
 from berg_agents.ui.sessions import SessionManager
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import Response
-from pydantic_ai import DeferredToolRequests
-from pydantic_ai.ui.vercel_ai import VercelAIAdapter
+
 
 logger = logging.getLogger(__name__)
 

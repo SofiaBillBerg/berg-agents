@@ -10,83 +10,84 @@ A quick reference for everyday BergAgents usage.
 
 ## 📋 Common Slash Commands (TUI / Web)
 
-| Command | Description |
-|---------|-------------|
-| `/help` | List all available commands |
-| `/agents` | Show registered agents |
-| `/models` | Show loaded models (web UI only) |
-| `/stats` | Show learning statistics |
-| `/tools` | List available tools |
-| `/health` | System health check |
-| `/history` | Show task transcript |
-| `/memory` | Memory stats |
-| `/context` | Current context |
-| `/settings` | Show current settings |
-| `/plugins` | List loaded plugins |
-| `/skills` | List registered skills |
-| `/mcps` | MCP server status |
-| `/harness` or `/task` | Execute a task through the Harness |
-| `/clear` | Clear session state |
+  | Command               | Description                        |
+  | --------------------- | ---------------------------------- |
+  | `/help`               | List all available commands        |
+  | `/agents`             | Show registered agents             |
+  | `/models`             | Show loaded models (web UI only)   |
+  | `/stats`              | Show learning statistics           |
+  | `/tools`              | List available tools               |
+  | `/health`             | System health check                |
+  | `/history`            | Show task transcript               |
+  | `/memory`             | Memory stats                       |
+  | `/context`            | Current context                    |
+  | `/settings`           | Show current settings              |
+  | `/plugins`            | List loaded plugins                |
+  | `/skills`             | List registered skills             |
+  | `/mcps`               | MCP server status                  |
+  | `/harness` or `/task` | Execute a task through the Harness |
+  | `/clear`              | Clear session state                |
 
 ## 📡 API Endpoints (REST)
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/api/harness` | Run a task; returns result dict |
-| POST | `/api/harness/{thread_id}/stream` | Start a streaming worker |
-| GET | `/api/harness/{thread_id}/events` | SSE stream of task events |
-| POST | `/api/harness/{thread_id}/respond` | Answer a HITL pause (approve/reject/edit) |
-| GET | `/api/learning-stats` | Get learning/outcome statistics |
-| GET/POST | `/api/providers` | List or modify provider registry |
-| GET | `/api/providers/active` | Show active provider |
-| GET | `/api/agents` | List all agents |
-| GET | `/api/agents/{name}` | Get detailed agent info |
-| POST/GET | `/api/threads` | Manage conversation threads |
-| POST | `/api/threads/{id}/cancel` | Cancel a running thread |
-| POST | `/api/threads/{id}/export` | Export thread transcript |
+  | Method   | Path                               | Purpose                                   |
+  | -------- | ------                             | ---------                                 |
+  | POST     | `/api/harness`                     | Run a task; returns result dict           |
+  | POST     | `/api/harness/{thread_id}/stream`  | Start a streaming worker                  |
+  | GET      | `/api/harness/{thread_id}/events`  | SSE stream of task events                 |
+  | POST     | `/api/harness/{thread_id}/respond` | Answer a HITL pause (approve/reject/edit) |
+  | GET      | `/api/learning-stats`              | Get learning/outcome statistics           |
+  | GET/POST | `/api/providers`                   | List or modify provider registry          |
+  | GET      | `/api/providers/active`            | Show active provider                      |
+  | GET      | `/api/agents`                      | List all agents                           |
+  | GET      | `/api/agents/{name}`               | Get detailed agent info                   |
+  | POST/GET | `/api/threads`                     | Manage conversation threads               |
+  | POST     | `/api/threads/{id}/cancel`         | Cancel a running thread                   |
+  | POST     | `/api/threads/{id}/export`         | Export thread transcript                  |
 
 ## ⚙️ Configuration Layers (order of precedence)
 
-1. **Explicit dict** passed to `BergAgentsApp.create()` (highest).  
-2. **Environment variables** (`BERG_AGENT_*`).  
-3. **`.env`** file (plain key-value pairs).  
-4. **`config/bergagents.jsonc`** (default config).  
+1. **Explicit dict** passed to `BergAgentsApp.create()` (highest).
+2. **Environment variables** (`BERG_AGENT_*`).
+3. **`.env`** file (plain key-value pairs).
+4. **`config/bergagents.jsonc`** (default config).
 
 ## 🗝️ Common Environment Variables
 
-| Variable | Meaning |
-|----------|---------|
-| `OPENAI_API_KEY` | API key for OpenAI models (`${env:OPENAI_API_KEY}` in config). |
-| `ANTHROPIC_API_KEY` | API key for Anthropic. |
-| `BERG_AGENT_MCP_SERVERS` | Path to MCP JSONC config file. |
-| `BERG_AGENT_CONFIG` | Optional alternate config file overrides. |
-| `ALLOW_MODEL_REQUESTS` | Set to `true` to enable live model calls (CI disables it). |
+  | Variable                 | Meaning                                                        |
+  | ----------               | ---------                                                      |
+  | `OPENAI_API_KEY`         | API key for OpenAI models (`${env:OPENAI_API_KEY}` in config). |
+  | `ANTHROPIC_API_KEY`      | API key for Anthropic.                                         |
+  | `BERG_AGENT_MCP_SERVERS` | Path to MCP JSONC config file.                                 |
+  | `BERG_AGENT_CONFIG`      | Optional alternate config file overrides.                      |
+  | `ALLOW_MODEL_REQUESTS`   | Set to `true` to enable live model calls (CI disables it).     |
 
 ## 🛠️ Handy CLI Flags
 
-| Flag | Example | Effect |
-|------|---------|--------|
-| `--tui` | `python -m berg_agents --tui` | Launch the Rich terminal UI. |
-| `--web` | `python -m berg_agents --web` | Start the FastAPI server. |
-| `--port` | `--port 8001` | Choose port for web UI (default 8001). |
-| `--host` | `--host 0.0.0.0` | Bind to all interfaces. |
-| `--task` | `--task "Summarize README"` | Provide the task description. |
-| `--agent` | `--agent custom_reviewer` | Specify a custom agent to run. |
-| `--tool` | `--tool fs__read` | Use a built-in tool. |
-| `--tool-args` | `--tool-args '{"path":"src/app.py"}'` | Arguments for the tool. |
-| `--set-variable` | `--set-variable my_var="{{result}}"` | Store previous tool output. |
-| `--complexity` | `--complexity high` | Hint to Guardian about expected difficulty. |
-| `--hitl-pause` | `--hitl-pause true` | Force a HITL pause regardless of risk. |
+  | Flag             | Example                               | Effect                                      |
+  | ------           | ---------                             | --------                                    |
+  | `--tui`          | `python -m berg_agents --tui`         | Launch the Rich terminal UI.                |
+  | `--web`          | `python -m berg_agents --web`         | Start the FastAPI server.                   |
+  | `--port`         | `--port 8001`                         | Choose port for web UI (default 8001).      |
+  | `--host`         | `--host 0.0.0.0`                      | Bind to all interfaces.                     |
+  | `--task`         | `--task "Summarize README"`           | Provide the task description.               |
+  | `--agent`        | `--agent custom_reviewer`             | Specify a custom agent to run.              |
+  | `--tool`         | `--tool fs__read`                     | Use a built-in tool.                        |
+  | `--tool-args`    | `--tool-args '{"path":"src/app.py"}'` | Arguments for the tool.                     |
+  | `--set-variable` | `--set-variable my_var="{{result}}"`  | Store previous tool output.                 |
+  | `--complexity`   | `--complexity high`                   | Hint to Guardian about expected difficulty. |
+  | `--hitl-pause`   | `--hitl-pause true`                   | Force a HITL pause regardless of risk.      |
 
 ## ✅ Quick Checklist Before Committing
 
-- [ ] Code passes `ruff check` and `ruff format --check`.  
-- [ ] Unit tests exist and run (`pytest`).  
-- [ ] Documentation pages updated (new API, tutorials, or changes).  
-- [ ] Version bump in `pyproject.toml` and `config/bergagents.jsonc`.  
-- [ ] Changelog entry added.  
-- [ ] All new concepts documented in the appropriate tutorial or best-practice page.  
+- [ ] Code passes `ruff check` and `ruff format --check`.
+- [ ] Unit tests exist and run (`pytest`).
+- [ ] Documentation pages updated (new API, tutorials, or changes).
+- [ ] Version bump in `pyproject.toml` and `config/bergagents.jsonc`.
+- [ ] Changelog entry added.
+- [ ] All new concepts documented in the appropriate tutorial or best-practice page.
 
----
+--------------------------------------------------------------------------------
 
-Keep this page bookmarked; it's the fastest way to recall the most used commands and patterns. 🎯
+Keep this page bookmarked; it's the fastest way to recall the most used commands and patterns.
+🎯

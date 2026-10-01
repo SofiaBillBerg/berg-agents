@@ -17,8 +17,10 @@ of the repository.
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import sys
+
+from pathlib import Path
+
 
 _THEME_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _THEME_DIR.parents[3]

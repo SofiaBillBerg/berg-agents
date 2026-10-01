@@ -26,26 +26,27 @@ harness> /help
 
 Slash commands (identical list and order in the web picker):
 
-| Command | What it does |
-|---------|--------------|
-| `/help` | Show all slash commands |
-| `/agents` | List registered agents |
-| `/models` | Show available models (web UI) |
-| `/stats` | Learning statistics |
-| `/tools` | List available tools (web UI) |
-| `/health` | System health check (web UI) |
-| `/history` | Show session task transcript |
-| `/memory` | Memory information (web UI) |
-| `/context` | Show current context (web UI) |
-| `/settings` | Show settings (web UI) |
-| `/plugins` | List plugins (web UI) |
-| `/skills` | List skills (web UI) |
-| `/mcps` | MCP server status (web UI) |
-| `/harness` | Run a task through the harness |
-| `/task` | Same as `/harness` |
-| `/clear` | Clear the session |
+  | Command     | What it does                   |
+  | ----------- | ------------------------------ |
+  | `/help`     | Show all slash commands        |
+  | `/agents`   | List registered agents         |
+  | `/models`   | Show available models (web UI) |
+  | `/stats`    | Learning statistics            |
+  | `/tools`    | List available tools (web UI)  |
+  | `/health`   | System health check (web UI)   |
+  | `/history`  | Show session task transcript   |
+  | `/memory`   | Memory information (web UI)    |
+  | `/context`  | Show current context (web UI)  |
+  | `/settings` | Show settings (web UI)         |
+  | `/plugins`  | List plugins (web UI)          |
+  | `/skills`   | List skills (web UI)           |
+  | `/mcps`     | MCP server status (web UI)     |
+  | `/harness`  | Run a task through the harness |
+  | `/task`     | Same as `/harness`             |
+  | `/clear`    | Clear the session              |
 
-Commands marked "web UI" are listed in the TUI for parity but answered there with a web-only notice - the TUI only executes commands the Harness API can answer honestly. Unknown commands warn and continue.
+Commands marked "web UI" are listed in the TUI for parity but answered there with a web-only notice - the TUI only executes commands the Harness API can answer honestly.
+Unknown commands warn and continue.
 
 ## Python API
 
@@ -59,8 +60,8 @@ result = app.execute("Summarize the auth module", task_type="standard")
 assert result["status"] in ("completed", "needs_human_review", "failed")
 
 # Inspect the system
-app.list_agents()        # agent catalog
-app.get_learning_stats() # task → model → outcome stats
+app.list_agents()  # agent catalog
+app.get_learning_stats()  # task → model → outcome stats
 
 # Custom config (highest precedence; falls back to bergagents.jsonc)
 app = BergAgentsApp.create({"harness": {"enable_learning": False}})
@@ -79,14 +80,17 @@ python -m berg_agents --web --port 8001
 # → http://127.0.0.1:8001
 ```
 
-Type `/` to open the slash-command picker (same 16 commands as the TUI). Agent, HITL, and learning panels update from the same task lifecycle the TUI renders.
+Type `/` to open the slash-command picker (same 16 commands as the TUI).
+Agent, HITL, and learning panels update from the same task lifecycle the TUI renders.
 
 ### Frontend development
 
-For UI work, run the backend and the Next.js dev server separately. The
+For UI work, run the backend and the Next.js dev server separately.
+The
 dev server is cross-origin, so it needs the backend URL at startup
 (inlined by Next.js) - without it all `/api/*` calls 404 against
-Next.js itself. The backend allows CORS from `localhost`/`127.0.0.1`
+Next.js itself.
+The backend allows CORS from `localhost`/`127.0.0.1`
 ports 3000-3001.
 
 ```bash
@@ -100,16 +104,16 @@ API and the static export from the same origin.
 
 ### API endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/api/harness` | Run a task, return the result dict |
-| POST | `/api/harness/{thread_id}/stream` | Start a streaming worker |
-| GET | `/api/harness/{thread_id}/events` | SSE stream (`data-*` parts, AI SDK UI-message-stream v1) |
-| POST | `/api/harness/{thread_id}/respond` | Answer a HITL pause (approve / reject / edit) |
-| GET | `/api/learning-stats` | Learning/outcome statistics |
-| GET/POST | `/api/providers`, `/api/providers/active` | Provider registry |
-| GET | `/api/agents`, `/api/agents/{name}` | Agent catalog |
-| POST/GET | `/api/threads`, `/api/threads/{id}/cancel`, `/threads/{id}/export` | Threads |
+  | Method   | Path                                                               | Purpose                                                  |
+  | -------- | ------                                                             | ---------                                                |
+  | POST     | `/api/harness`                                                     | Run a task, return the result dict                       |
+  | POST     | `/api/harness/{thread_id}/stream`                                  | Start a streaming worker                                 |
+  | GET      | `/api/harness/{thread_id}/events`                                  | SSE stream (`data-*` parts, AI SDK UI-message-stream v1) |
+  | POST     | `/api/harness/{thread_id}/respond`                                 | Answer a HITL pause (approve / reject / edit)            |
+  | GET      | `/api/learning-stats`                                              | Learning/outcome statistics                              |
+  | GET/POST | `/api/providers`, `/api/providers/active`                          | Provider registry                                        |
+  | GET      | `/api/agents`, `/api/agents/{name}`                                | Agent catalog                                            |
+  | POST/GET | `/api/threads`, `/api/threads/{id}/cancel`, `/threads/{id}/export` | Threads                                                  |
 
 ## Human-in-the-Loop
 

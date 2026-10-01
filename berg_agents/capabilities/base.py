@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+
 #: Canonical risk levels.
 #: ``high`` → requires explicit approval; ``"medium"`` → context-dependent;
 #: ``"low"`` → safe to run without review.

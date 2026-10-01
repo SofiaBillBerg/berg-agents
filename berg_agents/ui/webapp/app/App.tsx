@@ -7,12 +7,14 @@
  * no RealHarness wrapper - pure AI SDK v7.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import type { AgentInfo } from "@/harness/webhook";
+import type { Command } from "./components/SlashCommandAutocomplete";
+import type { ToolResult } from "./components/ChatTranscript";
 
+import React, { useCallback, useEffect, useState } from "react";
 import { Button, Card, Disclosure } from "@heroui/react";
 
 import { useAISDKChat } from "@/harness";
-import type { AgentInfo } from "@/harness/webhook";
 import { API_BASE } from "@/envConfig";
 import { buildExportMarkdown } from "@/utils/utils";
 
@@ -24,11 +26,8 @@ import LearningPanel from "./components/LearningPanel.tsx";
 import ChatTranscript from "./components/ChatTranscript.tsx";
 import StatusCard from "./components/StatusCard.tsx";
 import Navbar from "./components/Navbar.tsx";
-
 import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
 import { ConversationHistory } from "./components/ConversationHistory";
-import type { Command } from "./components/SlashCommandAutocomplete";
-import type { ToolResult } from "./components/ChatTranscript";
 
 /*
  * Error boundary for lazy-loaded components.
@@ -57,7 +56,7 @@ class LazyComponentErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <Card variant="default" className="m-4 border-danger">
+        <Card className="m-4 border-danger" variant="default">
           <Card.Header>
             <Card.Title className="text-danger">
               Failed to load {this.props.componentName}
@@ -322,27 +321,27 @@ function ChatContent() {
               <Button
                 aria-label="Export conversation as markdown"
                 className="border border-primary text-primary hover:bg-primary/10"
+                size="sm"
                 onPress={() => {
-                const md = buildExportMarkdown(messages, [], null, null);
-                const blob = new Blob([md], { type: "text/markdown" });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = `berg-agents-export-${new Date().toISOString().slice(0, 10)}.md`;
-                link.click();
-                URL.revokeObjectURL(url);
-              }}
-              size="sm"
-            >
-              ⬇ Export
-            </Button>
+                  const md = buildExportMarkdown(messages, [], null, null);
+                  const blob = new Blob([md], { type: "text/markdown" });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = `berg-agents-export-${new Date().toISOString().slice(0, 10)}.md`;
+                  link.click();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                ⬇ Export
+              </Button>
             </span>
           </div>
         </div>
 
         {/* Saved chats - collapsed by default so the conversation
             stays front and center. Expands to snapshot/restore. */}
-        <Disclosure defaultExpanded={false} className="mb-4">
+        <Disclosure className="mb-4" defaultExpanded={false}>
           <Disclosure.Heading>
             <Disclosure.Trigger>
               🕘 History
@@ -357,9 +356,9 @@ function ChatContent() {
         </Disclosure>
 
         <StatusCard
-          status={statusInfo}
-          isConnected={true}
           connectionError={chatError ? String(chatError) : null}
+          isConnected={true}
+          status={statusInfo}
         />
 
         {/* Slash command palette - only while the input starts with "/" */}
@@ -430,10 +429,10 @@ function ChatContent() {
 
         {/* Chat transcript - now receives any tool results */}
         <ChatTranscript
-          isExecuting={isStreaming}
           hitlRequest={undefined}
-          transcript={messages}
+          isExecuting={isStreaming}
           toolResults={toolResults}
+          transcript={messages}
         />
 
         {/* Input bar at the bottom */}
@@ -441,17 +440,17 @@ function ChatContent() {
           <InputBar
             disabled={isStreaming}
             input={input}
-            onSend={handleSendWrapper}
-            onStop={isStreaming ? stop : undefined}
             placeholder="Type a message... (e.g. 'hello' or 'write a Python script')"
             setInput={setInput}
             onKeyDown={onKeyDown}
+            onSend={handleSendWrapper}
+            onStop={isStreaming ? stop : undefined}
           />
         </div>
 
         {/* Activity details - compact summaries collapsed by default;
             full views live on the /agents and /stats tabs. */}
-        <Disclosure defaultExpanded={false} className="mt-4">
+        <Disclosure className="mt-4" defaultExpanded={false}>
           <Disclosure.Heading>
             <Disclosure.Trigger>
               Details & Activity
@@ -460,7 +459,7 @@ function ChatContent() {
           </Disclosure.Heading>
           <Disclosure.Content>
             <Disclosure.Body>
-              <AgentPanel compact agents={agents} activeAgent={null} />
+              <AgentPanel compact activeAgent={null} agents={agents} />
               <LearningPanel compact stats={learningStats} />
 
               {chatError && (

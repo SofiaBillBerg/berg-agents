@@ -1,7 +1,6 @@
 exclude: "^packrat(/|$)" # Exclude the packrat folder
+
 repos:
-  # Local hooks must be defined inline (repo: local does not read
-  # .pre-commit-hooks.yaml); the script entries live in project_utils/.
   - repo: local
     hooks:
       - id: run-autofix
@@ -9,36 +8,13 @@ repos:
         entry: project_utils/run_autofix.sh
         language: script
         stages: [pre-commit, manual]
-      #      - id: pre-commit-quick
-      #        name: pre-commit-quick
-      #        entry: project_utils/pre-commit-quick.sh
-      #        language: script
-      #        stages: [ pre-commit ]
-      # - id: run-formatters
-      #   name: run-formatters
-      #   entry: project_utils/run_formatters.sh
-      #   language: script
-      #   stages: [manual]
-      # - id: run-diagrams
-      #   name: run-diagrams
-      #   entry: project_utils/run_diagrams.sh
-      #   language: script
-        stages: [manual]
+
       - id: quarto-render
         name: quarto-render
         entry: quarto render
-        language: shell
+        language: unsupported
+        pass_filenames: false
         stages: [pre-push, manual]
-      # - id: run-analyzers
-      #   name: run-analyzers
-      #   entry: project_utils/run_analyzers.sh
-      #   language: script
-      #   stages: [manual]
-      # - id: pre-push
-      #   name: pre-push
-      #   entry: pre-push
-      #   language: script
-      #   stages: [pre-push]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -68,7 +44,16 @@ repos:
         args: [--py312-plus]
   - repo: https://github.com/posit-dev/air-pre-commit
     # Air version
-    rev: 0.8.2
+    rev: 0.12.0
     hooks:
-      # Run the formatter
       - id: air-format
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    # ty version.
+    rev: v0.0.84
+    hooks:
+      - id: ty
+  - repo: https://github.com/jolars/panache-pre-commit
+    rev: v3.4.0 # Use the latest version
+    hooks:
+      - id: panache-format # Format files
+      - id: panache-lint # Lint and auto-fix issues

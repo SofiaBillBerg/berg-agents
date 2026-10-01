@@ -63,11 +63,11 @@ function InputBar({
       <TextArea
         ref={textareaRef}
         fullWidth
-        id="message-input"
-        name="message"
         aria-label="Message input"
         className="flex-1 overflow-hidden resize-none"
         disabled={disabled}
+        id="message-input"
+        name="message"
         placeholder={placeholder}
         rows={3}
         value={input}

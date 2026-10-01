@@ -1,0 +1,43 @@
+flavor = "quarto"
+
+[format]
+line-width = 80
+wrap = "semantic"
+math-delimiter-style = "preserve"
+math = "reflow"
+math-indent = 2
+line-ending = "lf"
+
+[extensions]
+autolinks = true
+citations = true
+emoji = false
+fancy-lists = true
+hard-line-breaks = false
+implicit-figures = true
+inline-images = true
+inline-links = true
+link-attributes = true
+pandoc-title-block = true
+quarto-callouts = true
+quarto-crossrefs = true
+quarto-shortcodes = true
+reference-links = true
+shortcut-reference-links = true
+task-lists = true
+yaml-metadata-block = true
+
+[formatters]
+r = "air"
+python = "ruff"
+
+[linters]
+r = "arity"
+python = "ruff"
+sh = "shfmt"
+js = "eslint"
+
+
+[flavors]
+gfm = ["README.md"]
+quarto = ["***/**/*.md", "**/**/*.qmd", "**/**/*.rmd"]

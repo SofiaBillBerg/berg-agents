@@ -5,12 +5,12 @@ format: html
 
 # Configuration
 
-BergAgents uses a **provider-centric configuration** pattern. Each model
+BergAgents uses a **provider-centric configuration** pattern.
+Each model
 belongs to a provider; provider/baseURL/apiKey resolve FROM the model id -
 never from a global provider flag.
 
 Layers (increasing precedence):
-
 
 1. **Config file**: `config/bergagents.jsonc` - `providers` + `harness`/`model_routing`/`hitl_rules`/`plugins`/`agents`
 2. **`.env` file**: values referenced from config with `${env:VAR_NAME}` or `{env:VAR}`
@@ -87,7 +87,8 @@ Resolution (`berg_agents/providers/registry.py`):
 }
 ```
 
-Loaded via `BergAgentsApp.create()` → `Settings` → `Harness`. Subagents: Guardian (risk gate), Planner (breakdown), Implementation (edits), Curator (review), Learning (outcome stats).
+Loaded via `BergAgentsApp.create()` → `Settings` → `Harness`.
+Subagents: Guardian (risk gate), Planner (breakdown), Implementation (edits), Curator (review), Learning (outcome stats).
 
 ## `.env` File
 
@@ -113,7 +114,8 @@ External MCP servers live in the file pointed at by `BERG_AGENT_MCP_SERVERS` (de
 ]
 ```
 
-Secrets are never stored in the MCP file - only `${env:VAR}` references. Sensitive servers (`github`, `memory`) pause for approval; read-only servers (`context7`, `docs`, `reference`) run without interruption.
+Secrets are never stored in the MCP file - only `${env:VAR}` references.
+Sensitive servers (`github`, `memory`) pause for approval; read-only servers (`context7`, `docs`, `reference`) run without interruption.
 
 ## Profiles
 
@@ -129,4 +131,6 @@ Secrets are never stored in the MCP file - only `${env:VAR}` references. Sensiti
 
 ## Precedence Example
 
-Config file: `BERG_AGENT_TEMPERATURE = 0.7` . `.env`: `BERG_AGENT_TEMPERATURE=0.9` . environment: `BERG_AGENT_TEMPERATURE=0.5` → effective value is `0.5` (environment wins).
+Config file: `BERG_AGENT_TEMPERATURE = 0.7` .
+`.env`: `BERG_AGENT_TEMPERATURE=0.9` .
+environment: `BERG_AGENT_TEMPERATURE=0.5` → effective value is `0.5` (environment wins).

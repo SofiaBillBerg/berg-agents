@@ -29,21 +29,24 @@ reads the same values from the ``model_dump()`` dict using the ``ollama_*`` /
 from __future__ import annotations
 
 import contextlib
-from functools import lru_cache
 import json
 import logging
 import os
-from pathlib import Path
 import re
+
+from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
-from berg_agents.config.jsonc import loads as jsonc_loads
 from dotenv import dotenv_values, load_dotenv
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import PydanticBaseSettingsSource
 from pydantic_settings.sources.providers.json import JsonConfigSettingsSource
 from pydantic_settings.sources.providers.yaml import YamlConfigSettingsSource
+
+from berg_agents.config.jsonc import loads as jsonc_loads
+
 
 #: Matches ``${env:VAR}`` or ``${VAR}`` placeholders for env substitution.
 _ENV_PLACEHOLDER_RE = re.compile(r"\$\{(?:env:)?([A-Za-z_][A-Za-z0-9_]*)}")
@@ -577,9 +580,7 @@ class Settings(BaseSettings):
         try:
             # Create the directory tree if any part of it is missing.
             expanded.mkdir(parents=True, exist_ok=True)
-        except (
-            Exception
-        ) as exc:  # ruff: ignore[blind-except] -- intentional broad catch
+        except Exception as exc:  # ruff: ignore[blind-except] -- intentional broad catch
             # Log at WARNING rather than raising: a bad path should not
             # prevent the server from starting (Requirement 6.4).
             logging.getLogger(__name__).warning(

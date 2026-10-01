@@ -34,9 +34,7 @@ Design notes
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 import contextlib
-from dataclasses import dataclass, field
 import json
 import logging
 import queue
@@ -44,11 +42,15 @@ import re
 import subprocess
 import threading
 import time
+
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from berg_agents.core.tool_spec import ToolParam, ToolSpec
+
 
 # ---------------------------------------------------------------------------
 # Naming convention (must match config/mcp.py byte-for-byte)
@@ -68,11 +70,7 @@ SERVER_SEP = "__"
 SENSITIVE_SERVERS: frozenset[str] = frozenset({"github", "memory"})
 
 #: Servers that are strictly read-only and safe to call autonomously.
-READONLY_SERVERS: frozenset[str] = frozenset(
-    {
-        "codegraph",
-        "context7"}
-)
+READONLY_SERVERS: frozenset[str] = frozenset({"codegraph", "context7"})
 
 
 # Matches ``mcp_<server>__<tool>`` and captures the server segment.
@@ -274,9 +272,7 @@ class StdioMcpTransport:
                 if not line:
                     continue
                 self.logger.warning("mcp stderr: %s", line)
-        except (
-            Exception
-        ) as exc:  # ruff: ignore[blind-except] - drainer never raises
+        except Exception as exc:  # ruff: ignore[blind-except] - drainer never raises
             self.logger.debug("mcp stderr drainer exited: %s", exc)
 
     def request(
@@ -472,9 +468,7 @@ class HttpMcpTransport:
             method="POST",
         )
         try:
-            with urllib_request.urlopen(
-                req, timeout=self.timeout_s
-            ) as resp:  # ruff: ignore[suspicious-url-open-usage]
+            with urllib_request.urlopen(req, timeout=self.timeout_s) as resp:  # ruff: ignore[suspicious-url-open-usage]
                 raw = resp.read()
         except urllib_error.URLError as exc:
             self._drop(request_id)
@@ -510,16 +504,15 @@ class HttpMcpTransport:
             method="GET",
         )
         try:  # ruff: ignore[too-many-statements-in-try-clause]
-            with urllib_request.urlopen(
-                req, timeout=None
-            ) as resp:  # ruff: ignore[suspicious-url-open-usage]
+            with urllib_request.urlopen(req, timeout=None) as resp:  # ruff: ignore[suspicious-url-open-usage]
                 event_type = "message"
                 data_lines: list[str] = []
                 for raw in iter(resp.readline, b""):
                     if self._closed:
                         return
                     line = (
-                        raw.decode("utf-8", errors="replace")
+                        raw
+                        .decode("utf-8", errors="replace")
                         .rstrip("\n")
                         .rstrip("\r")
                     )
@@ -947,15 +940,15 @@ def load_mcp_server_configs(
 
 
 __all__ = [
-    "MCP_TOOL_PREFIX",
-    "READONLY_SERVERS",
-    "SENSITIVE_SERVERS",
-    "SERVER_SEP",
     "HttpMcpTransport",
+    "MCP_TOOL_PREFIX",
     "McpClient",
     "McpError",
     "McpServerConfig",
     "McpTransport",
+    "READONLY_SERVERS",
+    "SENSITIVE_SERVERS",
+    "SERVER_SEP",
     "StdioMcpTransport",
     "close_all",
     "is_readonly_server",

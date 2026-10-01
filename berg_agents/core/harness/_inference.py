@@ -30,10 +30,12 @@ import dataclasses
 import json
 import logging
 import re
+
 from typing import Any
 
 from berg_agents.agents.implementation import ImplementationDeps
 from berg_agents.core.interface import TaskComplexity
+
 
 logger = logging.getLogger(__name__)
 
@@ -135,11 +137,7 @@ async def _await_inference(
 
 
 #: Tool names whose calls count as touching a file.
-_FILE_TOUCHING_TOOLS: frozenset[str] = frozenset(
-    {
-        "write_file",
-        "edit_file"}
-)
+_FILE_TOUCHING_TOOLS: frozenset[str] = frozenset({"write_file", "edit_file"})
 
 #: Tool-argument keys carrying the touched path, in priority order.
 _FILE_PATH_ARG_KEYS: tuple[str, ...] = ("file_path", "path")

@@ -21,14 +21,16 @@ python -m berg_agents \
 ```
 
 - **`fs__read`** - the tool name registered under `berg_agents.tools._io`.
-- **`--tool`** - tells the Harness which registered tool to execute.  
+- **`--tool`** - tells the Harness which registered tool to execute.
 - **`--tool-args`** - JSON arguments passed to the tool.
 
-You can chain tools by letting one tool emit an event that another tool consumes. This is the core of "advanced usage".
+You can chain tools by letting one tool emit an event that another tool consumes.
+This is the core of "advanced usage".
 
 ## 2️⃣ Sharing context with `set_variable` and `get_variable`
 
-The Harness provides a **key-value store** that lives for the duration of a thread (session). Use it to pass data between unrelated tools.
+The Harness provides a **key-value store** that lives for the duration of a thread (session).
+Use it to pass data between unrelated tools.
 
 ```bash
 # Store the result of a search in a variable called 'search_results'
@@ -68,12 +70,13 @@ python -m berg_agents \
     }'
 ```
 
-- **`execute_subtask`** creates a **new nested thread** that goes through the full Guardian → Planner → Implementation → Curator cycle.  
+- **`execute_subtask`** creates a **new nested thread** that goes through the full Guardian → Planner → Implementation → Curator cycle.
 - The parent task can capture its result via `--set-variable` or stop it with a HITL pause.
 
 ## 4️⃣ Combining multiple built-in tools in one command
 
-You can dispatch several tools sequentially by invoking the Harness multiple times in a single line. This is handy for quick experiments.
+You can dispatch several tools sequentially by invoking the Harness multiple times in a single line.
+This is handy for quick experiments.
 
 ```bash
 python -m berg_agents \
@@ -105,19 +108,21 @@ python -m berg_agents \
     --set-variable generated_path="{{result}}"
 ```
 
-- **`generate_markdown`** is a placeholder for a tool you can implement that takes a code snippet and spits out a markdown definition.  
+- **`generate_markdown`** is a placeholder for a tool you can implement that takes a code snippet and spits out a markdown definition.
 - `${NOW}` is a special macro expanded by the runtime to a timestamp.
 
 ## 6️⃣ Tips for robust multi-tool workflows
 
-| Tip | Why it matters |
-|-----|----------------|
-| **Always emit a unique event name** (e.g., `review_done`, `summary_generated`) | Prevents name collisions when multiple agents emit events simultaneously. |
-| **Validate input before calling a mutating tool** | Avoid accidental overwrites; use Guardian risk assessment to pause before destructive ops. |
-| **Limit nested subprocess depth** (Harness enforces `max_steps`; keep it low for safety) | Prevent runaway loops and DoS inside the sandbox. |
-| **Inspect `--tool` output length** | Long outputs may be truncated; if you need full output, write to a temporary file first and read it back. |
-| **Use `--set-variable` for debugging** | You can later view all stored variables via `/debug-vars` in the TUI. |
+  | Tip                                                                                      | Why it matters                                                                                            |
+  | -----                                                                                    | ----------------                                                                                          |
+  | **Always emit a unique event name** (e.g., `review_done`, `summary_generated`)           | Prevents name collisions when multiple agents emit events simultaneously.                                 |
+  | **Validate input before calling a mutating tool**                                        | Avoid accidental overwrites; use Guardian risk assessment to pause before destructive ops.                |
+  | **Limit nested subprocess depth** (Harness enforces `max_steps`; keep it low for safety) | Prevent runaway loops and DoS inside the sandbox.                                                         |
+  | **Inspect `--tool` output length**                                                       | Long outputs may be truncated; if you need full output, write to a temporary file first and read it back. |
+  | **Use `--set-variable` for debugging**                                                   | You can later view all stored variables via `/debug-vars` in the TUI.                                     |
 
----
+--------------------------------------------------------------------------------
 
-With these patterns you can build sophisticated pipelines that span file I/O, code generation, external APIs, and human approvals-all within the safe, audited sandbox that BergAgents provides. Happy chaining! 🎛️
+With these patterns you can build sophisticated pipelines that span file I/O, code generation, external APIs, and human approvals-all within the safe, audited sandbox that BergAgents provides.
+Happy chaining!
+🎛️

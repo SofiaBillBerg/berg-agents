@@ -8,7 +8,9 @@ This guide gets BergAgents installed and running on your local machine.
 ## 1. Prerequisites
 
 - **Python 3.12+**
+
 - **`uv`** (recommended) or `pip`
+
 - **An OpenAI-compatible provider** - e.g. Ollama running locally with a pulled model:
 
   ```bash

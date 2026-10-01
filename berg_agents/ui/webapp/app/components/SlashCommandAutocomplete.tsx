@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-
 import { Button, Card } from "@heroui/react";
 
 export interface PaletteCommand {
@@ -34,7 +33,7 @@ export const SlashCommandAutocomplete = ({
   );
 
   return (
-    <Card variant="secondary" className="mb-2">
+    <Card className="mb-2" variant="secondary">
       <Card.Content className="flex flex-col gap-1 p-2">
         <input
           aria-label="Filter commands"

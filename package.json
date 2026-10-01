@@ -1,6 +1,11 @@
 {
   "devDependencies": {
     "@omniroute/opencode-provider": "^0.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "git-format-staged": "^4.0.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "lint-staged.sh": "^0.6.9",
     "mermaid-formatter": "^0.3.0",
     "prettier": "^3.9.6"
   },
@@ -10,5 +15,8 @@
     "next": "16.3.6",
     "react": "19.3.0",
     "react-dom": "19.3.0"
+  },
+  "scripts": {
+    "prepare": "husky"
   }
 }

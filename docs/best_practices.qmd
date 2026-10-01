@@ -26,26 +26,26 @@ my_project/
 └─ pyproject.toml
 ```
 
-- **Never mix** production code with `docs/` or `config/` files.  
-- Keep **custom agents** under `src/.../agents/` and **tools** under `src/.../tools/`.  
+- **Never mix** production code with `docs/` or `config/` files.
+- Keep **custom agents** under `src/.../agents/` and **tools** under `src/.../tools/`.
 - All **environment-specific secrets** belong in `.env`; reference them with `${env:VAR}`.
 
 ## 2️⃣ Configuration Hygiene
 
-| Rule | Explanation |
-|------|-------------|
-| **Never hard-code API keys** | Use `${env:OPENAI_API_KEY}` (or provider-specific placeholder) and keep the real values in `.env` (which is git-ignored). |
-| **Version your `bergagents.jsonc`** | Add a top-level `"config_version": "1.2"` field; bump it whenever you add a new provider or change a schema. |
-| **Prefer `providers` over global flags** | Each model ID carries its provider; there is no global "use OpenAI" toggle. |
-| **Separate per-environment configs** | Use `config/beta.jsonc`, `config/prod.jsonc`, and switch via `BERG_AGENT_CONFIG=$(pwd)/config/beta.jsonc`. |
+  | Rule                                     | Explanation                                                                                                               |
+  | ------                                   | -------------                                                                                                             |
+  | **Never hard-code API keys**             | Use `${env:OPENAI_API_KEY}` (or provider-specific placeholder) and keep the real values in `.env` (which is git-ignored). |
+  | **Version your `bergagents.jsonc`**      | Add a top-level `"config_version": "1.2"` field; bump it whenever you add a new provider or change a schema.              |
+  | **Prefer `providers` over global flags** | Each model ID carries its provider; there is no global "use OpenAI" toggle.                                               |
+  | **Separate per-environment configs**     | Use `config/beta.jsonc`, `config/prod.jsonc`, and switch via `BERG_AGENT_CONFIG=$(pwd)/config/beta.jsonc`.                |
 
 ## 3️⃣ Writing Custom Agents
 
-1. **Inherit from `BaseAgent`** (or `AbstractAgent` if you need more methods).  
-2. **Implement `async def run(self, event: LoopEvents) -> None`**.  
-3. **Emit structured events** with `await self.emit(event_name, payload)`.  
-4. **Never perform I/O outside the sandbox** - all filesystem operations must go through the built-in `fs__*` tools.  
-5. **Register the agent** in `config/agents.toml` (or via Python `register_agent`).  
+1. **Inherit from `BaseAgent`** (or `AbstractAgent` if you need more methods).
+2. **Implement `async def run(self, event: LoopEvents) -> None`**.
+3. **Emit structured events** with `await self.emit(event_name, payload)`.
+4. **Never perform I/O outside the sandbox** - all filesystem operations must go through the built-in `fs__*` tools.
+5. **Register the agent** in `config/agents.toml` (or via Python `register_agent`).
 
 ```toml
 # config/agents.toml
@@ -56,9 +56,9 @@ class = "MyCustomAgent"
 
 ## 4️⃣ Writing Custom Tools
 
-- Create a **`ToolSpec`** subclass in `berg_agents.capabilities`.  
-- Register it in the **`ToolRegistry`** (usually via `config/tools.toml`).  
-- Mark it with `pause: true` if it mutates state or requires HITL approval.  
+- Create a **`ToolSpec`** subclass in `berg_agents.capabilities`.
+- Register it in the **`ToolRegistry`** (usually via `config/tools.toml`).
+- Mark it with `pause: true` if it mutates state or requires HITL approval.
 
 ```toml
 # config/tools.toml
@@ -71,9 +71,10 @@ description = "Runs a read-only SQL query against the local SQLite DB."
 
 ## 5️⃣ Testing & CI
 
-- **Unit tests** live in `tests/` and use `pytest`.  
-- **No live-model tests** - set `ALLOW_MODEL_REQUESTS=False` (the default) and mock model responses.  
-- **Lint** with `ruff` and **format** with `ruff format`. Add a pre-commit hook:  
+- **Unit tests** live in `tests/` and use `pytest`.
+- **No live-model tests** - set `ALLOW_MODEL_REQUESTS=False` (the default) and mock model responses.
+- **Lint** with `ruff` and **format** with `ruff format`.
+  Add a pre-commit hook:
 
 ```bash
 ruff check --select F .
@@ -101,22 +102,23 @@ jobs:
 
 ## 6️⃣ Continuous Documentation
 
-- **Document every public API** with a docstring and an example in the relevant tutorial.  
-- **Add a "Last updated" timestamp** at the bottom of each `.qmd` page (`Last updated: {{ now }}`).  
-- **Link source** at the top: `[View source](../src/berg_agents/core/harness.py)`.  
+- **Document every public API** with a docstring and an example in the relevant tutorial.
+- **Add a "Last updated" timestamp** at the bottom of each `.qmd` page (`Last updated: {{ now }}`).
+- **Link source** at the top: `[View source](../src/berg_agents/core/harness.py)`.
 
 ## 7️⃣ Migration Checklist (when moving from LangChain / ADK / Agno)
 
-| Step | Action |
-|------|--------|
-| 1 | Replace `from langchain.agents import AgentType` with `from berg_agents.agents.factory import register_agent`. |
-| 2 | Map `AgentType.CHAT_GPT` → a **provider-centric** entry in `config/bergagents.jsonc`. |
-| 3 | Replace `Chain` objects with **`Harness`** sub-agents (Planner → Implementation). |
-| 4 | Update tool calls: `@tool` → `make_tool_spec` + registration. |
-| 5 | Convert `memory` objects to **checkpoint-aware** storage via `checkpoint.save_state`. |
-| 6 | Update HITL interaction: `ask_user` → `Harness` HITL pause (`await self.request_human()`). |
-| 7 | Run `pytest` and verify that existing test expectations still hold. |
+  | Step   | Action                                                                                                         |
+  | ------ | --------                                                                                                       |
+  | 1      | Replace `from langchain.agents import AgentType` with `from berg_agents.agents.factory import register_agent`. |
+  | 2      | Map `AgentType.CHAT_GPT` → a **provider-centric** entry in `config/bergagents.jsonc`.                          |
+  | 3      | Replace `Chain` objects with **`Harness`** sub-agents (Planner → Implementation).                              |
+  | 4      | Update tool calls: `@tool` → `make_tool_spec` + registration.                                                  |
+  | 5      | Convert `memory` objects to **checkpoint-aware** storage via `checkpoint.save_state`.                          |
+  | 6      | Update HITL interaction: `ask_user` → `Harness` HITL pause (`await self.request_human()`).                     |
+  | 7      | Run `pytest` and verify that existing test expectations still hold.                                            |
 
----
+--------------------------------------------------------------------------------
 
-By following these practices you'll keep the codebase coherent, make onboarding smoother, and reduce the likelihood of runtime surprises. 🚀
+By following these practices you'll keep the codebase coherent, make onboarding smoother, and reduce the likelihood of runtime surprises.
+🚀

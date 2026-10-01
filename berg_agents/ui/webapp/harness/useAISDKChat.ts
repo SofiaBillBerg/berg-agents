@@ -9,11 +9,13 @@
  * tool calls (file operations + run_task), which run the full BergAgents harness.
  */
 
+import type { UIMessage, TextUIPart } from "ai";
+import type { SetStateAction } from "react";
+
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import type { UIMessage, TextUIPart } from "ai";
 import { useEffect, useState } from "react";
-import type { SetStateAction } from "react";
+
 import { API_BASE } from "@/envConfig";
 
 /** localStorage key for the live conversation (shared with History). */
@@ -289,7 +291,6 @@ export function useAISDKChat(): UseAISDKChatReturn {
     } catch {
       // Corrupt storage - start with an empty conversation.
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // handleInputChange for a textarea/input - reads e.target.value.

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from berg_agents.exceptions import CodeAgentError
 
+
 __all__ = ["FileObject", "_atomic_write", "create_from_template"]
 
 

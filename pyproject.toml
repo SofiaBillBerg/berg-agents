@@ -34,8 +34,7 @@ default-base = [
     { include-group = "agent-deps" },
     { include-group = "dev" },
     { include-group = "docs" },
-    { include-group = "tests" }
-]
+    { include-group = "tests" }]
 notebooks = [
     "ipykernel>=7.3.0",
     "jupyterlab>=4.6.3",
@@ -68,9 +67,7 @@ agent-deps = [
     "ai>=0.5.2",
     "a2a-sdk[all]>=0.3.21",
     "pydantic-ai-slim>=2.35.3"]
-docs = [
-    "pydoctor>=25.10.1",
-    "quarto>=0.1.0"]
+docs = ["pydoctor>=25.10.1", "quarto>=0.1.0"]
 dev = [
     "black>=24.3.0",
     "flake8>=7.3.0",
@@ -103,7 +100,6 @@ tests = [
 # berg_agents = "berg_agents.cli:main"
 
 
-
 # This section configures uv to use the nightly PyTorch index and allow pre-releases.
 # It is the equivalent of running:
 # uv pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu130
@@ -122,7 +118,6 @@ torch = [
 torchvision = [
     { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
     { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }]
-
 
 
 [[tool.uv.index]]
@@ -208,7 +203,7 @@ extend-select = [
     "FBT"]
 task-tags = ["TODO", "FIX", "BUG", "CHECK", "CONTROL"]
 extend-ignore = [
-    "too-many-blank-lines", # Blank-line count is the formatter's job; E303 fights `ruff format` under preview.
+    "too-many-blank-lines",                      # Blank-line count is the formatter's job; E303 fights `ruff format` under preview.
     "boolean-default-value-positional-argument",
     "boolean-type-hint-positional-argument",
     "too-many-arguments",
@@ -268,8 +263,7 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 
 [tool.ruff]
-src = [
-    "berg_agents"]
+src = ["berg_agents"]
 extend-exclude = [
     "_build",
     ".venv",
@@ -292,8 +286,18 @@ line-length = 80
     "undefined-local-with-import-star",
     "line-too-long",
     "T20"] # Ignore unused imports and wildcard imports in Jupyter notebooks.
-"*test*.py" = ["assert", "magic-value-comparison", "ARG", "implicit-namespace-package", "no-self-use"]
-"project_utils/*.py" = ["unused-import", "non-pep604-annotation-union", "non-pep604-annotation-optional", "non-pep585-annotation", "line-too-long"]
+"*test*.py" = [
+    "assert",
+    "magic-value-comparison",
+    "ARG",
+    "implicit-namespace-package",
+    "no-self-use"]
+"project_utils/*.py" = [
+    "unused-import",
+    "non-pep604-annotation-union",
+    "non-pep604-annotation-optional",
+    "non-pep585-annotation",
+    "line-too-long"]
 
 
 [tool.black]
@@ -447,6 +451,14 @@ infer-return-types = "checked"
 
 [tool.pyrefly.errors]
 redundant-condition = "error"
+
+
+[tool.ty.analysis]
+respect-type-ignore-comments=true
+
+[tool.ty.environment]
+extra-paths = ["berg_agents/", "stubs/", ".venv/"]
+root = ["."]
 
 [tool.pyanalyze]
 missing_parameter_annotation = true

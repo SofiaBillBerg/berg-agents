@@ -6,10 +6,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { Card, Spinner } from "@heroui/react";
 
 import { API_BASE } from "@/envConfig";
+
 import { LearningPanel } from "../components/LearningPanel.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 

@@ -46,7 +46,9 @@ from __future__ import annotations
 import logging
 import os
 import re
+
 from typing import Any
+
 
 __all__ = ["list_models", "load_providers", "resolve_model"]
 
@@ -240,11 +242,9 @@ def list_models(cfg: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     models: list[dict[str, Any]] = []
     for (pname, mid), kwargs in _iter_model_kwargs(providers).items():
         display = kwargs.pop("_display_name", None)
-        models.append(
-            {
-                "provider": pname,
-                "model": mid,
-                "base_url": kwargs.get("base_url"),
-                "display_name": display or f"{pname}: {mid}"}
-        )
+        models.append({
+            "provider": pname,
+            "model": mid,
+            "base_url": kwargs.get("base_url"),
+            "display_name": display or f"{pname}: {mid}"})
     return models

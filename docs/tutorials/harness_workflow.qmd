@@ -12,8 +12,8 @@ format: html
 
 We want to **refactor the authentication module** so that it:
 
-1. Adds rate-limiting to the API endpoint.  
-2. Writes unit tests for the new logic.  
+1. Adds rate-limiting to the API endpoint.
+2. Writes unit tests for the new logic.
 3. Updates documentation with usage examples.
 
 ## 2️⃣ Create a task description
@@ -34,12 +34,12 @@ python -m berg_agents \
 
 ### What the flags do
 
-| Flag | Meaning |
-|------|----------|
-| `--plan` | Sends a planning prompt to the **Planner** sub-agent. |
-| `--implement` | Sends an implementation prompt to the **Implementation** sub-agent. |
-| `--curate` | Sends a curation prompt to the **Curator** sub-agent. |
-| `--task` | The overall description that the **Guardian** uses to assess risk/complexity. |
+  | Flag          | Meaning                                                                       |
+  | ------        | ----------                                                                    |
+  | `--plan`      | Sends a planning prompt to the **Planner** sub-agent.                         |
+  | `--implement` | Sends an implementation prompt to the **Implementation** sub-agent.           |
+  | `--curate`    | Sends a curation prompt to the **Curator** sub-agent.                         |
+  | `--task`      | The overall description that the **Guardian** uses to assess risk/complexity. |
 
 You can omit any flag; the harness will skip that step.
 
@@ -51,8 +51,7 @@ from berg_agents.app import BergAgentsApp
 app = BergAgentsApp.create()
 
 result = app.execute(
-    "Refactor auth module to add rate limiting and tests",
-    task_type="standard"
+    "Refactor auth module to add rate limiting and tests", task_type="standard"
 )
 print(result)
 ```
@@ -61,16 +60,17 @@ The output contains a `selected_agent`, the model used, and any HITL decision if
 
 ## 5️⃣ Inspect the result
 
-- **CLI**: after the command finishes, you can type `/stats` to see learning metrics.  
-- **Web UI**: open `http://127.0.0.1:8001` and look at the **Task History** panel.  
+- **CLI**: after the command finishes, you can type `/stats` to see learning metrics.
+- **Web UI**: open `http://127.0.0.1:8001` and look at the **Task History** panel.
 - **Python**: `app.get_learning_stats()` returns a dict with success rates, model tiers, etc.
 
 ## 6️⃣ Tweaking the workflow
 
-- **Change complexity**: add `--complexity high` (or low, medium) to influence the Guardian's risk calculation.  
-- **Force a HITL pause**: set `--risk` via an environment variable (e.g., `RISK=high` before running).  
+- **Change complexity**: add `--complexity high` (or low, medium) to influence the Guardian's risk calculation.
+- **Force a HITL pause**: set `--risk` via an environment variable (e.g., `RISK=high` before running).
 - **Custom sub-agents**: register your own agent (see the *Custom Agent* tutorial) and reference it with `--agent my_custom_agent`.
 
----
+--------------------------------------------------------------------------------
 
-**That's it!** You now have a reproducible, reproducible multi-step pipeline that you can embed in scripts, CI jobs, or UI explorations. 🎉
+**That's it!** You now have a reproducible, reproducible multi-step pipeline that you can embed in scripts, CI jobs, or UI explorations.
+🎉

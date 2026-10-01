@@ -9,8 +9,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any
 import uuid
+
+from typing import Any
+
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 from berg_agents.agents.curator import curate_task, curation_confidence
 from berg_agents.agents.guardian import (
@@ -54,7 +57,7 @@ from berg_agents.core.harness._routing import (
 from berg_agents.core.interface import TaskComplexity
 from berg_agents.core.learning_gate import LearningGate
 from berg_agents.providers.registry import resolve_model
-from pydantic_ai.exceptions import UnexpectedModelBehavior
+
 
 logger = logging.getLogger(__name__)
 
@@ -134,9 +137,7 @@ class Harness:
                 name="learning",
                 description="Tracks outcomes and advises routing",
                 preferred_complexity="standard",
-                capabilities=[
-                    "outcome_tracking",
-                    "routing_advice"],
+                capabilities=["outcome_tracking", "routing_advice"],
             )}
 
     def _chat_bypass_result(
@@ -421,9 +422,7 @@ class Harness:
         # Planning is reserved for work that needs it;
         # trivial/standard tasks skip straight to routing.
         plan: dict[str, Any] | None = None
-        if complexity in {
-            TaskComplexity.COMPLEX,
-            TaskComplexity.CRITICAL}:
+        if complexity in {TaskComplexity.COMPLEX, TaskComplexity.CRITICAL}:
             plan = build_plan(description, task_type, complexity)
         # Ensure plan carries concrete actions (functional, not decorative)
         # Ensure COMPLEX/CRITICAL plan carries concrete steps; empty plan filled with step template.if plan is not None and (plan.get("steps") is None or not plan.get("steps")):
@@ -541,9 +540,7 @@ class Harness:
                     "task_type": task_type,
                     "complexity": complexity.value,
                     "description": description},
-                {
-                    "success": True,
-                    "inference_attempted": inference_attempted},
+                {"success": True, "inference_attempted": inference_attempted},
                 model_used=effective_model,
                 success=True,
             )

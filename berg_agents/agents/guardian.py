@@ -24,17 +24,20 @@ used for nuanced cases: it can call the deterministic
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from dataclasses import field as dc_field
 import logging
 import re
+
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from typing import Any
 
-from berg_agents.core.interface import RiskLevel, TaskComplexity
-from berg_agents.providers.models import resolve_model_instance
 from pydantic import BaseModel
 from pydantic import Field as PydField
 from pydantic_ai import Agent, RunContext
+
+from berg_agents.core.interface import RiskLevel, TaskComplexity
+from berg_agents.providers.models import resolve_model_instance
+
 
 logger = logging.getLogger(__name__)
 
@@ -78,18 +81,9 @@ MEDIUM_RISK_PATTERNS: list[str] = [
 # block of ``config/bergagents.jsonc`` (the config is the
 # source of truth; these are import-safe fallbacks so the
 # pure decision functions never need file access).
-AUTO_EXECUTE: list[str] = [
-    "read_file",
-    "list_files",
-    "search_code"]
-NOTIFY_AFTER: list[str] = [
-    "edit_file",
-    "new_file",
-    "generate_test"]
-ASK_BEFORE: list[str] = [
-    "delete_file",
-    "execute_command",
-    "refactor"]
+AUTO_EXECUTE: list[str] = ["read_file", "list_files", "search_code"]
+NOTIFY_AFTER: list[str] = ["edit_file", "new_file", "generate_test"]
+ASK_BEFORE: list[str] = ["delete_file", "execute_command", "refactor"]
 HUMAN_LEADS: list[str] = [
     "security_change",
     "production_deploy",
@@ -175,12 +169,7 @@ def assess_risk(
         "production",
         "migration"}:
         return RiskLevel.HIGH
-    if normalized in {
-        "refactor",
-        "install",
-        "configure",
-        "upgrade",
-        "rewrite"}:
+    if normalized in {"refactor", "install", "configure", "upgrade", "rewrite"}:
         return RiskLevel.MEDIUM
 
     # Default: nothing matched, so low risk.
@@ -415,13 +404,13 @@ except Exception:
 __all__ = [
     "ASK_BEFORE",
     "AUTO_EXECUTE",
+    "GuardianDecision",
+    "GuardianDeps",
     "HIGH_RISK_PATTERNS",
     "HUMAN_LEADS",
     "LOW_CONFIDENCE_THRESHOLD",
     "MEDIUM_RISK_PATTERNS",
     "NOTIFY_AFTER",
-    "GuardianDecision",
-    "GuardianDeps",
     "assess_risk",
     "build_guardian_agent",
     "decide_hitl",

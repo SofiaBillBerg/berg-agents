@@ -44,13 +44,14 @@ adapter simply has no delta source.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
-from dataclasses import asdict, dataclass
 import json
 import logging
 import time
-from typing import Any
 import uuid
+
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
+from dataclasses import asdict, dataclass
+from typing import Any
 
 from berg_agents.core.checkpoint import Checkpointer, make_snapshot
 from berg_agents.core.hitl import (
@@ -61,6 +62,7 @@ from berg_agents.core.hitl import (
     is_valid_decision,
 )
 from berg_agents.core.tool_spec import ToolRegistry, effective_risk_class
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -147,11 +149,9 @@ class StepEnd:
     """A step has finished.
 
     :attr:`step` is the index of the step that just finished; the next step will be `step + 1`.
-    :attr:`max_steps` is the configured maximum number of steps for the loop.
     """
 
     step: int
-    max_steps: int
 
 
 @dataclass(frozen=True)

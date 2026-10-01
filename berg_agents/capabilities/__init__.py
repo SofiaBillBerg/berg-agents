@@ -9,4 +9,5 @@ from __future__ import annotations
 
 from .registry import ToolCatalog
 
+
 __all__ = ["ToolCatalog"]

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
 import logging
+
+from dataclasses import dataclass, field
 from typing import Any
 
 from berg_agents.agents.guardian import GuardianDecision
@@ -13,6 +14,7 @@ from berg_agents.core.hitl import DEFAULT_INTERRUPT_TOOLS
 from berg_agents.core.interface import RiskLevel, TaskComplexity
 from berg_agents.core.learning_gate import LearningGate
 from berg_agents.core.tool_spec import ToolSpec
+
 
 logger = logging.getLogger(__name__)
 
@@ -133,9 +135,7 @@ def _confidence_gate_bypassed(
 
     :return:        True when the gate may be bypassed.
     """
-    if verdict.risk_level in {
-        RiskLevel.HIGH.value,
-        RiskLevel.CRITICAL.value}:
+    if verdict.risk_level in {RiskLevel.HIGH.value, RiskLevel.CRITICAL.value}:
         return False
     if verdict.complexity == TaskComplexity.CRITICAL.value:
         return False
@@ -266,7 +266,8 @@ def _apply_mutation_guard(
             update={
                 "needs_human_review": True,
                 "reasons": [
-                    f"Mutating action required: task '{description[:60]}...' (type: {task_type}) requires human approval before file/tool mutation"]}
+                    f"Mutating action required: task '{description[:60]}...' (type: {task_type}) requires human approval before file/tool mutation"
+                ]}
         )
     return verdict
 

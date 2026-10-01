@@ -20,6 +20,7 @@ from .cli_ui import (
 from .server import create_app
 from .sessions import SessionManager
 
+
 __all__ = [
     "SLASH_COMMANDS",
     "SessionManager",

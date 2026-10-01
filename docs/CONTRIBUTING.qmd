@@ -6,7 +6,8 @@ format: html
 
 # Contributing
 
-Bug fixes, features, and docs improvements are all welcome. The rules below keep the architecture coherent - please follow them.
+Bug fixes, features, and docs improvements are all welcome.
+The rules below keep the architecture coherent - please follow them.
 
 ## Development Setup
 
@@ -20,21 +21,25 @@ uv pip install -e .
 
 ## Architecture Principles (NEVER DRIFT)
 
-- `berg_agents/core/` is framework-free - no LangChain, no LangGraph, no web imports. Adapters live in `backends/`.
+- `berg_agents/core/` is framework-free - no LangChain, no LangGraph, no web imports.
+  Adapters live in `backends/`.
 - All tasks route through `Harness`, never directly to agents.
-- No shims, wrappers, redirects, or backcompat layers. Delete dead code; don't bridge it.
+- No shims, wrappers, redirects, or backcompat layers.
+  Delete dead code; don't bridge it.
 - New agents implement `AbstractAgent`; new tools are `ToolSpec` values in the `ToolRegistry`.
 
 ## Code Style & Linting
 
-`ruff` for lint and format. Before pushing:
+`ruff` for lint and format.
+Before pushing:
 
 ```bash
 ruff check --select F .
 ruff format --check .
 ```
 
-Public functions, classes, and methods get docstrings. PEP 8 naming.
+Public functions, classes, and methods get docstrings.
+PEP 8 naming.
 
 ## Testing
 
@@ -42,7 +47,8 @@ Public functions, classes, and methods get docstrings. PEP 8 naming.
 pytest   # full suite, offline: mocks only, never live models
 ```
 
-Rules: no live-model tests (`ALLOW_MODEL_REQUESTS=False` in `conftest.py` is never bypassed); strengthen assertions in lockstep with behavior changes, never weaken them to fit. Add tests for every fix and feature.
+Rules: no live-model tests (`ALLOW_MODEL_REQUESTS=False` in `conftest.py` is never bypassed); strengthen assertions in lockstep with behavior changes, never weaken them to fit.
+Add tests for every fix and feature.
 
 ## Submitting Changes
 

@@ -16,14 +16,19 @@ schema or be persisted to MemPalace.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
 import fnmatch
 import inspect
+
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from typing import Any, get_args, get_origin
 
-from berg_agents.capabilities.base import RiskClass  # canonical risk vocabulary
 from pydantic import BaseModel, Field, create_model
+
+from berg_agents.capabilities.base import (
+    RiskClass,  # canonical risk vocabulary
+)
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -411,7 +416,7 @@ def make_tool_spec(
     doc = (func.__doc__ or "").strip()
     first_line = doc.split("\n", 1)[0].strip() if doc else ""
     return ToolSpec(
-        name=name or func.__name__,
+        name=getattr(name or func.__name__, "strip", lambda: func.__name__)(),
         description=description or first_line,
         params=tuple(params),
         execute=func,

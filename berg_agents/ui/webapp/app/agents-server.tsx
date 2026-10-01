@@ -3,10 +3,11 @@
  * Demonstrates Next.js Server Component pattern with server-side data fetching.
  */
 
+import type { AgentInfo } from "@/harness/webhook";
+
 import { cache } from "react";
 
 import { apiFetch } from "@/envConfig";
-import type { AgentInfo } from "@/harness/webhook";
 
 const fetchAgents = cache(async (): Promise<AgentInfo[]> => {
   try {
