@@ -1,5 +1,5 @@
 /*
- * Chat hook — wraps AI SDK v7's useChat to talk to the streaming backend.
+ * Chat hook - wraps AI SDK v7's useChat to talk to the streaming backend.
  *
  * The backend (/api/chat/stream) uses pydantic_ai's VercelAIAdapter to emit
  * native Vercel AI protocol SSE. This hook provides a clean interface for
@@ -32,7 +32,7 @@ export interface ChatMessage {
 }
 
 export interface PendingApproval {
-  /** Approval id — pass back to respondToApproval */
+  /** Approval id - pass back to respondToApproval */
   id: string;
   /** Tool the model wants to run (e.g. "write_file") */
   toolName: string;
@@ -43,9 +43,9 @@ export interface PendingApproval {
 export interface UseAISDKChatReturn {
   messages: ChatMessage[];
   input: string;
-  /** Direct state setter — compatible with InputBar's setInput prop. */
+  /** Direct state setter - compatible with InputBar's setInput prop. */
   setInput: (value: SetStateAction<string>) => void;
-  /** Change handler — also compatible with InputBar. */
+  /** Change handler - also compatible with InputBar. */
   handleInputChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => void;
@@ -69,7 +69,7 @@ export interface UseAISDKChatReturn {
 /**
  * Extract the model's private reasoning trace from a UIMessage.
  * Reasoning parts (`type: "reasoning"`) carry the chain-of-thought
- * the model streamed before acting — shown collapsed in the UI.
+ * the model streamed before acting - shown collapsed in the UI.
  */
 function messageReasoning(msg: UIMessage): string | undefined {
   const bits: string[] = [];
@@ -95,7 +95,7 @@ function messageReasoning(msg: UIMessage): string | undefined {
  * In v7, UIMessage has `parts` instead of `content`.
  *
  * Tool-call-only turns carry no text parts, which used to render as
- * empty bubbles. Tool invocations are summarized as `🔧 name(args…)`
+ * empty bubbles. Tool invocations are summarized as `🔧 name(args...)`
  * lines so activity stays visible instead of blank.
  */
 function messageText(msg: UIMessage): string {
@@ -119,7 +119,7 @@ function messageText(msg: UIMessage): string {
             p.input as Record<string, unknown>,
           ).map(([k, v]) => {
             const s = typeof v === "string" ? v : JSON.stringify(v);
-            return `${k}=${s.length > 60 ? s.slice(0, 60) + "…" : s}`;
+            return `${k}=${s.length > 60 ? s.slice(0, 60) + "..." : s}`;
           });
           args = entries.length > 0 ? `(${entries.join(", ")})` : "";
         } catch {
@@ -138,7 +138,7 @@ function messageText(msg: UIMessage): string {
 }
 
 /**
- * Main chat hook — wraps AI SDK v7's useChat to talk to /api/chat/stream.
+ * Main chat hook - wraps AI SDK v7's useChat to talk to /api/chat/stream.
  *
  * Simple messages ("hello") get a direct LLM reply. Complex messages
  * trigger tool calls (file operations + run_task), which run the full
@@ -147,7 +147,7 @@ function messageText(msg: UIMessage): string {
  */
 export function useAISDKChat(): UseAISDKChatReturn {
   // useChat v7 returns: messages, sendMessage, status, error, setMessages, stop
-  // It does NOT return input/handleInputChange/handleSubmit — we manage input
+  // It does NOT return input/handleInputChange/handleSubmit - we manage input
   // state separately and call sendMessage directly.
   const [input, setInput] = useState("");
 
@@ -164,7 +164,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // Resume a paused run after the user answers an approval request.
     // Fires only when the last assistant step holds an answered
     // approval (state "approval-responded") with no completed output
-    // yet — normal finished turns (all parts "output-available" or
+    // yet - normal finished turns (all parts "output-available" or
     // plain text) never match, so no spurious re-sends.
     sendAutomaticallyWhen: ({ messages }) => {
       const last = messages[messages.length - 1] as
@@ -255,7 +255,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     try {
       localStorage.removeItem(CHAT_MESSAGES_KEY);
     } catch {
-      // Private-mode storage may throw — in-memory state still clears.
+      // Private-mode storage may throw - in-memory state still clears.
     }
   };
 
@@ -273,7 +273,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
         JSON.stringify(uiMessages.slice(-MAX_PERSISTED_MESSAGES)),
       );
     } catch {
-      // Quota exceeded or private mode — chat still works in memory.
+      // Quota exceeded or private mode - chat still works in memory.
     }
   }, [uiMessages]);
 
@@ -287,12 +287,12 @@ export function useAISDKChat(): UseAISDKChatReturn {
         setUIMessages(parsed as unknown as UIMessage[]);
       }
     } catch {
-      // Corrupt storage — start with an empty conversation.
+      // Corrupt storage - start with an empty conversation.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // handleInputChange for a textarea/input — reads e.target.value.
+  // handleInputChange for a textarea/input - reads e.target.value.
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {

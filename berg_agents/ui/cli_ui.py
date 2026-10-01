@@ -146,8 +146,8 @@ def render_agents(
         table.add_row(
             str(agent.get("name", "unknown")),
             str(agent.get("description", "")),
-            str(agent.get("preferred_complexity", "—")),
-            ", ".join(str(cap) for cap in capabilities) or "—",
+            str(agent.get("preferred_complexity", "-")),
+            ", ".join(str(cap) for cap in capabilities) or "-",
         )
     console.print(table)
 
@@ -170,10 +170,10 @@ def render_result(
     status = result.get("status", "failed")
     if status == "completed":
         lines = [
-            f"task_id: {result.get('task_id', '—')}",
-            f"agent: {result.get('selected_agent', '—')}",
-            f"model: {result.get('model', '—')}",
-            f"complexity: {result.get('complexity', '—')}"]
+            f"task_id: {result.get('task_id', '-')}",
+            f"agent: {result.get('selected_agent', '-')}",
+            f"model: {result.get('model', '-')}",
+            f"complexity: {result.get('complexity', '-')}"]
         plan = result.get("plan")
         if isinstance(plan, dict):
             lines.append(f"plan steps: {len(plan.get('subtasks', []))}")
@@ -182,8 +182,8 @@ def render_result(
                 "\n".join(lines),
                 title=f"Task completed ({result.get('task_type', 'generic')})",
                 subtitle=(
-                    f"risk: {result.get('risk_level', '—')} "
-                    f"confidence: {result.get('confidence', '—')}"
+                    f"risk: {result.get('risk_level', '-')} "
+                    f"confidence: {result.get('confidence', '-')}"
                 ),
                 border_style="green",
             )
@@ -192,15 +192,15 @@ def render_result(
     if status == "needs_human_review":
         reasons = result.get("review_reasons", [])
         body = (
-            "\n".join(f"• {reason}" for reason in reasons) or "review requested"
+            "\n".join(f"* {reason}" for reason in reasons) or "review requested"
         )
         console.print(
             Panel(
                 body,
                 title="Human review required",
                 subtitle=(
-                    f"risk: {result.get('risk_level', '—')} "
-                    f"complexity: {result.get('complexity', '—')}"
+                    f"risk: {result.get('risk_level', '-')} "
+                    f"complexity: {result.get('complexity', '-')}"
                 ),
                 border_style="yellow",
             )

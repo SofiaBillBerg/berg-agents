@@ -41,7 +41,7 @@ __all__ = ["Harness"]
 
 #: Per-call timeout (seconds) for synchronous model inference.
 #: The registry default (``6000000``ms in bergagents.jsonc) is
-#: effectively infinite, so inference never inherits it — this
+#: effectively infinite, so inference never inherits it - this
 #: explicit bound applies instead.
 _INFERENCE_TIMEOUT_S = 90.0
 
@@ -235,7 +235,7 @@ def _files_changed_from_text(text: str) -> list[str]:
     seen: set[str] = set()
     touched: list[str] = []
 
-    # Try treating the whole text as a JSON value first —
+    # Try treating the whole text as a JSON value first -
     # handles escaped-string model outputs.
     try:
         parsed = json.loads(text)
@@ -266,7 +266,7 @@ def _merge_files_changed(
 
     Caller-provided entries come first; observed paths are
     appended deduplicated. The caller's mapping is never
-    mutated — curation gets its own copy.
+    mutated - curation gets its own copy.
 
     Args:
         metadata: Normalized task metadata mapping.

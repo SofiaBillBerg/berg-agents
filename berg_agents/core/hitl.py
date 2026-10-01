@@ -7,7 +7,7 @@ is in the ``interrupt_on`` policy.  The pause is serialized as a
 the pause with :class:`HitlDecision` (approve / reject / edit) via
 :func:`BergLoop.resume`.
 
-This module is **pure data + pure helpers** — it owns no I/O, no
+This module is **pure data + pure helpers** - it owns no I/O, no
 adapter, and no framework dependency.  The loop (B.3) is the only
 caller; tests can exercise the rules in isolation.
 
@@ -18,7 +18,7 @@ Why dataclasses + a `Literal` action instead of an enum?  Two reasons:
    is a 1-to-1 string union; we can compare ``action == "approve"`` in
    the loop without a second import.
 2. **Frozen-by-default.**  ``@dataclass(frozen=True)`` makes both
-   request and decision hashable and immutable — the loop can stash
+   request and decision hashable and immutable - the loop can stash
    them into the snapshot dict without risk of mutation by callers.
 
 The risk vocabulary follows :data:`core.tool_spec.RiskClass`
@@ -57,7 +57,7 @@ class HitlRequest:
 
     :var tool_call_id: Stable id assigned by the loop (matches the id of the corresponding :class:`LoopEvent` ``ToolCallRequest``).
     :var tool_name: Public name of the tool about to be invoked.
-    :var tool_args: The arguments the model chose.  This is the shallow-copied mapping from the LLM response — the loop does not mutate it.
+    :var tool_args: The arguments the model chose.  This is the shallow-copied mapping from the LLM response - the loop does not mutate it.
     :var risk_class: Inherited from :class:`ToolSpec.risk_class` (``"low" | "medium" | "high"``).
     :var allowed_decisions: Subset of :data:`HitlAction` values the resolver may pick.  Defaults to all three.
     :var reason: Human-readable explanation the loop has computed (e.g. ``"edits a tracked file"``).  The TUI surfaces this.
@@ -170,14 +170,14 @@ def default_interrupt_on(
 
     1. Every name in :data:`DEFAULT_INTERRUPT_TOOLS` (``edit_file``,
        ``write_file``, ``delete``, ``execute``) is ``True``.
-    2. Every other tool is ``False`` — the loop will not pause for
+    2. Every other tool is ``False`` - the loop will not pause for
        read-only helpers.
 
     The argument is a *mapping* of name → tool (typically
     :attr:`ToolRegistry.specs`) so this helper stays free of the
     registry class.  Only the keys are read.
 
-    :param tools: Mapping of tool name → tool object (any object —
+    :param tools: Mapping of tool name → tool object (any object -
         only the keys matter).
     :return: ``{tool_name: bool}`` for every tool in *tools*.
     """
@@ -202,7 +202,7 @@ def apply_decision(
 
     - ``"approve"`` → return :attr:`HitlRequest.tool_args` unchanged.
     - ``"edit"``    → return :attr:`HitlDecision.edited_args`
-      (or ``{}`` if it was missing — the dataclass forbids this so
+      (or ``{}`` if it was missing - the dataclass forbids this so
       callers passing ``None`` get a defensive default).
     - ``"reject"``  → return ``None``; the loop turns this into a
       :class:`ToolError` with reason ``"rejected by human"``.

@@ -73,7 +73,7 @@ export function AgentPanel({
           <Card.Title>Registered Agents</Card.Title>
           <Card.Description>
             {agents.length} available
-            {activeAgent ? ` · ${activeAgent} active` : ""}
+            {activeAgent ? ` . ${activeAgent} active` : ""}
           </Card.Description>
         </Card.Header>
         <Card.Content className="flex flex-col gap-2">

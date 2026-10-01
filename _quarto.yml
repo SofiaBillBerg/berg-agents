@@ -5,6 +5,8 @@ project:
     - docs/docs_web/search-index.json
     - docs/docs_web/docs/404.html
   type: website
+  favicon: berg_agents/ui/webapp/public/favicon/favicon.ico
+  image: berg_agents/ui/webapp/public/favicon/favicon.svg
   output-dir: docs/docs_web
   pre-render:
     - "project_utils/run_apidocs.sh"
@@ -59,6 +61,10 @@ website:
           href: docs/TOOLS.qmd
         - text: "Configuration"
           href: docs/CONFIGURATION.qmd
+        - text: "Best Practices"
+          href: docs/best_practices.qmd
+        - text: "Cheat Sheet"
+          href: docs/cheatsheet.qmd
     - title: "Reference"
       contents:
         - text: "API Reference Overview"
@@ -70,9 +76,23 @@ website:
         - text: "Contributing"
           href: docs/CONTRIBUTING.qmd
         - text: "News & Changelog"
-          href: decisions/decisions-log.md
+          href: docs/CHANGELOG.qmd
         - text: "FAQ & Troubleshooting"
           href: docs/FAQ.qmd
+    - title: "Tutorials"
+      contents:
+        - text: "Tutorials Overview"
+          href: docs/TUTORIALS.qmd
+        - text: "Quickstart Agents"
+          href: docs/tutorials/quickstart_agents.qmd
+        - text: "MCP Integration"
+          href: docs/tutorials/mcp_integration.qmd
+        - text: "Human-in-the-loop"
+          href: docs/tutorials/hilt_lifecycle.qmd
+        - text: "Harness Workflow"
+          href: docs/tutorials/harness_workflow.qmd
+        - text: "Advanced Tools"
+          href: docs/tutorials/advanced_tools.qmd
 
 format:
   html:

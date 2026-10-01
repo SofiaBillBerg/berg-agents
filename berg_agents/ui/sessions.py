@@ -3,7 +3,7 @@
 Holds the active provider/model selection and workspace root directory.
 The single :class:`SessionManager` instance lives on ``app.state`` (see
 :mod:`berg_agents.ui.server`) so routes stay thin and testable through
-dependency injection — no module-level singletons.
+dependency injection - no module-level singletons.
 """
 
 from __future__ import annotations

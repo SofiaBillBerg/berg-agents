@@ -1,11 +1,11 @@
-/* Berg Agents colour palette — canonical source.
+/* Berg Agents colour palette - canonical source.
  * Mirrored as Python in colors.py; synced to docs/styles/ via sync.py.
  *
- * Palette is "SofiaBillBerg" — purple → blue → teal on a near-white ground.
+ * Palette is "SofiaBillBerg" - purple → blue → teal on a near-white ground.
  */
 
 :root {
-  /* Brand — the signature gradient stops */
+  /* Brand - the signature gradient stops */
   --berg-brand-purple: #7d029c;
   --berg-brand-blue: #3b528b;
   --berg-brand-teal: #21908c;
@@ -19,7 +19,7 @@
   --berg-accent-yellow: #fde725; /* callout marker */
   --berg-accent-amber: #fd9f07; /* warning marker */
 
-  /* Neutrals — body copy, surfaces, dividers */
+  /* Neutrals - body copy, surfaces, dividers */
   --berg-text: #010a13;
   --berg-bg: #fbf7fb;
   --berg-surface: #fffafa;
@@ -28,7 +28,7 @@
   --berg-border: #e9ecef;
   --berg-muted: #551a8b; /* callout label colour */
 
-  /* Status — aligned to the viridis family used in custom.css callouts */
+  /* Status - aligned to the viridis family used in custom.css callouts */
   --berg-status-info: #3b528b;
   --berg-status-success: #21908c;
   --berg-status-warn: #fd9f07;

@@ -54,7 +54,7 @@
   //"BERG_AGENT_MODEL": "${env:BERG_AGENT_MODEL}",
 
   //# ---------------------------------------------------------------------------
-  //# PROVIDER/MODEL REGISTRY (preferred — replaces the flat keys above).
+  //# PROVIDER/MODEL REGISTRY (preferred - replaces the flat keys above).
   //# Each model belongs to a provider: selecting a model id automatically
   //# resolves its provider, baseURL and apiKey. Any OpenAI-compatible
   //# endpoint can be added here with zero code changes. "{env:VAR}" strings
@@ -154,7 +154,7 @@
     "learning": {
       "preferred_complexity": "standard"}},
   //# ---------------------------------------------------------------------------
-  //# PRESETS (config-driven toolsets/capabilities — optional, all additive).
+  //# PRESETS (config-driven toolsets/capabilities - optional, all additive).
   //# Uncomment and adapt. Schema: berg_agents/capabilities/specs.py.
   //# NOTE: when uncommenting the block below, add a trailing comma to the
   //# closing "}" of "agents" above (JSONC allows comments, not stray commas).

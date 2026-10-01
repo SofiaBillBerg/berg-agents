@@ -1,10 +1,10 @@
 /*
- * App component — uses AI SDK v7's useChat hook directly via useAISDKChat.
+ * App component - uses AI SDK v7's useChat hook directly via useAISDKChat.
  *
  * The backend (/api/chat/stream) uses pydantic_ai's VercelAIAdapter to emit
  * native Vercel AI protocol SSE. The frontend uses useChat from
  * @ai-sdk/react to consume it. No custom EventEmitter, no MockHarness,
- * no RealHarness wrapper — pure AI SDK v7.
+ * no RealHarness wrapper - pure AI SDK v7.
  */
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -79,7 +79,7 @@ class LazyComponentErrorBoundary extends React.Component<
 }
 
 /*
- * Main chat UI — receives state from useAISDKChat and renders the interface.
+ * Main chat UI - receives state from useAISDKChat and renders the interface.
  */
 function ChatContent() {
   const aiChat = useAISDKChat();
@@ -96,7 +96,7 @@ function ChatContent() {
     pendingApprovals,
     respondToApproval} = aiChat;
 
-  // Commands for the slash‑autocomplete palette
+  // Commands for the slash-autocomplete palette
   const localCommands: Command[] = [
     { name: "/help", description: "Show help info" },
     { name: "/agents", description: "List available agents" },
@@ -126,7 +126,7 @@ function ChatContent() {
   }, []);
 
   // -------------------------------------------------------------------------
-  // Tool‑result handling (used by ChatTranscript)
+  // Tool-result handling (used by ChatTranscript)
   // -------------------------------------------------------------------------
   const [toolResults, setToolResults] = useState<ToolResult[]>([]);
 
@@ -161,7 +161,7 @@ function ChatContent() {
       output: data.output,
       expanded: false,
       onToggle: () => {
-        // Toggle the expanded state of the just‑added result.
+        // Toggle the expanded state of the just-added result.
         setToolResults((prev) => {
           const newPrev = [...prev];
           const last = newPrev[newPrev.length - 1];
@@ -174,7 +174,7 @@ function ChatContent() {
   };
 
   // -------------------------------------------------------------------------
-  // Slash‑command handling – including backend-backed tool commands
+  // Slash-command handling - including backend-backed tool commands
   // -------------------------------------------------------------------------
   const processSlashCommand = useCallback(
     async (text: string) => {
@@ -186,13 +186,13 @@ function ChatContent() {
       const args = rest.join(" ");
 
       // -----------------------------------------------------------------
-      // Backend-backed tool commands – these hit /api/tool/execute.
+      // Backend-backed tool commands - these hit /api/tool/execute.
       // -----------------------------------------------------------------
       const toolCommands = ["read_file", "write_file", "edit_file", "run_task"];
       if (toolCommands.includes(cmdLower)) {
         try {
           // Parse the argument string as JSON.  If parsing fails we fall back
-          // to sending the raw string as a single‑property argument.
+          // to sending the raw string as a single-property argument.
           let parsedArgs: any;
           try {
             parsedArgs = JSON.parse(args);
@@ -210,7 +210,7 @@ function ChatContent() {
       }
 
       // -----------------------------------------------------------------
-      // Local UI commands – these do NOT hit the backend.
+      // Local UI commands - these do NOT hit the backend.
       // -----------------------------------------------------------------
       if (cmdLower === "help") {
         return {
@@ -227,7 +227,7 @@ function ChatContent() {
       if (cmdLower === "agents") {
         return {
           handled: true,
-          card: `/agents\n\n${agents.map((a) => `${a.name} — ${a.description || ""}`).join("\n") || "No agents"}`};
+          card: `/agents\n\n${agents.map((a) => `${a.name} - ${a.description || ""}`).join("\n") || "No agents"}`};
       }
       if (cmdLower === "stats") {
         return {
@@ -237,7 +237,7 @@ function ChatContent() {
       if (cmdLower === "health") {
         return {
           handled: true,
-          card: `/health\nOK · ${messages.length} messages`};
+          card: `/health\nOK . ${messages.length} messages`};
       }
       if (cmdLower === "models") {
         return {
@@ -251,7 +251,7 @@ function ChatContent() {
       }
 
       // -----------------------------------------------------------------
-      // Anything else – let the message flow to the AI model.
+      // Anything else - let the message flow to the AI model.
       // -----------------------------------------------------------------
       return { handled: false };
     },
@@ -259,7 +259,7 @@ function ChatContent() {
   );
 
   // -------------------------------------------------------------------------
-  // Send handler – intercepts slash commands, otherwise forwards to AI SDK.
+  // Send handler - intercepts slash commands, otherwise forwards to AI SDK.
   // -------------------------------------------------------------------------
   const handleSendWrapper = useCallback(() => {
     if (!input.trim()) return;
@@ -269,14 +269,14 @@ function ChatContent() {
     if (cmdMatch) {
       void processSlashCommand(input.trim()).then((outcome) => {
         if (!outcome.handled) {
-          // Not a recognized command – forward the original text.
+          // Not a recognized command - forward the original text.
           void sendMessage(input.trim());
         }
       });
       return;
     }
 
-    // No slash prefix – just send the message to the AI model.
+    // No slash prefix - just send the message to the AI model.
     void sendMessage(input.trim());
   }, [input, processSlashCommand, sendMessage]);
 
@@ -340,7 +340,7 @@ function ChatContent() {
           </div>
         </div>
 
-        {/* Saved chats — collapsed by default so the conversation
+        {/* Saved chats - collapsed by default so the conversation
             stays front and center. Expands to snapshot/restore. */}
         <Disclosure defaultExpanded={false} className="mb-4">
           <Disclosure.Heading>
@@ -362,7 +362,7 @@ function ChatContent() {
           connectionError={chatError ? String(chatError) : null}
         />
 
-        {/* Slash command palette — only while the input starts with "/" */}
+        {/* Slash command palette - only while the input starts with "/" */}
         {input.startsWith("/") && (
           <SlashCommandAutocomplete
             commands={localCommands}
@@ -373,7 +373,7 @@ function ChatContent() {
           />
         )}
 
-        {/* HITL approval requests — the agent paused and needs a human
+        {/* HITL approval requests - the agent paused and needs a human
             yes/no before a mutating tool runs. Answering resumes the
             same run; rejecting tells the model why. */}
         {pendingApprovals.length > 0 && (
@@ -428,7 +428,7 @@ function ChatContent() {
           </Card>
         )}
 
-        {/* Chat transcript – now receives any tool results */}
+        {/* Chat transcript - now receives any tool results */}
         <ChatTranscript
           isExecuting={isStreaming}
           hitlRequest={undefined}
@@ -449,7 +449,7 @@ function ChatContent() {
           />
         </div>
 
-        {/* Activity details – compact summaries collapsed by default;
+        {/* Activity details - compact summaries collapsed by default;
             full views live on the /agents and /stats tabs. */}
         <Disclosure defaultExpanded={false} className="mt-4">
           <Disclosure.Heading>
@@ -479,6 +479,6 @@ function ChatContent() {
 const ChatContentMemo = React.memo(ChatContent);
 
 export default function App() {
-  // No provider needed — useChat is hook‑based with DefaultChatTransport.
+  // No provider needed - useChat is hook-based with DefaultChatTransport.
   return <ChatContentMemo />;
 }

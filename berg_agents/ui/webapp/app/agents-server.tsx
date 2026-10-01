@@ -1,5 +1,5 @@
 /*
- * Agents Server Component — fetches agent list on the server.
+ * Agents Server Component - fetches agent list on the server.
  * Demonstrates Next.js Server Component pattern with server-side data fetching.
  */
 
@@ -26,7 +26,7 @@ export default async function AgentsServer() {
       <h2>Available Agents ({agents.length})</h2>
       {agents.map((agent) => (
         <div key={agent.name}>
-          <strong>{agent.name}</strong> — {agent.model}
+          <strong>{agent.name}</strong> - {agent.model}
         </div>
       ))}
     </div>

@@ -1,4 +1,4 @@
-"""Provider layer — model resolution.
+"""Provider layer - model resolution.
 
 The only public surface is :func:`resolve_model_instance`, which reads
 ``config/bergagents.jsonc`` and returns a fully-configured

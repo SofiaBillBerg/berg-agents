@@ -68,7 +68,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
       const parsed: unknown = raw ? JSON.parse(raw) : [];
       if (Array.isArray(parsed)) setSessions(parsed as ChatSnapshot[]);
     } catch {
-      // Corrupt storage — start empty.
+      // Corrupt storage - start empty.
     }
   }, []);
 
@@ -77,7 +77,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
     try {
       localStorage.setItem(HISTORY_KEY, JSON.stringify(next.slice(0, 50)));
     } catch {
-      // Quota exceeded — keep in-memory state only.
+      // Quota exceeded - keep in-memory state only.
     }
   };
 
@@ -96,7 +96,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
     try {
       localStorage.setItem(CHAT_MESSAGES_KEY, JSON.stringify(session.messages));
     } catch {
-      // Quota exceeded — still restore in memory.
+      // Quota exceeded - still restore in memory.
     }
     onSelect(session.messages);
   };
@@ -119,7 +119,7 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
       <Card.Content className="flex flex-col gap-1.5">
         {sessions.length === 0 && (
           <Card.Description>
-            No saved chats yet — hit “Save chat” to snapshot this one.
+            No saved chats yet - hit "Save chat" to snapshot this one.
           </Card.Description>
         )}
         {sessions.map((s) => (

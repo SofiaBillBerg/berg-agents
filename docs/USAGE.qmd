@@ -45,7 +45,7 @@ Slash commands (identical list and order in the web picker):
 | `/task` | Same as `/harness` |
 | `/clear` | Clear the session |
 
-Commands marked "web UI" are listed in the TUI for parity but answered there with a web-only notice — the TUI only executes commands the Harness API can answer honestly. Unknown commands warn and continue.
+Commands marked "web UI" are listed in the TUI for parity but answered there with a web-only notice - the TUI only executes commands the Harness API can answer honestly. Unknown commands warn and continue.
 
 ## Python API
 
@@ -68,9 +68,9 @@ app = BergAgentsApp.create({"harness": {"enable_learning": False}})
 
 Result shapes:
 
-- `completed` — carries `selected_agent`, `model`, `tier`, `complexity`, `risk_level`, `confidence`
-- `needs_human_review` — carries `review_reasons`; approve to resume with `hitl_decision` in task metadata
-- `failed` — carries `error`, rendered inline (never a traceback)
+- `completed` - carries `selected_agent`, `model`, `tier`, `complexity`, `risk_level`, `confidence`
+- `needs_human_review` - carries `review_reasons`; approve to resume with `hitl_decision` in task metadata
+- `failed` - carries `error`, rendered inline (never a traceback)
 
 ## Web UI
 
@@ -85,9 +85,9 @@ Type `/` to open the slash-command picker (same 16 commands as the TUI). Agent, 
 
 For UI work, run the backend and the Next.js dev server separately. The
 dev server is cross-origin, so it needs the backend URL at startup
-(inlined by Next.js) — without it all `/api/*` calls 404 against
+(inlined by Next.js) - without it all `/api/*` calls 404 against
 Next.js itself. The backend allows CORS from `localhost`/`127.0.0.1`
-ports 3000–3001.
+ports 3000-3001.
 
 ```bash
 python -m berg_agents --web --port 8001   # backend API
@@ -115,13 +115,13 @@ API and the static export from the same origin.
 
 When a task needs review, the Harness returns `needs_human_review`:
 
-- **TUI**: the result panel shows the review reasons, then `Approve and resume? [y/N]:` — approval re-executes with `hitl_decision: approve` in metadata, anything else fails the task as rejected.
+- **TUI**: the result panel shows the review reasons, then `Approve and resume? [y/N]:` - approval re-executes with `hitl_decision: approve` in metadata, anything else fails the task as rejected.
 - **Web**: the HITL surface shows tool name + arguments with Approve / Reject / Edit (edit rewrites the args before the tool runs).
 
 See [Tools](TOOLS.qmd) for which tools pause by default.
 
 ## See Also
 
-- [Configuration](CONFIGURATION.qmd) — providers, routing, HITL rules
-- [Tools](TOOLS.qmd) — built-in tools, capabilities, MCP
-- [Quick Start](QUICKSTART.qmd) — installation and first run
+- [Configuration](CONFIGURATION.qmd) - providers, routing, HITL rules
+- [Tools](TOOLS.qmd) - built-in tools, capabilities, MCP
+- [Quick Start](QUICKSTART.qmd) - installation and first run

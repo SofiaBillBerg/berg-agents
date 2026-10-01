@@ -1,4 +1,4 @@
-/* Dark preset — opt-in by setting <html data-berg-preset="dark">. */
+/* Dark preset - opt-in by setting <html data-berg-preset="dark">. */
 
 :root[data-berg-preset="dark"] {
   --berg-text: #f5f5f7;

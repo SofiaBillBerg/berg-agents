@@ -1,7 +1,7 @@
---- include-code-files.lua – filter to include code from source files
+--- include-code-files.lua - filter to include code from source files
 ---
 --- Copyright: © 2020 Bruno BEAUFILS
---- License:   MIT – see LICENSE file for details
+--- License:   MIT - see LICENSE file for details
 
 --- Dedent a line
 local function dedent(line, n)

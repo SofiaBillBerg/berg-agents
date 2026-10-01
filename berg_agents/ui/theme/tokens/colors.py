@@ -1,4 +1,4 @@
-"""Berg Agents color palette — Python mirror of tokens/colors.css.
+"""Berg Agents color palette - Python mirror of tokens/colors.css.
 
 Single source of truth for the palette lives in `tokens/colors.css`. This
 module exposes the same values so the CLI and the FastAPI server can
@@ -11,7 +11,7 @@ Keep in sync manually after editing colors.css, or run:
 
 from __future__ import annotations
 
-# Brand — the signature gradient stops
+# Brand - the signature gradient stops
 BRAND_PURPLE = "#7d029c"
 BRAND_BLUE = "#3b528b"
 BRAND_TEAL = "#21908c"

@@ -45,7 +45,7 @@ export const ToolCard = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Clipboard unavailable (permissions, insecure context) — no-op.
+      // Clipboard unavailable (permissions, insecure context) - no-op.
     }
   };
 

@@ -13,7 +13,7 @@ A local, LLM-driven code assistant with a **framework-agnostic core** and provid
 
 - **Harness** (`berg_agents/core/harness.py`): guardian → planner → implementation → curator, plus a learning gate recording task → model → outcome. Results are `completed`, `needs_human_review`, or `failed` dicts.
 - **Loop** (`berg_agents/core/loop.py`): framework-free LLM↔tool cycle yielding typed events, with HITL pause/resume, cancel, and `max_steps`. Adapters expose `chat(messages, *, tools, temperature)`.
-- **Tools** (`berg_agents/core/tool_spec.py`, `agents/factory.py`): native `ToolSpec` registry — `read_file` (low risk), `edit_file` / `write_file` (high risk) — wrapped as audited capabilities; MCP servers add `mcp_<server>__<tool>` tools.
+- **Tools** (`berg_agents/core/tool_spec.py`, `agents/factory.py`): native `ToolSpec` registry - `read_file` (low risk), `edit_file` / `write_file` (high risk) - wrapped as audited capabilities; MCP servers add `mcp_<server>__<tool>` tools.
 - **Providers** (`berg_agents/providers/registry.py`): the provider resolves FROM the model id. No hardcoded providers, no global provider flag.
 
 ## Run
@@ -31,7 +31,7 @@ app.execute("Fix the flaky sync test", task_type="standard")
 
 ## Configure
 
-`config/bergagents.jsonc` — `providers`, `harness`, `model_routing` (models per complexity), `hitl_rules`, `hitl_rules` (auto_execute / notify_after / ask_before / human_leads), `plugins`, per-agent complexity. Secrets in `.env` via `${env:VAR}`; `BERG_AGENT_*` env vars override everything. Full reference in [Configuration](../docs/CONFIGURATION.qmd).
+`config/bergagents.jsonc` - `providers`, `harness`, `model_routing` (models per complexity), `hitl_rules`, `hitl_rules` (auto_execute / notify_after / ask_before / human_leads), `plugins`, per-agent complexity. Secrets in `.env` via `${env:VAR}`; `BERG_AGENT_*` env vars override everything. Full reference in [Configuration](../docs/CONFIGURATION.qmd).
 
 ## Test
 
@@ -41,10 +41,10 @@ pytest  # offline: mocks only, ALLOW_MODEL_REQUESTS=False
 
 ## Documentation
 
-- [Quick Start](../docs/QUICKSTART.qmd) — install and first run
-- [Usage](../docs/USAGE.qmd) — TUI, Python API, web, endpoints
-- [Configuration](../docs/CONFIGURATION.qmd) — providers, routing, HITL
-- [Tools](../docs/TOOLS.qmd) — built-ins, capabilities, MCP
-- [API](../docs/API.qmd) — module map
-- [Contributing](../docs/CONTRIBUTING.qmd) — architecture rules
-- [FAQ](../docs/FAQ.qmd) — troubleshooting
+- [Quick Start](../docs/QUICKSTART.qmd) - install and first run
+- [Usage](../docs/USAGE.qmd) - TUI, Python API, web, endpoints
+- [Configuration](../docs/CONFIGURATION.qmd) - providers, routing, HITL
+- [Tools](../docs/TOOLS.qmd) - built-ins, capabilities, MCP
+- [API](../docs/API.qmd) - module map
+- [Contributing](../docs/CONTRIBUTING.qmd) - architecture rules
+- [FAQ](../docs/FAQ.qmd) - troubleshooting

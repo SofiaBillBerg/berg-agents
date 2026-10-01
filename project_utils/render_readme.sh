@@ -24,7 +24,7 @@ fi
 # echo "README.md copied and links fixed."
 
 echo "Converting docs/README.qmd to README.md with quarto pandoc"
-quarto pandoc docs/README.qmd --to github_document README.md
+quarto pandoc docs/README.qmd --to markdown_github --reference-links=true --output README.md
 # Postfix links with ../ in the README.md
 echo "Fixing links in README.md..."
 sed -i.bak 's|\.\./||g' README.md

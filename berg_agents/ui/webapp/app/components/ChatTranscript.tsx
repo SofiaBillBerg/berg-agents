@@ -18,9 +18,9 @@ export interface ChatTranscriptProps {
 export interface ToolResult {
   /** Name of the tool (e.g. "read_file", "run_task") */
   tool: string;
-  /** Raw input arguments (JSON‑serialised string) – optional */
+  /** Raw input arguments (JSON-serialised string) - optional */
   input?: string;
-  /** Output from the tool – must be JSON‑serialisable */
+  /** Output from the tool - must be JSON-serialisable */
   output?: any;
   /** Whether the card is currently expanded */
   expanded?: boolean;
@@ -41,7 +41,7 @@ export function ChatTranscript({
           <div className="conversation-container overflow-y-auto flex-1 min-h-0 max-h-[55vh]">
             <MessageList history={transcript} />
 
-            {/* HITL Pending Notice – HeroUI Alert with compound components */}
+            {/* HITL Pending Notice - HeroUI Alert with compound components */}
             {hitlRequest != null && (
               <Alert className="mt-3" status="warning">
                 <Alert.Indicator />
@@ -56,7 +56,7 @@ export function ChatTranscript({
         </Card.Content>
       </Card>
 
-      {/* Thinking Bubble – HeroUI Spinner + Surface */}
+      {/* Thinking Bubble - HeroUI Spinner + Surface */}
       {isExecuting && !hitlRequest && (
         <Surface
           className="thinking-bubble p-3 mb-4 flex items-center gap-2"
@@ -67,7 +67,7 @@ export function ChatTranscript({
         </Surface>
       )}
 
-      {/* Tool Result Cards – rendered below the thinking bubble */}
+      {/* Tool Result Cards - rendered below the thinking bubble */}
       {toolResults && toolResults.length > 0 && (
         <div className="mt-4 space-y-3">
           {toolResults.map((tr, idx) => (

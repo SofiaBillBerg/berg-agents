@@ -2,7 +2,7 @@
 
 All routes consumed by the Next.js frontend (``webapp/app``).
 The streaming chat endpoint uses :class:`~pydantic_ai.ui.vercel_ai.VercelAIAdapter`
-for native Vercel AI SSE protocol — no manual event-loop / SSE translation needed.
+for native Vercel AI SSE protocol - no manual event-loop / SSE translation needed.
 """
 
 from __future__ import annotations
@@ -113,22 +113,22 @@ def create_router(
     async def chat_stream(
         request: Request,
     ) -> Response:
-        """Agentic streaming chat — native Vercel AI protocol via pydantic_ai.
+        """Agentic streaming chat - native Vercel AI protocol via pydantic_ai.
 
         Uses :class:`~pydantic_ai.ui.vercel_ai.VercelAIAdapter` to handle all
         event transformation: frontend messages → agent run input, agent
         events → Vercel AI SSE chunks (text deltas, tool calls, tool results,
         HITL approval requests).
 
-        Simple messages like "hello" get a direct LLM reply — no tool calls.
+        Simple messages like "hello" get a direct LLM reply - no tool calls.
         Complex requests (e.g. "write a file") trigger the model's tools
         (file operations + ``run_task``), which run the full BergAgents pipeline.
 
         The agent, model, and system prompt all come from configuration
-        (``config/bergagents.jsonc`` and ``config/profiles.yaml``) — never
+        (``config/bergagents.jsonc`` and ``config/profiles.yaml``) - never
         hardcoded. An optional ``?model=`` query param overrides the model.
 
-        :param request: FastAPI request — VercelAIAdapter inspects the body
+        :param request: FastAPI request - VercelAIAdapter inspects the body
             and ``accept`` header to pick the protocol and parse messages.
         :return: StreamingResponse with SSE chunks in Vercel AI protocol.
         """
@@ -144,16 +144,16 @@ def create_router(
 
         # sdk_version=6 enables tool-approval streaming (human-in-the-loop).
         # VercelAIAdapter.dispatch_request handles all SSE encoding and
-        # protocol transformation natively — no manual event loops needed.
+        # protocol transformation natively - no manual event loops needed.
         # output_type adds DeferredToolRequests: tools flagged
         # requires_approval (bash, edit_file, write_file, run_task)
         # pause the run instead of executing, the adapter streams an
         # approval request, and the frontend answers it with
-        # addToolApprovalResponse — which re-POSTs here carrying the
+        # addToolApprovalResponse - which re-POSTs here carrying the
         # approval. The adapter extracts approvals from the incoming
         # messages and resumes the same run. (The adapter only adds
         # DeferredToolRequests itself when it contributes a toolset,
-        # which we don't use — hence declaring it explicitly.)
+        # which we don't use - hence declaring it explicitly.)
         return await VercelAIAdapter.dispatch_request(
             request,
             agent=agent,
@@ -181,7 +181,7 @@ def create_router(
         endpoint the webapp's ``executeTool`` (slash commands like
         ``/read_file``) calls. Tool functions already return
         human-readable messages instead of raising, so failures
-        arrive as ``status="error"`` output — never tracebacks.
+        arrive as ``status="error"`` output - never tracebacks.
 
         :param request: Tool name plus arguments (mapping, or a bare
             string treated as ``file_path``).
@@ -208,7 +208,7 @@ def create_router(
                 return ToolExecuteResponse(
                     tool=name,
                     output="Missing 'description': tell me what to do, "
-                    "e.g. /run_task {\"description\": \"summarize README\"}.",
+                    'e.g. /run_task {"description": "summarize README"}.',
                     status="error",
                 )
             result = await asyncio.to_thread(
@@ -247,7 +247,7 @@ def create_router(
             return ToolExecuteResponse(
                 tool=name,
                 output=f"Bad arguments for {name}: {exc}. "
-                f"Send {{\"file_path\": ..., \"content\": ...}} where needed.",
+                f'Send {{"file_path": ..., "content": ...}} where needed.',
                 status="error",
             )
         except Exception as exc:  # Defensive: never leak tracebacks.

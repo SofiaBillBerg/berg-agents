@@ -1,4 +1,4 @@
-"""Routing helpers for Harness — HITL gates, mutation checks, agent selection."""
+"""Routing helpers for Harness - HITL gates, mutation checks, agent selection."""
 
 from __future__ import annotations
 
@@ -64,11 +64,8 @@ def _tool_is_mutating(tool_name: str) -> bool:
     or prefixed by one of its entries (``delete_file``,
     ``execute_command``) may mutate.
 
-    Args:
-        tool_name: Planned tool name.
-
-    Returns:
-        True when the tool may mutate state.
+    :param tool_name: Planned tool name.
+    :return: True when the tool may mutate state.
     """
     if tool_name == "general":
         return False
@@ -90,12 +87,9 @@ def _task_plans_mutation(task_type: str, description: str = "") -> bool:
     back to a general tool plan), so it is checked
     alongside the planned tool list and description keywords.
 
-    Args:
-        task_type: Task type used for tool planning.
-        description: Free-text task description.
-
-    Returns:
-        True when at least one planned tool may mutate.
+    :param task_type: Task type used for tool planning.
+    :param description: Free-text task description.
+    :return: True when at least one planned tool may mutate.
     """
     if _tool_is_mutating(task_type):
         return True
@@ -133,13 +127,11 @@ def _confidence_gate_bypassed(
     while mutating tool calls still pause for approval.
     High/critical risk and critical complexity always gate.
 
-    Args:
-        verdict: Guardian review verdict.
-        task_type: Task type used for tool planning.
-        description: Free-text task description.
+    :param verdict: Guardian review verdict.
+    :param task_type: Task type used for tool planning.
+    :param description: Free-text task description.
 
-    Returns:
-        True when the gate may be bypassed.
+    :return:        True when the gate may be bypassed.
     """
     if verdict.risk_level in {
         RiskLevel.HIGH.value,
@@ -166,18 +158,16 @@ def _failed_result(
     Shared by the chat bypass and the main inference path;
     both report the same shape with ``inference_attempted=True``.
 
-    Args:
-        resolved_id: Caller thread id.
-        task_type: Task type label.
-        description: Human-readable task description.
-        complexity: Routed complexity.
-        verdict: Guardian review verdict (risk reporting only).
-        model: Complexity-default model id label.
-        error: Human-readable failure reason.
-        learning_gate: Gate recording the failure, or None to skip.
+    :param resolved_id: Caller thread id.
+    :param task_type: Task type label.
+    :param description: Human-readable task description.
+    :param complexity: Routed complexity.
+    :param verdict: Guardian review verdict (risk reporting only).
+    :param model: Complexity-default model id label.
+    :param error: Human-readable failure reason.
+    :param learning_gate: Gate recording the failure, or None to skip.
 
-    Returns:
-        Failure result dict.
+    :return:        Failure result dict.
     """
     failed: dict[str, Any] = {
         "status": "failed",
@@ -210,11 +200,9 @@ def _extract_planned_actions(raw: Any) -> list[dict[str, Any]] | None:
     list of objects yields None so the caller falls back to the
     placeholder action list.
 
-    Args:
-        raw: Raw model output (string or any object).
+    :param raw: Raw model output (string or any object).
 
-    Returns:
-        Normalized action list, or None when parsing failed.
+    :return:        Normalized action list, or None when parsing failed.
     """
     if not isinstance(raw, str):
         raw = str(raw or "")
@@ -265,13 +253,11 @@ def _apply_mutation_guard(
     Non-mutating tasks (chat/general queries) bypass guardian
     human review gates entirely.
 
-    Args:
-        verdict: Guardian review verdict to adjust.
-        task_type: Task type used for tool planning.
-        description: Free-text task description.
+    :param verdict: Guardian review verdict to adjust.
+    :param task_type: Task type used for tool planning.
+    :param description: Free-text task description.
 
-    Returns:
-        An updated verdict copy; the input is left untouched.
+    :return:        An updated verdict copy; the input is left untouched.
     """
     if not _task_plans_mutation(task_type, description):
         return verdict.model_copy(update={"needs_human_review": False})
@@ -302,21 +288,19 @@ def _review_gate_result(
     tools are all read-only is bypassed the same way. When the
     orchestrator pre-planned concrete mutating actions (a
     read-only planning inference), ``action_requests`` carries
-    the model's real tool calls — with actual file paths — so
+    the model's real tool calls - with actual file paths - so
     the HITL card shows what will truly happen.
 
-    Args:
-        verdict: Guardian review verdict (already mutation-guarded).
-        task_type: Task type label.
-        description: Human-readable task description.
-        resolved_id: Caller thread id for log lines.
-        confidence: Routing confidence score.
-        approved: True when metadata records a human approval.
-        action_requests: Pre-planned concrete mutating actions,
-            if planning inference ran, else None.
+    :param verdict: Guardian review verdict (already mutation-guarded).
+    :param task_type: Task type label.
+    :param description: Human-readable task description.
+    :param resolved_id: Caller thread id for log lines.
+    :param confidence: Routing confidence score.
+    :param approved: True when metadata records a human approval.
+    :param action_requests: Pre-planned concrete mutating actions,
+        if planning inference ran, else None.
 
-    Returns:
-        The ``needs_human_review`` result dict when the task must
+    :return:        The ``needs_human_review`` result dict when the task must
         pause, else None to let execution proceed.
     """
     if not verdict.needs_human_review:

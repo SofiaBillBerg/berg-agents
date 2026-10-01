@@ -12,7 +12,7 @@ Two layers: short-term thread state (checkpoints persist messages, step, and pen
 
 ## Can I use a cloud LLM instead of Ollama?
 
-Yes — add any OpenAI-compatible endpoint under `providers` in `config/bergagents.jsonc`:
+Yes - add any OpenAI-compatible endpoint under `providers` in `config/bergagents.jsonc`:
 
 ```jsonc
 "providers": {
@@ -23,11 +23,11 @@ Yes — add any OpenAI-compatible endpoint under `providers` in `config/bergagen
 }
 ```
 
-The provider is derived **from the model id** — there is no global provider flag. Switch at runtime via the web model selector. See [Configuration](CONFIGURATION.qmd).
+The provider is derived **from the model id** - there is no global provider flag. Switch at runtime via the web model selector. See [Configuration](CONFIGURATION.qmd).
 
 ## What happens if the LLM server is not running?
 
-The adapter call raises, the loop captures it as a `RunError` event, and the surface renders the failure inline — TUI panel, web error state, or `{"status": "failed", "error": ...}` from the API. Check the provider is reachable at its `baseURL`, then retry.
+The adapter call raises, the loop captures it as a `RunError` event, and the surface renders the failure inline - TUI panel, web error state, or `{"status": "failed", "error": ...}` from the API. Check the provider is reachable at its `baseURL`, then retry.
 
 ## Is it safe to let the agent edit my files?
 
@@ -37,9 +37,9 @@ Guardian assesses risk × complexity × confidence against `hitl_rules` (`auto_e
 
 Wrap a function with `make_tool_spec` and register it in the `ToolRegistry` (capabilities flow through `tool_to_capability`). New subagents implement `AbstractAgent` and register via `app.register_agent(name, agent)`.
 
-## The TUI shows `(no text response)` — what does that mean?
+## The TUI shows `(no text response)` - what does that mean?
 
-The model finished without text (e.g. it only called tools, or returned empty content). It is the honest placeholder, not an error — the tool results are still shown.
+The model finished without text (e.g. it only called tools, or returned empty content). It is the honest placeholder, not an error - the tool results are still shown.
 
 ## How do I configure MCP servers?
 

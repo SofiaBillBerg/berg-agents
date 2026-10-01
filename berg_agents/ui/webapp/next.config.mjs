@@ -15,7 +15,7 @@ const nextConfig = {
   distDir: "./dist",
   reactStrictMode: false,
   turbopack: {
-    // Project root — prevents Next.js from using /home/nvidia as root
+    // Project root - prevents Next.js from using /home/nvidia as root
     root: import.meta.dirname,
     resolveAlias: {}},
   allowedDevOrigins: ["localhost", "127.0.0.1"],
@@ -65,7 +65,7 @@ const nextConfig = {
         protocol: "http",
         hostname: "localhost"}]},
 
-  // ESLint configuration — moved to .eslintrc.json for Next.js 16 compatibility
+  // ESLint configuration - moved to .eslintrc.json for Next.js 16 compatibility
   // eslint config now in separate file
 };
 

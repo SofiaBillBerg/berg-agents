@@ -2,7 +2,7 @@
 #
 # Loaded by the /api/chat/stream endpoint via Agent.from_file().
 # All model/provider configuration lives in config/bergagents.jsonc
-# (the "providers" block) — this spec only declares which model
+# (the "providers" block) - this spec only declares which model
 # to use by default. The model string is resolved against the
 # provider registry at runtime.
 #

@@ -92,7 +92,7 @@ export function LearningPanel({ stats, compact = false }: LearningPanelProps) {
           </Card.Header>
           <Card.Content>
             <Card.Description>
-              Nothing learned yet — run a task and this panel will show what
+              Nothing learned yet - run a task and this panel will show what
               worked, per task type and model.
             </Card.Description>
           </Card.Content>

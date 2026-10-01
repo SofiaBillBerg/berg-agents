@@ -1,5 +1,5 @@
 /*
- * Agents page — dedicated view for registered agents and their details.
+ * Agents page - dedicated view for registered agents and their details.
  * Fetches agent list from /api/agents on the client.
  */
 
@@ -15,7 +15,7 @@ import { AgentPanel } from "../components/AgentPanel.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 
 /**
- * AgentsPage — client component that fetches and displays all registered
+ * AgentsPage - client component that fetches and displays all registered
  * agents. Shows a spinner while loading and an empty state if no agents.
  */
 export default function AgentsPage() {
@@ -79,7 +79,7 @@ export default function AgentsPage() {
       <div className="p-4 max-w-[95vw] mx-auto">
         <h1 className="text-2xl font-bold mb-4">Registered Agents</h1>
         <p className="text-sm text-muted-foreground mb-4">
-          {agents.length} agent(s) available — each handles different task types
+          {agents.length} agent(s) available - each handles different task types
           via the BergAgents harness pipeline.
         </p>
         <AgentPanel agents={agents} activeAgent={null} />

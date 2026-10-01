@@ -1,8 +1,8 @@
-"""Complexity routing — single source for complexity → model.
+"""Complexity routing - single source for complexity → model.
 
 Single axis: task complexity levels (trivial/standard/complex/critical)
 map directly onto models. There are no separate "small/medium/large"
-tiers — that parallel vocabulary is deleted. Every caller
+tiers - that parallel vocabulary is deleted. Every caller
 (`agents/implementation`, `agents/planner`, `core/harness`,
 `profiles/router`) imports from here.
 """

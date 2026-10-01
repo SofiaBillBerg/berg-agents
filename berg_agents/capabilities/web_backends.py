@@ -5,26 +5,27 @@ one returns content. Each backend declares the env var gating it
 (``None`` = always available) plus ``search``/``fetch`` callables that
 return ``str`` on success or ``None`` to pass to the next backend:
 
-- ``ollama`` — Ollama's ``/api/web_search`` + ``/api/web_fetch`` REST
+- ``ollama`` - Ollama's ``/api/web_search`` + ``/api/web_fetch`` REST
   endpoints (needs ``OLLAMA_API_KEY``).
-- ``duckduckgo`` — in-process DuckDuckGo search (no key; needs the
+- ``duckduckgo`` - in-process DuckDuckGo search (no key; needs the
   ``duckduckgo`` extra). Search only.
-- ``direct`` — plain HTTPS fetch + markdownify (no key). Fetch only.
+- ``direct`` - plain HTTPS fetch + markdownify (no key). Fetch only.
 
 Order comes from ``settings.web_search_backends``
 (``BERG_AGENT_WEB_SEARCH_BACKENDS``, default
 ``["ollama", "duckduckgo"]`` for search and the fetch-capable subset
-thereof for fetch). Add, remove, or reorder providers in config —
+thereof for fetch). Add, remove, or reorder providers in config -
 the chain adapts without code changes. Unknown names are skipped
 with a warning.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 import logging
 import os
-from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,11 @@ _MAX_SNIPPET_CHARS = 600
 
 
 def _env(name: str) -> str:
-    """Read an env var fresh, ensuring the root .env was loaded first."""
+    """Read an env var fresh, ensuring the root .env was loaded first.
+
+    :param name: Env var name.
+    :return: Env var value (empty string if unset).
+    """
     value = os.getenv(name, "").strip()
     if value:
         return value
@@ -70,14 +75,18 @@ def _ollama_search(query: str, max_results: int) -> str | None:
     lines = []
     for i, r in enumerate(results[:max_results], start=1):
         lines.append(
-            f"{i}. {r.get('title') or 'untitled'} — {r.get('url', '')}\n"
+            f"{i}. {r.get('title') or 'untitled'} - {r.get('url', '')}\n"
             f"   {(r.get('content', '') or '').strip()[:_MAX_SNIPPET_CHARS]}"
         )
     return "\n".join(lines)
 
 
 def _ollama_fetch(url: str) -> str | None:
-    """Ollama-index page fetch; ``None`` when unusable."""
+    """Ollama-index page fetch; ``None`` when unusable.
+
+    :param url: Page URL to fetch.
+    :return: Markdownified page content, or None on failure.
+    """
     import httpx
 
     key = _env("OLLAMA_API_KEY")
@@ -98,7 +107,12 @@ def _ollama_fetch(url: str) -> str | None:
 
 
 def _duckduckgo_search(query: str, max_results: int) -> str | None:
-    """In-process DuckDuckGo search; ``None`` on failure."""
+    """In-process DuckDuckGo search; ``None`` on failure.
+
+    :param query: Search query string.
+    :param max_results: Max results wanted (clamped to 1-10).
+    :return: Formatted search results, or None on failure.
+    """
     from ddgs import DDGS
 
     hits = DDGS().text(query, max_results=max_results) or []
@@ -107,7 +121,7 @@ def _duckduckgo_search(query: str, max_results: int) -> str | None:
     lines = []
     for i, h in enumerate(hits[:max_results], start=1):
         lines.append(
-            f"{i}. {h.get('title') or 'untitled'} — {h.get('href', '')}\n"
+            f"{i}. {h.get('title') or 'untitled'} - {h.get('href', '')}\n"
             f"   {(h.get('body', '') or '').strip()[:_MAX_SNIPPET_CHARS]}"
         )
     return "\n".join(lines)
@@ -136,17 +150,23 @@ class WebBackend:
     fetch: Callable[[str], str | None] | None = None
 
 
-#: Registry — data, not branches. Add providers here; select via config.
+#: Registry - data, not branches. Add providers here; select via config.
 BACKENDS: dict[str, WebBackend] = {
     "ollama": WebBackend(
-        name="ollama", key_var="OLLAMA_API_KEY",
-        search=_ollama_search, fetch=_ollama_fetch,
+        name="ollama",
+        key_var="OLLAMA_API_KEY",
+        search=_ollama_search,
+        fetch=_ollama_fetch,
     ),
     "duckduckgo": WebBackend(
-        name="duckduckgo", key_var=None, search=_duckduckgo_search,
+        name="duckduckgo",
+        key_var=None,
+        search=_duckduckgo_search,
     ),
     "direct": WebBackend(
-        name="direct", key_var=None, fetch=_direct_fetch,
+        name="direct",
+        key_var=None,
+        fetch=_direct_fetch,
     )}
 
 DEFAULT_BACKEND_ORDER = ["ollama", "duckduckgo", "direct"]
@@ -170,16 +190,19 @@ def _ordered_backends(
 
 
 def make_web_search(order: list[str] | None = None) -> Callable[..., str]:
-    """Build a ``query``/``max_results`` search function over backends."""
+    """Build a ``query``/``max_results`` search function over backends.
 
+    :param order: List of backend names to use, in order.
+    :return: A search function.
+    """
     backends = _ordered_backends(order, kind="search")
 
     def web_search(query: str, max_results: int = 5) -> str:
         """Search the web across the configured backends, in order.
 
-        Args:
-            query: Search query string.
-            max_results: Max results wanted (clamped to 1-10).
+        :param query: Search query string.
+        :param max_results: Max results wanted (clamped to 1-10).
+        :return: Formatted search results, or a message if none found.
         """
         try:
             clamped = max(1, min(int(max_results), 10))
@@ -204,7 +227,8 @@ def make_web_search(order: list[str] | None = None) -> Callable[..., str]:
             + (
                 ""
                 if any(
-                    (BACKENDS[n].key_var or "") and _env(BACKENDS[n].key_var or "")
+                    (BACKENDS[n].key_var or "")
+                    and _env(BACKENDS[n].key_var or "")
                     for n in attempted
                     if n in BACKENDS
                 )
@@ -219,14 +243,13 @@ def make_web_search(order: list[str] | None = None) -> Callable[..., str]:
 
 def make_web_fetch(order: list[str] | None = None) -> Callable[..., str]:
     """Build a ``url`` fetch function over backends."""
-
     backends = _ordered_backends(order, kind="fetch")
 
     def web_fetch(url: str) -> str:
         """Fetch one page across the configured backends, in order.
 
-        Args:
-            url: Page URL to fetch.
+        :param url: Page URL to fetch.
+        :return: Markdownified page content, or a message if none found.
         """
         attempted: list[str] = []
         for backend in backends:

@@ -10,7 +10,7 @@ export interface PaletteCommand {
 }
 
 interface SlashCommandAutocompleteProps {
-  /** Commands to offer (e.g. [{name: '/help', description: '…'}]) */
+  /** Commands to offer (e.g. [{name: '/help', description: '...'}]) */
   commands: PaletteCommand[];
   /** Called with the chosen command */
   onSelect: (command: PaletteCommand) => void;
@@ -19,7 +19,7 @@ interface SlashCommandAutocompleteProps {
 /**
  * Minimal slash-command palette: a filter box plus one button per
  * matching command. Rendered by the parent only while the input
- * starts with "/". Plain HeroUI Button/Card — no Command primitives.
+ * starts with "/". Plain HeroUI Button/Card - no Command primitives.
  */
 export const SlashCommandAutocomplete = ({
   commands,
@@ -39,7 +39,7 @@ export const SlashCommandAutocomplete = ({
         <input
           aria-label="Filter commands"
           className="bg-transparent text-sm px-2 py-1 outline-none"
-          placeholder="Type to filter…"
+          placeholder="Type to filter..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />

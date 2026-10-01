@@ -9,7 +9,7 @@ Design goals
 1. **Framework agnostic.** The BergAgents runtime
    must not silently pull in framework code.  The grep gate in
    ``tests/test_core_checkpoint.py`` enforces this.
-2. **Pure data on disk.** A snapshot is a JSON-serializable ``dict`` —
+2. **Pure data on disk.** A snapshot is a JSON-serializable ``dict`` -
    no Python objects, no class references, no class-bound methods.  The
    loop is responsible for producing it (it can copy any tool
    ``ToolSpec`` by serializing its ``params``); the checkpoint store
@@ -49,7 +49,7 @@ class Checkpointer(Protocol):
     """Pluggable persistence for one thread's state.
 
     Implementations MUST be safe to call from multiple threads.  The
-    snapshot is opaque to the store — it is whatever the loop decided
+    snapshot is opaque to the store - it is whatever the loop decided
     to write.  Implementations MUST round-trip every value the loop is
     likely to write (str, int, float, bool, None, list, dict, nested
     combos of the above).
@@ -100,7 +100,7 @@ class InMemoryCheckpointer:
     same thread may safely call ``put`` then ``get`` without deadlocking.
     Useful for tests, short-lived CLI runs, and the default
     ``build_berg_agents`` configuration.  Not durable across process
-    restarts — see :class:`FileCheckpointer` for that.
+    restarts - see :class:`FileCheckpointer` for that.
     """
 
     def __init__(self) -> None:

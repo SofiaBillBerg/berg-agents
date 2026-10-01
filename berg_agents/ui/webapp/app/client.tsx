@@ -40,12 +40,12 @@ export function ClientOnly() {
   }, []);
 
   if (!mounted) {
-    return <div className="p-8 text-sm">Loading chat…</div>;
+    return <div className="p-8 text-sm">Loading chat...</div>;
   }
 
   return (
     <ErrorBoundary>
-      <Suspense fallback={<div className="p-8 text-sm">Loading chat…</div>}>
+      <Suspense fallback={<div className="p-8 text-sm">Loading chat...</div>}>
         <App />
       </Suspense>
     </ErrorBoundary>

@@ -1,0 +1,102 @@
+---
+title: "Tutorial - Adding an MCP Server"
+author: "Your Name"
+format: html
+---
+
+# Tutorial - Adding an MCP Server
+
+> MCP (Model-Control-Protocol) lets BergAgents call external tools (e.g., GitHub, file-system utilities, databases) in a sandboxed, auditable way.
+
+## 1️⃣ Install the MCP client dependency
+
+```bash
+uv pip install "berg_agents[mcp]"
+```
+
+> The extra installs `pydantic-mcp` and the transport adapters.
+
+## 2️⃣ Create an MCP configuration file
+
+Create `config/mcp.jsonc` (the `.c` extension signals JSONC, which supports comments).
+
+```jsonc
+{
+  "github__search": {
+    "type": "stdio",
+    "command": "gh",
+    "args": ["repo", "search", "--json", "name,full_name,description"]
+  },
+  "fs__read": {
+    "type": "stdio",
+    "command": "cat",
+    "args": ["{file_path}"]
+  }
+}
+```
+
+- **`github__search`** - a name that will appear as a tool called `mcp_github__search` inside BergAgents.  
+- **`type: "stdio"`** - tells BergAgents to launch the command as a standard-I/O process.  
+- **`args`** can contain placeholders like `{file_path}` that BergAgents substitutes at runtime.
+
+## 3️⃣ Reference the MCP config from the environment
+
+Add (or extend) the `BERG_AGENT_MCP_SERVERS` env var, pointing to the config file:
+
+```bash
+export BERG_AGENT_MCP_SERVERS=$(pwd)/config/mcp.jsonc
+```
+
+You can also put the path in a `.env` file:
+
+```
+BERG_AGENT_MCP_SERVERS=./config/mcp.jsonc
+```
+
+## 4️⃣ Use the MCP tool from the CLI
+
+```bash
+# Search for repos whose name contains "BergAgents"
+python -m berg_agents \
+    --task "Search GitHub for repos named 'BergAgents'" \
+    --mcp-tool "github__search" \
+    --mcp-args '{"query": "BergAgents"}'
+```
+
+The backend will:
+
+1. Spawn the `gh` process.  
+2. Pass the JSON payload to its stdin.  
+3. Capture stdout, parse the JSON, and return the result to the agent.
+
+You can achieve the same from the **web UI**: open the **Tools** panel, click **MCP**, choose the server, then invoke `github__search` with a JSON payload.
+
+## 5️⃣ Using the tool inside a custom agent
+
+```python
+from berg_agents.agents.base import BaseAgent
+from berg_agents.core.loop import LoopEvents
+
+class GithubSearcher(BaseAgent):
+    async def run(self, event: LoopEvents) -> None:
+        # `event.payload` contains the parsed args dict from the harness
+        query = event.payload.get("query", "berg_agents")
+        # Call the pre-registered MCP tool
+        result = await self.call_tool("github__search", {"query": query})
+        await self.emit("search_result", {"matches": result})
+```
+
+Register `GithubSearcher` the same way as in the **Custom Agent** tutorial, then you can invoke it from any task.
+
+---
+
+## Tips & Gotchas
+
+- **Tool name collision** - the tool name must be unique across all tools (including built-in ones).  
+- **Timeouts** - MCP tools run inside a sandbox; if they exceed the default 30 s they will be terminated and the agent receives a `ToolTimeout` event.  
+- **Security** - the sandbox restricts file system access to the workspace root (`/workspace/`). Paths outside are rejected.  
+- **Debugging** - set `export BERG_DEBUG_MCP=true` to see the raw stdio conversation in the terminal.
+
+---
+
+Now you can extend BergAgents with any external command-line tool or HTTP-based MCP server, giving you access to the whole ecosystem of developer utilities without leaving the Harness. 🚀

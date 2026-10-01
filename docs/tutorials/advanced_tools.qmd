@@ -1,0 +1,123 @@
+---
+title: "Tutorial - Advanced Tool Usage"
+author: "Your Name"
+format: html
+---
+
+# Tutorial - Advanced Tool Usage
+
+> This guide shows how to combine multiple built-in tools in a single task, share context between tools, and create richer workflows.
+
+## 1️⃣ Tool invocation basics
+
+Each tool is exposed as a **MCP-style** endpoint that can be called from the Harness, from a custom agent, or from the CLI using a special `--tool` flag.
+
+```bash
+# Read a file (built-in file tool)
+python -m berg_agents \
+    --task "Read src/utils.py" \
+    --tool "fs__read" \
+    --tool-args '{"path": "src/utils.py"}'
+```
+
+- **`fs__read`** - the tool name registered under `berg_agents.tools._io`.
+- **`--tool`** - tells the Harness which registered tool to execute.  
+- **`--tool-args`** - JSON arguments passed to the tool.
+
+You can chain tools by letting one tool emit an event that another tool consumes. This is the core of "advanced usage".
+
+## 2️⃣ Sharing context with `set_variable` and `get_variable`
+
+The Harness provides a **key-value store** that lives for the duration of a thread (session). Use it to pass data between unrelated tools.
+
+```bash
+# Store the result of a search in a variable called 'search_results'
+python -m berg_agents \
+    --task "Search for 'BergAgents' in the repo" \
+    --tool "mcp_github__search" \
+    --tool-args '{"query":"BergAgents"}' \
+    --set-variable search_results="{{result}}"
+```
+
+Later in the same thread:
+
+```bash
+# Retrieve the stored variable and use it as input to a summarizer tool
+python -m berg_agents \
+    --task "Summarize the GitHub search results" \
+    --tool "summarize_text" \
+    --tool-args '{"text":"{{search_results}}"}' \
+    --set-variable summary="{{result}}"
+```
+
+The `{{result}}` placeholder is replaced with the **previous tool's output** automatically by the runtime.
+
+## 3️⃣ Using `execute_subtask` to embed a mini-pipeline
+
+If you need more orchestration than a simple chain, you can embed a **sub-task** that runs a full Harness loop inside the larger task.
+
+```bash
+python -m berg_agents \
+    --task "Refactor authentication code" \
+    --tool "execute_subtask" \
+    --tool-args '{
+        "subtask_description": "Add rate-limit decorator",
+        "task_type": "implementation",
+        "preferred_complexity": "medium",
+        "agent_override": {"name": "implementation_agent", "preferred_complexity": 1}
+    }'
+```
+
+- **`execute_subtask`** creates a **new nested thread** that goes through the full Guardian → Planner → Implementation → Curator cycle.  
+- The parent task can capture its result via `--set-variable` or stop it with a HITL pause.
+
+## 4️⃣ Combining multiple built-in tools in one command
+
+You can dispatch several tools sequentially by invoking the Harness multiple times in a single line. This is handy for quick experiments.
+
+```bash
+python -m berg_agents \
+    --task "Refactor utils.py and write tests" \
+    --tool "fs__write" \
+    --tool-args '{"path":"src/utils_refactored.py","content":"# Refactored ..."}' \
+    --set-variable refactored_content="{{result}}" \
+    --tool "fs__write" \
+    --tool-args '{"path":"tests/test_utils.py","content":"import pytest\\nfrom utils import foo\\n\\ndef test_foo(): ..."}' \
+    --set-variable test_content="{{result}}"
+```
+
+In practice, you would probably write a **custom task** that wraps these steps, but the CLI demo illustrates the concept.
+
+## 5️⃣ Example: End-to-End "Documentation Generator"
+
+Suppose you want to automatically generate a markdown doc for every new public function.
+
+```bash
+python -m berg_agents \
+    --task "Generate docs for new function `process_data`" \
+    --tool "fs__read" \
+    --tool-args '{"path":"src/process_data.py"}' \
+    --set-variable source_code="{{result}}" \
+    --tool "generate_markdown" \
+    --tool-args '{"template":"doc_template.md","variables":{"CODE":"{{source_code}}"}}' \
+    --tool "fs__write" \
+    --tool-args '{"path":"docs/generated/${NOW}.md","content":"{{result}}"}' \
+    --set-variable generated_path="{{result}}"
+```
+
+- **`generate_markdown`** is a placeholder for a tool you can implement that takes a code snippet and spits out a markdown definition.  
+- `${NOW}` is a special macro expanded by the runtime to a timestamp.
+
+## 6️⃣ Tips for robust multi-tool workflows
+
+| Tip | Why it matters |
+|-----|----------------|
+| **Always emit a unique event name** (e.g., `review_done`, `summary_generated`) | Prevents name collisions when multiple agents emit events simultaneously. |
+| **Validate input before calling a mutating tool** | Avoid accidental overwrites; use Guardian risk assessment to pause before destructive ops. |
+| **Limit nested subprocess depth** (Harness enforces `max_steps`; keep it low for safety) | Prevent runaway loops and DoS inside the sandbox. |
+| **Inspect `--tool` output length** | Long outputs may be truncated; if you need full output, write to a temporary file first and read it back. |
+| **Use `--set-variable` for debugging** | You can later view all stored variables via `/debug-vars` in the TUI. |
+
+---
+
+With these patterns you can build sophisticated pipelines that span file I/O, code generation, external APIs, and human approvals-all within the safe, audited sandbox that BergAgents provides. Happy chaining! 🎛️

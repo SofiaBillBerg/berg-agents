@@ -36,7 +36,7 @@ export interface ProviderData {
 
 /**
  * Switch the active LLM provider and model.
- * Calls the backend API via apiFetch — in production this hits the FastAPI
+ * Calls the backend API via apiFetch - in production this hits the FastAPI
  * proxy endpoint; in dev mode it can be upgraded to a true Server Action.
  */
 export async function switchProvider(

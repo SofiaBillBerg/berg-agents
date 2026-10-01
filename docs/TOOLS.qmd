@@ -22,7 +22,7 @@ The workspace root mounts at `/workspace/`; path normalization blocks escapes (`
 
 ## Capabilities
 
-`berg_agents/capabilities/tool_adapter.py:tool_to_capability()` wraps a `ToolSpec` as a `Capability` (kebab-case id, intent from description, input model from params) so tools dispatch through the standard audited envelope flow. Risk is inferred — sensitive MCP servers and explicit `risk_class` win, read-only name hints (`read`, `search`, `lookup`, `list`, `get`, …) map to low, everything else is medium.
+`berg_agents/capabilities/tool_adapter.py:tool_to_capability()` wraps a `ToolSpec` as a `Capability` (kebab-case id, intent from description, input model from params) so tools dispatch through the standard audited envelope flow. Risk is inferred - sensitive MCP servers and explicit `risk_class` win, read-only name hints (`read`, `search`, `lookup`, `list`, `get`, ...) map to low, everything else is medium.
 
 Custom subagents implement `AbstractAgent` and register via `app.register_agent(name, agent)`.
 

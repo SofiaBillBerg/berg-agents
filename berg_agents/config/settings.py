@@ -122,7 +122,7 @@ def ensure_env_loaded() -> None:
     Reads only the repo-root ``.env`` (the single centralized env
     file); it never overrides a variable the process environment
     already defines, so explicit exports always win. This is the
-    only place that mutates :data:`os.environ` from files — the
+    only place that mutates :data:`os.environ` from files - the
     settings sources themselves read files without side effects.
 
     Also derives ``OLLAMA_BASE_URL`` from the
@@ -162,18 +162,18 @@ RULES:
 - Do not write long essays. Give concise, actionable answers.
 - For questions clearly outside filesystem/code tasks, reply directly.
 
-TOOL SELECTION (complete inventory — the agent has exactly these tools):
-- list_files: list a directory's contents (call this first to explore — use the exact paths it returns)
+TOOL SELECTION (complete inventory - the agent has exactly these tools):
+- list_files: list a directory's contents (call this first to explore - use the exact paths it returns)
 - read_file: inspect file contents (files only, never directories)
 - search_code: find text across the codebase (literal match, e.g. definitions, references, error strings)
-- bash: run shell commands — tests, builds, linters, inspection (e.g. "pytest -q", "ls"). Has a timeout; output is truncated. All shell needs go through bash.
+- bash: run shell commands - tests, builds, linters, inspection (e.g. "pytest -q", "ls"). Has a timeout; output is truncated. All shell needs go through bash.
 - write_file: create a new file or overwrite an existing one
 - edit_file: replace the contents of an existing file
 - run_task: delegate complex multi-step work (planning, refactors, analysis)
   to the full harness pipeline (planner, guardian review, implementation)
 
 If a task seems to need anything outside this list, use run_task for
-multi-step work — or say plainly it cannot be done with the available
+multi-step work - or say plainly it cannot be done with the available
 tools. Calls to unknown tool names fail; on failure, continue with a
 tool from the list above.
 
@@ -231,6 +231,11 @@ class JsoncConfigSettingsSource(JsonConfigSettingsSource):
     """
 
     def _read_file(self, file_path: Path | Traversable) -> dict[str, Any]:
+        """Read the JSONC file and return a dict of settings.
+
+        :param file_path: Path to the JSONC file.
+        :return: Dictionary of settings.
+        """
         with file_path.open(encoding=self.json_file_encoding) as jsonc_file:
             raw = jsonc_loads(jsonc_file.read())
         expanded = _expand_env_vars(raw, _load_substitution_env())
@@ -282,6 +287,11 @@ class EnvExpandingYamlConfigSettingsSource(YamlConfigSettingsSource):
     """
 
     def _read_file(self, file_path: Path | Traversable) -> dict[str, Any]:
+        """Read the YAML file and expand ``${env:VAR}`` / ``${VAR}`` placeholders.
+
+        :param file_path: Path to the YAML file.
+        :return: Dictionary of settings with placeholders expanded.
+        """
         import yaml
 
         with file_path.open(encoding=self.yaml_file_encoding) as yaml_file:
@@ -415,7 +425,7 @@ class Settings(BaseSettings):
     #: Declared directly in ``config/bergagents.jsonc`` as a ``providers``
     #: block. Each provider carries connection ``options`` (baseURL,
     #: apiKey, ...) and a ``models`` map. The provider is derived from the
-    #: selected model id — see :mod:`berg_agents.providers.registry`.
+    #: selected model id - see :mod:`berg_agents.providers.registry`.
     providers: dict[str, Any] | None = None
 
     #: Default model id (must be declared under a provider's ``models`` map).
@@ -460,7 +470,7 @@ class Settings(BaseSettings):
     #: ``"duckduckgo"`` (in-process search, no key), ``"direct"``
     #: (plain HTTPS fetch, no key). Unknown names are skipped with a
     #: warning. ``None`` (default) means
-    #: ``["ollama", "duckduckgo", "direct"]`` — each capability only
+    #: ``["ollama", "duckduckgo", "direct"]`` - each capability only
     #: uses the backends supporting its operation. Maps to
     #: ``BERG_AGENT_WEB_SEARCH_BACKENDS`` (JSON array of strings).
     web_search_backends: list[str] | None = None
@@ -516,7 +526,7 @@ class Settings(BaseSettings):
 
     # Memory backend and autosave hook.
     # Autosave is off by default: MemPalace is for manual,
-    # deliberate KG facts the agent chooses to record — never
+    # deliberate KG facts the agent chooses to record - never
     # an automatic per-task log (diary entries or otherwise).
     memory_backend: str = "mempalace"
     memory_autosave: bool = False

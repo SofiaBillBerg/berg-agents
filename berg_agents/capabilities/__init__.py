@@ -1,4 +1,4 @@
-"""Capability layer — tool routing and catalog.
+"""Capability layer - tool routing and catalog.
 
 Only :class:`ToolCatalog` is actively used (by the harness routing layer).
 The old capability-registry / envelope / audit / tool-adapter modules were

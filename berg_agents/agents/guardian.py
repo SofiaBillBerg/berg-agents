@@ -3,7 +3,7 @@
 The Guardian is the gatekeeper of the human-AI balance
 principle. It decides when human-in-the-loop review is
 needed based on task complexity, risk level, and model
-confidence — never "AI does everything".
+confidence - never "AI does everything".
 
 The Guardian's behavior is defined here, in this module:
 
@@ -330,7 +330,7 @@ def build_guardian_agent(
     """Build the Guardian Pydantic AI agent.
 
     The model is always an explicit OpenAI-compatible instance
-    built by :func:`resolve_model_instance` — never a bare id —
+    built by :func:`resolve_model_instance` - never a bare id -
     so provider, base URL, and key resolve from the model.
 
     Args:

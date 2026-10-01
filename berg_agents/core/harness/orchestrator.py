@@ -1,4 +1,4 @@
-"""Harness orchestrator — the deterministic engine (split from harness.py).
+"""Harness orchestrator - the deterministic engine (split from harness.py).
 
 Imports inference and routing helpers from sibling modules. Keeps the public
 `Harness` API identical so `from berg_agents.core.harness import Harness` still works.
@@ -78,17 +78,16 @@ class Harness:
     ) -> None:
         """Initialize the harness.
 
-        Args:
-            enable_learning: Record outcomes via LearningGate.
-            enable_inference: Allow synchronous model
+        :param enable_learning: Record outcomes via LearningGate.
+        :param enable_inference: Allow synchronous model
                 inference on this instance. Approved resumes
                 and ungated runs both call the model when True;
                 the default False keeps offline runs on
                 deterministic templates with
                 ``inference_attempted=False``.
-            hitl_gates: HITL task-type gate overrides; module
+        :param hitl_gates: HITL task-type gate overrides; module
                 defaults apply when None.
-            model_cfg: Config override for model resolution;
+        :param model_cfg: Config override for model resolution;
                 live settings apply when None.
         """
         self._enable_learning = enable_learning
@@ -162,24 +161,22 @@ class Harness:
         built read-only, so a mutating request without execution
         keywords cannot silently change files.
 
-        Args:
-            task: Original task mapping for agent selection.
-            task_type: Task type label.
-            description: Human-readable task description.
-            complexity: Routed complexity.
-            metadata: Normalized task metadata mapping.
-            resolved_id: Caller thread id.
-            verdict: Guardian review verdict (risk reporting only).
-            confidence: Routing confidence score.
-            planner_score: Planner self-assessment score.
-            impl_score: Implementation confidence score.
+        :param task: Original task mapping for agent selection.
+        :param task_type: Task type label.
+        :param description: Human-readable task description.
+        :param complexity: Routed complexity.
+        :param metadata: Normalized task metadata mapping.
+        :param resolved_id: Caller thread id.
+        :param verdict: Guardian review verdict (risk reporting only).
+        :param confidence: Routing confidence score.
+        :param planner_score: Planner self-assessment score.
+        :param impl_score: Implementation confidence score.
 
-        Returns:
-            Completed result dict when the bypass applies,
+        :return: Completed result dict when the bypass applies,
             else None to continue normal routing.
         """
         if _task_plans_mutation(task_type, description):
-            # Send to planner — never hardcode file paths; planner decides from user's request
+            # Send to planner - never hardcode file paths; planner decides from user's request
             planned = self._plan_mutating_actions(
                 task_type=task_type,
                 description=description,
@@ -219,7 +216,7 @@ class Harness:
                     + description
                 ]}
         if not self._wants_inference(metadata):
-            # Must plan concrete actions with real paths — not echo request
+            # Must plan concrete actions with real paths - not echo request
             planned = self._plan_mutating_actions(
                 task_type=task_type,
                 description=description,
@@ -325,13 +322,11 @@ class Harness:
         are all read-only, so conversation proceeds while
         mutating tool calls still pause.
 
-        Args:
-            task: Mapping with ``description``, ``task_type``,
+        :param task: Mapping with ``description``, ``task_type``,
                 and optional ``metadata`` keys.
-            task_id: Caller thread id; generated when None.
+        :param task_id: Caller thread id; generated when None.
 
-        Returns:
-            Result dict with ``status`` ``completed`` or
+        :return: Result dict with ``status`` ``completed`` or
             ``needs_human_review`` plus stage outputs.
             ``model`` names the actually-run model: the
             ``model_run.model_id`` when task metadata carries
@@ -392,7 +387,7 @@ class Harness:
             return bypassed
         # Plan-then-gate: before pausing a mutating task for
         # human review, ask the model (read-only, nothing is
-        # executed) to declare the concrete actions it intends —
+        # executed) to declare the concrete actions it intends -
         # real file paths instead of the ToolCatalog placeholder
         # echo. The HITL card then shows what will truly happen,
         # and approve/edit operate on real arguments.
@@ -563,11 +558,9 @@ class Harness:
         ``metadata["run_model"]``. The gate path returns
         before this is consulted, so gated tasks never infer.
 
-        Args:
-            metadata: Normalized task metadata mapping.
+        :param metadata: Normalized task metadata mapping.
 
-        Returns:
-            True when the implementation agent should run.
+        :return:        True when the implementation agent should run.
         """
         if self._enable_inference:
             return True
@@ -584,21 +577,19 @@ class Harness:
         """Ask the model (read-only) what mutating actions it intends.
 
         Runs a planning inference with no mutating tools registered:
-        the model declares its concrete tool calls — real file paths
-        and a one-line summary — as a JSON array. The caller shows
+        the model declares its concrete tool calls - real file paths
+        and a one-line summary - as a JSON array. The caller shows
         these on the HITL card so the human approves the *actual*
         plan, not a placeholder echo of their request. On any
         failure this returns None and the gate falls back to the
         deterministic placeholder actions.
 
-        Args:
-            description: Task description for the prompt.
-            task_type: Task type for deps.
-            complexity: Routed complexity driving the model.
-            metadata: Task metadata carrying any model override.
+        :param description: Task description for the prompt.
+        :param task_type: Task type for deps.
+        :param complexity: Routed complexity driving the model.
+        :param metadata: Task metadata carrying any model override.
 
-        Returns:
-            Normalized action list ``[{"action": name,
+        :return:        Normalized action list ``[{"action": name,
             "args": {...}}, ...]``, or None when planning failed.
         """
         if not self._wants_inference(metadata):
@@ -660,19 +651,18 @@ class Harness:
         ``metadata["requested_model"]`` wins; otherwise the
         complexity default (then the registry default) applies via
         ``build_implementation_agent``. Must run in a
-        synchronous context (CLI, worker thread, tests) —
+        synchronous context (CLI, worker thread, tests) -
         never from a running event loop.
 
-        Args:
-            description: Task description for the prompt.
-            task_type: Task type for deps and prompt.
-            complexity: Routed complexity driving the model.
-            plan: Planner output, if any, for prompt context.
-            steps: Deterministic step templates for context.
-            metadata: Task metadata carrying the override.
 
-        Returns:
-            ``(answer, model_run)`` with displayable answer
+        :param description: Task description for the prompt.
+        :param task_type: Task type for deps and prompt.
+        :param complexity: Routed complexity driving the model.
+        :param plan: Planner output, if any, for prompt context.
+        :param steps: Deterministic step templates for context.
+        :param metadata: Task metadata carrying the override.
+
+        :return:        ``(answer, model_run)`` with displayable answer
             text and run metadata. A final
             ``UnexpectedModelBehavior`` (output validation
             exhausted) falls back to the normalized plain-text
@@ -680,7 +670,7 @@ class Harness:
             callers still complete with ``inference_attempted``
             True and learning recorded.
 
-        Raises:
+        :raises:
             _ModelUnavailableError: On unknown models,
                 build failures, connection/model errors,
                 timeouts, or empty answers.
@@ -701,7 +691,7 @@ class Harness:
                 "You are Berg Agents, a friendly, helpful AI coding assistant and conversational partner. "
                 "Answer the user's question, greeting, or message naturally, clearly, and conversationally. "
                 "Do not execute file changes or use file-editing tools unless specifically requested. "
-                "NEVER generate greetings, salutations, or filler prose — a greeting wastes tokens and "
+                "NEVER generate greetings, salutations, or filler prose - a greeting wastes tokens and "
                 "provides no value. Respond with a single brief acknowledgment, then ask what the user needs."
             )
             if chat_mode
@@ -766,7 +756,7 @@ class Harness:
             answer = _render_answer(_normalize_tool_call_text(str(raw_body)))
             # Ensure retry-exhausted result is visible, not empty
             if not answer.strip():
-                answer = "[Model retry exhausted — no output produced after retries. Check model/connection.]"
+                answer = "[Model retry exhausted - no output produced after retries. Check model/connection.]"
             if not answer.strip():
                 raise _ModelUnavailableError(
                     f"model_unavailable: empty answer from "
@@ -821,13 +811,11 @@ class Harness:
         on curation-typed tasks aside) fall back to the
         default implementation executor per the spec.
 
-        Args:
-            task: Task mapping being routed.
-            planner_score: Precomputed planner confidence.
-            impl_score: Precomputed implementation score.
+        :param task: Task mapping being routed.
+        :param planner_score: Precomputed planner confidence.
+        :param impl_score: Precomputed implementation score.
 
-        Returns:
-            Selected registry name.
+        :return:        Selected registry name.
         """
         scores = {
             "planner": planner_score,
@@ -844,14 +832,11 @@ class Harness:
     def get_agent(self, name: str) -> Any:
         """Return one registry entry by name.
 
-        Args:
-            name: Registered agent name.
+        :param name: Registered agent name.
 
-        Returns:
-            The agent facade or catalog card.
+        :return:        The agent facade or catalog card.
 
-        Raises:
-            KeyError: When no agent has that name.
+        :raises KeyError: When no agent has that name.
         """
         try:
             return self._agents[name]
@@ -861,8 +846,7 @@ class Harness:
     def get_agent_info(self) -> list[dict[str, Any]]:
         """List catalog info for all registered agents.
 
-        Returns:
-            Info mappings in registration order.
+        :return: Info mappings in registration order.
         """
         infos: list[dict[str, Any]] = []
         for name, agent in self._agents.items():
@@ -879,17 +863,15 @@ class Harness:
     def register_agent(self, name: str, agent: Any) -> None:
         """Register a custom agent facade.
 
-        Args:
-            name: Registry key for the agent.
-            agent: Agent implementing the contract.
+        :param   name: Registry key for the agent.
+        :param agent: Agent implementing the contract.
         """
         self._agents[name] = agent
 
     def get_learning_stats(self) -> dict[str, Any]:
         """Return learning/outcome statistics.
 
-        Returns:
-            Stats mapping with outcome counters plus
+        :return: Stats mapping with outcome counters plus
             insight and adjustment tallies.
         """
         return self._learning_gate.get_stats()
@@ -898,7 +880,6 @@ class Harness:
     def _new_id() -> str:
         """Generate a short hex id for id-less tasks.
 
-        Returns:
-            12-char hex string.
+        :return: 12-char hex string.
         """
         return uuid.uuid4().hex[:12]

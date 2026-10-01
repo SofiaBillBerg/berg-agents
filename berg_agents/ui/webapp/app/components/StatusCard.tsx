@@ -1,5 +1,5 @@
 /*
- * StatusCard component — HeroUI v3 optimized status indicator using compound components.
+ * StatusCard component - HeroUI v3 optimized status indicator using compound components.
  * Replaces basic status divs with proper Card compound pattern.
  */
 
@@ -38,7 +38,7 @@ export function StatusCard({
   }
 
   // Error state: the last chat request failed (backend down, model
-  // unreachable, tool error). There is no mock/limited mode — say so
+  // unreachable, tool error). There is no mock/limited mode - say so
   // plainly and keep the message so it can be reported.
   return (
     <Card className="mb-4 border-yellow-200" variant="secondary">
@@ -55,7 +55,7 @@ export function StatusCard({
           />
           <span className="text-sm text-yellow-700">
             {isConnected
-              ? "The backend answered with an error — see details below."
+              ? "The backend answered with an error - see details below."
               : "Cannot reach the backend at :8001. Is `uv run berg_agents --web` running?"}
           </span>
           {connectionError && (

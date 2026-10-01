@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 /**
  * ThemeToggle component.
  * Toggles between light and dark themes by switching the `.dark` class and
- * the `data-theme` attribute on <html> — the selectors HeroUI v3 actually
+ * the `data-theme` attribute on <html> - the selectors HeroUI v3 actually
  * reads (see app/globals.css: `.dark, [data-theme="dark"]`).
  * Persisted under the `berg-theme` key, falling back to the legacy
  * `berg-preset` key so existing visitors keep their choice.
@@ -53,7 +53,7 @@ function ThemeToggle() {
     try {
       localStorage.setItem(THEME_KEY, next ? "dark" : "light");
     } catch {
-      // Private-mode storage may throw — the in-memory state still applies.
+      // Private-mode storage may throw - the in-memory state still applies.
     }
     applyTheme(next);
   };

@@ -1,4 +1,4 @@
-"""BergAgents — main application class.
+"""BergAgents - main application class.
 
 This is the primary entry point for the BergAgents system. It wires together:
 - Harness (core engine: guardian → planner → implementation → curator)
@@ -160,11 +160,10 @@ class BergAgentsApp:
     ) -> None:
         """Initialize the BergAgents app.
 
-        Args:
-            harness: Optional custom Harness instance.
-            enable_learning: Whether to enable the learning gate.
-            enable_inference: Whether the default harness may
-                call the model synchronously.
+        :param harness: Optional custom Harness instance.
+        :param enable_learning: Whether to enable the learning gate.
+        :param enable_inference: Whether the default harness may
+            call the model synchronously.
         """
         self.harness = harness or Harness(
             enable_learning=enable_learning,
@@ -175,8 +174,8 @@ class BergAgentsApp:
     def create(cls, config: dict[str, Any] | None = None) -> BergAgentsApp:
         """Factory: create and configure the app.
 
-        Args:
-            config: Optional configuration dict. Keys:
+        :param cls: Class to instantiate (subclassing supported).
+        :param config: Optional configuration dict. Keys:
                 - enable_learning: bool (default True)
                 - enable_inference: bool (default True)
                 - model_routing: models by complexity
@@ -184,8 +183,7 @@ class BergAgentsApp:
                 - agents: per-agent overrides
                   (preferred_complexity)
 
-        Returns:
-            Configured BergAgentsApp instance.
+        :return: Configured BergAgentsApp instance.
         """
         opts = _CreateOptions()
 
@@ -218,9 +216,8 @@ class BergAgentsApp:
     def serve(self, host: str = "0.0.0.0", port: int = 8001) -> None:
         """Start the FastAPI web server.
 
-        Args:
-            host: Host to bind to.
-            port: Port to listen on.
+        :param host: Host to bind to.
+        :param port: Port to listen on.
         """
         from berg_agents.ui.server import create_app
         import uvicorn
@@ -233,12 +230,11 @@ class BergAgentsApp:
     ) -> dict[str, Any]:
         """Execute a task through the harness.
 
-        Args:
-            description: Task description.
-            task_type: Type of task.
 
-        Returns:
-            Execution result dict.
+        :param description: Task description.
+        :param task_type: Type of task.
+
+        :return: Execution result dict.
         """
         task = {"description": description, "task_type": task_type}
         return self.harness.execute_task(task)
@@ -246,17 +242,15 @@ class BergAgentsApp:
     def get_learning_stats(self) -> dict[str, Any]:
         """Get learning/outcome statistics.
 
-        Returns:
-            Dict with outcome stats.
+        :return: Dict with outcome stats.
         """
         return self.harness.get_learning_stats()
 
     def register_agent(self, name: str, agent: Any) -> None:
         """Register a custom agent.
 
-        Args:
-            name: Agent name.
-            agent: Agent instance implementing AbstractAgent.
+        :param name: Agent name.
+        :param agent: Agent instance implementing AbstractAgent.
         """
         self.harness.register_agent(name, agent)
 
@@ -269,7 +263,10 @@ _app_holder: list[BergAgentsApp] = []
 
 
 def get_app() -> BergAgentsApp:
-    """Return the singleton BergAgentsApp instance."""
+    """Return the singleton BergAgentsApp instance.
+
+    :return: BergAgentsApp instance.
+    """
     if not _app_holder:
         _app_holder.append(BergAgentsApp.create())
     return _app_holder[0]

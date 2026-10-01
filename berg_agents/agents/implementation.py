@@ -8,9 +8,6 @@ Model selection resolves the task complexity directly onto a model
 from ``config/bergagents.jsonc`` (``model_routing.models``), formatted
 as a ``provider:model`` string via
 :func:`berg_agents.providers.models.resolve_model_string`.
-
-By design this module imports nothing from LangChain, LangGraph, or
-DeepAgents.
 """
 
 from __future__ import annotations
@@ -156,11 +153,9 @@ def plan_steps_for(task_type: str) -> list[PlanStep]:
     known task types get their dedicated step template, anything
     else falls back to the generic analyze/execute/verify plan.
 
-    Args:
-        task_type: Task type (e.g. ``"edit_file"``).
+    :param task_type: Task type (e.g. ``"edit_file"``).
 
-    Returns:
-        Ordered list of plan steps; never empty.
+    :return: Ordered list of plan steps; never empty.
     """
     # Copy dicts into PlanStep models so callers cannot mutate
     # the module-level templates through the returned list.
@@ -177,12 +172,10 @@ def estimate_confidence(task_type: str, description: str) -> float:
     types score 0.95, descriptions with execution keywords score
     0.7, everything else scores 0.1.
 
-    Args:
-        task_type: Task type string.
-        description: Free-text task description.
+    :param task_type: Task type string.
+    :param description: Free-text task description.
 
-    Returns:
-        Confidence score between 0.0 and 1.0.
+    :return: Confidence score between 0.0 and 1.0.
     """
     # Exact task-type match is the strongest signal.
     if task_type in EXECUTABLE_TASK_TYPES:
@@ -222,7 +215,7 @@ def build_implementation_agent(
         instructions: Optional custom agent instructions override.
         read_only: When True, mutating tools (``write_file``,
             ``edit_file``) are not registered, so the model
-            cannot change files even if it tries — chat-mode
+            cannot change files even if it tries - chat-mode
             runs use this; gated/approved runs keep full tools.
 
     Returns:
@@ -230,7 +223,7 @@ def build_implementation_agent(
     """
     # Explicit model ids bypass routing; otherwise the complexity's
     # model is resolved. The id is then built into an explicit
-    # OpenAI-compatible model instance — config only, no env lookups.
+    # OpenAI-compatible model instance - config only, no env lookups.
     if model_id is None:
         model_id = model_for_complexity(complexity, cfg)
     model = resolve_model_instance(model_id, cfg)
@@ -373,7 +366,7 @@ def build_implementation_agent(
         """List files and subdirectories in a workspace directory.
 
         Use this to explore the project layout before reading
-        files — never guess at paths. Directories end with "/".
+        files - never guess at paths. Directories end with "/".
 
         Args:
             ctx: Run context carrying implementation deps.
@@ -402,9 +395,7 @@ def build_implementation_agent(
             )
         except OSError as exc:
             return f"Could not list {file_path}: {exc}"
-        lines = [
-            f"{p.name}/" if p.is_dir() else p.name for p in entries[:200]
-        ]
+        lines = [f"{p.name}/" if p.is_dir() else p.name for p in entries[:200]]
         extra = (
             f"\n... and {len(entries) - 200} more (listing truncated)"
             if len(entries) > 200
@@ -423,14 +414,12 @@ def build_implementation_agent(
         Use this to run tests, builds, linters, or inspect the
         system. There is no other shell/terminal tool.
 
-        Args:
-            ctx: Run context carrying implementation deps.
-            command: Shell command to run (via ``bash -c``).
-            timeout: Seconds before the command is killed
+        :param ctx: Run context carrying implementation deps.
+        :param command: Shell command to run (via ``bash -c``).
+        :param timeout: Seconds before the command is killed
                 (clamped to 120).
 
-        Returns:
-            Exit code plus combined output (truncated at 8000 chars).
+        :retun:  Exit code plus combined output (truncated at 8000 chars).
         """
         import logging
         import subprocess
@@ -445,7 +434,7 @@ def build_implementation_agent(
         try:
             proc = subprocess.run(
                 command,
-                shell=True,
+                check=False, shell=True,
                 executable="/bin/bash",
                 cwd=root_path,
                 capture_output=True,
@@ -464,8 +453,7 @@ def build_implementation_agent(
         )
         if len(combined) > 8000:
             combined = (
-                combined[:8000]
-                + f"\n... output truncated "
+                combined[:8000] + f"\n... output truncated "
                 f"({len(combined)} chars total)"
             )
         return f"[exit {proc.returncode}]\n{combined}".strip()
@@ -482,13 +470,11 @@ def build_implementation_agent(
         binaries, hidden/vendor dirs, files over 1MB; capped at
         50 hits). Use this instead of guessing file paths.
 
-        Args:
-            ctx: Run context carrying implementation deps.
-            pattern: Literal text to search for (not a regex).
-            directory: Where to search (default: workspace root).
+        :param ctx: Run context carrying implementation deps.
+        :param pattern: Literal text to search for (not a regex).
+        :param directory: Where to search (default: workspace root).
 
-        Returns:
-            ``path:line: text`` hits, or a no-match message.
+        :return: ``path:line: text`` hits, or a no-match message.
         """
         root = ctx.deps.workspace_root or "."
         base = _normalize_target(directory, root)
@@ -553,7 +539,7 @@ def build_implementation_agent(
 
     # Mutating tools are withheld in read-only (chat) mode so
     # the model cannot change files without going through the
-    # harness HITL gate — instructions alone never stop a
+    # harness HITL gate - instructions alone never stop a
     # tool call, missing tools do.
     if not read_only:
 
@@ -565,14 +551,12 @@ def build_implementation_agent(
         ) -> str:
             """Create or overwrite a file in the workspace.
 
-            Args:
-                ctx: Run context carrying implementation deps.
-                file_path: Path to the file, relative to workspace root
-                    or prefixed with /workspace.
-                content: File contents to write.
+            :param ctx: Run context carrying implementation deps.
+            :param file_path: Path to the file, relative to workspace root
+                or prefixed with /workspace.
+            :param content: File contents to write.
 
-            Returns:
-                Confirmation message with the written path.
+            :return: Confirmation message with the written path.
             """
             root = ctx.deps.workspace_root or "."
             target = _normalize_target(file_path, root)
@@ -587,14 +571,12 @@ def build_implementation_agent(
         ) -> str:
             """Replace the contents of an existing file in the workspace.
 
-            Args:
-                ctx: Run context carrying implementation deps.
-                file_path: Path to the file, relative to workspace root
-                    or prefixed with /workspace.
-                content: New file contents.
+            :param ctx: Run context carrying implementation deps.
+            :param file_path: Path to the file, relative to workspace root
+                or prefixed with /workspace.
+            :param content: New file contents.
 
-            Returns:
-                Confirmation message with the edited path.
+            :return: Confirmation message with the edited path.
             """
             root = ctx.deps.workspace_root or "."
             target = _normalize_target(file_path, root)
@@ -606,7 +588,7 @@ def build_implementation_agent(
 
 # Module-level default agent for harness callers (lazy fallback).
 # Building at import time must not crash when tier defaults point to
-# undeclared models (common when bergagents.jsonc is minimal) — fallback
+# undeclared models (common when bergagents.jsonc is minimal) - fallback
 # to the first declared provider model. No network/LLM calls are made.
 try:
     implementation_agent: Agent[ImplementationDeps, str] = (

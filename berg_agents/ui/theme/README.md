@@ -1,4 +1,4 @@
-# Berg Agents — UI theme
+# Berg Agents - UI theme
 
 This directory is the single source of truth for the visual style of every
 surface berg_agents ships: web UI, TUI, and (via `docs/`) the documentation.
@@ -24,7 +24,7 @@ berg_agents/ui/theme/
 ## Why this exists
 
 The docs site (Quarto) already has its own `docs/styles/custom.css` that
-defines a "SofiaBillBerg" style — purple→blue→teal gradient, Inter on a
+defines a "SofiaBillBerg" style - purple→blue→teal gradient, Inter on a
 near-white background, soft borders. Without a shared module the webapp
 ends up looking like a generic Google-blue product and we end up with
 two copies of the same palette drifting apart.
@@ -36,7 +36,7 @@ the webapp imports `theme.css` directly, and the CLI/server import
 
 ## Usage
 
-Webapp — in `styles.css` replace the current `var(--color-*)` block with:
+Webapp - in `styles.css` replace the current `var(--color-*)` block with:
 
 ```css
 @import "./theme/theme.css";

@@ -37,7 +37,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
     """Return the default tool set as ToolSpecs.
 
     Wraps file ops with *root_dir* captured via closure so the model only
-    sees ``file_path`` / ``content`` — not ``root_dir``.
+    sees ``file_path`` / ``content`` - not ``root_dir``.
 
     :param root_dir: Root directory file tools are bound to.
     :return: List of ToolSpec instances.
@@ -72,9 +72,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
         except OSError as exc:
             return f"Could not read {file_path}: {exc}"
         except UnicodeDecodeError:
-            return (
-                f"Could not read {file_path}: not a UTF-8 text file."
-            )
+            return f"Could not read {file_path}: not a UTF-8 text file."
 
     def _edit(file_path: str, content: str) -> str:
         """Edit an existing file (replace contents).
@@ -100,7 +98,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
         """List files and subdirectories in a workspace directory.
 
         Use this to explore the project layout before reading
-        files — never guess at paths. Directories end with "/".
+        files - never guess at paths. Directories end with "/".
         Results are sorted, directories first, capped at 200
         entries to keep the context small.
 
@@ -125,9 +123,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
             )
         except OSError as exc:
             return f"Could not list {file_path}: {exc}"
-        lines = [
-            f"{p.name}/" if p.is_dir() else p.name for p in entries[:200]
-        ]
+        lines = [f"{p.name}/" if p.is_dir() else p.name for p in entries[:200]]
         extra = (
             f"\n... and {len(entries) - 200} more (listing truncated)"
             if len(entries) > 200
@@ -140,7 +136,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
 
         Use this to run tests, builds, linters, or inspect the
         system (e.g. ``pytest -q``, ``ls``, ``python --version``).
-        There is no other shell/terminal tool — this is it.
+        There is no other shell/terminal tool - this is it.
 
         Safety: commands run with ``cwd`` bound to the workspace
         root, a timeout (default 30s, capped at 120s), and output
@@ -179,8 +175,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
         )
         if len(combined) > 8000:
             combined = (
-                combined[:8000]
-                + f"\n... output truncated "
+                combined[:8000] + f"\n... output truncated "
                 f"({len(combined)} chars total)"
             )
         return f"[exit {proc.returncode}]\n{combined}".strip()

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { Button, TextArea } from "@heroui/react";
 
 /**
- * Props for the InputBar component. Prop names and semantics are frozen —
+ * Props for the InputBar component. Prop names and semantics are frozen -
  * `App.tsx` passes all of these and must not change.
  */
 export interface InputBarProps {
@@ -10,11 +10,11 @@ export interface InputBarProps {
   input: string;
   /** Parent state setter for the input text. */
   setInput: (value: React.SetStateAction<string>) => void;
-  /** Send handler — slash commands are handled locally, else a harness task. */
+  /** Send handler - slash commands are handled locally, else a harness task. */
   onSend: () => void;
   /** True while a task runs or an approval is pending (blocks new sends). */
   disabled: boolean;
-  /** Stop handler — cancels an in-flight streaming request. */
+  /** Stop handler - cancels an in-flight streaming request. */
   onStop?: () => void;
   /** Key handler from the parent (Enter-to-send, Escape closes pickers). */
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -23,7 +23,7 @@ export interface InputBarProps {
 }
 
 /**
- * InputBar component — HeroUI v3 rebuild.
+ * InputBar component - HeroUI v3 rebuild.
  *
  * Chat input field with send button. Disabled while streaming or HITL
  * pending. Auto-resizes based on content (adaptive height between 60px

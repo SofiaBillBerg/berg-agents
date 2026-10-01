@@ -3,7 +3,7 @@
  *
  * This file provides TypeScript types that mirror the Python backend's
  * response schemas (see berg_agents/ui/schemas.py). It replaces the old
- * complex IHarness interface — the frontend now uses AI SDK v6's useChat
+ * complex IHarness interface - the frontend now uses AI SDK v6's useChat
  * hook directly against /api/chat/stream.
  */
 

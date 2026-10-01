@@ -9,7 +9,7 @@ override the extension points you need, delegate the rest).
 Why a toolset instead of loose ``tool_plain`` registrations:
 
 - One stable ``id`` (``"workspace"``) identifying every instruction
-  and tool the workspace contributes — addressable as
+  and tool the workspace contributes - addressable as
   ``toolset:workspace`` and safe for durable execution.
 - One ``get_instructions`` block teaching explore-first usage, instead
   of repeating usage guidance per tool and in the system prompt.
@@ -17,7 +17,7 @@ Why a toolset instead of loose ``tool_plain`` registrations:
   flags select the registered subset per deployment, and ``call_tool``
   is the single audit/logging switch for every invocation.
 - The harness loop and ``POST /api/tool/execute`` keep using the raw
-  :class:`ToolSpec` list — this toolset is the pydantic-ai view of
+  :class:`ToolSpec` list - this toolset is the pydantic-ai view of
   the same single source, not a second one.
 """
 
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 #: Stable toolset id. Instruction parts from
 #: :meth:`WorkspaceToolset.get_instructions` are addressable as
-#: ``toolset:workspace``; keep it constant — durable execution and
+#: ``toolset:workspace``; keep it constant - durable execution and
 #: log readers key off this string, never the wording.
 WORKSPACE_TOOLSET_ID = "workspace"
 
@@ -44,11 +44,11 @@ WORKSPACE_TOOLSET_ID = "workspace"
 #: list: this text teaches *how* to work the filesystem, the prompt
 #: names *what* exists.
 _WORKSPACE_INSTRUCTIONS = """\
-Workspace tools (toolset `workspace`) — how to work the filesystem:
+Workspace tools (toolset `workspace`) - how to work the filesystem:
 
 - EXPLORE FIRST: call list_files before reading anything. Never guess
   at paths; use the exact paths list_files returns.
-- Directories are not files: read_file on a directory tells you so —
+- Directories are not files: read_file on a directory tells you so -
   follow its guidance instead of retrying.
 - SEARCH before assuming: use search_code to find definitions,
   references, or error strings instead of reading trees by hand.
@@ -56,12 +56,12 @@ Workspace tools (toolset `workspace`) — how to work the filesystem:
   and truncated output; long jobs should be split or backgrounded by
   the caller. There is no other shell tool.
 - WRITE with intent: write_file creates, edit_file replaces. Both
-  need human approval in chat — the user sees an approve/reject
+  need human approval in chat - the user sees an approve/reject
   dialog, so say what you are about to do before calling.
 - COMPLEX work (multi-step plans, refactors, research) belongs in
   run_task, which drives the full harness pipeline for you.
 - If a tool answers "not found" or "is a directory", follow the
-  message. Do not retry the same call and do not invent tool names —
+  message. Do not retry the same call and do not invent tool names -
   the toolset above is the complete inventory.
 """
 
@@ -79,7 +79,7 @@ class WorkspaceToolset(WrapperToolset[None]):
     :param harness: Optional harness for the ``run_task`` delegate.
         Omitted (e.g. read-only contexts) means no ``run_task`` tool.
     :param read_only: When True, only low-risk tools (list, read,
-        search) are registered — the model cannot change files even
+        search) are registered - the model cannot change files even
         if it tries. Mutating tools are withheld, not merely
         instructed away.
     :param allow_shell: When False, the ``bash`` tool is withheld
@@ -94,9 +94,20 @@ class WorkspaceToolset(WrapperToolset[None]):
         read_only: bool = False,
         allow_shell: bool = True,
     ) -> None:
-        from pydantic_ai.toolsets import FunctionToolset
+        """Initialize the workspace toolset.
 
+        :param root_dir: Workspace root all file tools are bound to.
+        :param harness: Optional harness for the ``run_task`` delegate.
+            Omitted (e.g. read-only contexts) means no ``run_task`` tool.
+        :param read_only: When True, only low-risk tools (list, read,
+            search) are registered - the model cannot change files even
+            if it tries. Mutating tools are withheld, not merely
+            instructed away.
+        :param allow_shell: When False, the ``bash`` tool is withheld
+            (safe default for untrusted deployments).
+        """
         from berg_agents.agents.factory import create_tools
+        from pydantic_ai.toolsets import FunctionToolset
 
         inner: FunctionToolset[None] = FunctionToolset()
         for spec in create_tools(root_dir):
@@ -134,11 +145,18 @@ class WorkspaceToolset(WrapperToolset[None]):
 
     @property
     def id(self) -> str | None:
-        """Stable toolset id (``"workspace"``)."""
+        """Stable toolset id (``"workspace"``).
+
+        :return: Toolset id.
+        """
         return WORKSPACE_TOOLSET_ID
 
     async def get_instructions(self, ctx: Any) -> str:
-        """Workspace usage guide, injected once per run."""
+        """Workspace usage guide, injected once per run.
+
+        :param ctx: Context from the agent.
+        :return: Usage instructions for the workspace toolset.
+        """
         _ = ctx
         return _WORKSPACE_INSTRUCTIONS
 
@@ -162,14 +180,22 @@ class WorkspaceToolset(WrapperToolset[None]):
         except Exception as exc:
             logger.warning("workspace tool %s failed: %s", name, exc)
             raise
-        logger.debug("workspace tool %s returned %d chars", name, len(str(result)))
+        logger.debug(
+            "workspace tool %s returned %d chars", name, len(str(result))
+        )
         return result
 
     @staticmethod
     def _make_run_task(harness: Any) -> Any:
-        """Build the ``run_task`` pipeline delegate bound to *harness*."""
+        """Build the ``run_task`` pipeline delegate bound to *harness*.
 
-        async def _run_task(description: str, task_type: str = "generic") -> str:
+        :param harness: Harness to execute tasks through.
+        :return: Async callable for the ``run_task`` tool.
+        """
+
+        async def _run_task(
+            description: str, task_type: str = "generic"
+        ) -> str:
             """Execute a complex task through the full BergAgents harness pipeline.
 
             Use this for tasks that need planning, subagents, file changes,
@@ -179,9 +205,9 @@ class WorkspaceToolset(WrapperToolset[None]):
             For simple questions or conversation, reply directly without calling
             this tool.
 
-            Args:
-                description: What the user wants done.
-                task_type: Type of task (generic, code, research, etc.).
+            :param description: What the user wants done.
+            :param task_type: Type of task (generic, code, research, etc.).
+            :return: JSON-encoded result from the harness.
             """
             task: dict[str, Any] = {
                 "description": description,
@@ -212,6 +238,8 @@ class WorkspaceToolset(WrapperToolset[None]):
                 return result
             if isinstance(result, list) and result:
                 result = result[0] if isinstance(result[0], dict) else {}
-            return json.dumps(result) if isinstance(result, dict) else str(result)
+            return (
+                json.dumps(result) if isinstance(result, dict) else str(result)
+            )
 
         return _run_task

@@ -1,4 +1,4 @@
-"""Berg Agents — framework-agnostic multi-agent system.
+"""Berg Agents - framework-agnostic multi-agent system.
 
 The main entry point is BergAgentsApp:
 

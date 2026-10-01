@@ -85,7 +85,14 @@ class Subtask:
     estimated_complexity: str = "standard"
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the subtask as a plain dictionary."""
+        """Return the subtask as a plain dictionary.
+
+        Used for JSON serialization in plan outputs. The
+        ``estimated_complexity`` field is included for convenience
+        even though it duplicates the ``complexity`` value.
+
+        :return: Dictionary representation of the subtask.
+        """
         # Values stay JSON-serializable for API responses.
         return {
             "id": self.id,
@@ -139,7 +146,10 @@ def estimate_complexity(
 
 
 def _decompose_refactor() -> list[Subtask]:
-    """Build the analyze-plan-edit-test refactor template."""
+    """Build the analyze-plan-edit-test refactor template.
+
+    :return: Ordered list of subtasks for refactoring work.
+    """
     # Four ordered steps; later steps depend on earlier ones.
     return [
         Subtask(
@@ -176,7 +186,10 @@ def _decompose_refactor() -> list[Subtask]:
 
 
 def _decompose_implement() -> list[Subtask]:
-    """Build the design-implement-test template."""
+    """Build the design-implement-test template.
+
+    :return: Ordered list of subtasks for new-feature work.
+    """
     # Three ordered steps for new-feature work.
     return [
         Subtask(
@@ -202,7 +215,10 @@ def _decompose_implement() -> list[Subtask]:
 
 
 def _decompose_fix() -> list[Subtask]:
-    """Build the diagnose-fix-regression-test template."""
+    """Build the diagnose-fix-regression-test template.
+
+    :return: Ordered list of subtasks for bug-fix work.
+    """
     # Three ordered steps for bug-fix work.
     return [
         Subtask(
@@ -228,7 +244,10 @@ def _decompose_fix() -> list[Subtask]:
 
 
 def _decompose_test() -> list[Subtask]:
-    """Build the identify-paths-generate-tests template."""
+    """Build the identify-paths-generate-tests template.
+
+    :return: Ordered list of subtasks for test-generation work.
+    """
     # Two ordered steps for test-generation work.
     return [
         Subtask(
@@ -252,12 +271,10 @@ def decompose(description: str, task_type: str = "generic") -> list[Subtask]:
     Uses keyword matching for common task types; anything
     else becomes a single generic subtask.
 
-    Args:
-        description: Human-readable task description.
-        task_type: Machine task type.
+    :param description: Human-readable task description.
+    :param task_type: Machine task type.
 
-    Returns:
-        Unordered list of subtasks (order with
+    :return:: Unordered list of subtasks (order with
         :func:`order_subtasks`).
     """
     # Lowercase once so every branch shares one normalized copy.
@@ -278,11 +295,9 @@ def order_subtasks(subtasks: list[Subtask]) -> list[Subtask]:
 
     Tasks with no dependencies come first.
 
-    Args:
-        subtasks: Subtasks in any order.
+    :param subtasks: Subtasks in any order.
 
-    Returns:
-        Subtasks ordered so dependencies precede dependents.
+    :return: Subtasks ordered so dependencies precede dependents.
     """
     # Map ids for O(1) lookup during the depth-first walk.
     subtask_map = {s.id: s for s in subtasks}
@@ -290,7 +305,10 @@ def order_subtasks(subtasks: list[Subtask]) -> list[Subtask]:
     result: list[Subtask] = []
 
     def visit(subtask_id: str) -> None:
-        """Append one subtask after its dependencies."""
+        """Append one subtask after its dependencies.
+
+        :param subtask_id: Subtask id to visit.
+        """
         # Skip repeats and dangling dependency ids silently.
         if subtask_id in visited:
             return
@@ -309,11 +327,10 @@ def order_subtasks(subtasks: list[Subtask]) -> list[Subtask]:
 def plan_depth(ordered: list[Subtask]) -> int:
     """Calculate the maximum dependency depth of a plan.
 
-    Args:
-        ordered: Topologically ordered subtasks.
 
-    Returns:
-        Longest dependency chain length (0 when empty).
+    :param ordered: Topologically ordered subtasks.
+
+    :return: Longest dependency chain length (0 when empty).
     """
     if not ordered:
         return 0
@@ -322,7 +339,11 @@ def plan_depth(ordered: list[Subtask]) -> int:
     subtask_map = {s.id: s for s in ordered}
 
     def get_depth(subtask_id: str) -> int:
-        """Return cached depth of one subtask."""
+        """Return cached depth of one subtask.
+
+        :param subtask_id: Subtask id to check.
+        :return: Depth of the subtask (0 for no dependencies).
+        """
         if subtask_id in depth_map:
             return depth_map[subtask_id]
         subtask = subtask_map.get(subtask_id)
@@ -470,7 +491,7 @@ def estimate_task_complexity(
 
 
 class Planner(AbstractAgent):
-    """Planner agent — breaks down tasks into subtasks.
+    """Planner agent - breaks down tasks into subtasks.
 
     Deterministic facade over :func:`build_plan` keeping the
     ``can_handle`` / ``execute`` contract. LLM-driven runs
@@ -497,11 +518,9 @@ class Planner(AbstractAgent):
         complex/critical work, low for trivial work that
         needs no planning.
 
-        Args:
-            task: Task dictionary.
+        :param task: Task dictionary.
 
-        Returns:
-            Confidence score between 0.0 and 1.0.
+        :return: Confidence score between 0.0 and 1.0.
         """
         task_type = task.get("task_type", "")
         if task_type in _PLAN_TASK_TYPES:

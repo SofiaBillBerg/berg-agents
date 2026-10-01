@@ -1,4 +1,4 @@
-/* Berg Agents — single import for the webapp.
+/* Berg Agents - single import for the webapp.
  *
  * This file is the only one the webapp needs to reference. It pulls in
  * tokens and components in the correct order, and applies the default

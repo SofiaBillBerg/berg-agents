@@ -1,0 +1,21 @@
+---
+title: "Tutorials"
+author: "Your Name"
+format: html
+---
+
+# Tutorials
+
+Welcome! Below is a curated set of step-by-step guides that show common workflows with BergAgents. Each tutorial lives in its own file and can be opened directly from the sidebar.
+
+| Tutorial | What you'll learn |
+|----------|-------------------|
+| [Quick-start: Custom Agent](tutorials/quickstart_agents.qmd) | Define, register, and run a brand-new agent. |
+| [Harness Workflow](tutorials/harness_workflow.qmd) | Multi-step plan → implement → curate pipeline. |
+| [MCP Integration](tutorials/mcp_integration.qmd) | Connect external command-line tools via MCP. |
+| [HITL Lifecycle](tutorials/hilt_lifecycle.qmd) | Human-in-the-Loop pause, edit, and resume. |
+| [Advanced Tool Usage](tutorials/advanced_tools.qmd) | Chain multiple tools, share context, and build mini-pipelines. |
+
+Feel free to pick the one that matches the task you're trying to accomplish, or follow them in order to get a complete picture of BergAgents' capabilities.
+
+--- 

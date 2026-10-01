@@ -1,4 +1,4 @@
-"""Harness package — re-exports.
+"""Harness package - re-exports.
 
 The public surface is :class:`Harness` from the orchestrator module.
 API schema types live in :mod:`berg_agents.ui.schemas`.

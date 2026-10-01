@@ -9,7 +9,7 @@ This guide gets BergAgents installed and running on your local machine.
 
 - **Python 3.12+**
 - **`uv`** (recommended) or `pip`
-- **An OpenAI-compatible provider** — e.g. Ollama running locally with a pulled model:
+- **An OpenAI-compatible provider** - e.g. Ollama running locally with a pulled model:
 
   ```bash
   ollama pull qwen3.5:9b
@@ -84,6 +84,6 @@ print(result["status"])  # completed | needs_human_review | failed
 
 ## Next Steps
 
-- [**Usage**](USAGE.qmd) — TUI commands, Python API, and web workflows
-- [**Tools**](TOOLS.qmd) — what the agent can touch and how approval works
-- [**Configuration**](CONFIGURATION.qmd) — providers, routing, HITL rules
+- [**Usage**](USAGE.qmd) - TUI commands, Python API, and web workflows
+- [**Tools**](TOOLS.qmd) - what the agent can touch and how approval works
+- [**Configuration**](CONFIGURATION.qmd) - providers, routing, HITL rules

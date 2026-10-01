@@ -1,5 +1,5 @@
 /*
- * Navbar component — top navigation bar with links to Chat, Agents, and Stats.
+ * Navbar component - top navigation bar with links to Chat, Agents, and Stats.
  * Simple div-based navbar (HeroUI v3 doesn't ship a dedicated Navbar).
  */
 
@@ -9,14 +9,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
 
-/** Navigation items — links to the three main pages. */
+/** Navigation items - links to the three main pages. */
 const NAV_ITEMS = [
   { href: "/", label: "Chat", icon: "💬" },
   { href: "/agents", label: "Agents", icon: "🤖" },
   { href: "/stats", label: "Stats", icon: "📊" }];
 
 /**
- * Inner nav links — isolated so `usePathname` always renders inside a
+ * Inner nav links - isolated so `usePathname` always renders inside a
  * Suspense boundary (required during prerender).
  */
 function NavLinks() {
@@ -46,7 +46,7 @@ function NavLinks() {
 }
 
 /**
- * Navbar component — renders a simple top navigation bar.
+ * Navbar component - renders a simple top navigation bar.
  * Highlights the active page and provides links between Chat, Agents, and Stats.
  */
 export function Navbar() {

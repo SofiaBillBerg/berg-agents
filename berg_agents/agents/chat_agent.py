@@ -1,7 +1,7 @@
 """Pydantic AI adapter for BergAgents tools and agent construction.
 
 Builds a :class:`~pydantic_ai.Agent` whose tools come from a single
-:class:`~berg_agents.agents.workspace_toolset.WorkspaceToolset` — one
+:class:`~berg_agents.agents.workspace_toolset.WorkspaceToolset` - one
 named, audited toolset wrapping the framework-free ``ToolSpec`` list
 (which the harness loop uses directly) plus the ``run_task`` pipeline
 delegate. Used by the ``VercelAIAdapter`` streaming endpoint.
@@ -22,11 +22,14 @@ def _shell_allowed() -> bool:
     Kill-switch for untrusted deployments: set
     ``BERG_AGENT_ALLOW_SHELL=0`` (or false/no/off) to withhold the
     shell tool entirely. Defaults to allowed.
+
+    :return: True if the shell tool is allowed, False if withheld.
     """
-    return (
-        os.getenv("BERG_AGENT_ALLOW_SHELL", "true").strip().lower()
-        not in {"0", "false", "no", "off"}
-    )
+    return os.getenv("BERG_AGENT_ALLOW_SHELL", "true").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off"}
 
 
 def build_chat_agent(
@@ -52,13 +55,13 @@ def build_chat_agent(
     :return: A configured ``Agent`` ready for ``VercelAIAdapter``.
     """
     from berg_agents.agents.workspace_toolset import WorkspaceToolset
+    from berg_agents.capabilities.skills import load_skill_capabilities
     from berg_agents.capabilities.web_backends import (
         make_web_fetch,
         make_web_search,
     )
     from berg_agents.config.settings import get_settings
     from berg_agents.core.harness import Harness
-    from berg_agents.capabilities.skills import load_skill_capabilities
     from berg_agents.providers.models import resolve_model_instance
     from pydantic_ai import Agent
     from pydantic_ai.capabilities import WebFetch, WebSearch
@@ -71,7 +74,7 @@ def build_chat_agent(
     settings = get_settings()
     system_prompt = (
         settings.system_prompt.format(root_dir=root_dir)
-        if "{root_dir}" in settings.system_prompt
+        if f"{root_dir}" in settings.system_prompt
         else settings.system_prompt
     )
 

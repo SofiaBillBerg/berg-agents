@@ -39,7 +39,7 @@ def _store_in_mempalace(insight: dict[str, Any]) -> None:
     """No-op: MemPalace is not an automatic log.
 
     Diary entries are written manually by the agent when it has
-    something genuinely worth recording — never on a schedule or
+    something genuinely worth recording - never on a schedule or
     per-task outcome. This function exists as the single call site
     and is intentionally empty.
 
@@ -59,7 +59,7 @@ class LearningGate:
     """
 
     def __init__(self, db_path: str | None = None) -> None:
-        """Initialize the Learning Gate — loads persisted insights if available."""
+        """Initialize the Learning Gate - loads persisted insights if available."""
         self._db_path = ensure(db_path)
         # Best-effort load from SQLite (honors existing OutcomeStore stats, not a full replay)
         self._insights: list[dict[str, Any]] = load(
@@ -114,7 +114,7 @@ class LearningGate:
             self._rule_adjustments.append(adjustment)
             insert(self._db_path, "learning_adjustments", adjustment)
             self._apply_adjustment(adjustment)
-            # A routing rule actually changed — that IS worth
+            # A routing rule actually changed - that IS worth
             # remembering; hand it to the moderated MemPalace write.
             adj_insight = {
                 "type": "adjustment",
@@ -177,7 +177,7 @@ class LearningGate:
                 "action": "reinforce",
                 "message": f"{model} succeeded at {task_type} ({complexity})."}
         self._insights.append(insight)
-        # Persist to SQLite for restart survival — the single source of truth.
+        # Persist to SQLite for restart survival - the single source of truth.
         try:
             import datetime
             import json
@@ -198,7 +198,7 @@ class LearningGate:
         if store_memory:
             # Autosave = mempalace only, for genuine insights.
             # notes/learning_log.md is for the agent to write
-            # meaningful notes when it chooses — not an
+            # meaningful notes when it chooses - not an
             # automatically appended stream.
             _store_in_mempalace(insight)
         return insight

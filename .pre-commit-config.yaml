@@ -8,32 +8,37 @@ repos:
         name: run-autofix
         entry: project_utils/run_autofix.sh
         language: script
-      #   stages: [pre-commit, manual]
+        stages: [pre-commit, manual]
       #      - id: pre-commit-quick
       #        name: pre-commit-quick
       #        entry: project_utils/pre-commit-quick.sh
       #        language: script
       #        stages: [ pre-commit ]
-      - id: run-formatters
-        name: run-formatters
-        entry: project_utils/run_formatters.sh
-        language: script
+      # - id: run-formatters
+      #   name: run-formatters
+      #   entry: project_utils/run_formatters.sh
+      #   language: script
+      #   stages: [manual]
+      # - id: run-diagrams
+      #   name: run-diagrams
+      #   entry: project_utils/run_diagrams.sh
+      #   language: script
         stages: [manual]
-      - id: run-diagrams
-        name: run-diagrams
-        entry: project_utils/run_diagrams.sh
-        language: script
-        stages: [manual]
-      - id: run-analyzers
-        name: run-analyzers
-        entry: project_utils/run_analyzers.sh
-        language: script
-        stages: [manual]
-      - id: pre-push
-        name: pre-push
-        entry: pre-push
-        language: script
-        stages: [pre-push]
+      - id: quarto-render
+        name: quarto-render
+        entry: quarto render
+        language: shell
+        stages: [pre-push, manual]
+      # - id: run-analyzers
+      #   name: run-analyzers
+      #   entry: project_utils/run_analyzers.sh
+      #   language: script
+      #   stages: [manual]
+      # - id: pre-push
+      #   name: pre-push
+      #   entry: pre-push
+      #   language: script
+      #   stages: [pre-push]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -60,4 +65,10 @@ repos:
     rev: v3.21.2
     hooks:
       - id: pyupgrade
-        args: [--py311-plus]
+        args: [--py312-plus]
+  - repo: https://github.com/posit-dev/air-pre-commit
+    # Air version
+    rev: 0.8.2
+    hooks:
+      # Run the formatter
+      - id: air-format

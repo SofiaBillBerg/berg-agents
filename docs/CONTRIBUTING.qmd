@@ -6,7 +6,7 @@ format: html
 
 # Contributing
 
-Bug fixes, features, and docs improvements are all welcome. The rules below keep the architecture coherent — please follow them.
+Bug fixes, features, and docs improvements are all welcome. The rules below keep the architecture coherent - please follow them.
 
 ## Development Setup
 
@@ -20,7 +20,7 @@ uv pip install -e .
 
 ## Architecture Principles (NEVER DRIFT)
 
-- `berg_agents/core/` is framework-free — no LangChain, no LangGraph, no web imports. Adapters live in `backends/`.
+- `berg_agents/core/` is framework-free - no LangChain, no LangGraph, no web imports. Adapters live in `backends/`.
 - All tasks route through `Harness`, never directly to agents.
 - No shims, wrappers, redirects, or backcompat layers. Delete dead code; don't bridge it.
 - New agents implement `AbstractAgent`; new tools are `ToolSpec` values in the `ToolRegistry`.

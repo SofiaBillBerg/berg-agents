@@ -1,4 +1,4 @@
-# Vulture whitelist — false positives that cannot be detected as alive.
+# Vulture whitelist - false positives that cannot be detected as alive.
 # Run: uv tool run vulture berg_agents --min-confidence 80
 
 ignore_names:

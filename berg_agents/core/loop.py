@@ -72,7 +72,11 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class RunStarted:
-    """The cycle has begun.  Emitted exactly once at the top of :meth:`BergLoop.run`."""
+    """The cycle has begun.  Emitted exactly once at the top of :meth:`BergLoop.run`.
+
+    :attr:`thread_id` is the thread that started.
+    :attr:`input_messages` is the list of input messages.
+    """
 
     thread_id: str
     input_messages: tuple[Mapping[str, Any], ...]
@@ -80,7 +84,13 @@ class RunStarted:
 
 @dataclass(frozen=True)
 class RunCompleted:
-    """The cycle ended without errors, HITL pause, or cancellation."""
+    """The cycle ended without errors, HITL pause, or cancellation.
+
+    :attr:`final_message` is the last assistant message.
+    :attr:`steps` is the number of steps taken.
+    :attr:`tool_calls` is the number of tool calls made.
+    :attr:`thread_id` is the thread that completed.
+    """
 
     thread_id: str
     final_message: Mapping[str, Any]
@@ -95,6 +105,10 @@ class RunError:
     Includes :class:`RuntimeError` from the LLM adapter,
     :class:`TimeoutError`, the loop's own ``max_steps`` limit, or
     any other exception that escaped a tool call.
+
+    :attr:`step` is the index of the step that failed.
+    :attr:`thread_id` is the thread that failed.
+    :attr:`error` is the error message.
     """
 
     thread_id: str
@@ -104,7 +118,12 @@ class RunError:
 
 @dataclass(frozen=True)
 class RunCancelled:
-    """The cycle ended because :meth:`BergLoop.cancel` was called."""
+    """The cycle ended because :meth:`BergLoop.cancel` was called.
+
+    :attr:`reason` is the reason for the cancellation.
+    :attr:`step` is the index of the step that was cancelled.
+    :attr:`thread_id` is the thread that was cancelled.
+    """
 
     thread_id: str
     reason: str
@@ -113,7 +132,11 @@ class RunCancelled:
 
 @dataclass(frozen=True)
 class StepStart:
-    """A new step is about to begin (one LLM call + N tool calls)."""
+    """A new step is about to begin (one LLM call + N tool calls).
+
+    :attr:`step` is the index of the step that is about to start; the next step will be `step + 1`.
+    :attr:`max_steps` is the configured maximum number of steps for the loop.
+    """
 
     step: int
     max_steps: int
@@ -121,9 +144,14 @@ class StepStart:
 
 @dataclass(frozen=True)
 class StepEnd:
-    """A step has finished."""
+    """A step has finished.
+
+    :attr:`step` is the index of the step that just finished; the next step will be `step + 1`.
+    :attr:`max_steps` is the configured maximum number of steps for the loop.
+    """
 
     step: int
+    max_steps: int
 
 
 @dataclass(frozen=True)
@@ -187,6 +215,11 @@ class ToolEnd:
 class ToolError:
     """A tool raised an exception.  The loop captures the message and
     feeds it back to the model as a ``tool`` role error.
+
+    :attr:`ToolSpec.execute` exceptions are caught and wrapped in this event;
+    the loop never lets exceptions escape to the caller.
+    :attr:`ToolCallResult.error` is set to the exception message.
+    :attr:`ToolCallResult.output` is ``None``.
     """
 
     call_id: str
@@ -196,7 +229,18 @@ class ToolError:
 
 @dataclass(frozen=True)
 class HitlRequired:
-    """Pause the loop.  Caller must call :meth:`BergLoop.resume`."""
+    """Pause the loop.  Caller must call :meth:`BergLoop.resume`.
+
+    The loop yields this event when a tool call is flagged for human review.  The caller must persist the snapshot and then call :meth:`BergLoop.resume` with a :class:`HitlDecision` to continue the cycle.
+
+    :attr:`HitlRequest` is the concrete request for human review, including the tool call ID, name, arguments, risk class, allowed decisions, and a reason string.  The caller can use this information to present a UI or CLI prompt to the human operator.
+    :attr:`HitlDecision` is the human's decision on the pending request, which must be passed to :meth:`BergLoop.resume` to continue the cycle.
+    :attr:`HitlResolved` is emitted at the top of :meth:`BergLoop.resume` to indicate that the paused call has been answered and the loop is continuing.
+    :attr:`HitlRequired` is emitted at the top of :meth:`BergLoop.run` when a tool call is flagged for human review.  The caller must persist the snapshot and then call :meth:`BergLoop.resume` with a :class:`HitlDecision` to continue the cycle.
+    :param call_id: The tool call ID.
+    :param tool_name: The name of the tool.
+    :param tool_args: The arguments for the tool call.
+    """
 
     call_id: str
     tool_name: str
@@ -207,7 +251,11 @@ class HitlRequired:
 
 @dataclass(frozen=True)
 class HitlResolved:
-    """The paused call has been answered.  Emitted at the top of :meth:`BergLoop.resume`."""
+    """The paused call has been answered.  Emitted at the top of :meth:`BergLoop.resume`.
+
+    :param call_id: The tool call ID.
+    :param decision: The human's decision.
+    """
 
     call_id: str
     decision: str
@@ -328,6 +376,9 @@ class BergLoop:
 
         The flag is checked at the top of every step.  Calling this on
         a thread with no active run is a no-op.
+
+        :param thread_id: The thread to cancel.
+        :param reason: Optional reason string for logging / metrics.
         """
         self._cancel_flags[thread_id] = reason
 
@@ -354,6 +405,10 @@ class BergLoop:
         :class:`RunError` / :class:`RunCancelled`) or when
         :class:`HitlRequired` is emitted (caller drives
         :meth:`resume`).
+
+        :param thread_id: The thread to resume.
+        :param decision: The human's decision on the pending HITL request.
+        :return: Yields :class:`LoopEvent` values until the cycle ends.
         """
         if not isinstance(thread_id, str) or not thread_id:
             raise ValueError("thread_id must be a non-empty string")
@@ -449,13 +504,13 @@ class BergLoop:
                             )
                             if (
                                 name
-                                in ("write_file", "edit_file", "delete_file")
+                                in {"write_file", "edit_file", "delete_file"}
                                 and path
                             ):
                                 return f"agent wants to {name.replace('_', ' ')} to {path}"
                             if name == "read_file" and path:
                                 return f"agent wants to read file at {path}"
-                            if name == "run_command" or name == "execute":
+                            if name in {"run_command", "execute"}:
                                 cmd = (
                                     args.get("command")
                                     or args.get("cmd")
@@ -563,6 +618,10 @@ class BergLoop:
 
         The generator is stateful per ``thread_id``; the checkpointer
         lets a different process pick up the resume.
+
+        :param thread_id: The thread to resume.
+        :param decision: The human's decision on the pending HITL request.
+        :return: Yields :class:`LoopEvent` values until the cycle ends.
         """
         if not isinstance(thread_id, str) or not thread_id:
             raise ValueError("thread_id must be a non-empty string")
@@ -665,6 +724,12 @@ class BergLoop:
 
         Re-uses the same dispatch logic.  Returns when the cycle is
         complete or hits another HITL pause / cancellation / error.
+
+        :param thread_id: The thread to resume.
+        :param messages: The current message list.
+        :param steps: The current step count.
+        :param tool_call_count: The current tool call count.
+        :return: Yields :class:`LoopEvent` values until the cycle ends.
         """
         self._cancel_flags.pop(thread_id, None)
         while steps < self._max_steps:
@@ -718,6 +783,12 @@ class BergLoop:
 
                     # Build concrete action declaration for HITL visibility.
                     def _hitl_reason(name: str, args: Mapping[str, Any]) -> str:
+                        """File-writing actions: declare the target path.
+
+                        :param name: tool name
+                        :param args: tool args
+                        :return: human-readable reason for HITL pause
+                        """
                         path = (
                             args.get("path")
                             or args.get("file_path")
@@ -725,13 +796,13 @@ class BergLoop:
                             or args.get("target")
                         )
                         if (
-                            name in ("write_file", "edit_file", "delete_file")
+                            name in {"write_file", "edit_file", "delete_file"}
                             and path
                         ):
                             return f"agent wants to {name.replace('_', ' ')} to {path}"
                         if name == "read_file" and path:
                             return f"agent wants to read file at {path}"
-                        if name in ("run_command", "execute"):
+                        if name in {"run_command", "execute"}:
                             cmd = (
                                 args.get("command")
                                 or args.get("cmd")
@@ -817,6 +888,15 @@ class BergLoop:
         Yields ``ToolStart`` on entry, then either ``ToolEnd`` (success)
         or ``ToolError`` (failure).  The final value yielded (via
         ``return``) is the tool's return value (``None`` on error).
+
+        :param call_id: Unique ID for this tool call.
+        :param name: Tool name.
+        :param args: Tool arguments.
+        :param messages: The current message list, to which the tool's
+            result or error is appended.
+        :return: Yields :class:`ToolStart`, then either :class:`ToolEnd`
+            or :class:`ToolError`.  The final value is the tool's return
+            value (``None`` on error).
         """
         spec = self._registry.get(name)
         if spec is None or spec.execute is None:
@@ -847,22 +927,40 @@ class BergLoop:
         return output  # ruff: ignore[return-in-generator]
 
     def _step_start(self, step: int) -> StepStart:
-        """Build a :class:`StepStart` and notify the callback."""
+        """Build a :class:`StepStart` and notify the callback.
+
+        :param step: The current step number (0-based).
+        :return: The :class:`StepStart` event.
+        """
         evt = StepStart(step=step, max_steps=self._max_steps)
         if self._on_step is not None:
             self._on_step(evt)
         return evt
 
     def _is_cancelled(self, thread_id: str) -> bool:
+        """Check if the given thread_id has been marked for cancellation.
+
+        :param thread_id: The thread ID to check.
+        :return: True if the thread is cancelled, False otherwise.
+        """
         return thread_id in self._cancel_flags
 
     def _risk_for(self, tool_name: str) -> str:
+        """Return the effective risk class for a tool, defaulting to "medium".
+
+        :param tool_name: The name of the tool to check.
+        :return: The effective risk class as a string.
+        """
         spec = self._registry.get(tool_name)
         if spec is None:
             return "medium"
         return effective_risk_class(spec)
 
     def _openai_tools(self) -> list[dict[str, Any]]:
+        """Return the tool registry as a list of OpenAI-shaped dicts.
+
+        :return: A list of tool specifications in OpenAI format.
+        """
         return [spec.to_openai_tool() for spec in self._registry.all()]
 
     def _persist_snapshot(
@@ -874,6 +972,14 @@ class BergLoop:
         tool_calls: int,
         pending_hitl: HitlRequest | None,
     ) -> None:
+        """Persist the current state of the loop for resuming later.
+
+        :param thread_id: The thread ID for which to persist the snapshot.
+        :param messages: The current list of messages.
+        :param step: The current step number.
+        :param tool_calls: The current count of tool calls made.
+        :param pending_hitl: The current pending HITL request, if any.
+        """
         if self._checkpointer is None:
             return
         # The checkpointer's ``pending_hitl`` slot is typed as a
@@ -892,6 +998,11 @@ class BergLoop:
         self._checkpointer.put(thread_id, snap)
 
     def _load_snapshot(self, thread_id: str) -> Mapping[str, Any] | None:
+        """Load a persisted snapshot for the given thread_id.
+
+        :param thread_id: The thread ID for which to load the snapshot.
+        :return: The snapshot as a mapping, or None if not found.
+        """
         if self._checkpointer is None:
             return None
         snap = self._checkpointer.get(thread_id)
@@ -913,7 +1024,11 @@ class BergLoop:
 
 
 def _extract_assistant_message(response: Any) -> dict[str, Any]:
-    """Pull the first assistant choice out of an OpenAI-shaped dict."""
+    """Pull the first assistant choice out of an OpenAI-shaped dict.
+
+    :param response: The raw response from the adapter.
+    :return: The assistant message as a dict.
+    """
     if not isinstance(response, Mapping):
         raise TypeError(
             f"adapter response must be a Mapping, got {type(response).__name__}",
@@ -942,6 +1057,12 @@ def _extract_tool_calls(message: Mapping[str, Any]) -> list[dict[str, Any]]:
        :class:`NativeAdapter`, but we accept it so the loop is
        provider-agnostic.)
     3. Empty / no tool calls: return ``[]``.
+
+    :param message: The assistant message dict.
+    :return: A list of tool call dicts, each with ``id``, ``name``, and ``args`` keys.
+    :raises TypeError: if the message is not a mapping or has unexpected structure.
+    :raises ValueError: if the message has no tool calls and no content blocks.
+    :return: A list of tool call dicts, each with ``id``, ``name``, and ``args`` keys.
     """
     out: list[dict[str, Any]] = []
     raw = message.get("tool_calls")
@@ -987,7 +1108,13 @@ def _tool_result_message(
     name: str,
     output: Any,
 ) -> dict[str, Any]:
-    """Build a ``tool`` role message that feeds the result back to the model."""
+    """Build a ``tool`` role message that feeds the result back to the model.
+
+    :param call_id: The tool call ID.
+    :param name: The tool name.
+    :param output: The tool's output, which will be coerced to a string.
+    :return: A dict representing the message.
+    """
     if not isinstance(output, str):
         output = repr(output)
     return {
@@ -1002,7 +1129,13 @@ def _tool_error_message(
     name: str,
     error: str,
 ) -> dict[str, Any]:
-    """Same as :func:`_tool_result_message` but for an error string."""
+    """Same as :func:`_tool_result_message` but for an error string.
+
+    :param call_id: The tool call ID.
+    :param name: The tool name.
+    :param error: The error message.
+    :return: A dict representing the message.
+    """
     return _tool_result_message(call_id, name, f"ERROR: {error}")
 
 

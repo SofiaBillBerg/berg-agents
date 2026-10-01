@@ -1,4 +1,4 @@
-/* Berg Agents webapp — visual design language.
+/* Berg Agents webapp - visual design language.
  *
  * The canonical theme (palette + typography + spacing) is imported from
  * main.tsx via ./theme.js. To re-style, edit files in ../../ui/theme/
@@ -260,7 +260,7 @@ button.primary:hover,
   box-shadow: var(--berg-shadow-sm);
 }
 
-/* User bubble — soft purple tint, no hard border */
+/* User bubble - soft purple tint, no hard border */
 .message-bubble.user .message-content {
   background: linear-gradient(
     135deg,
@@ -270,7 +270,7 @@ button.primary:hover,
   color: var(--berg-text);
 }
 
-/* Assistant bubble — soft warm surface, gradient left rule */
+/* Assistant bubble - soft warm surface, gradient left rule */
 .message-bubble.assistant .message-content {
   background: var(--berg-surface);
   color: var(--berg-text);
@@ -1320,7 +1320,7 @@ button.primary:hover,
   flex: 1 1 auto;
 }
 
-/* Harness events and raw JSON must wrap — clipped text is unreadable. */
+/* Harness events and raw JSON must wrap - clipped text is unreadable. */
 .harness-event pre,
 .harness-chrome pre,
 .tool-activity pre {

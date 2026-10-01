@@ -21,7 +21,7 @@ By design this module never imports the deleted
 OpenAI Chat Completions wire format (see
 :func:`berg_agents.providers.registry.resolve_model`), so the
 explicit model is always an ``OpenAIChatModel`` pointed at
-the configured ``base_url`` — never a provider-name string
+the configured ``base_url`` - never a provider-name string
 that would make Pydantic AI guess the backend (and its
 environment variables) from the prefix.
 """
@@ -127,7 +127,7 @@ def resolve_model_instance(
     as the default) but returns a ready-to-run
     :class:`~pydantic_ai.models.openai.OpenAIChatModel`
     pointed at the configured ``base_url`` with the configured
-    ``api_key`` — no provider-name guessing, no process-env
+    ``api_key`` - no provider-name guessing, no process-env
     lookups, no network calls. Construction is fully offline.
 
     Args:

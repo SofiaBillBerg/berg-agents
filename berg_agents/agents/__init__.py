@@ -2,7 +2,7 @@
 
 Import order matters here: ``factory`` must load before ``guardian`` so that
 ``core.interface`` is fully initialised before the orchestrator (loaded via
-``core.harness``) imports from ``agents.guardian`` — otherwise a circular
+``core.harness``) imports from ``agents.guardian`` - otherwise a circular
 import bites at module load time.
 """
 

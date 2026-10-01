@@ -47,8 +47,8 @@ def excluded_tools_for_model(model_id: str) -> list[str]:
     """Return the merged ``excluded_tools`` patterns for a model id.
 
     Collects ``excluded_tools`` entries from every harness profile that
-    applies to *model_id* — both the bare logical-provider profile (e.g.
-    ``"ollama"``) and any exact ``provider:model`` profile — and supports
+    applies to *model_id* - both the bare logical-provider profile (e.g.
+    ``"ollama"``) and any exact ``provider:model`` profile - and supports
     glob patterns so entire families can be hidden, e.g. ``"mcp_*"`` to drop
     all MCP tools or ``"mcp_memory__*"``, for one provider only::
 

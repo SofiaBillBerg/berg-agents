@@ -1,0 +1,83 @@
+---
+title: "Tutorial - Building a Custom Agent"
+author: "Your Name"
+format: html
+---
+
+# Tutorial - Building a Custom Agent
+
+> This tutorial shows how to create a brand-new agent, register it with BergAgents, and run a task that uses it.
+
+## 1️⃣ Define the agent class
+
+Create a file `my_package/agents/custom_reviewer.py`:
+
+```python
+# my_package/agents/custom_reviewer.py
+from berg_agents.agents.base import BaseAgent
+from berg_agents.core.loop import LoopEvents
+
+class CustomReviewer(BaseAgent):
+    """A tiny reviewer that echoes back the first 100 characters of a file."""
+
+    async def run(self, event: LoopEvents) -> None:
+        # `event.payload` contains the input string passed from the harness
+        snippet = event.payload[:100] + ("..." if len(event.payload) > 100 else "")
+        # Send the snippet back as the agent's output
+        await self.emit("review", {"snippet": snippet})
+```
+
+## 2️⃣ Register the agent
+
+Add the import and registration call in your `config/agents.toml` (or directly in Python):
+
+```toml
+# config/agents.toml
+[agents.custom_reviewer]
+module = "my_package.agents.custom_reviewer"
+class = "CustomReviewer"
+```
+
+If you prefer a pure-Python registration, do:
+
+```python
+# in your startup script or __init__.py
+from berg_agents.agents.factory import register_agent
+from my_package.agents.custom_reviewer import CustomReviewer
+
+register_agent("custom_reviewer", CustomReviewer)
+```
+
+## 3️⃣ Run a task that uses the agent
+
+```bash
+# From the repo root
+python -m berg_agents \
+    --task "Read README.qmd and give me a short 2-sentence summary" \
+    --agent "custom_reviewer"
+```
+
+You should see a streamed output similar to:
+
+```
+[review] {'snippet': '## Quick-Start\nBergAgents ...'}
+```
+
+## 4️⃣ What just happened?
+
+1. The **Harness** instantiated the `CustomReviewer` agent.  
+2. It passed the task description to the agent's `run` method.  
+3. The agent sliced the first 100 characters and emitted a `review` event.  
+4. The Harness captured the event and returned it as the final result.
+
+That's all there is to it! Feel free to replace the logic with any behaviour - file writes, API calls, database queries - just remember to **await** any async work and **emit** events that the harness can capture.
+
+---
+
+## Next Steps
+
+- Add unit-tests for your agent using `pytest`.  
+- Experiment with HITL rules (see `docs/tutorials/hilt_lifecycle.qmd`).  
+- Publish the agent as a pip-installable package so other projects can reuse it.
+
+Happy hacking! 🚀

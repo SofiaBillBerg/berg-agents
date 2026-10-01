@@ -1,7 +1,7 @@
-/* Berg Agents Theme — Canonical Tokens and Base Primitives for Next.js */
+/* Berg Agents Theme - Canonical Tokens and Base Primitives for Next.js */
 
 :root {
-  /* Brand — the signature gradient stops */
+  /* Brand - the signature gradient stops */
   --berg-brand-purple: #7d029c;
   --berg-brand-blue: #3b528b;
   --berg-brand-teal: #21908c;
@@ -15,7 +15,7 @@
   --berg-accent-yellow: #fde725; /* callout marker */
   --berg-accent-amber: #fd9f07; /* warning marker */
 
-  /* Neutrals — body copy, surfaces, dividers */
+  /* Neutrals - body copy, surfaces, dividers */
   --berg-text: #010a13;
   --berg-bg: #fbf7fb;
   --berg-surface: #fffafa;
@@ -24,7 +24,7 @@
   --berg-border: #e9ecef;
   --berg-muted: #551a8b; /* callout label colour */
 
-  /* Status — aligned to the viridis family used in custom.css callouts */
+  /* Status - aligned to the viridis family used in custom.css callouts */
   --berg-status-info: #3b528b;
   --berg-status-success: #21908c;
   --berg-status-warn: #fd9f07;
@@ -48,14 +48,14 @@
     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --berg-font-mono: "Fira Code", "Monaco", "Consolas", monospace;
 
-  --berg-fs-xs: 0.75rem; /* 12px — meta */
-  --berg-fs-sm: 0.875rem; /* 14px — small body */
-  --berg-fs-base: 1rem; /* 16px — body */
-  --berg-fs-md: 1.125rem; /* 18px — lead */
-  --berg-fs-lg: 1.25rem; /* 20px — subtitle */
-  --berg-fs-xl: 1.5rem; /* 24px — heading */
-  --berg-fs-2xl: 2rem; /* 32px — section title */
-  --berg-fs-3xl: 2.5rem; /* 40px — banner title */
+  --berg-fs-xs: 0.75rem; /* 12px - meta */
+  --berg-fs-sm: 0.875rem; /* 14px - small body */
+  --berg-fs-base: 1rem; /* 16px - body */
+  --berg-fs-md: 1.125rem; /* 18px - lead */
+  --berg-fs-lg: 1.25rem; /* 20px - subtitle */
+  --berg-fs-xl: 1.5rem; /* 24px - heading */
+  --berg-fs-2xl: 2rem; /* 32px - section title */
+  --berg-fs-3xl: 2.5rem; /* 40px - banner title */
 
   --berg-fw-regular: 400;
   --berg-fw-medium: 500;
@@ -86,12 +86,12 @@
   --berg-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Dark mode — plum-tinted surfaces so every legacy `var(--berg-*)`
+/* Dark mode - plum-tinted surfaces so every legacy `var(--berg-*)`
    consumer (body, app shell, inputs, chips, callouts, cmd-output)
    follows the ThemeToggle `.dark` class, matching the HeroUI
    surfaces that already switch via their own oklch tokens. */
 .dark {
-  /* Neutrals — light copy on dark plum surfaces */
+  /* Neutrals - light copy on dark plum surfaces */
   --berg-text: #f2ecf7;
   --berg-bg: #14101b;
   --berg-surface: #1e1727;
@@ -100,7 +100,7 @@
   --berg-border: #3a2f4a;
   --berg-muted: #c9a6e8; /* callout label colour, readable on dark */
 
-  /* Status — lifted for contrast on dark surfaces */
+  /* Status - lifted for contrast on dark surfaces */
   --berg-status-info: #9db1e8;
   --berg-status-success: #5fc4bd;
   --berg-status-warn: #fd9f07;

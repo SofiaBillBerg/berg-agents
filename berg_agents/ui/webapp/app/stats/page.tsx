@@ -1,5 +1,5 @@
 /*
- * Stats page — dedicated view for learning/outcome statistics.
+ * Stats page - dedicated view for learning/outcome statistics.
  * Fetches stats from /api/learning-stats on the client.
  */
 
@@ -14,7 +14,7 @@ import { LearningPanel } from "../components/LearningPanel.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 
 /**
- * StatsPage — client component that fetches and displays learning statistics.
+ * StatsPage - client component that fetches and displays learning statistics.
  * Shows a spinner while loading and an empty state if no learnings exist.
  */
 export default function StatsPage() {
@@ -78,7 +78,7 @@ export default function StatsPage() {
       <div className="p-4 max-w-[95vw] mx-auto">
         <h1 className="text-2xl font-bold mb-4">Learning Stats</h1>
         <p className="text-sm text-muted-foreground mb-4">
-          Outcome statistics from agent runs — track success rates by task type
+          Outcome statistics from agent runs - track success rates by task type
           and model to understand what works best.
         </p>
         <LearningPanel stats={stats as never} />

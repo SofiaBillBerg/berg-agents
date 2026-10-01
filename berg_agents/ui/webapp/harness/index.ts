@@ -1,6 +1,6 @@
 /*
  * Barrel export for the harness module.
- * Simplified — uses AI SDK v7's useChat directly, no custom harness classes.
+ * Simplified - uses AI SDK v7's useChat directly, no custom harness classes.
  */
 
 // Re-export types used by components.
@@ -11,7 +11,7 @@ export type {
   HarnessEvent,
   HitlDecisionInput} from "./webhook";
 
-// Main chat hook — wraps AI SDK v7's useChat.
+// Main chat hook - wraps AI SDK v7's useChat.
 export { useAISDKChat } from "./useAISDKChat";
 export type {
   ChatMessage,
