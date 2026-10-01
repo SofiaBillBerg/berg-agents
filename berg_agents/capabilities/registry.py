@@ -30,14 +30,14 @@ class _ToolCatalogImpl:
         "fix",
     )
 
-    TOOL_REQUIREMENTS: dict[str, list[str]] = ClassVar({
+    TOOL_REQUIREMENTS: dict[str, list[str]] = {
         "edit_file": ["read_file", "edit_file"],
         "new_file": ["new_file"],
         "read_file": ["read_file"],
         "delete_file": ["delete_file"],
         "generate_test": ["read_file", "new_file"],
         "format_code": ["read_file", "edit_file"],
-        "execute_command": ["execute_command"]})
+        "execute_command": ["execute_command"]}
 
     @classmethod
     def tools_for(cls, task_type: str, description: str = "") -> list[str]:
