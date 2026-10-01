@@ -73,8 +73,7 @@
   entry: check-merge-conflict
   language: python
   types: [text]
-    stages: [pre-push, manual]
-
+  stages: [pre-push, manual]
 
 - id: check-symlinks
   name: check for broken symlinks
@@ -178,7 +177,6 @@
   types: [yaml]
   stages: [pre-commit, pre-push, manual]
 
-
 - id: air-format
   name: air-format
   description: Run the Air formatter on all files.
@@ -196,3 +194,4 @@
   name: ty
   description: "Run 'ty' for extremely fast Python type checking"
   entry: uv check --quiet --preview-features=check-command  --ty-version=0.0.84   --all-groups --python .venv/bin/python3
+  stages: [pre-push]
