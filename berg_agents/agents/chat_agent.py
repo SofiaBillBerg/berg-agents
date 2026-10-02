@@ -1,10 +1,9 @@
 """Pydantic AI adapter for BergAgents tools and agent construction.
 
 Builds a :class:`~pydantic_ai.Agent` whose tools come from a single
-:class:`~berg_agents.agents.workspace_toolset.WorkspaceToolset` - one
-named, audited toolset wrapping the framework-free ``ToolSpec`` list
-(which the harness loop uses directly) plus the ``run_task`` pipeline
-delegate. Used by the ``VercelAIAdapter`` streaming endpoint.
+:class:`~berg_agents.agents.workspace_toolset.WorkspaceToolset` — file
+tools plus staged plan/implement subagent delegates. Used by the
+``VercelAIAdapter`` streaming endpoint.
 """
 
 from __future__ import annotations
@@ -43,9 +42,9 @@ def build_chat_agent(
 
     The agent receives a single
     :class:`~berg_agents.agents.workspace_toolset.WorkspaceToolset`
-    (id ``"workspace"``): file/shell tools plus the ``run_task``
-    harness delegate, with per-tool approval flags and a usage guide
-    carried by the toolset itself.
+    (id ``"workspace"``): file/shell tools plus staged ``plan_task``
+    / ``implement_task`` subagent delegates, with per-tool approval
+    flags and a usage guide carried by the toolset itself.
 
     System prompt, model, and temperature all come from configuration
     (``config/bergagents.jsonc`` and ``config/profiles.yaml``) - never
@@ -68,7 +67,6 @@ def build_chat_agent(
         make_web_search,
     )
     from berg_agents.config.settings import get_settings
-    from berg_agents.core.harness import Harness
     from berg_agents.providers.models import resolve_model_instance
 
     # Resolve the model from config - resolve_model_instance reads
@@ -83,13 +81,9 @@ def build_chat_agent(
         else settings.system_prompt
     )
 
-    # Shared harness for the run_task delegate - full pipeline
-    # (planning, subagents, HITL, implementation).
-    harness = Harness(enable_inference=True)
-
+    # Shared workspace root for file tools and subagent delegates.
     toolset = WorkspaceToolset(
         root_dir,
-        harness=harness,
         allow_shell=_shell_allowed(),
     )
 
@@ -101,11 +95,11 @@ def build_chat_agent(
         # recovery chance instead of failing the whole turn.
         # NOTE: no approval-handling capability here on purpose.
         # Tools flagged requires_approval (bash, edit_file,
-        # write_file, run_task) pause the run as DeferredToolRequests;
-        # the chat endpoint declares that output type so the
-        # VercelAIAdapter streams an approval request, and the
-        # frontend answers it with an approval response. Every
-        # approval is collected through the UI.
+        # write_file, implement_task) pause the run as
+        # DeferredToolRequests; the chat endpoint declares that
+        # output type so the VercelAIAdapter streams an approval
+        # request, and the frontend answers it with an approval
+        # response. Every approval is collected through the UI.
         retries={"output": 3},
         toolsets=[toolset, *build_mcp_toolsets()],
         capabilities=[

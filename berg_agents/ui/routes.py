@@ -124,8 +124,11 @@ def create_router(
         HITL approval requests).
 
         Simple messages like "hello" get a direct LLM reply - no tool calls.
-        Complex requests (e.g. "write a file") trigger the model's tools
-        (file operations + ``run_task``), which run the full BergAgents pipeline.
+        Multi-step requests are handled through visible delegation:
+        the model plans first (``plan_task``), then implements
+        (``implement_task``) - each stage streams its own result into
+        the transcript, so progress, steering points, and approvals
+        stay visible instead of vanishing inside one opaque call.
 
         The agent, model, and system prompt all come from configuration
         (``config/bergagents.jsonc`` and ``config/profiles.yaml``) - never
@@ -149,8 +152,8 @@ def create_router(
         # VercelAIAdapter.dispatch_request handles all SSE encoding and
         # protocol transformation natively - no manual event loops needed.
         # output_type adds DeferredToolRequests: tools flagged
-        # requires_approval (bash, edit_file, write_file, run_task)
-        # pause the run instead of executing, the adapter streams an
+        # requires_approval (bash, edit_file, write_file,
+        # implement_task) pause the run instead of executing, the adapter streams an
         # approval request, and the frontend answers it with
         # addToolApprovalResponse - which re-POSTs here carrying the
         # approval. The adapter extracts approvals from the incoming

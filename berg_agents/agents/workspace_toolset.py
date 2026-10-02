@@ -60,10 +60,11 @@ Workspace tools (toolset `workspace`) - how to work the filesystem:
 - WRITE with intent: write_file creates, edit_file replaces. Both
   need human approval in chat - the user sees an approve/reject
   dialog, so say what you are about to do before calling.
-- COMPLEX work (multi-step plans, refactors, research) belongs in
-  run_task, which drives the full harness pipeline for you.
+- COMPLEX work (multi-step plans, refactors, research) starts with
+  plan_task, then implement_task runs the approved plan. Each stage
+  streams its own result — progress stays visible.
 - If a tool answers "not found" or "is a directory", follow the
-  message. Do not retry the same call and do not invent tool names -
+  message. Do not retry the same call and do not invent tool names —
   the toolset above is the complete inventory.
 """
 
@@ -73,13 +74,12 @@ class WorkspaceToolset(WrapperToolset[None]):
 
     Builds an inner :class:`FunctionToolset` from
     :func:`~berg_agents.agents.factory.create_tools` (the same specs
-    the harness loop and ``/api/tool/execute`` run) plus an optional
-    ``run_task`` pipeline delegate, then adds identity, instructions,
-    dynamic membership, and an audited call path on top.
+    the harness loop and ``/api/tool/execute`` run) plus staged
+    ``plan_task`` / ``implement_task`` subagent delegates, then adds
+    identity, instructions, dynamic membership, and an audited call
+    path on top.
 
     :param root_dir: Workspace root all file tools are bound to.
-    :param harness: Optional harness for the ``run_task`` delegate.
-        Omitted (e.g. read-only contexts) means no ``run_task`` tool.
     :param read_only: When True, only low-risk tools (list, read,
         search) are registered - the model cannot change files even
         if it tries. Mutating tools are withheld, not merely
@@ -92,15 +92,12 @@ class WorkspaceToolset(WrapperToolset[None]):
         self,
         root_dir: str | Path,
         *,
-        harness: Any | None = None,
         read_only: bool = False,
         allow_shell: bool = True,
     ) -> None:
         """Initialize the workspace toolset.
 
         :param root_dir: Workspace root all file tools are bound to.
-        :param harness: Optional harness for the ``run_task`` delegate.
-            Omitted (e.g. read-only contexts) means no ``run_task`` tool.
         :param read_only: When True, only low-risk tools (list, read,
             search) are registered - the model cannot change files even
             if it tries. Mutating tools are withheld, not merely
@@ -131,17 +128,32 @@ class WorkspaceToolset(WrapperToolset[None]):
                 description=spec.description or spec.name,
                 requires_approval=risk != "low",
             )
-        if harness is not None and not read_only:
+        if not read_only:
+            # Staged delegation: plan first (read-only, no approval),
+            # then implement against the approved plan (approval-gated).
+            # Each stage streams its own result, so progress stays
+            # visible instead of vanishing inside one opaque call.
             inner.add_function(
-                self._make_run_task(harness),
-                name="run_task",
+                _make_plan_task(),
+                name="plan_task",
                 description=(
-                    "Execute a complex task through the full BergAgents "
-                    "harness pipeline (planning, subagents, file changes, "
-                    "review). Use for multi-step work; reply directly for "
-                    "simple questions."
+                    "Decompose a task into an ordered step plan via the "
+                    "planner subagent. Call this before implement_task "
+                    "on any multi-step work."
+                ),
+                requires_approval=False,
+                timeout=240.0,
+            )
+            inner.add_function(
+                _make_implement_task(str(root_dir)),
+                name="implement_task",
+                description=(
+                    "Execute an approved step plan via the implementation "
+                    "subagent (workspace-rooted file tools). Only call "
+                    "with a plan the user has seen."
                 ),
                 requires_approval=True,
+                timeout=600.0,
             )
         super().__init__(wrapped=inner)
         self._root_dir = str(root_dir)
@@ -188,59 +200,54 @@ class WorkspaceToolset(WrapperToolset[None]):
         )
         return result
 
-    @staticmethod
-    def _make_run_task(harness: Any) -> Any:
-        """Build the ``run_task`` pipeline delegate bound to *harness*.
+def _make_plan_task() -> Any:
+    """Build the ``plan_task`` delegate (planner subagent, read-only)."""
 
-        :param harness: Harness to execute tasks through.
-        :return: Async callable for the ``run_task`` tool.
+    async def _plan_task(description: str) -> str:
+        """Decompose a task into an ordered step plan.
+
+        Calls the planner subagent in an isolated run and returns
+        its plan as text. Read-only: plans nothing, changes nothing.
+        Always plan before implementing multi-step work.
+
+        :param description: What needs doing, in plain language.
+        :return: Numbered step plan as text.
         """
+        from berg_agents.agents.planner import PlannerDeps, build_planner_agent
 
-        async def _run_task(
-            description: str, task_type: str = "generic"
-        ) -> str:
-            """Execute a complex task through the full BergAgents harness pipeline.
+        agent = build_planner_agent()
+        result = await agent.run(description, deps=PlannerDeps())
+        return str(result.output)
 
-            Use this for tasks that need planning, subagents, file changes,
-            HITL review, or multi-step execution - e.g. 'write a Python script',
-            'refactor this module', or 'analyze the codebase'.
+    return _plan_task
 
-            For simple questions or conversation, reply directly without calling
-            this tool.
 
-            :param description: What the user wants done.
-            :param task_type: Type of task (generic, code, research, etc.).
-            :return: JSON-encoded result from the harness.
-            """
-            task: dict[str, Any] = {
-                "description": description,
-                "task_type": task_type,
-                "metadata": {}}
-            result = await asyncio.to_thread(
-                harness.execute_task, task, task_id=f"chat-{id(description)}"
-            )
+def _make_implement_task(root_dir: str) -> Any:
+    """Build the ``implement_task`` delegate (implementation subagent)."""
 
-            # If the harness needs human review, surface it so the caller
-            # (VercelAIAdapter) emits the HITL event to the frontend.
-            if (
-                isinstance(result, dict)
-                and result.get("status") == "needs_human_review"
-            ):
-                return json.dumps({
-                    "status": "needs_human_review",
-                    "review_reasons": result.get("review_reasons", []),
-                    "risk_level": result.get("risk_level"),
-                    "action_requests": result.get("action_requests", []),
-                    "answer": result.get("implementation", {}).get(
-                        "answer", ""
-                    )})
+    async def _implement_task(plan: str, task_type: str = "generic") -> str:
+        """Execute an approved step plan via the implementation subagent.
 
-            if isinstance(result, str):
-                return result
-            if isinstance(result, list) and result:
-                result = result[0] if isinstance(result[0], dict) else {}
-            return (
-                json.dumps(result) if isinstance(result, dict) else str(result)
-            )
+        Runs in an isolated run with workspace-rooted file tools and
+        returns what was done. Only call with a plan the user has
+        seen — execution needs human approval first.
 
-        return _run_task
+        :param plan: The step plan to execute (from ``plan_task``).
+        :param task_type: Task type label for model routing.
+        :return: Execution summary as text.
+        """
+        from berg_agents.agents.implementation import (
+            ImplementationDeps,
+            build_implementation_agent,
+        )
+
+        agent = build_implementation_agent()
+        result = await agent.run(
+            plan,
+            deps=ImplementationDeps(
+                workspace_root=root_dir, task_type=task_type
+            ),
+        )
+        return str(result.output)
+
+    return _implement_task
