@@ -43,10 +43,21 @@ export function toTranscriptHistory(
 }
 
 /**
+ * One transcript message for export. `reasoning` carries the model's
+ * chain-of-thought trace when the provider emitted one — it renders
+ * as a blockquote so no thinking is lost in saved sessions.
+ */
+export interface ExportMessage {
+  role: string;
+  content: string;
+  reasoning?: string;
+}
+
+/**
  * Build session export as markdown.
  */
 export function buildExportMarkdown(
-  transcript: Array<{ role: string; content: string }>,
+  transcript: Array<ExportMessage>,
   events: Array<{ type: string; data?: unknown }>,
   hitlRequest: unknown,
   cmdOutput: string | null,
@@ -59,7 +70,8 @@ export function buildExportMarkdown(
     "---",
     ""];
 
-  // 1. Conversation transcript
+  // 1. Conversation transcript (tool outputs ride inside content;
+  // reasoning traces are quoted so saved sessions keep the thinking).
   if (transcript.length > 0) {
     lines.push("## Conversation", "");
     transcript.forEach((msg) => {
@@ -71,7 +83,15 @@ export function buildExportMarkdown(
             : msg.role === "system"
               ? "⚙️ **System**"
               : msg.role;
-      lines.push(header, "", msg.content || "", "", "---", "");
+      lines.push(header, "", msg.content || "", "");
+      if (msg.reasoning && msg.reasoning.trim() !== "") {
+        lines.push("**🧠 Thinking:**", "");
+        for (const line of msg.reasoning.trim().split("\n")) {
+          lines.push(`> ${line}`);
+        }
+        lines.push("");
+      }
+      lines.push("---", "");
     });
   }
 

@@ -12,8 +12,8 @@ export interface InputBarProps {
   setInput: (value: React.SetStateAction<string>) => void;
   /** Send handler - slash commands are handled locally, else a harness task. */
   onSend: () => void;
-  /** True while a task runs or an approval is pending (blocks new sends). */
-  disabled: boolean;
+  /** True while a response streams (send then interrupts + redirects). */
+  streaming: boolean;
   /** Stop handler - cancels an in-flight streaming request. */
   onStop?: () => void;
   /** Key handler from the parent (Enter-to-send, Escape closes pickers). */
@@ -25,16 +25,19 @@ export interface InputBarProps {
 /**
  * InputBar component - HeroUI v3 rebuild.
  *
- * Chat input field with send button. Disabled while streaming or HITL
- * pending. Auto-resizes based on content (adaptive height between 60px
- * and 300px). The HeroUI TextArea renders a native textarea, so the
- * auto-resize effect keeps working through its forwarded ref.
+ * Chat input field with send button. The box stays editable while
+ * streaming so the user can steer: pressing Send mid-stream stops the
+ * current response and sends the new message instead (interrupt and
+ * redirect). ⏹ Stop cancels outright. Auto-resizes based on content
+ * (adaptive height between 60px and 300px). The HeroUI TextArea
+ * renders a native textarea, so the auto-resize effect keeps working
+ * through its forwarded ref.
  */
 function InputBar({
   input,
   setInput,
   onSend,
-  disabled,
+  streaming,
   onStop,
   onKeyDown,
   placeholder = "Type a message..."}: InputBarProps) {
@@ -56,7 +59,7 @@ function InputBar({
       maxHeight,
     );
     textarea.style.height = `${newHeight}px`;
-  }, [input, disabled]);
+  }, [input, streaming]);
 
   return (
     <div className="input-bar">
@@ -65,32 +68,43 @@ function InputBar({
         fullWidth
         aria-label="Message input"
         className="flex-1 overflow-hidden resize-none"
-        disabled={disabled}
         id="message-input"
         name="message"
-        placeholder={placeholder}
+        placeholder={
+          streaming ? "Type to interrupt and redirect…" : placeholder
+        }
         rows={3}
         value={input}
         onChange={(event) => setInput(event.target.value)}
         onKeyDown={onKeyDown}
       />
-      <Button
-        className="min-h-11 shrink-0"
-        isDisabled={disabled || !input.trim()}
-        variant="primary"
-        onPress={onSend}
+      <span
+        title={
+          streaming
+            ? "Stop the current response and send this instead"
+            : "Send message"
+        }
       >
-        {disabled ? "Sending..." : "Send"}
-      </Button>
-
-      {disabled && onStop && (
         <Button
-          className="min-h-11 shrink-0 border border-warning text-warning hover:bg-warning/10"
-          variant="outline"
-          onPress={onStop}
+          className="min-h-11 shrink-0"
+          isDisabled={!input.trim()}
+          variant="primary"
+          onPress={onSend}
         >
-          ⏹ Stop
+          {streaming ? "↩ Send" : "Send"}
         </Button>
+      </span>
+
+      {streaming && onStop && (
+        <span title="Cancel the in-flight response">
+          <Button
+            className="min-h-11 shrink-0 border border-warning text-warning hover:bg-warning/10"
+            variant="outline"
+            onPress={onStop}
+          >
+            ⏹ Stop
+          </Button>
+        </span>
       )}
     </div>
   );

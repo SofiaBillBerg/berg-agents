@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.15",
     "Operating System :: OS Independent"]
 dependencies = [
+    "pydantic-ai-harness[code-mode]>=0.36.0",
     "pydantic-ai-slim[duckduckgo,web-fetch]>=2.51.0"] # use dependency groups
 
 [build-system]

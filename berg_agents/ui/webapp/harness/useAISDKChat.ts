@@ -14,7 +14,7 @@ import type { SetStateAction } from "react";
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { API_BASE } from "@/envConfig";
 
@@ -60,6 +60,8 @@ export interface UseAISDKChatReturn {
   clearMessages: () => void;
   stop: () => void;
   sendMessage: (content: string) => Promise<void>;
+  /** Stop the current response, then send (mid-stream steering). */
+  interruptWith: (content: string) => Promise<void>;
   /** Replace the live conversation (history restore). */
   restoreMessages: (msgs: unknown[]) => void;
   /** Tool calls currently awaiting human approval. */
@@ -121,7 +123,7 @@ function messageText(msg: UIMessage): string {
             p.input as Record<string, unknown>,
           ).map(([k, v]) => {
             const s = typeof v === "string" ? v : JSON.stringify(v);
-            return `${k}=${s.length > 60 ? s.slice(0, 60) + "..." : s}`;
+            return `${k}=${s}`;
           });
           args = entries.length > 0 ? `(${entries.join(", ")})` : "";
         } catch {
@@ -129,14 +131,71 @@ function messageText(msg: UIMessage): string {
         }
       }
       // A paused tool call renders as an approval prompt, not a plain call.
+      // Parts without an approval id are ghosts from dead runs (see
+      // sanitizeHistory): shown as expired, and the approval card
+      // correctly ignores them since there is nothing to answer.
+      const approval = (p as { approval?: unknown }).approval as
+        { id?: unknown } | undefined;
       const marker =
         (p as { state?: unknown }).state === "approval-requested"
-          ? "⏳ needs approval"
+          ? typeof approval?.id === "string"
+            ? "⏳ needs approval"
+            : "⏳ approval expired"
           : "🔧";
       chunks.push(`${marker} ${name}${args}`);
+      // Completed calls also show their output (capped) so the result
+      // — including run_task planning output — stays visible instead
+      // of vanishing behind a one-line invocation.
+      const output = (p as { output?: unknown }).output;
+      if (output !== undefined && output !== null) {
+        let text = typeof output === "string" ? output : JSON.stringify(output);
+        if (text.length > 1500) {
+          text = `${text.slice(0, 1500)}\n… (output truncated)`;
+        }
+        if (text.trim() !== "") {
+          chunks.push(`\`\`\`\n${text.trim()}\n\`\`\``);
+        }
+      }
     }
   }
   return chunks.filter(Boolean).join("\n");
+}
+
+/**
+ * Sanitize a restored conversation so stale single-use state can never
+ * poison a fresh run. Approval responses are per-run nonces: replaying
+ * an old `approval-responded` part makes the backend try to resume a
+ * dead run (observed as cryptic failures). Parts answered but never
+ * executed revert to `approval-requested` so the user is asked again;
+ * malformed parts are dropped.
+ */
+function sanitizeHistory(msgs: unknown[]): unknown[] {
+  return msgs
+    .filter(
+      (m): m is Record<string, unknown> =>
+        typeof m === "object" &&
+        m !== null &&
+        typeof (m as { id?: unknown }).id === "string" &&
+        typeof (m as { role?: unknown }).role === "string" &&
+        Array.isArray((m as { parts?: unknown }).parts),
+    )
+    .map((m) => ({
+      ...m,
+      parts: (m.parts as unknown[]).filter((p) => {
+        if (typeof p !== "object" || p === null) return false;
+        const part = p as { type?: unknown; state?: unknown };
+        if (typeof part.type !== "string") return false;
+        if (
+          (part.type === "dynamic-tool" || part.type.startsWith("tool-")) &&
+          part.state === "approval-responded" &&
+          (part as { output?: unknown }).output === undefined
+        ) {
+          // Answered but never executed: re-ask instead of replaying.
+          (part as { state: unknown }).state = "approval-requested";
+          delete (part as { approval?: unknown }).approval;
+        }
+        return true;
+      })}));
 }
 
 /**
@@ -264,11 +323,18 @@ export function useAISDKChat(): UseAISDKChatReturn {
   // Restore a snapshot (e.g. from ConversationHistory) into the live chat.
   const restoreMessages = (msgs: unknown[]) => {
     if (!Array.isArray(msgs)) return;
-    setUIMessages(msgs as unknown as UIMessage[]);
+    setUIMessages(sanitizeHistory(msgs) as unknown as UIMessage[]);
   };
+
+  // Tracks whether the mount-restore below has run. The persist effect
+  // must stay quiet until then: on a fresh mount uiMessages is empty,
+  // and persisting that emptiness first would wipe the stored
+  // conversation (this is what erased chats on tab switches).
+  const restoredRef = useRef(false);
 
   // Persist the live conversation so tab switches and reloads keep it.
   useEffect(() => {
+    if (!restoredRef.current) return;
     try {
       localStorage.setItem(
         CHAT_MESSAGES_KEY,
@@ -286,10 +352,12 @@ export function useAISDKChat(): UseAISDKChatReturn {
       if (!raw) return;
       const parsed: unknown = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        setUIMessages(parsed as unknown as UIMessage[]);
+        setUIMessages(sanitizeHistory(parsed) as unknown as UIMessage[]);
       }
     } catch {
       // Corrupt storage - start with an empty conversation.
+    } finally {
+      restoredRef.current = true;
     }
   }, []);
 
@@ -317,6 +385,16 @@ export function useAISDKChat(): UseAISDKChatReturn {
     await sdkSendMessage({ text: content });
   };
 
+  // Interrupt-and-redirect: stop the in-flight response, then send.
+  // This is how the user steers mid-stream. stop() aborts the fetch;
+  // the fresh send opens its own request, so no state gets tangled.
+  const interruptWith = async (content: string) => {
+    if (!content.trim()) return;
+    stop();
+    setInput("");
+    await sdkSendMessage({ text: content });
+  };
+
   return {
     messages,
     input,
@@ -330,6 +408,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     clearMessages,
     stop,
     sendMessage,
+    interruptWith,
     restoreMessages,
     pendingApprovals,
     respondToApproval};

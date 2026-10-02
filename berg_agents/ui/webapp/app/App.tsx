@@ -92,6 +92,7 @@ function ChatContent() {
     stop,
     clearMessages,
     restoreMessages,
+    interruptWith,
     pendingApprovals,
     respondToApproval} = aiChat;
 
@@ -259,7 +260,20 @@ function ChatContent() {
 
   // -------------------------------------------------------------------------
   // Send handler - intercepts slash commands, otherwise forwards to AI SDK.
+  // While streaming, sending interrupts the in-flight response and
+  // redirects with the new message (steering); otherwise it sends.
   // -------------------------------------------------------------------------
+  const forwardToModel = useCallback(
+    (text: string) => {
+      if (isStreaming) {
+        void interruptWith(text);
+      } else {
+        void sendMessage(text);
+      }
+    },
+    [isStreaming, interruptWith, sendMessage],
+  );
+
   const handleSendWrapper = useCallback(() => {
     if (!input.trim()) return;
 
@@ -269,15 +283,15 @@ function ChatContent() {
       void processSlashCommand(input.trim()).then((outcome) => {
         if (!outcome.handled) {
           // Not a recognized command - forward the original text.
-          void sendMessage(input.trim());
+          forwardToModel(input.trim());
         }
       });
       return;
     }
 
     // No slash prefix - just send the message to the AI model.
-    void sendMessage(input.trim());
-  }, [input, processSlashCommand, sendMessage]);
+    forwardToModel(input.trim());
+  }, [input, processSlashCommand, forwardToModel]);
 
   // -------------------------------------------------------------------------
   // Keyboard handling (Enter → send, Shift+Enter → new line)
@@ -414,7 +428,10 @@ function ChatContent() {
                         respondToApproval(
                           approval.id,
                           false,
-                          "Rejected by user in chat UI.",
+                          "Rejected by the user. Do NOT attempt this action " +
+                            "again in any form — neither the same call with " +
+                            "different arguments nor an equivalent edit. " +
+                            "Continue without it or ask what to do instead.",
                         )
                       }
                     >
@@ -435,15 +452,16 @@ function ChatContent() {
           transcript={messages}
         />
 
-        {/* Input bar at the bottom */}
-        <div className="relative">
+        {/* Input bar at the bottom — sticky so long transcripts can
+            never push it out of view. */}
+        <div className="relative sticky bottom-2 z-10 bg-background/95 backdrop-blur rounded-lg">
           <InputBar
-            disabled={isStreaming}
             input={input}
             placeholder="Type a message... (e.g. 'hello' or 'write a Python script')"
             setInput={setInput}
             onKeyDown={onKeyDown}
             onSend={handleSendWrapper}
+            streaming={isStreaming}
             onStop={isStreaming ? stop : undefined}
           />
         </div>

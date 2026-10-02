@@ -172,6 +172,8 @@ TOOL SELECTION (complete inventory - the agent has exactly these tools):
 - bash: run shell commands - tests, builds, linters, inspection (e.g. "pytest -q", "ls"). Has a timeout; output is truncated. All shell needs go through bash.
 - write_file: create a new file or overwrite an existing one
 - edit_file: replace the contents of an existing file
+- patch_file: replace one exact text block inside a file (surgical
+  alternative to rewriting the whole file)
 - run_task: delegate complex multi-step work (planning, refactors, analysis)
   to the full harness pipeline (planner, guardian review, implementation)
 

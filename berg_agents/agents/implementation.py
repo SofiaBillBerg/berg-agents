@@ -583,6 +583,62 @@ def build_implementation_agent(
             _atomic_write(target, content)
             return f"Edited {target}"
 
+        @agent.tool
+        def patch_file(
+            ctx: RunContext[ImplementationDeps],
+            file_path: str,
+            old_text: str,
+            new_text: str,
+        ) -> str:
+            """Replace one block of text inside an existing file.
+
+            Surgical alternative to rewriting the whole file: only
+            the first occurrence of ``old_text`` is replaced.
+
+            :param ctx: Run context carrying implementation deps.
+            :param file_path: Path to the file, relative to workspace
+                root or prefixed with /workspace.
+            :param old_text: Exact text block to replace (verbatim).
+            :param new_text: Replacement text.
+
+            :return: Confirmation message, or guidance when the file
+                is missing or the block is not found verbatim.
+            """
+            root = ctx.deps.workspace_root or "."
+            target = _normalize_target(file_path, root)
+            if target.is_dir():
+                return (
+                    f"{file_path} is a directory, not a file. "
+                    f"Call list_files with file_path={file_path!r} "
+                    f"to see its contents."
+                )
+            if not target.exists():
+                return (
+                    f"File not found: {file_path}. "
+                    f"Call list_files on the parent directory to see "
+                    f"what exists."
+                )
+            try:
+                text = target.read_text(encoding="utf-8")
+            except OSError as exc:
+                return f"Could not read {file_path}: {exc}"
+            except UnicodeDecodeError:
+                return f"Could not read {file_path}: not a UTF-8 text file."
+            if old_text not in text:
+                return (
+                    f"Block not found verbatim in {file_path}. "
+                    f"Call read_file first and copy the exact text, "
+                    f"whitespace included."
+                )
+            remaining = text.count(old_text) - 1
+            _atomic_write(target, text.replace(old_text, new_text, 1))
+            note = (
+                f" ({remaining} identical block(s) left untouched)"
+                if remaining
+                else ""
+            )
+            return f"Patched {target}{note}"
+
     return agent
 
 

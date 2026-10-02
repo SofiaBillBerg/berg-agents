@@ -58,8 +58,10 @@ def build_chat_agent(
     """
     from pydantic_ai import Agent
     from pydantic_ai.capabilities import WebFetch, WebSearch
+    from pydantic_ai_harness import Planning
 
     from berg_agents.agents.workspace_toolset import WorkspaceToolset
+    from berg_agents.capabilities.mcp_toolsets import build_mcp_toolsets
     from berg_agents.capabilities.skills import load_skill_capabilities
     from berg_agents.capabilities.web_backends import (
         make_web_fetch,
@@ -105,7 +107,7 @@ def build_chat_agent(
         # frontend answers it with an approval response. Every
         # approval is collected through the UI.
         retries={"output": 3},
-        toolsets=[toolset],
+        toolsets=[toolset, *build_mcp_toolsets()],
         capabilities=[
             # Provider-adaptive web tools: provider-native first where
             # the model supports it, local implementation otherwise.
@@ -114,6 +116,10 @@ def build_chat_agent(
             # ollama → duckduckgo → direct).
             WebSearch(local=make_web_search(settings.web_search_backends)),
             WebFetch(local=make_web_fetch(settings.web_search_backends)),
+            # Model-owned task plans with a live reminder: multi-step
+            # work shows its todos/plan in the transcript instead of
+            # happening invisibly. Eager — planning is core behavior.
+            Planning(),
             # Repo skills (SKILL.md manuals) as deferred capabilities:
             # one-line catalog entries until the model loads one.
             # Point BERG_AGENT_SKILLS at e.g. ".agents/skills".
