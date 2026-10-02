@@ -86,6 +86,15 @@
           "name": "gemma4:cloud"},
         "nemotron-3-nano:30b-cloud": {
           "name": "nemotron-3-nano:30b-cloud"}}},
+    "omniroute-anthropic": {
+      "name": "omniroute-anthropic",
+      "options": {
+        "baseURL": "http://localhost:20128/api/v1/messages",
+        "apiKey": "${env:BERG_AGENT_OMNIROUTE_API_KEY}",
+        "timeout": 120000},
+      "models": {
+        "ac-com/logfare/auto": {
+          "name": "ac-com/logfare/auto"}}},
     "omniroute": {
       "name": "omniroute",
       "npm": "@ai-sdk/openai-compatible",
@@ -94,10 +103,18 @@
         "apiKey": "${env:BERG_AGENT_OMNIROUTE_API_KEY}",
         "timeout": 120000},
       "models": {
-        "auto": {
-          "name": "auto"},
-        "best-free": {
-          "name": "auto/best-free"}}}},
+        "free-stack-route": {
+          "name": "free-stack-route"},
+        "auto/best-free": {
+          "name": "auto/best-free"},
+        "logfare/logfare/auto": {
+          "name": "logfare/logfare/auto"},
+        "llmkiwi/auto": {
+          "name": "llmkiwi/auto"},
+        "base-free-stack": {
+          "name": "base-free-stack"},
+        "auto/free-combo": {
+          "name": "auto/free-combo"}}}},
   "defaultModel": "nemotron-3-nano:30b-cloud",
   //# MCP server secrets (git-ignored; referenced as ${VAR} in .mcp.json)
   //# "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}",
