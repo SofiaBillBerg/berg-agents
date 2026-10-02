@@ -485,7 +485,7 @@ function ChatContent() {
 
         {/* Input bar at the bottom — sticky so long transcripts can
             never push it out of view. */}
-        <div className="relative sticky bottom-2 z-10 bg-background/95 backdrop-blur rounded-lg">
+        <div className="sticky bottom-2 z-10 rounded-lg bg-background/95 backdrop-blur">
           <InputBar
             input={input}
             placeholder="Type a message... (e.g. 'hello' or 'write a Python script')"
@@ -519,6 +519,10 @@ function ChatContent() {
             </Disclosure.Body>
           </Disclosure.Content>
         </Disclosure>
+
+        {/* Breathing room below the last section so nothing sits
+            flush against the viewport edge (the "cropped" bottom). */}
+        <div className="h-10" aria-hidden="true" />
       </div>
     </LazyComponentErrorBoundary>
   );

@@ -1318,6 +1318,10 @@ button.primary:hover,
    above the chrome panels. The page scrolls when chrome opens. */
 .conversation-container {
   flex: 1 1 auto;
+  /* Contained scrolling: the transcript scrolls inside its card, so
+     page-level scroll can never cut the newest message or the input
+     bar out of view (the "cropped halfway" bottom). */
+  max-height: 55vh;
 }
 
 /* Harness events and raw JSON must wrap - clipped text is unreadable. */

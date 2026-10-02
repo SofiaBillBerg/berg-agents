@@ -67,6 +67,7 @@ def _load_config() -> dict[str, Any]:
     return servers if isinstance(servers, dict) else {}
 
 
+_CACHE: dict[str, Any] = {}
 _LAST_NAMES: list[str] = []
 
 
@@ -99,27 +100,25 @@ class _ResilientToolset(WrapperToolset[None]):
 
 
 def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
-    """Build one toolset per enabled MCP server.
+    """Build one toolset per enabled MCP server (cached per process).
 
-    Toolsets are built FRESH on every call on purpose: stdio-based
-    servers hold a live subprocess session that cannot be shared
-    between overlapping agent runs (sharing caused
-    "Failed to initialize server session" whenever two chat
-    requests overlapped). Construction is cheap; the connection
-    itself still opens lazily per run via the framework lifecycle.
+    Toolset objects are shared across requests; the stdio transports
+    underneath default to keep-alive, so server subprocesses persist
+    instead of respawning per chat message. Each agent run still opens
+    its own session through the framework lifecycle, and the
+    resilient wrapper degrades a dead server to "no tools" rather
+    than failing the turn.
 
-    :param refresh: Ignored (kept for API compatibility); every call
-        builds fresh instances.
+    :param refresh: Rebuild instead of reusing cached toolsets.
     :return: Toolsets ready for ``Agent(toolsets=[...])``.
     """
     from pydantic_ai.mcp import MCPToolset, StdioTransport, StreamableHttpTransport
 
     from berg_agents.core.mcp import is_sensitive_server
 
-    global _LAST_NAMES
-    if _LAST_NAMES and not refresh:
-        pass  # names only; instances below are always fresh (see docstring)
-    _LAST_NAMES = []
+    global _CACHE, _LAST_NAMES
+    if _CACHE and not refresh:
+        return list(_CACHE.values())
 
     toolsets: dict[str, Any] = {}
     for name, entry in _load_config().items():
@@ -141,10 +140,14 @@ def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
                 if not command:
                     raise ValueError("empty command")
                 env = _expand(entry.get("environment") or entry.get("env"))
+                # keep_alive is the fastmcp default (True); set it
+                # explicitly so the subprocess survives between runs
+                # instead of respawning per chat message.
                 client = StdioTransport(
                     command=command[0],
                     args=command[1:],
                     env=env if isinstance(env, dict) else None,
+                    keep_alive=True,
                 )
             else:
                 logger.warning(
@@ -169,6 +172,7 @@ def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
             logger.warning(
                 "MCP server %r unavailable, skipping: %s", name, exc
             )
+    _CACHE = toolsets
     _LAST_NAMES = sorted(toolsets)
     return list(toolsets.values())
 

@@ -121,8 +121,12 @@ export interface UseAISDKChatReturn {
   restoreMessages: (msgs: unknown[]) => void;
   /** Tool calls currently awaiting human approval. */
   pendingApprovals: PendingApproval[];
-  /** Answer every pending approval at once; the stream resumes. */
+  /** Answer one approval (per-item stepwise decisions). */
+  respondToApproval: (id: string, approved: boolean, reason?: string) => void;
+  /** Answer every pending approval at once (batch convenience). */
   respondToAllApprovals: (approved: boolean, reason?: string) => Promise<void>;
+  /** Replace a paused call's args (edit before approving). */
+  editApprovalArgs: (id: string, args: unknown) => void;
 }
 
 /**
@@ -286,10 +290,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
           messages: sanitizeHistory(messages as unknown as unknown[], true),
           trigger,
           messageId}})}),
-    // Resume a paused run after the user answers an approval request.
-    // Approvals are answered as a complete batch (see
-    // respondToAllApprovals), so resend when answered parts exist and
-    // nothing is still waiting. Normal finished turns never match.
+    // Resume a paused run after approvals. Per-item answers mark parts
+    // one at a time; the resend fires once every pending part in the
+    // paused message is answered (stepwise decisions never fire a
+    // partial resume, which the backend rejects). Normal finished
+    // turns never match.
     sendAutomaticallyWhen: ({ messages }) => {
       const last = messages[messages.length - 1] as
         { role?: unknown; parts?: unknown } | undefined;
