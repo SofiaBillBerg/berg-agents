@@ -2,6 +2,14 @@ import { useState } from "react";
 import { Surface } from "@heroui/react";
 
 import { MarkdownRenderer } from "./MarkdownRenderer.tsx";
+import { ToolCard } from "./ToolCard.tsx";
+
+export interface MessageToolCall {
+  tool: string;
+  input?: string;
+  output?: string;
+  state?: string;
+}
 
 export interface MessageItem {
   id?: string;
@@ -9,7 +17,7 @@ export interface MessageItem {
   content?: string;
   text?: string;
   reasoning?: string;
-  toolCalls?: any[];
+  toolCalls?: MessageToolCall[];
 }
 
 export interface MessageListProps {
@@ -82,6 +90,19 @@ export function MessageList({ history = [] }: MessageListProps) {
             <div className="message-list-content text-sm">
               <MarkdownRenderer content={text} />
             </div>
+            {msg.toolCalls && msg.toolCalls.length > 0 && (
+              <div className="mt-2 flex flex-col gap-2">
+                {msg.toolCalls.map((call, callIdx) => (
+                  <ToolCard
+                    key={`${msg.id || idx}-tool-${callIdx}`}
+                    tool={call.tool}
+                    input={call.input}
+                    output={call.output}
+                    expanded={false}
+                  />
+                ))}
+              </div>
+            )}
           </Surface>
         );
       })}

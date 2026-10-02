@@ -91,7 +91,11 @@
       "options": {
         "baseURL": "http://localhost:20128/api/v1/messages",
         "apiKey": "${env:BERG_AGENT_OMNIROUTE_API_KEY}",
-        "timeout": 120000},
+        "timeout": 120000,
+        //# API flavor: "anthropic-messages" builds a native AnthropicModel
+        //# against baseURL as-is. Without it, the OpenAI client appends
+        //# "/chat/completions" and the endpoint 404s.
+        "api": "anthropic-messages"},
       "models": {
         "ac-com/logfare/auto": {
           "name": "ac-com/logfare/auto"}}},

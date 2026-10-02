@@ -31,6 +31,61 @@ export interface ChatMessage {
   parts?: Array<Record<string, unknown>>;
   /** Model's private reasoning trace (omitted when empty). */
   reasoning?: string;
+  /** Completed tool calls, rendered as collapsible cards. */
+  toolCalls?: Array<{
+    tool: string;
+    input?: string;
+    output?: string;
+    state?: string;
+  }>;
+}
+
+/** Max output chars kept per tool call for display/export. */
+const MAX_TOOL_OUTPUT_CHARS = 4000;
+
+/**
+ * Extract completed tool calls from a UIMessage for card rendering.
+ * Output text is capped so one giant result cannot flood the chat.
+ */
+function messageToolCalls(msg: UIMessage): ChatMessage["toolCalls"] {
+  const calls: NonNullable<ChatMessage["toolCalls"]> = [];
+  for (const part of msg.parts) {
+    const p = part as unknown as Record<string, unknown>;
+    const pType = typeof p.type === "string" ? p.type : "";
+    if (pType !== "dynamic-tool" && !pType.startsWith("tool-")) continue;
+    const name =
+      (typeof p.toolName === "string" && p.toolName) ||
+      (pType.startsWith("tool-") ? pType.slice("tool-".length) : "tool");
+    let input = "";
+    if (p.input != null) {
+      try {
+        input =
+          typeof p.input === "string"
+            ? p.input
+            : JSON.stringify(p.input, null, 2);
+      } catch {
+        input = "";
+      }
+    }
+    let output: string | undefined;
+    const raw = (p as { output?: unknown }).output;
+    if (raw !== undefined && raw !== null) {
+      try {
+        output = typeof raw === "string" ? raw : JSON.stringify(raw, null, 2);
+      } catch {
+        output = String(raw);
+      }
+      if (output.length > MAX_TOOL_OUTPUT_CHARS) {
+        output = `${output.slice(0, MAX_TOOL_OUTPUT_CHARS)}\n… (output truncated)`;
+      }
+    }
+    calls.push({
+      tool: name,
+      input: input || undefined,
+      output,
+      state: typeof p.state === "string" ? (p.state as string) : undefined});
+  }
+  return calls.length > 0 ? calls : undefined;
 }
 
 export interface PendingApproval {
@@ -66,8 +121,8 @@ export interface UseAISDKChatReturn {
   restoreMessages: (msgs: unknown[]) => void;
   /** Tool calls currently awaiting human approval. */
   pendingApprovals: PendingApproval[];
-  /** Answer an approval request; the stream resumes automatically. */
-  respondToApproval: (id: string, approved: boolean, reason?: string) => void;
+  /** Answer every pending approval at once; the stream resumes. */
+  respondToAllApprovals: (approved: boolean, reason?: string) => Promise<void>;
 }
 
 /**
@@ -130,31 +185,26 @@ function messageText(msg: UIMessage): string {
           args = "";
         }
       }
-      // A paused tool call renders as an approval prompt, not a plain call.
-      // Parts without an approval id are ghosts from dead runs (see
-      // sanitizeHistory): shown as expired, and the approval card
-      // correctly ignores them since there is nothing to answer.
-      const approval = (p as { approval?: unknown }).approval as
-        { id?: unknown } | undefined;
-      const marker =
-        (p as { state?: unknown }).state === "approval-requested"
-          ? typeof approval?.id === "string"
-            ? "⏳ needs approval"
-            : "⏳ approval expired"
-          : "🔧";
-      chunks.push(`${marker} ${name}${args}`);
-      // Completed calls also show their output (capped) so the result
-      // — including run_task planning output — stays visible instead
-      // of vanishing behind a one-line invocation.
+      // Completed calls render as collapsible ToolCards downstream
+      // (see messageToolCalls), so the text transcript keeps only a
+      // marker for calls still in flight or awaiting approval.
+      // (Exports re-attach outputs from `toolCalls` — see utils.)
       const output = (p as { output?: unknown }).output;
-      if (output !== undefined && output !== null) {
-        let text = typeof output === "string" ? output : JSON.stringify(output);
-        if (text.length > 1500) {
-          text = `${text.slice(0, 1500)}\n… (output truncated)`;
-        }
-        if (text.trim() !== "") {
-          chunks.push(`\`\`\`\n${text.trim()}\n\`\`\``);
-        }
+      const hasOutput = output !== undefined && output !== null;
+      if (!hasOutput) {
+        // A paused tool call renders as an approval prompt, not a plain call.
+        // Parts without an approval id are ghosts from dead runs (see
+        // sanitizeHistory): shown as expired, and the approval card
+        // correctly ignores them since there is nothing to answer.
+        const approval = (p as { approval?: unknown }).approval as
+          { id?: unknown } | undefined;
+        const marker =
+          (p as { state?: unknown }).state === "approval-requested"
+            ? typeof approval?.id === "string"
+              ? "⏳ needs approval"
+              : "⏳ approval expired"
+            : "🔧";
+        chunks.push(`${marker} ${name}${args}`);
       }
     }
   }
@@ -169,7 +219,7 @@ function messageText(msg: UIMessage): string {
  * executed revert to `approval-requested` so the user is asked again;
  * malformed parts are dropped.
  */
-function sanitizeHistory(msgs: unknown[]): unknown[] {
+function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
   return msgs
     .filter(
       (m): m is Record<string, unknown> =>
@@ -179,23 +229,28 @@ function sanitizeHistory(msgs: unknown[]): unknown[] {
         typeof (m as { role?: unknown }).role === "string" &&
         Array.isArray((m as { parts?: unknown }).parts),
     )
-    .map((m) => ({
-      ...m,
-      parts: (m.parts as unknown[]).filter((p) => {
-        if (typeof p !== "object" || p === null) return false;
-        const part = p as { type?: unknown; state?: unknown };
-        if (typeof part.type !== "string") return false;
-        if (
-          (part.type === "dynamic-tool" || part.type.startsWith("tool-")) &&
-          part.state === "approval-responded" &&
-          (part as { output?: unknown }).output === undefined
-        ) {
-          // Answered but never executed: re-ask instead of replaying.
-          (part as { state: unknown }).state = "approval-requested";
-          delete (part as { approval?: unknown }).approval;
-        }
-        return true;
-      })}));
+    .map((m, index, all) => {
+      if (preserveLatest && index === all.length - 1) return m;
+      return {
+        ...m,
+        parts: (m.parts as unknown[]).filter((p) => {
+          if (typeof p !== "object" || p === null) return false;
+          const part = p as { type?: unknown; state?: unknown };
+          if (typeof part.type !== "string") return false;
+          if (
+            (part.type === "dynamic-tool" || part.type.startsWith("tool-")) &&
+            part.state === "approval-responded" &&
+            (part as { output?: unknown }).output === undefined
+          ) {
+            // Answered but never executed: re-ask instead of replaying.
+            return {
+              ...part,
+              state: "approval-requested",
+              approval: undefined};
+          }
+          return { ...part };
+        })};
+    });
 }
 
 /**
@@ -221,34 +276,37 @@ export function useAISDKChat(): UseAISDKChatReturn {
     stop,
     addToolApprovalResponse} = useChat({
     transport: new DefaultChatTransport({
-      api: `${API_BASE}/api/chat/stream`}),
+      api: `${API_BASE}/api/chat/stream`,
+      // Strip stale approval answers before every send. Anything
+      // answered in an EARLIER message belongs to a dead run; only
+      // the live last message may carry answers to the backend.
+      prepareSendMessagesRequest: ({ id, messages, trigger, messageId }) => ({
+        body: {
+          id,
+          messages: sanitizeHistory(messages as unknown as unknown[], true),
+          trigger,
+          messageId}})}),
     // Resume a paused run after the user answers an approval request.
-    // Fires only when the last assistant step holds an answered
-    // approval (state "approval-responded") with no completed output
-    // yet - normal finished turns (all parts "output-available" or
-    // plain text) never match, so no spurious re-sends.
+    // Approvals are answered as a complete batch (see
+    // respondToAllApprovals), so resend when answered parts exist and
+    // nothing is still waiting. Normal finished turns never match.
     sendAutomaticallyWhen: ({ messages }) => {
       const last = messages[messages.length - 1] as
         { role?: unknown; parts?: unknown } | undefined;
       if (!last || last.role !== "assistant" || !Array.isArray(last.parts)) {
         return false;
       }
-      const toolStates: string[] = [];
+      let answered = 0;
+      let waiting = 0;
       for (const part of last.parts) {
         if (typeof part !== "object" || part === null) continue;
         const p = part as { type?: unknown; state?: unknown };
         const t = typeof p.type === "string" ? p.type : "";
         if (t !== "dynamic-tool" && !t.startsWith("tool-")) continue;
-        toolStates.push(typeof p.state === "string" ? p.state : "");
+        if (p.state === "approval-responded") answered += 1;
+        else if (p.state === "approval-requested") waiting += 1;
       }
-      if (!toolStates.some((s) => s === "approval-responded")) return false;
-      return toolStates.every((s) =>
-        [
-          "output-available",
-          "output-error",
-          "output-denied",
-          "approval-responded"].includes(s),
-      );
+      return answered > 0 && waiting === 0;
     }});
 
   const isStreaming = status === "streaming" || status === "submitted";
@@ -288,24 +346,27 @@ export function useAISDKChat(): UseAISDKChatReturn {
     }
   }
 
-  // Answer an approval request. The SDK marks the part responded and
-  // re-POSTs the conversation; the backend resumes the paused run.
-  const respondToApproval = (
-    id: string,
-    approved: boolean,
-    reason?: string,
-  ) => {
-    void addToolApprovalResponse({ id, approved, reason });
+  // Answer ALL pending approvals as one batch. The backend requires
+  // a complete answer set (partial answers error with "results need
+  // to be provided for all deferred tool calls"), so per-item answers
+  // are deliberately not offered: one pause, one decision, one resume.
+  const respondToAllApprovals = async (approved: boolean, reason?: string) => {
+    const ids = pendingApprovals.map((a) => a.id);
+    for (const id of ids) {
+      await addToolApprovalResponse({ id, approved, reason });
+    }
   };
 
   // Convert AI SDK UIMessage[] to the simpler ChatMessage[] our UI expects.
-  // Reasoning traces ride along separately so the UI can collapse them.
+  // Reasoning traces and tool calls ride along separately so the UI can
+  // collapse them (reasoning block, ToolCards).
   const messages: ChatMessage[] = uiMessages.map((msg) => ({
     id: msg.id,
     role: msg.role as "user" | "assistant" | "system",
     content: messageText(msg),
     parts: [],
-    reasoning: messageReasoning(msg)}));
+    reasoning: messageReasoning(msg),
+    toolCalls: messageToolCalls(msg)}));
 
   const setMessages = (msgs: ChatMessage[]) => {
     setUIMessages(msgs as unknown as UIMessage[]);
@@ -321,9 +382,10 @@ export function useAISDKChat(): UseAISDKChatReturn {
   };
 
   // Restore a snapshot (e.g. from ConversationHistory) into the live chat.
+  // Stored snapshots predate this load, so no paused run can be live.
   const restoreMessages = (msgs: unknown[]) => {
     if (!Array.isArray(msgs)) return;
-    setUIMessages(sanitizeHistory(msgs) as unknown as UIMessage[]);
+    setUIMessages(sanitizeHistory(msgs, false) as unknown as UIMessage[]);
   };
 
   // Tracks whether the mount-restore below has run. The persist effect
@@ -352,7 +414,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
       if (!raw) return;
       const parsed: unknown = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        setUIMessages(sanitizeHistory(parsed) as unknown as UIMessage[]);
+        setUIMessages(sanitizeHistory(parsed, false) as unknown as UIMessage[]);
       }
     } catch {
       // Corrupt storage - start with an empty conversation.
@@ -411,5 +473,5 @@ export function useAISDKChat(): UseAISDKChatReturn {
     interruptWith,
     restoreMessages,
     pendingApprovals,
-    respondToApproval};
+    respondToAllApprovals};
 }

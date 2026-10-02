@@ -51,6 +51,12 @@ export interface ExportMessage {
   role: string;
   content: string;
   reasoning?: string;
+  toolCalls?: Array<{
+    tool: string;
+    input?: string;
+    output?: string;
+    state?: string;
+  }>;
 }
 
 /**
@@ -90,6 +96,15 @@ export function buildExportMarkdown(
           lines.push(`> ${line}`);
         }
         lines.push("");
+      }
+      for (const call of msg.toolCalls ?? []) {
+        lines.push(`**🔧 ${call.tool}**`, "");
+        if (call.input) {
+          lines.push("```json", call.input, "```", "");
+        }
+        if (call.output) {
+          lines.push("```", call.output, "```", "");
+        }
       }
       lines.push("---", "");
     });

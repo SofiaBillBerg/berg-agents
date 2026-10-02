@@ -11,8 +11,8 @@ import type { AgentInfo } from "@/harness/webhook";
 import type { Command } from "./components/SlashCommandAutocomplete";
 import type { ToolResult } from "./components/ChatTranscript";
 
-import React, { useCallback, useEffect, useState } from "react";
-import { Button, Card, Disclosure } from "@heroui/react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Button, Card, Disclosure, Toast, toast } from "@heroui/react";
 
 import { useAISDKChat } from "@/harness";
 import { API_BASE } from "@/envConfig";
@@ -94,7 +94,7 @@ function ChatContent() {
     restoreMessages,
     interruptWith,
     pendingApprovals,
-    respondToApproval} = aiChat;
+    respondToAllApprovals} = aiChat;
 
   // Commands for the slash-autocomplete palette
   const localCommands: Command[] = [
@@ -274,8 +274,19 @@ function ChatContent() {
     [isStreaming, interruptWith, sendMessage],
   );
 
+  // Guards double submits (fast double-Enter / Enter+click fired two
+  // identical POSTs before streaming state flipped). Released shortly
+  // after; streaming state (or the interrupt path) owns re-entry
+  // protection from there on.
+  const sendGuardRef = useRef<string | null>(null);
+
   const handleSendWrapper = useCallback(() => {
     if (!input.trim()) return;
+    if (sendGuardRef.current === input.trim()) return;
+    sendGuardRef.current = input.trim();
+    setTimeout(() => {
+      sendGuardRef.current = null;
+    }, 1500);
 
     // Detect a leading slash command.
     const cmdMatch = input.trim().match(/^\/(\w+)\s*(.*)/);
@@ -306,6 +317,22 @@ function ChatContent() {
     [handleSendWrapper],
   );
 
+  // Surface backend/stream errors as a toast (visible wherever the
+  // user has scrolled) in addition to the inline StatusCard record.
+  const lastToastedError = useRef<string | null>(null);
+  useEffect(() => {
+    if (chatError && chatError !== lastToastedError.current) {
+      lastToastedError.current = chatError;
+      toast.danger("Request failed", {
+        description:
+          chatError.length > 300 ? `${chatError.slice(0, 300)}…` : chatError,
+        timeout: 8000});
+    }
+    if (!chatError) {
+      lastToastedError.current = null;
+    }
+  }, [chatError]);
+
   // -------------------------------------------------------------------------
   // Status determination (error / streaming / idle)
   // -------------------------------------------------------------------------
@@ -317,6 +344,7 @@ function ChatContent() {
 
   return (
     <LazyComponentErrorBoundary componentName="Chat">
+      <Toast.Provider />
       <Navbar />
       <div className="app-container p-4 w-full max-w-[95vw] mx-auto">
         <div className="berg-title-banner mb-4 flex justify-between items-center flex-wrap gap-3">
@@ -386,9 +414,11 @@ function ChatContent() {
           />
         )}
 
-        {/* HITL approval requests - the agent paused and needs a human
-            yes/no before a mutating tool runs. Answering resumes the
-            same run; rejecting tells the model why. */}
+        {/* HITL approval requests - the agent paused and needs one human
+            decision covering every pending action. The backend only
+            accepts complete answer sets, so approvals are always
+            batch-wide: approve everything to resume, or reject
+            everything to stop this step. */}
         {pendingApprovals.length > 0 && (
           <Card className="mb-4 border-warning" variant="default">
             <Card.Header>
@@ -396,7 +426,7 @@ function ChatContent() {
               <Card.Description>
                 The agent wants to run {pendingApprovals.length} action
                 {pendingApprovals.length > 1 ? "s" : ""}. Nothing executes until
-                you decide.
+                you decide — one decision covers them all.
               </Card.Description>
             </Card.Header>
             <Card.Content className="flex flex-col gap-3">
@@ -413,33 +443,34 @@ function ChatContent() {
                       {approval.args}
                     </pre>
                   )}
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onPress={() => respondToApproval(approval.id, true)}
-                    >
-                      ✅ Approve & run
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onPress={() =>
-                        respondToApproval(
-                          approval.id,
-                          false,
-                          "Rejected by the user. Do NOT attempt this action " +
-                            "again in any form — neither the same call with " +
-                            "different arguments nor an equivalent edit. " +
-                            "Continue without it or ask what to do instead.",
-                        )
-                      }
-                    >
-                      ❌ Reject
-                    </Button>
-                  </div>
                 </div>
               ))}
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  isDisabled={isStreaming}
+                  onPress={() => void respondToAllApprovals(true)}
+                >
+                  ✅ Approve & run all
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  isDisabled={isStreaming}
+                  onPress={() =>
+                    void respondToAllApprovals(
+                      false,
+                      "Rejected by the user. Do NOT attempt these actions " +
+                        "again in any form — neither the same calls with " +
+                        "different arguments nor equivalent edits. " +
+                        "Continue without them or ask what to do instead.",
+                    )
+                  }
+                >
+                  ❌ Reject all
+                </Button>
+              </div>
             </Card.Content>
           </Card>
         )}

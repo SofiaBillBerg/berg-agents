@@ -1,5 +1,6 @@
 
 /.tmp/
+docs/tutorials/
 /notes/*
 project_utils/check_config.py
 # editiors
@@ -8,6 +9,7 @@ project_utils/check_config.py
 /.jbeval/
 project_utils/git_config.sh
 project_utils/setup-local-filter.sh
+/project_utils/setup-local-filter.sh
 project_utils/crlf_to_lf.sh
 **/*.bk
 **/*.bak

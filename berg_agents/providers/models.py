@@ -126,11 +126,16 @@ def resolve_model_instance(
 
     Uses the same resolution as :func:`resolve_model_string`
     (provider ownership from the registry, first declared model
-    as the default) but returns a ready-to-run
-    :class:`~pydantic_ai.models.openai.OpenAIChatModel`
+    as the default) but returns a ready-to-run model object
     pointed at the configured ``base_url`` with the configured
     ``api_key`` - no provider-name guessing, no process-env
     lookups, no network calls. Construction is fully offline.
+
+    The concrete class follows the provider block's ``"api"``
+    option: ``"anthropic-messages"`` builds a native
+    :class:`~pydantic_ai.models.anthropic.AnthropicModel`,
+    anything else (or nothing) builds an
+    :class:`~pydantic_ai.models.openai.OpenAIChatModel`.
 
     Args:
         model_id: Model identifier exactly as declared
@@ -192,6 +197,37 @@ def resolve_model_instance(
             "Registry resolved to an empty model name "
             "or base URL; refusing to build a model "
             "instance."
+        )
+    # Provider API flavor (per provider block, e.g.
+    # ``"api": "anthropic-messages"``). Default is OpenAI
+    # Chat Completions. A Messages-style base URL on the
+    # default flavor is a config error, not something to
+    # guess at: the OpenAI SDK would append
+    # ``/chat/completions`` to it and produce a 404.
+    api = str(resolved.get("api", "") or "").strip().lower()
+    if api in ("anthropic-messages", "anthropic"):
+        from pydantic_ai.providers.anthropic import AnthropicProvider
+
+        from pydantic_ai.models.anthropic import AnthropicModel
+
+        # The Anthropic SDK always appends "/v1/messages" itself, so a
+        # base URL already carrying that suffix (the full endpoint path,
+        # as users naturally paste it) would double up. Strip it.
+        root = base_url.rstrip("/")
+        for suffix in ("/v1/messages", "/messages"):
+            if root.endswith(suffix):
+                root = root[: -len(suffix)] or "/"
+                break
+        return AnthropicModel(  # type: ignore[return-value]
+            name,
+            provider=AnthropicProvider(base_url=root, api_key=api_key),
+        )
+    if base_url.rstrip("/").endswith("/messages"):
+        raise ValueError(
+            f"Provider base URL {base_url!r} looks like an Anthropic "
+            "Messages endpoint, but the provider block does not declare "
+            '"api": "anthropic-messages". Add that option instead of '
+            "letting the OpenAI client append /chat/completions to it."
         )
     return OpenAIChatModel(
         name,
