@@ -95,6 +95,11 @@ export interface PendingApproval {
   toolName: string;
   /** Human-readable argument summary */
   args: string;
+  /** True once the user decided this item (decided items stay in the
+      batch list so they can be retracted before the resume fires). */
+  decided?: boolean;
+  /** User's denial reason, when rejected with one. */
+  reason?: string;
 }
 
 export interface UseAISDKChatReturn {
@@ -121,12 +126,18 @@ export interface UseAISDKChatReturn {
   restoreMessages: (msgs: unknown[]) => void;
   /** Tool calls currently awaiting human approval. */
   pendingApprovals: PendingApproval[];
+  /** Full active approval batch from the last assistant message: pending
+      plus already-decided items (decided items stay visible with badges
+      + undo until the resume fires and parts transition to output). */
+  approvalBatch: PendingApproval[];
   /** Answer one approval (per-item stepwise decisions). */
   respondToApproval: (id: string, approved: boolean, reason?: string) => void;
   /** Answer every pending approval at once (batch convenience). */
   respondToAllApprovals: (approved: boolean, reason?: string) => Promise<void>;
   /** Replace a paused call's args (edit before approving). */
   editApprovalArgs: (id: string, args: unknown) => void;
+  /** Withdraw a per-item decision before the batch resumes. */
+  revertApproval: (id: string) => void;
 }
 
 /**
@@ -351,15 +362,137 @@ export function useAISDKChat(): UseAISDKChatReturn {
     }
   }
 
-  // Answer ALL pending approvals as one batch. The backend requires
-  // a complete answer set (partial answers error with "results need
-  // to be provided for all deferred tool calls"), so per-item answers
-  // are deliberately not offered: one pause, one decision, one resume.
+  // Full active batch for the per-item approval card: derived from the
+  // LAST assistant message only, including both pending
+  // ("approval-requested") and already-decided ("approval-responded")
+  // parts. Decided items stay visible with badges + undo until the
+  // resume fires and parts transition to output state (at which point
+  // the batch empties and the card disappears).
+  const approvalBatch: PendingApproval[] = [];
+  for (let i = uiMessages.length - 1; i >= 0; i--) {
+    const msg = uiMessages[i];
+    if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
+    for (const part of msg.parts) {
+      const p = part as unknown as Record<string, unknown>;
+      if (
+        typeof p !== "object" ||
+        p === null ||
+        (p.state !== "approval-requested" && p.state !== "approval-responded")
+      ) {
+        continue;
+      }
+      const approval = p.approval as
+        { id?: unknown; approved?: unknown; reason?: unknown } | undefined;
+      const approvalId = typeof approval?.id === "string" ? approval.id : null;
+      if (!approvalId) continue;
+      const pType = typeof p.type === "string" ? (p.type as string) : "";
+      const toolName =
+        (typeof p.toolName === "string" && (p.toolName as string)) ||
+        (pType.startsWith("tool-") ? pType.slice("tool-".length) : "tool");
+      let args = "";
+      if (p.input != null && typeof p.input === "object") {
+        try {
+          args = JSON.stringify(p.input);
+        } catch {
+          args = "";
+        }
+      }
+      const decided = p.state === "approval-responded";
+      const reason =
+        typeof approval?.reason === "string" ? approval.reason : undefined;
+      if (!approvalBatch.some((a) => a.id === approvalId)) {
+        approvalBatch.push({ id: approvalId, toolName, args, decided, reason });
+      }
+    }
+    // Only the last assistant message carries the live batch.
+    break;
+  }
+
+  // Answer ONE approval (per-item stepwise decision). The SDK marks
+  // that single part as responded; the resume only fires once EVERY
+  // pending part in the paused message is answered (see
+  // sendAutomaticallyWhen), so partial decisions never trigger a
+  // partial resume — the backend requires a complete answer set.
+  const respondToApproval = (
+    id: string,
+    approved: boolean,
+    reason?: string,
+  ) => {
+    void addToolApprovalResponse({ id, approved, reason });
+  };
+
+  // Answer EVERY pending approval at once (batch convenience).
   const respondToAllApprovals = async (approved: boolean, reason?: string) => {
     const ids = pendingApprovals.map((a) => a.id);
     for (const id of ids) {
       await addToolApprovalResponse({ id, approved, reason });
     }
+  };
+
+  // Replace a paused call's args before approving (edit). Updates the
+  // part's input in place; the backend adapter maps an approved call's
+  // part input to ToolApproved(override_args=...), so the edited args
+  // reach the actual tool execution. Allowed in both states: the
+  // resume only fires once EVERY pending part is answered, so editing
+  // still lands in time until the last decision is made.
+  const editApprovalArgs = (id: string, args: unknown) => {
+    setUIMessages(
+      (prev) =>
+        prev.map((msg) => {
+          const parts = msg.parts as unknown as Array<Record<string, unknown>>;
+          if (!Array.isArray(parts)) return msg;
+          let changed = false;
+          const nextParts = parts.map((p) => {
+            if (
+              typeof p !== "object" ||
+              p === null ||
+              (p.state !== "approval-requested" &&
+                p.state !== "approval-responded")
+            ) {
+              return p;
+            }
+            const approval = p.approval as { id?: unknown } | undefined;
+            if (approval?.id !== id) return p;
+            changed = true;
+            return { ...p, input: args };
+          });
+          return changed ? { ...msg, parts: nextParts } : msg;
+        }) as unknown as UIMessage[],
+    );
+  };
+
+  // Withdraw a per-item decision before the batch resumes: flip the
+  // part back to approval-requested so the user can reconsider. The
+  // part reappears in the approval card and no longer counts as
+  // answered, so the resume is held back again.
+  const revertApproval = (id: string) => {
+    setUIMessages(
+      (prev) =>
+        prev.map((msg) => {
+          const parts = msg.parts as unknown as Array<Record<string, unknown>>;
+          if (!Array.isArray(parts)) return msg;
+          let changed = false;
+          const nextParts = parts.map((p) => {
+            if (
+              typeof p !== "object" ||
+              p === null ||
+              p.state !== "approval-responded"
+            ) {
+              return p;
+            }
+            const approval = p.approval as { id?: unknown } | undefined;
+            if (approval?.id !== id) return p;
+            changed = true;
+            return {
+              ...p,
+              state: "approval-requested",
+              // Drop the answer so the wire payload carries a clean
+              // requested-state approval again.
+              approval: { ...approval, approved: undefined, reason: undefined }};
+          });
+          return changed ? { ...msg, parts: nextParts } : msg;
+        }) as unknown as UIMessage[],
+    );
   };
 
   // Convert AI SDK UIMessage[] to the simpler ChatMessage[] our UI expects.
@@ -478,5 +611,9 @@ export function useAISDKChat(): UseAISDKChatReturn {
     interruptWith,
     restoreMessages,
     pendingApprovals,
-    respondToAllApprovals};
+    approvalBatch,
+    respondToApproval,
+    respondToAllApprovals,
+    editApprovalArgs,
+    revertApproval};
 }

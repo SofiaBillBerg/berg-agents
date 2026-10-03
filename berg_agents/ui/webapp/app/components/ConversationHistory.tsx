@@ -53,6 +53,56 @@ function snapshotTitle(messages: unknown[]): string {
   return "Untitled conversation";
 }
 
+/** Read all saved snapshots (newest first). */
+export function readSnapshots(): ChatSnapshot[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed as ChatSnapshot[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Persist snapshots (newest first, capped). */
+export function writeSnapshots(sessions: ChatSnapshot[]): void {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(sessions.slice(0, 50)));
+  } catch {
+    // Quota exceeded - in-memory state is the caller's job.
+  }
+}
+
+/**
+ * Snapshot the live conversation into history (resumable session).
+ * Returns the snapshot, or null when there is nothing to save.
+ * Skips duplicates: when the newest snapshot already holds the same
+ * messages, it is returned untouched instead of saving twice.
+ */
+export function snapshotLiveChat(): ChatSnapshot | null {
+  const messages = readLiveMessages();
+  if (messages.length === 0) return null;
+  const sessions = readSnapshots();
+  const newest = sessions[0];
+  try {
+    if (
+      newest &&
+      JSON.stringify(newest.messages) === JSON.stringify(messages)
+    ) {
+      return newest;
+    }
+  } catch {
+    // Unserializable - fall through and save anyway.
+  }
+  const snapshot: ChatSnapshot = {
+    id: `${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+    title: snapshotTitle(messages),
+    timestamp: new Date().toISOString(),
+    messages: messages.slice(-200)};
+  writeSnapshots([snapshot, ...sessions]);
+  return snapshot;
+}
+
 /**
  * Sidebar widget that snapshots the live chat into localStorage and
  * restores snapshots back into it. Sessions persist across tab
@@ -81,17 +131,15 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
   };
 
   const saveCurrent = () => {
-    const messages = readLiveMessages();
-    if (messages.length === 0) return;
-    const snapshot: ChatSnapshot = {
-      id: `${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
-      title: snapshotTitle(messages),
-      timestamp: new Date().toISOString(),
-      messages: messages.slice(-200)};
-    persist([snapshot, ...sessions]);
+    const snapshot = snapshotLiveChat();
+    if (snapshot) setSessions(readSnapshots());
   };
 
   const restore = (session: ChatSnapshot) => {
+    // Never lose the live conversation: park it as a session first
+    // (deduped inside snapshotLiveChat) before replacing it.
+    snapshotLiveChat();
+    setSessions(readSnapshots());
     try {
       localStorage.setItem(CHAT_MESSAGES_KEY, JSON.stringify(session.messages));
     } catch {

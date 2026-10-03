@@ -109,11 +109,14 @@ body::before {
   width: 100%;
   max-width: 95vw;
   margin: 0 auto;
-  padding: var(--berg-sp-5);
-  padding-bottom: var(--berg-sp-6);
+  padding: var(--berg-sp-3) var(--berg-sp-5) var(--berg-sp-3);
   font-family: var(--berg-font-sans), sans-serif;
-  height: 100%; /* fills html/body which are 100% tall */
-  overflow-y: auto; /* expanded chrome must never clip below the fold */
+  /* Viewport shell: the page itself never scrolls. The transcript
+     owns the only scroll region, so the input bar can never be
+     cropped below the fold. */
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   color: var(--berg-text);
@@ -1312,16 +1315,13 @@ button.primary:hover,
   color: var(--berg-text, #222);
 }
 
-/* The transcript fills free space between header and input.
-   No minimum height: when the chat is empty it collapses so
-   the input stays close to the header instead of floating far
-   above the chrome panels. The page scrolls when chrome opens. */
+/* The transcript fills free space between header and input and owns
+   the only scroll region on the page. Relative sizing only — no
+   absolute max-height, so the input bar always stays in view. */
 .conversation-container {
   flex: 1 1 auto;
-  /* Contained scrolling: the transcript scrolls inside its card, so
-     page-level scroll can never cut the newest message or the input
-     bar out of view (the "cropped halfway" bottom). */
-  max-height: 55vh;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* Harness events and raw JSON must wrap - clipped text is unreadable. */

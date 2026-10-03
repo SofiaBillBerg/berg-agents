@@ -60,7 +60,7 @@ export function MessageList({ history = [] }: MessageListProps) {
   return (
     <div
       aria-label="Conversation transcript"
-      className="message-list flex flex-col gap-3"
+      className="message-list flex flex-col gap-2"
       role="log"
     >
       {history.map((msg, idx) => {
@@ -80,7 +80,7 @@ export function MessageList({ history = [] }: MessageListProps) {
         return (
           <Surface
             key={msg.id || `msg-${idx}`}
-            className={`message-list-item p-3 ${roleClass}`}
+            className={`message-list-item px-2.5 py-2 ${roleClass}`}
             variant="secondary"
           >
             <div className="text-xs font-semibold tracking-wide uppercase text-muted mb-1">
@@ -91,7 +91,7 @@ export function MessageList({ history = [] }: MessageListProps) {
               <MarkdownRenderer content={text} />
             </div>
             {msg.toolCalls && msg.toolCalls.length > 0 && (
-              <div className="mt-2 flex flex-col gap-2">
+              <div className="mt-1.5 flex flex-col gap-1">
                 {msg.toolCalls.map((call, callIdx) => (
                   <ToolCard
                     key={`${msg.id || idx}-tool-${callIdx}`}
@@ -99,6 +99,7 @@ export function MessageList({ history = [] }: MessageListProps) {
                     input={call.input}
                     output={call.output}
                     expanded={false}
+                    state={call.state}
                   />
                 ))}
               </div>

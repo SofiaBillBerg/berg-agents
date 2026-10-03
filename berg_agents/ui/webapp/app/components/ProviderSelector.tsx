@@ -1,7 +1,7 @@
 import type { ProviderItem, ActiveProviderState } from "../actions/providers";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Label, ListBox, Select, Spinner } from "@heroui/react";
+import { Alert, ListBox, Select, Spinner } from "@heroui/react";
 
 import { getProviderData, switchProvider } from "../actions/providers";
 
@@ -149,58 +149,53 @@ export function ProviderSelector({
     : null;
 
   return (
-    <div className="provider-selector flex items-center gap-2 flex-wrap">
-      <div className="provider-selector-bar flex items-center gap-2 bg-surface-soft p-1.5 rounded-lg border border-border">
-        <Select
-          aria-label="Provider"
-          className="provider-select text-xs"
-          isDisabled={isSwitching}
-          name="provider"
-          placeholder={
-            providers.length === 0
-              ? "No providers configured"
-              : "Select provider"
+    <div className="provider-selector flex items-center gap-2">
+      <Select
+        aria-label="Provider"
+        className="provider-select text-xs max-w-72"
+        isDisabled={isSwitching}
+        name="provider"
+        placeholder={
+          providers.length === 0 ? "No providers configured" : "Select provider"
+        }
+        selectedKey={selectedValue}
+        onSelectionChange={(key) => {
+          if (key == null) return;
+          const val = String(key);
+          const colonIdx = val.indexOf(":");
+          if (colonIdx !== -1) {
+            const provider = val.substring(0, colonIdx);
+            const model = val.substring(colonIdx + 1);
+            void handleSwitch(provider, model);
           }
-          selectedKey={selectedValue}
-          onSelectionChange={(key) => {
-            if (key == null) return;
-            const val = String(key);
-            const colonIdx = val.indexOf(":");
-            if (colonIdx !== -1) {
-              const provider = val.substring(0, colonIdx);
-              const model = val.substring(colonIdx + 1);
-              void handleSwitch(provider, model);
-            }
-          }}
-        >
-          <Label>Provider:</Label>
-          <Select.Trigger>
-            <Select.Value />
-            <Select.Indicator />
-          </Select.Trigger>
-          <Select.Popover>
-            <ListBox>
-              {providers.map((p, idx) => (
-                <ListBox.Item
-                  key={`${p.name}-${p.model}-${idx}`}
-                  id={`${p.name}:${p.model}`}
-                  textValue={`${p.name} (${p.model})`}
-                >
-                  {p.name} ({p.model})
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-              ))}
-            </ListBox>
-          </Select.Popover>
-        </Select>
+        }}
+      >
+        <Select.Trigger>
+          <Select.Value />
+          <Select.Indicator />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox>
+            {providers.map((p, idx) => (
+              <ListBox.Item
+                key={`${p.name}-${p.model}-${idx}`}
+                id={`${p.name}:${p.model}`}
+                textValue={`${p.name} (${p.model})`}
+              >
+                {p.name} ({p.model})
+                <ListBox.ItemIndicator />
+              </ListBox.Item>
+            ))}
+          </ListBox>
+        </Select.Popover>
+      </Select>
 
-        {isSwitching && (
-          <div className="flex items-center gap-1 text-xs text-brand-purple">
-            <Spinner size="sm" />
-            <span>Switching...</span>
-          </div>
-        )}
-      </div>
+      {isSwitching && (
+        <div className="flex items-center gap-1 text-xs text-brand-purple">
+          <Spinner size="sm" />
+          <span>Switching...</span>
+        </div>
+      )}
 
       {notice && (
         <Alert status={notice.type === "success" ? "success" : "danger"}>

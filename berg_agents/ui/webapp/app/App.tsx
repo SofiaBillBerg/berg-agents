@@ -8,11 +8,12 @@
  */
 
 import type { AgentInfo } from "@/harness/webhook";
+import type { PendingApproval } from "@/harness";
 import type { Command } from "./components/SlashCommandAutocomplete";
 import type { ToolResult } from "./components/ChatTranscript";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Card, Disclosure, Toast, toast } from "@heroui/react";
+import { Button, Card, Toast, toast } from "@heroui/react";
 
 import { useAISDKChat } from "@/harness";
 import { API_BASE } from "@/envConfig";
@@ -23,11 +24,14 @@ import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
 import AgentPanel from "./components/AgentPanel.tsx";
 import LearningPanel from "./components/LearningPanel.tsx";
-import ChatTranscript from "./components/ChatTranscript.tsx";
+import ChatTranscript, {
+  CHAT_SCROLL_ID} from "./components/ChatTranscript.tsx";
 import StatusCard from "./components/StatusCard.tsx";
 import Navbar from "./components/Navbar.tsx";
 import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
-import { ConversationHistory } from "./components/ConversationHistory";
+import {
+  ConversationHistory,
+  snapshotLiveChat} from "./components/ConversationHistory";
 
 /*
  * Error boundary for lazy-loaded components.
@@ -78,6 +82,138 @@ class LazyComponentErrorBoundary extends React.Component<
 }
 
 /*
+ * One paused tool call inside the approval batch. Each item gets its
+ * own approve / reject / edit controls so the user can approve one,
+ * reject another, and edit the next. Decided items stay visible with
+ * a badge + undo until the batch resumes.
+ */
+function ApprovalItem({
+  approval,
+  isStreaming,
+  onApprove,
+  onReject,
+  onEdit,
+  onRevert}: {
+  approval: PendingApproval;
+  isStreaming: boolean;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  onEdit: (id: string, args: unknown) => void;
+  onRevert: (id: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(approval.args);
+
+  const saveEdit = () => {
+    let parsed: unknown = draft;
+    try {
+      parsed = JSON.parse(draft);
+    } catch {
+      // Not JSON - pass the raw text through as the edited args.
+    }
+    onEdit(approval.id, parsed);
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md border border-border p-1.5">
+      <div className="font-mono text-sm">
+        🔧 {approval.toolName}{" "}
+        {approval.decided ? (
+          <span className="text-xs">
+            {approval.reason ? "❌ Rejected" : "✅ Approved"}
+          </span>
+        ) : (
+          <span className="text-xs">⏳ Pending</span>
+        )}
+      </div>
+      {approval.reason && (
+        <div className="text-xs text-muted-foreground">
+          Reason: {approval.reason}
+        </div>
+      )}
+      {editing ? (
+        <>
+          <textarea
+            aria-label={`Edit arguments for ${approval.toolName}`}
+            className="font-mono bg-surface-soft p-2 rounded text-xs w-full min-h-20"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="primary"
+              isDisabled={isStreaming}
+              onPress={saveEdit}
+            >
+              💾 Save args
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onPress={() => {
+                setDraft(approval.args);
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          {approval.args && (
+            <pre className="font-mono bg-surface-soft p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+              {approval.args}
+            </pre>
+          )}
+          {approval.decided ? (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                isDisabled={isStreaming}
+                onPress={() => onRevert(approval.id)}
+              >
+                ↩️ Undo decision
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="primary"
+                isDisabled={isStreaming}
+                onPress={() => onApprove(approval.id)}
+              >
+                ✅ Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                isDisabled={isStreaming}
+                onPress={() => onReject(approval.id)}
+              >
+                ❌ Reject
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                isDisabled={isStreaming}
+                onPress={() => setEditing(true)}
+              >
+                ✏️ Edit args
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/*
  * Main chat UI - receives state from useAISDKChat and renders the interface.
  */
 function ChatContent() {
@@ -93,8 +229,11 @@ function ChatContent() {
     clearMessages,
     restoreMessages,
     interruptWith,
-    pendingApprovals,
-    respondToAllApprovals} = aiChat;
+    approvalBatch,
+    respondToApproval,
+    respondToAllApprovals,
+    editApprovalArgs,
+    revertApproval} = aiChat;
 
   // Commands for the slash-autocomplete palette
   const localCommands: Command[] = [
@@ -104,8 +243,7 @@ function ChatContent() {
     { name: "/clear", description: "Clear chat history" },
     { name: "/exit", description: "Exit chat" },
     { name: "/read_file", description: "Read a file via the backend" },
-    { name: "/list_files", description: "List a directory via the backend" },
-    { name: "/run_task", description: "Run the harness pipeline" }];
+    { name: "/list_files", description: "List a directory via the backend" }];
 
   // Local agent list (fetched from /api/agents)
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -129,6 +267,27 @@ function ChatContent() {
   // Tool-result handling (used by ChatTranscript)
   // -------------------------------------------------------------------------
   const [toolResults, setToolResults] = useState<ToolResult[]>([]);
+
+  // -------------------------------------------------------------------------
+  // Sessions + conversation navigation
+  // -------------------------------------------------------------------------
+  /** Show/hide the saved-sessions panel (resumable chats). */
+  const [showHistory, setShowHistory] = useState(false);
+
+  /** Scroll the transcript (the page itself never scrolls). */
+  const scrollChatTo = (where: "top" | "bottom") => {
+    const el = document.getElementById(CHAT_SCROLL_ID);
+    if (!el) return;
+    el.scrollTo({ top: where === "top" ? 0 : el.scrollHeight });
+  };
+
+  /** Park the live chat as a resumable session, then start fresh. */
+  const startNewChat = () => {
+    stop();
+    snapshotLiveChat();
+    clearMessages();
+    setShowHistory(false);
+  };
 
   /*
    * Execute a tool via the backend /api/tool/execute endpoint.
@@ -317,16 +476,22 @@ function ChatContent() {
     [handleSendWrapper],
   );
 
-  // Surface backend/stream errors as a toast (visible wherever the
-  // user has scrolled) in addition to the inline StatusCard record.
+  // Surface backend/stream errors as a persistent toast (stays until
+  // the user dismisses it) in addition to the inline StatusCard record.
   const lastToastedError = useRef<string | null>(null);
   useEffect(() => {
     if (chatError && chatError !== lastToastedError.current) {
       lastToastedError.current = chatError;
-      toast.danger("Request failed", {
+      const toastId = toast.danger("Request failed", {
         description:
           chatError.length > 300 ? `${chatError.slice(0, 300)}…` : chatError,
-        timeout: 8000});
+        timeout: 0,
+        actionProps: {
+          children: "Dismiss",
+          onPress: () => {
+            lastToastedError.current = null;
+            toast.close(toastId);
+          }}});
     }
     if (!chatError) {
       lastToastedError.current = null;
@@ -347,55 +512,123 @@ function ChatContent() {
       <Toast.Provider />
       <Navbar />
       <div className="app-container p-4 w-full max-w-[95vw] mx-auto">
-        <div className="berg-title-banner mb-4 flex justify-between items-center flex-wrap gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="m-0 whitespace-nowrap text-2xl font-bold">
-              Berg Agents Chat
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              The agent that learns with you.
-            </p>
-          </div>
-          <div className="header-actions flex items-center gap-2 flex-wrap">
-            <ThemeToggle />
-            <ProviderSelector />
-            <span title="Download this conversation as a Markdown file">
-              <Button
-                aria-label="Export conversation as markdown"
-                className="border border-primary text-primary hover:bg-primary/10"
-                size="sm"
-                onPress={() => {
+        {/* Single chrome row: title + sessions + nav + provider + export.
+            One row only, nothing shrinkable, so the transcript keeps
+            every spare pixel. */}
+        <div className="mb-1.5 flex items-center gap-1.5 flex-wrap shrink-0">
+          <h1
+            className="m-0 whitespace-nowrap text-base font-bold"
+            title="The agent that learns with you."
+          >
+            Berg Agents Chat
+          </h1>
+          <Button
+            aria-label={showHistory ? "Hide sessions" : "Show sessions"}
+            size="sm"
+            variant="secondary"
+            onPress={() => setShowHistory((prev) => !prev)}
+          >
+            🕘 {showHistory ? "Hide sessions" : "Sessions"}
+          </Button>
+          <Button
+            aria-label="Start a new chat (current chat is saved as a session)"
+            size="sm"
+            variant="secondary"
+            onPress={startNewChat}
+          >
+            ＋ New chat
+          </Button>
+          <Button
+            aria-label="Jump to the top of the conversation"
+            size="sm"
+            variant="secondary"
+            onPress={() => scrollChatTo("top")}
+          >
+            ↑ Top
+          </Button>
+          <Button
+            aria-label="Jump to the bottom of the conversation"
+            size="sm"
+            variant="secondary"
+            onPress={() => scrollChatTo("bottom")}
+          >
+            ↓ Bottom
+          </Button>
+          <span className="flex-1" />
+          <ThemeToggle />
+          <ProviderSelector />
+          <span title="Download this conversation as a Markdown file">
+            <Button
+              aria-label="Export conversation as markdown"
+              className="border border-primary text-primary hover:bg-primary/10"
+              size="sm"
+              onPress={() => {
+                // Large transcripts are multi-megabyte blobs: the
+                // object URL must outlive the click, so revocation is
+                // deferred (immediate revoke aborts big downloads).
+                // Any failure surfaces as a toast, never silence.
+                try {
                   const md = buildExportMarkdown(messages, [], null, null);
                   const blob = new Blob([md], { type: "text/markdown" });
                   const url = URL.createObjectURL(blob);
                   const link = document.createElement("a");
                   link.href = url;
                   link.download = `berg-agents-export-${new Date().toISOString().slice(0, 10)}.md`;
+                  document.body.appendChild(link);
                   link.click();
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                ⬇ Export
-              </Button>
-            </span>
-          </div>
+                  link.remove();
+                  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                  const sizeKb = Math.max(1, Math.round(blob.size / 1024));
+                  toast.success("Transcript exported", {
+                    description: `Saved ~${sizeKb} KB markdown to your downloads.`,
+                    timeout: 5000});
+                } catch (e) {
+                  const toastId = toast.danger("Export failed", {
+                    description: String(e),
+                    timeout: 0,
+                    actionProps: {
+                      children: "Dismiss",
+                      onPress: () => toast.close(toastId)}});
+                }
+              }}
+            >
+              ⬇ Export
+            </Button>
+          </span>
         </div>
 
-        {/* Saved chats - collapsed by default so the conversation
-            stays front and center. Expands to snapshot/restore. */}
-        <Disclosure className="mb-4" defaultExpanded={false}>
-          <Disclosure.Heading>
-            <Disclosure.Trigger>
-              🕘 History
-              <Disclosure.Indicator />
-            </Disclosure.Trigger>
-          </Disclosure.Heading>
-          <Disclosure.Content>
-            <Disclosure.Body>
-              <ConversationHistory onSelect={(msgs) => restoreMessages(msgs)} />
-            </Disclosure.Body>
-          </Disclosure.Content>
-        </Disclosure>
+        {/* Saved sessions - resumable chats. Restoring parks the live
+            chat as a session first, so nothing is ever lost. */}
+        {showHistory && (
+          <div className="mb-2 max-h-48 overflow-y-auto">
+            <ConversationHistory onSelect={(msgs) => restoreMessages(msgs)} />
+          </div>
+        )}
+
+        {/* Activity details - one inline toggle line (no card chrome),
+            so it costs almost no vertical space when collapsed. */}
+        <div className="mb-1.5 shrink-0">
+          <button
+            aria-label={showDetails ? "Hide details" : "Show details"}
+            className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+            onClick={() => setShowDetails((prev) => !prev)}
+            type="button"
+          >
+            {showDetails ? "▾" : "▸"} Details & Activity
+          </button>
+          {showDetails && (
+            <div className="mt-1">
+              <AgentPanel compact activeAgent={null} agents={agents} />
+              <LearningPanel compact stats={learningStats} />
+
+              {chatError && (
+                <div className="text-red-500 mt-4">
+                  Error: {String(chatError)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         <StatusCard
           connectionError={chatError ? String(chatError) : null}
@@ -414,36 +647,42 @@ function ChatContent() {
           />
         )}
 
-        {/* HITL approval requests - the agent paused and needs one human
-            decision covering every pending action. The backend only
-            accepts complete answer sets, so approvals are always
-            batch-wide: approve everything to resume, or reject
-            everything to stop this step. */}
-        {pendingApprovals.length > 0 && (
+        {/* HITL approval requests - the agent paused and needs a human
+            decision per action: approve one, reject another, edit the
+            next. The batch stays on screen (pending + decided items
+            with undo) until every item is answered, then the backend
+            resumes automatically. Approve-all / reject-all remain as
+            batch conveniences. */}
+        {approvalBatch.length > 0 && (
           <Card className="mb-4 border-warning" variant="default">
             <Card.Header>
               <Card.Title>⏸️ Approval needed</Card.Title>
               <Card.Description>
-                The agent wants to run {pendingApprovals.length} action
-                {pendingApprovals.length > 1 ? "s" : ""}. Nothing executes until
-                you decide — one decision covers them all.
+                The agent wants to run {approvalBatch.length} action
+                {approvalBatch.length > 1 ? "s" : ""}. Nothing executes until
+                you decide each one — the run resumes once all are answered.
               </Card.Description>
             </Card.Header>
-            <Card.Content className="flex flex-col gap-3">
-              {pendingApprovals.map((approval) => (
-                <div
+            <Card.Content className="flex flex-col gap-1.5">
+              {approvalBatch.map((approval) => (
+                <ApprovalItem
                   key={approval.id}
-                  className="flex flex-col gap-2 rounded border border-border p-2"
-                >
-                  <div className="font-mono text-sm">
-                    🔧 {approval.toolName}
-                  </div>
-                  {approval.args && (
-                    <pre className="font-mono bg-surface-soft p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap">
-                      {approval.args}
-                    </pre>
-                  )}
-                </div>
+                  approval={approval}
+                  isStreaming={isStreaming}
+                  onApprove={(id) => respondToApproval(id, true)}
+                  onReject={(id) =>
+                    respondToApproval(
+                      id,
+                      false,
+                      "Rejected by the user. Do NOT attempt this action " +
+                        "again in any form — neither the same call with " +
+                        "different arguments nor an equivalent edit. " +
+                        "Continue without it or ask what to do instead.",
+                    )
+                  }
+                  onEdit={editApprovalArgs}
+                  onRevert={revertApproval}
+                />
               ))}
               <div className="flex gap-2">
                 <Button
@@ -483,9 +722,10 @@ function ChatContent() {
           transcript={messages}
         />
 
-        {/* Input bar at the bottom — sticky so long transcripts can
-            never push it out of view. */}
-        <div className="sticky bottom-2 z-10 rounded-lg bg-background/95 backdrop-blur">
+        {/* Input bar - always visible at the bottom. The page never
+            scrolls (the transcript owns the scroll region), so no
+            sticky positioning is needed. */}
+        <div className="rounded-lg bg-background/95 backdrop-blur">
           <InputBar
             input={input}
             placeholder="Type a message... (e.g. 'hello' or 'write a Python script')"
@@ -496,33 +736,6 @@ function ChatContent() {
             onStop={isStreaming ? stop : undefined}
           />
         </div>
-
-        {/* Activity details - compact summaries collapsed by default;
-            full views live on the /agents and /stats tabs. */}
-        <Disclosure className="mt-4" defaultExpanded={false}>
-          <Disclosure.Heading>
-            <Disclosure.Trigger>
-              Details & Activity
-              <Disclosure.Indicator />
-            </Disclosure.Trigger>
-          </Disclosure.Heading>
-          <Disclosure.Content>
-            <Disclosure.Body>
-              <AgentPanel compact activeAgent={null} agents={agents} />
-              <LearningPanel compact stats={learningStats} />
-
-              {chatError && (
-                <div className="text-red-500 mt-4">
-                  Error: {String(chatError)}
-                </div>
-              )}
-            </Disclosure.Body>
-          </Disclosure.Content>
-        </Disclosure>
-
-        {/* Breathing room below the last section so nothing sits
-            flush against the viewport edge (the "cropped" bottom). */}
-        <div className="h-10" aria-hidden="true" />
       </div>
     </LazyComponentErrorBoundary>
   );

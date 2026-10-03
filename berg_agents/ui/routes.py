@@ -7,14 +7,22 @@ for native Vercel AI SSE protocol - no manual event-loop / SSE translation neede
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
+from functools import cached_property
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
-from pydantic_ai import DeferredToolRequests
+from pydantic_ai import DeferredToolRequests, DeferredToolResults
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.tools import ToolApproved, ToolDenied
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
+from pydantic_ai.ui.vercel_ai.request_types import (
+    ToolApprovalResponded,
+    ToolApprovalRespondedPart,
+)
 
 from berg_agents.core.harness import Harness
 from berg_agents.ui.schemas import (
@@ -28,6 +36,55 @@ from berg_agents.ui.sessions import SessionManager
 
 
 logger = logging.getLogger(__name__)
+
+
+class BergVercelAIAdapter(VercelAIAdapter):
+    """Vercel AI adapter with per-step HITL approval support.
+
+    The stock adapter maps each answered approval to a bare ``True`` or
+    ``False``. That discards the arguments the user edited in the UI
+    before approving. This subclass instead maps an *approved* call to
+    :class:`ToolApproved` carrying the part's ``input`` as
+    ``override_args``: the part's input is the original call's args
+    when untouched (a no-op override) and the user's edited args when
+    they revised them, so edits reach the actual tool execution.
+
+    Denials keep the stock behaviour (``False``, or
+    ``ToolDenied(message=...)`` when the user gave a reason).
+    """
+
+    @cached_property
+    def deferred_tool_results(self) -> DeferredToolResults | None:
+        """Build the resume payload from the answered approval parts.
+
+        :return: Deferred results for every answered approval in the
+            incoming request, or ``None`` when it carries no answers.
+        """
+        approvals: dict[str, ToolApproved | ToolDenied | bool] = {}
+        for msg in self.run_input.messages:
+            if msg.role != "assistant":
+                continue
+            for part in msg.parts:
+                if not isinstance(part, ToolApprovalRespondedPart):
+                    continue
+                approval = part.approval
+                if not isinstance(approval, ToolApprovalResponded):
+                    continue
+                if approval.approved:
+                    # The part's input carries the (possibly user-edited)
+                    # args; unchanged input is a no-op override.
+                    approvals[part.tool_call_id] = (
+                        ToolApproved(override_args=part.input)
+                        if part.input is not None
+                        else True
+                    )
+                elif approval.reason:
+                    approvals[part.tool_call_id] = ToolDenied(
+                        message=approval.reason
+                    )
+                else:
+                    approvals[part.tool_call_id] = False
+        return DeferredToolResults(approvals=approvals) if approvals else None
 
 
 def _register_provider_routes(
@@ -149,25 +206,59 @@ def create_router(
         )
 
         # sdk_version=6 enables tool-approval streaming (human-in-the-loop).
-        # VercelAIAdapter.dispatch_request handles all SSE encoding and
-        # protocol transformation natively - no manual event loops needed.
-        # output_type adds DeferredToolRequests: tools flagged
+        # BergVercelAIAdapter.dispatch_request handles all SSE encoding
+        # and protocol transformation natively - no manual event loops
+        # needed. output_type adds DeferredToolRequests: tools flagged
         # requires_approval (bash, edit_file, write_file,
-        # implement_task) pause the run instead of executing, the adapter streams an
-        # approval request, and the frontend answers it with
-        # addToolApprovalResponse - which re-POSTs here carrying the
-        # approval. The adapter extracts approvals from the incoming
-        # messages and resumes the same run. (The adapter only adds
-        # DeferredToolRequests itself when it contributes a toolset,
-        # which we don't use - hence declaring it explicitly.)
-        return await VercelAIAdapter.dispatch_request(
-            request,
-            agent=agent,
-            sdk_version=6,
-            output_type=[str, DeferredToolRequests],
-            on_complete=None,
-            on_cancel=None,
-        )
+        # implement_task) pause the run instead of executing, the
+        # adapter streams an approval request, and the frontend answers
+        # it with addToolApprovalResponse - which re-POSTs here
+        # carrying the approval. The adapter extracts approvals from
+        # the incoming messages and resumes the same run; approved
+        # calls may carry user-edited args (see the subclass). (The
+        # adapter only adds DeferredToolRequests itself when it
+        # contributes a toolset, which we don't use - hence declaring
+        # it explicitly.)
+
+        async def _log_run_cancelled(run_cancelled: object) -> None:
+            # Fired when a client stop/disconnect cancels the run, so
+            # the "Stop" button is observable server-side.
+            logger.info("chat run cancelled: %s", run_cancelled)
+
+        async def _dispatch_with_empty_stream_retry() -> Response:
+            # Proxy hiccups (observed via omniroute) can return an
+            # entirely empty SSE stream; pydantic-ai surfaces that as
+            # UnexpectedModelBehavior("... ended without content ...").
+            # The failed step produced no assistant turn and executed
+            # nothing, so re-sending the same request is safe: the
+            # body is cached by Starlette and the retry simply
+            # regenerates the missing turn instead of failing the chat.
+            for attempt in (1, 2):
+                try:
+                    return await BergVercelAIAdapter.dispatch_request(
+                        request,
+                        agent=agent,
+                        sdk_version=6,
+                        output_type=[str, DeferredToolRequests],
+                        on_complete=None,
+                        on_cancel=_log_run_cancelled,
+                    )
+                except UnexpectedModelBehavior as exc:
+                    if "ended without content" not in str(exc):
+                        raise
+                    if attempt == 2:
+                        logger.error(
+                            "chat stream empty twice - giving up: %s", exc
+                        )
+                        raise
+                    logger.warning(
+                        "chat stream ended empty (attempt %s/2) - retrying",
+                        attempt,
+                    )
+                    await asyncio.sleep(2)
+            raise AssertionError("unreachable")  # pragma: no cover
+
+        return await _dispatch_with_empty_stream_retry()
 
     @router.get("/api/learning-stats")
     async def learning_stats() -> dict[str, Any]:

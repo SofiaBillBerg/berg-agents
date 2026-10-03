@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Alert, Card, Spinner, Surface } from "@heroui/react";
 
 import { MessageList } from "./MessageList.tsx";
@@ -27,17 +27,42 @@ export interface ToolResult {
   onToggle?: () => void;
 }
 
+/** DOM id of the transcript scroll region (jump buttons target it). */
+export const CHAT_SCROLL_ID = "chat-scroll";
+
 export function ChatTranscript({
   transcript,
   isExecuting,
   hitlRequest,
   onExport,
   toolResults}: ChatTranscriptProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Stick-to-bottom while new content streams in — but only when the
+  // user is already near the bottom, so reading back through history
+  // is never yanked away.
+  const lastCount = useRef(transcript.length);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (transcript.length !== lastCount.current) {
+      lastCount.current = transcript.length;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+      if (nearBottom) {
+        el.scrollTop = el.scrollHeight;
+      }
+    }
+  }, [transcript]);
+
   return (
     <>
-      <Card className="mb-4" variant="default">
-        <Card.Content className="p-2">
-          <div className="conversation-container overflow-y-auto flex-1 min-h-0 max-h-[55vh]">
+      <Card className="mb-2 min-h-0 flex-1 flex flex-col" variant="default">
+        <Card.Content className="p-1.5 min-h-0 flex-1 flex flex-col">
+          <div
+            ref={scrollRef}
+            id={CHAT_SCROLL_ID}
+            className="conversation-container"
+          >
             <MessageList history={transcript} />
 
             {/* HITL Pending Notice - HeroUI Alert with compound components */}
