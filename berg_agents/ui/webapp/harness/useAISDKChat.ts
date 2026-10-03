@@ -142,23 +142,44 @@ export interface UseAISDKChatReturn {
 
 /**
  * Extract the model's private reasoning trace from a UIMessage.
- * Reasoning parts (`type: "reasoning"`) carry the chain-of-thought
- * the model streamed before acting - shown collapsed in the UI.
+ * Reasoning parts (`type: "reasoning"` from the adapter's ThinkingPart,
+ * or "thinking"/"thinking-delta" variants from other providers) carry
+ * the chain-of-thought the model streamed before acting - shown
+ * collapsed in the UI. Some models (qwen-style) emit thinking inline
+ * as `<think>...</think>` text instead of a typed part; those blocks
+ * are lifted out of the text here too, so both flavors render.
  */
-function messageReasoning(msg: UIMessage): string | undefined {
+function extractReasoning(msg: UIMessage): string | undefined {
   const bits: string[] = [];
   for (const part of msg.parts) {
     const p = part as unknown as Record<string, unknown>;
+    if (typeof p !== "object" || p === null) continue;
+    const pType = typeof p.type === "string" ? p.type : "";
     if (
-      typeof p !== "object" ||
-      p === null ||
-      (p as { type?: unknown }).type !== "reasoning"
+      pType === "reasoning" ||
+      pType.startsWith("thinking") ||
+      pType.startsWith("reasoning")
     ) {
+      const text =
+        (typeof p.text === "string" && p.text) ||
+        (typeof p.reasoning === "string" && (p.reasoning as string)) ||
+        "";
+      if (text.trim() !== "") bits.push(text);
       continue;
     }
-    const text = (p as { text?: unknown }).text;
-    if (typeof text === "string" && text.trim() !== "") {
-      bits.push(text);
+    // Inline <think> blocks inside regular text parts.
+    if (pType === "text") {
+      const text = typeof p.text === "string" ? (p.text as string) : "";
+      const matches = text.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi);
+      if (matches) {
+        for (const m of matches) {
+          const inner = m
+            .replace(/<\/?think>/i, "")
+            .replace(/<\/think>/i, "")
+            .trim();
+          if (inner) bits.push(inner);
+        }
+      }
     }
   }
   return bits.length > 0 ? bits.join("\n") : undefined;
@@ -170,13 +191,20 @@ function messageReasoning(msg: UIMessage): string | undefined {
  *
  * Tool-call-only turns carry no text parts, which used to render as
  * empty bubbles. Tool invocations are summarized as `🔧 name(args...)`
- * lines so activity stays visible instead of blank.
+ * lines so activity stays visible instead of blank. Inline <think>
+ * blocks are moved into `reasoning` (see extractReasoning), not shown.
  */
 function messageText(msg: UIMessage): string {
   const chunks: string[] = [];
   for (const part of msg.parts) {
     if (part.type === "text") {
-      chunks.push((part as TextUIPart).text);
+      const raw = (part as unknown as TextUIPart).text;
+      // Strip inline thinking blocks - they live in `reasoning` now.
+      const cleaned = raw
+        .replace(/<think>[\s\S]*?<\/think>/gi, "")
+        .replace(/<\/?think>/gi, "")
+        .trim();
+      if (cleaned) chunks.push(cleaned);
       continue;
     }
     // Tool parts: `dynamic-tool` or `tool-<name>` shapes (v7).
@@ -503,7 +531,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     role: msg.role as "user" | "assistant" | "system",
     content: messageText(msg),
     parts: [],
-    reasoning: messageReasoning(msg),
+    reasoning: extractReasoning(msg),
     toolCalls: messageToolCalls(msg)}));
 
   const setMessages = (msgs: ChatMessage[]) => {

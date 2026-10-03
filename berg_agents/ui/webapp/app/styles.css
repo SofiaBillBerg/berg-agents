@@ -111,11 +111,11 @@ body::before {
   margin: 0 auto;
   padding: var(--berg-sp-3) var(--berg-sp-5) var(--berg-sp-3);
   font-family: var(--berg-font-sans), sans-serif;
-  /* Viewport shell: the page itself never scrolls. The transcript
-     owns the only scroll region, so the input bar can never be
-     cropped below the fold. */
-  height: 100dvh;
-  max-height: 100dvh;
+  /* Fills the space left below the Navbar inside the flex shell
+     (body > #root). Not 100dvh: that would ignore the navbar height
+     and push the input bar off-screen (the cropped bottom). */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;

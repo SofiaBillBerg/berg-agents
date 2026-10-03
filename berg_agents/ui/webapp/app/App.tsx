@@ -26,7 +26,6 @@ import AgentPanel from "./components/AgentPanel.tsx";
 import LearningPanel from "./components/LearningPanel.tsx";
 import ChatTranscript, {
   CHAT_SCROLL_ID} from "./components/ChatTranscript.tsx";
-import StatusCard from "./components/StatusCard.tsx";
 import Navbar from "./components/Navbar.tsx";
 import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
 import {
@@ -273,6 +272,9 @@ function ChatContent() {
   // -------------------------------------------------------------------------
   /** Show/hide the saved-sessions panel (resumable chats). */
   const [showHistory, setShowHistory] = useState(false);
+
+  /** Show/hide the inline Details & Activity panel. */
+  const [showDetails, setShowDetails] = useState(false);
 
   /** Scroll the transcript (the page itself never scrolls). */
   const scrollChatTo = (where: "top" | "bottom") => {
@@ -630,11 +632,17 @@ function ChatContent() {
           )}
         </div>
 
-        <StatusCard
-          connectionError={chatError ? String(chatError) : null}
-          isConnected={true}
-          status={statusInfo}
-        />
+        {/* One inline status pill (no card) — errors still surface in
+            the persistent toast and in Details & Activity. */}
+        <div className="mb-1 shrink-0 flex items-center gap-2 px-1">
+          <span
+            className={`w-2 h-2 rounded-full ${statusInfo.pulse ? "animate-pulse" : ""}`}
+            style={{ background: statusInfo.color }}
+          />
+          <span className="text-xs text-muted-foreground">
+            {statusInfo.label}
+          </span>
+        </div>
 
         {/* Slash command palette - only while the input starts with "/" */}
         {input.startsWith("/") && (
@@ -654,7 +662,7 @@ function ChatContent() {
             resumes automatically. Approve-all / reject-all remain as
             batch conveniences. */}
         {approvalBatch.length > 0 && (
-          <Card className="mb-4 border-warning" variant="default">
+          <Card className="mb-1.5 shrink-0 border-warning" variant="default">
             <Card.Header>
               <Card.Title>⏸️ Approval needed</Card.Title>
               <Card.Description>
@@ -722,10 +730,10 @@ function ChatContent() {
           transcript={messages}
         />
 
-        {/* Input bar - always visible at the bottom. The page never
-            scrolls (the transcript owns the scroll region), so no
-            sticky positioning is needed. */}
-        <div className="rounded-lg bg-background/95 backdrop-blur">
+        {/* Input bar - always visible at the bottom. shrink-0 so a
+            tall transcript can never squeeze it out of view (the
+            actual cause of the previous "cropped" input). */}
+        <div className="shrink-0 rounded-lg bg-background/95 backdrop-blur">
           <InputBar
             input={input}
             placeholder="Type a message... (e.g. 'hello' or 'write a Python script')"

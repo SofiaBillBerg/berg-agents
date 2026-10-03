@@ -32,8 +32,8 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body>
-        <div id="root" style={{ height: "100%" }}>
+      <body className="flex h-dvh flex-col overflow-hidden">
+        <div id="root" className="flex min-h-0 flex-1 flex-col">
           {children}
         </div>
       </body>
