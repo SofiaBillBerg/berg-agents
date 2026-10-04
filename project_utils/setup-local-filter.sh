@@ -4,16 +4,16 @@
 # HOW TO USE LOCAL_ONLY TAGS:
 #
 # MARKDOWN / QUARTO (.md, .qmd):
-# 
+#
 #
 # PYTHON / TOML / GITIGNORE (.py, .toml, .gitignore):
-# 
+#
 #
 # JAVASCRIPT / TYPESCRIPT (.js, .ts):
-# 
+#
 #
 # YAML (.yml):
-# 
+#
 #
 # JSON (.json):
 # {
@@ -26,13 +26,14 @@
 EXTENSIONS=("*.md" "*.qmd" "*.py" "*.toml" ".gitignore" "*.js" "*.ts" "*.jsx" "*.tsx" "*.yml" "*.yaml" "*.json")
 
 for ext in "${EXTENSIONS[@]}"; do
-    if ! grep -q "$ext filter=strip-local" .gitattributes 2>/dev/null; then
-        echo "$ext filter=strip-local" >> .gitattributes
-        echo "Added filter for $ext to .gitattributes"
-    fi
+	if ! grep -q "$ext filter=strip-local" .gitattributes 2>/dev/null; then
+		echo "$ext filter=strip-local" >>.gitattributes
+		echo "Added filter for $ext to .gitattributes"
+	fi
 done
 # 2. Configure Git clean filter to strip local blocks before staging
-git config filter.strip-local.clean "$(cat << 'EOF'
+git config filter.strip-local.clean "$(
+	cat <<'EOF'
 python3 -c '
 import sys, re
 content = sys.stdin.read()
@@ -44,6 +45,5 @@ EOF
 
 # 3. Configure Git smudge filter
 git config filter.strip-local.smudge "cat"
-
 
 echo "Git filter for 'LOCAL_ONLY' content is successfully configured."

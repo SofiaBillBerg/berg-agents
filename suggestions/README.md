@@ -28,7 +28,8 @@ and adopt incrementally.
 1. **`RunContext.deps` is declared but ignored.** Every Pydantic AI agent in
    `berg_agents/agents/*` declares a `deps_type` (`PlannerDeps`,
    `ImplementationDeps`) and annotates its tools with `ctx: RunContext[...Deps]` —
-   but the tool bodies do `_ = ctx` everywhere. The deps are never read, and the
+   but the tool bodies do `_ = ctx` everywhere.
+   The deps are never read, and the
    `Agent` instances are never constructed with `deps=...`, so the dependency
    injection feature Pydantic AI is designed around does nothing in this project.
    **Fix:** real deps classes + a deps registry + `agent.run(..., deps=...)`.
@@ -37,15 +38,19 @@ and adopt incrementally.
    `dict` task with `metadata: dict[str, Any]`; the interface layer has a
    `TaskContext` dataclass; the loop stores a JSON snapshot with `messages`,
    `step`, `tool_calls`, `pending_hitl`; Pydantic AI's run carries
-   `RunContext.messages`, `RunContext.usage`, `RunContext.usage_limits`. Nothing
+   `RunContext.messages`, `RunContext.usage`, `RunContext.usage_limits`.
+   Nothing
    is a single source of truth, and the JSON snapshot format is implicit, brittle,
-   and easy to corrupt on version changes. **Fix:** one `SessionContext` Pydantic
+   and easy to corrupt on version changes.
+   **Fix:** one `SessionContext` Pydantic
    model that unifies all of these with a version field and typed round-trip.
 
 3. **No hooks for cross-cutting concerns.** There's no place for tracing,
    usage-budget awareness, or automatic checkpointing that sees the _same_ context
-   object the agents use. The checkpointing code and the Pydantic AI run are two
-   separate tracks that don't talk to each other. **Fix:** a
+   object the agents use.
+   The checkpointing code and the Pydantic AI run are two
+   separate tracks that don't talk to each other.
+   **Fix:** a
    `ContextProvider` protocol plus optional middleware that reads `RunContext`
    (usage, limits, model, messages) and persists a canonical snapshot per
    `thread_id`/`session_id`.
@@ -72,7 +77,8 @@ EOF
 ```
 
 The `.py` files are written to be **self-contained and importable** without
-modifying any existing `berg_agents/` file. Where they need to interop with the
+modifying any existing `berg_agents/` file.
+Where they need to interop with the
 existing runtime (checkpointing, tools), they **wrap** the existing pieces rather
 than replace them — e.g. `context_provider.py` can _optionally_ bridge to the
 existing `Checkpointer` so the web UI and TUI continue to resume unchanged while
@@ -87,7 +93,8 @@ new code adopts `ContextProvider`.
 - ❌ No changes to `BergLoop` internals (that's a separate, larger effort).
 - ❌ No migration guides for external frameworks (LangChain, ADK, etc.) — those
   are documented separately.
-- ❌ No tests. Testing is deliberately low-priority per the project guidance;
+- ❌ No tests.
+  Testing is deliberately low-priority per the project guidance;
   the `.py` files are written so they can be `pytest`-imported and checked later.
 
 ---
@@ -97,7 +104,8 @@ new code adopts `ContextProvider`.
 1. Should `RunContext.deps` become the single authoritative source of per-agent
    state, or should it stay read-only metadata with a separate `SessionContext`?
 2. What is the desired default persistence for `SessionContext` — in-memory only,
-   file-per-session, or SQLite/Redis? (The `ContextProvider` protocol answers this
+   file-per-session, or SQLite/Redis?
+   (The `ContextProvider` protocol answers this
    without code changes.)
 3. Do we want the checkpointing layer and the Pydantic AI run to converge on one
    snapshot shape, or keep them parallel with a migration adapter?

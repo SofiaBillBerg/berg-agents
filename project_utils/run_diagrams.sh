@@ -1,4 +1,4 @@
-#!/usr/bin/env bash 
+#!/usr/bin/env bash
 set +e
 set -o pipefail
 echo "Activating virtual environment..."
@@ -9,7 +9,7 @@ else
 fi
 echo "Starting code visualization script..."
 RAW_VISUALIZATION_DIR="$(pwd)/docs/visualizations"
-SVG_DIR="$RAW_VISUALIZATION_DIR/png"  #svg"
+SVG_DIR="$RAW_VISUALIZATION_DIR/png" #svg"
 mkdir -p "$SVG_DIR"
 echo "▶ Running custom Python diagram extractor..."
 python project_utils/generate_diagrams.py

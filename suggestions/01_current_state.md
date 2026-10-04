@@ -1,14 +1,16 @@
-# 01 — Current State: How Context Is Handled Today
+# 01 --- Current State: How Context Is Handled Today
 
-This file is a **factual audit** of the existing code. Nothing is argued for or
-against yet — just what the code does, sourced from the repo at
-`berg_agents/`. Every claim below is backed by a specific file/line.
+This file is a **factual audit** of the existing code.
+Nothing is argued for or
+against yet --- just what the code does, sourced from the repo at
+`berg_agents/`.
+Every claim below is backed by a specific file/line.
 
 ---
 
 ## 1. Context shapes are fragmented across four independent layers
 
-### 1.1 `core.interface.TaskContext` — the agent-facing contract
+### 1.1 `core.interface.TaskContext` --- the agent-facing contract
 
 **File:** `berg_agents/core/interface.py`
 
@@ -26,9 +28,10 @@ class TaskContext:
 - Used by `AbstractAgent.execute(task, context: TaskContext, model=None)` and by
   `Planner.execute(...)`.
 - It is **only used for the harness layer**, never for message history, never for
-  the LLM run, never for the checkpoint. `metadata` is an untyped catch-all.
+  the LLM run, never for the checkpoint.
+  `metadata` is an untyped catch-all.
 
-### 1.2 `core.interface.TaskContext` / `AgentResult` — result shape
+### 1.2 `core.interface.TaskContext` / `AgentResult` --- result shape
 
 **File:** `berg_agents/core/interface.py`
 
@@ -45,15 +48,17 @@ class AgentResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 ```
 
-`AgentResult.to_dict()` is the serializable view — again `metadata` is an
+`AgentResult.to_dict()` is the serializable view --- again `metadata` is an
 untyped dict.
 
-### 1.3 `harness/orchestrator.py` — the harness carries a raw `dict`
+### 1.3 `harness/orchestrator.py` --- the harness carries a raw `dict`
 
 **File:** `berg_agents/core/harness/orchestrator.py`, `execute_task`
 
 ```python
-def execute_task(self, task: dict[str, Any], task_id: str | None = None) -> dict[str, Any]:
+def execute_task(
+    self, task: dict[str, Any], task_id: str | None = None
+) -> dict[str, Any]:
     description = str(task.get("description", ""))
     task_type = str(task.get("task_type", "implementation") or "implementation")
     metadata = task.get("metadata") or {}
@@ -75,10 +80,11 @@ def execute_task(self, task: dict[str, Any], task_id: str | None = None) -> dict
 ```
 
 **Finding:** the "real" work happens with **plain `dict`**, and `TaskContext`
-exists only on the `AbstractAgent.execute` signature. The two are not the same
+exists only on the `AbstractAgent.execute` signature.
+The two are not the same
 object.
 
-### 1.4 `core.checkpoint` — the loop snapshot is a hand-rolled JSON shape
+### 1.4 `core.checkpoint` --- the loop snapshot is a hand-rolled JSON shape
 
 **File:** `berg_agents/core/checkpoint.py`, `make_snapshot`
 
@@ -97,18 +103,22 @@ def make_snapshot(
         "messages": [dict(m) for m in messages],
         "step": step,
         "tool_calls": tool_calls,
-        "pending_hitl": (dict(pending_hitl) if pending_hitl is not None else None),
+        "pending_hitl": (
+            dict(pending_hitl) if pending_hitl is not None else None
+        ),
         "metadata": dict(metadata) if metadata is not None else {},
         "schema_version": 1}
 ```
 
 **Finding:** the snapshot schema is defined by convenience, not by a schema
-object. `"schema_version": 1` is present but there is **no migration logic** —
-version bumping this dict is manual and error-prone. Note also the schema has
-`metadata` but no place for **usage / token counts / model id / session vars** —
+object.
+`"schema_version": 1` is present but there is **no migration logic** ---
+version bumping this dict is manual and error-prone.
+Note also the schema has
+`metadata` but no place for **usage / token counts / model id / session vars** ---
 those live only in `RunContext` inside a Pydantic AI run, never in the snapshot.
 
-### 1.5 Pydantic AI's own run context — a fifth shape
+### 1.5 Pydantic AI's own run context --- a fifth shape
 
 **File:** `pydantic_ai` (installed `2.51.0`)
 
@@ -129,7 +139,8 @@ class RunContext(Generic[RunContextAgentDepsT]):
 ```
 
 **Finding:** this is the _only_ place where usage, limits, model id, and the live
-message list coexist. It is invisible to the checkpoint layer and invisible to
+message list coexist.
+It is invisible to the checkpoint layer and invisible to
 the harness `dict`.
 
 ---
@@ -137,9 +148,9 @@ the harness `dict`.
 ## 2. `RunContext.deps` is declared everywhere but never used
 
 Every Pydantic AI agent module declares a deps type and annotates tools with
-`ctx: RunContext[...Deps]` — but the tool bodies ignore them:
+`ctx: RunContext[...Deps]` --- but the tool bodies ignore them:
 
-**`berg_agents/agents/planner.py`** — `PlannerDeps`, tools do `_ = ctx`:
+**`berg_agents/agents/planner.py`** --- `PlannerDeps`, tools do `_ = ctx`:
 
 ```python
 @planner_agent.tool
@@ -148,7 +159,7 @@ def decompose_task(ctx: RunContext[PlannerDeps], description: str, ...) -> str:
     _ = ctx
 ```
 
-**`berg_agents/agents/implementation.py`** — `ImplementationDeps`:
+**`berg_agents/agents/implementation.py`** --- `ImplementationDeps`:
 
 ```python
 @agent.tool
@@ -158,7 +169,8 @@ def read_file(ctx: RunContext[ImplementationDeps], file_path: str) -> str:
 ```
 
 Only `implementation.py`'s tools _read_ `ctx.deps.workspace_root`; the planner
-and guardian tools do `_ = ctx`. The agents are constructed with **no** `deps=...`
+and guardian tools do `_ = ctx`.
+The agents are constructed with **no** `deps=...`
 argument, so `ctx.deps` is effectively a synthetic stub.
 
 **Findings:**
@@ -168,9 +180,10 @@ argument, so `ctx.deps` is effectively a synthetic stub.
 2. Where deps _are_ used, they're passed in as `ctx.deps.workspace_root`, but the
    `Agent` instances are built once at import time (`planner_agent`,
    `implementation_agent` module globals) with a _fixed_ `workspace_root` baked
-   into the tool closures — not injected per run. This makes workspace resolution
+   into the tool closures --- not injected per run.
+   This makes workspace resolution
    static instead of per-thread.
-3. `ImplementationDeps` carries `workspace_root, complexity, task_type` — but
+3. `ImplementationDeps` carries `workspace_root, complexity, task_type` --- but
    `complexity` and `task_type` are already in the task dict / model routing, so
    there's duplication between the harness `dict`, the `TaskContext`, the deps,
    and the message history.
