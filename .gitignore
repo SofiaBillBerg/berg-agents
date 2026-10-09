@@ -18,8 +18,8 @@ cspell.json
 # R
 /renv/
 **/*.RData
-
-
+/.rvenv/
+/.rvenvlib/
 # quarto
 docs/docs_web/
 /.quarto/
@@ -82,7 +82,7 @@ coverage.lcov
 
 # berg-agents app outputs
 /outputs_from_bergagents
-
+/suggestions/
 
 # user stuff
 /notes/
@@ -100,3 +100,10 @@ coverage.lcov
 mempalace.yaml
 entities.json
 /berg_agent_outputs/
+
+# rig rvenv start
+# Everything in .rvenv is machine-specific output of `rig proj sync`; it can
+# be deleted and rebuilt at any time. The committed rvenv shim package lives
+# in .rvenvlib instead.
+/.rvenv/
+# rig rvenv end

@@ -5,8 +5,8 @@ project:
     - docs/docs_web/search-index.json
     - docs/docs_web/docs/404.html
   type: website
-  favicon: berg_agents/ui/webapp/public/favicon/favicon.ico
-  image: berg_agents/ui/webapp/public/favicon/favicon.svg
+ # favicon: berg_agents/ui/webapp/public/favicon/favicon.ico
+ # image: berg_agents/ui/webapp/public/favicon/favicon.svg
   output-dir: docs/docs_web
   pre-render:
     - "project_utils/run_apidocs.sh"
