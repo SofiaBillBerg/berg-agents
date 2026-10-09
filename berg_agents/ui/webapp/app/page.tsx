@@ -12,7 +12,6 @@
 
 import { Suspense } from "react";
 
-import "./theme.js";
 import { ClientOnly } from "./client.tsx";
 
 /**

@@ -479,7 +479,7 @@ function ChatContent() {
   );
 
   // Surface backend/stream errors as a persistent toast (stays until
-  // the user dismisses it) in addition to the inline StatusCard record.
+  // the user dismisses it) in addition to the inline status record.
   const lastToastedError = useRef<string | null>(null);
   useEffect(() => {
     if (chatError && chatError !== lastToastedError.current) {
@@ -504,10 +504,13 @@ function ChatContent() {
   // Status determination (error / streaming / idle)
   // -------------------------------------------------------------------------
   const statusInfo = chatError
-    ? { label: "Error", color: "#f44336", pulse: false }
+    ? { label: "Error", color: "var(--berg-status-error)", pulse: false }
     : isStreaming
-      ? { label: "Thinking...", color: "#1976d2", pulse: true }
-      : { label: "Idle", color: "#9e9e9e", pulse: false };
+      ? {
+          label: "Thinking...",
+          color: "var(--berg-status-info)",
+          pulse: true}
+      : { label: "Idle", color: "var(--berg-muted)", pulse: false };
 
   return (
     <LazyComponentErrorBoundary componentName="Chat">
@@ -517,13 +520,24 @@ function ChatContent() {
         {/* Single chrome row: title + sessions + nav + provider + export.
             One row only, nothing shrinkable, so the transcript keeps
             every spare pixel. */}
-        <div className="mb-1.5 flex items-center gap-1.5 flex-wrap shrink-0">
+        <div className="mb-1 flex items-center gap-1 flex-wrap shrink-0">
           <h1
-            className="m-0 whitespace-nowrap text-base font-bold"
+            className="m-0 whitespace-nowrap text-base font-bold bg-gradient-to-r from-[#7d029c] via-[#3b528b] to-[#21908c] bg-clip-text text-transparent"
             title="The agent that learns with you."
           >
             Berg Agents Chat
           </h1>
+          {/* Status lives inline in the title row so the transcript
+              keeps the pixels (was its own row before). */}
+          <span className="flex items-center gap-1" title={statusInfo.label}>
+            <span
+              className={`w-2 h-2 rounded-full ${statusInfo.pulse ? "animate-pulse" : ""}`}
+              style={{ background: statusInfo.color }}
+            />
+            <span className="text-xs text-muted-foreground">
+              {statusInfo.label}
+            </span>
+          </span>
           <Button
             aria-label={showHistory ? "Hide sessions" : "Show sessions"}
             size="sm"
@@ -609,7 +623,7 @@ function ChatContent() {
 
         {/* Activity details - one inline toggle line (no card chrome),
             so it costs almost no vertical space when collapsed. */}
-        <div className="mb-1.5 shrink-0">
+        <div className="mb-1 shrink-0">
           <button
             aria-label={showDetails ? "Hide details" : "Show details"}
             className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
@@ -630,18 +644,6 @@ function ChatContent() {
               )}
             </div>
           )}
-        </div>
-
-        {/* One inline status pill (no card) — errors still surface in
-            the persistent toast and in Details & Activity. */}
-        <div className="mb-1 shrink-0 flex items-center gap-2 px-1">
-          <span
-            className={`w-2 h-2 rounded-full ${statusInfo.pulse ? "animate-pulse" : ""}`}
-            style={{ background: statusInfo.color }}
-          />
-          <span className="text-xs text-muted-foreground">
-            {statusInfo.label}
-          </span>
         </div>
 
         {/* Slash command palette - only while the input starts with "/" */}

@@ -271,6 +271,9 @@ class JsoncConfigSettingsSource(JsonConfigSettingsSource):
                 field = model_fields.get(norm_key)
                 if field is None:
                     continue  # unknown key: stays reachable via extras only
+                if norm_key in expanded:
+                    # Explicit field-name form wins over the prefixed form.
+                    continue
                 decoded = value
                 if (
                     isinstance(value, str)
@@ -284,6 +287,20 @@ class JsoncConfigSettingsSource(JsonConfigSettingsSource):
                     with contextlib.suppress(ValueError):
                         decoded = json.loads(value)
                 mirrored[norm_key] = decoded
+        # Alias: the JSONC file documents the default model as
+        # ``defaultModel`` (camelCase) while the Settings field is
+        # ``default_model`` (snake_case). pydantic-settings does not
+        # translate between the two, so without this the configured
+        # default is silently dropped and the server falls back to
+        # the first declared model. An explicit ``default_model``
+        # key always wins over the alias.
+        if (
+            "default_model" not in mirrored
+            and "default_model" not in expanded
+            and isinstance(expanded.get("defaultModel"), str)
+            and expanded["defaultModel"].strip()
+        ):
+            mirrored["default_model"] = expanded["defaultModel"].strip()
         return {**expanded, **mirrored}
 
 
@@ -306,7 +323,16 @@ class EnvExpandingYamlConfigSettingsSource(YamlConfigSettingsSource):
 
         with file_path.open(encoding=self.yaml_file_encoding) as yaml_file:
             raw = yaml.safe_load(yaml_file) or {}
-        return _expand_env_vars(raw, _load_substitution_env())
+        expanded = _expand_env_vars(raw, _load_substitution_env())
+        # Same camelCase alias as the JSONC source: an explicit
+        # ``default_model`` key always wins over ``defaultModel``.
+        if (
+            "default_model" not in expanded
+            and isinstance(expanded.get("defaultModel"), str)
+            and expanded["defaultModel"].strip()
+        ):
+            expanded["default_model"] = expanded["defaultModel"].strip()
+        return expanded
 
 
 class Settings(BaseSettings):

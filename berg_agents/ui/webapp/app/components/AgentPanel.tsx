@@ -76,7 +76,9 @@ export function AgentPanel({
             {activeAgent ? ` . ${activeAgent} active` : ""}
           </Card.Description>
         </Card.Header>
-        <Card.Content className="flex flex-col gap-2">
+        {/* Responsive grid: one column on phones, two on tablets,
+            three on wide screens - never a single centered column. */}
+        <Card.Content className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {agents.map((agent) => {
             const isActive = activeAgent === agent.name;
             return (
@@ -105,11 +107,6 @@ export function AgentPanel({
                   )}
                 </Card.Header>
                 <Card.Content className="flex flex-wrap items-center gap-1.5">
-                  {isActive && (
-                    <Chip color="success" size="sm" variant="primary">
-                      Active
-                    </Chip>
-                  )}
                   {agent.preferred_complexity && (
                     <Chip size="sm" variant="secondary">
                       {agent.preferred_complexity}

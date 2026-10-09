@@ -1,8 +1,19 @@
 import type { Metadata } from "next";
 
 import React from "react";
+import { Public_Sans } from "next/font/google";
 
 import "./globals.css";
+
+/**
+ * Public Sans, self-hosted via next/font. The `variable` option exposes
+ * `--font-public-sans`, which is exactly what the HeroUI `--font-sans`
+ * token in globals.css (Sofia's builder theme) points at.
+ */
+const publicSans = Public_Sans({
+  subsets: ["latin"],
+  variable: "--font-public-sans",
+  display: "swap"});
 
 export const metadata: Metadata = {
   title: "Berg Agents Web UI",
@@ -28,7 +39,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html suppressHydrationWarning lang="en">
+    <html
+      suppressHydrationWarning
+      className={publicSans.variable}
+      lang="en"
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

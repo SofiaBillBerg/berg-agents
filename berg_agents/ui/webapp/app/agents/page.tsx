@@ -44,13 +44,15 @@ export default function AgentsPage() {
     return (
       <>
         <Navbar />
-        <div className="p-4">
-          <Card variant="default">
-            <Card.Content className="flex items-center justify-center py-8">
-              <Spinner size="lg" />
-              <span className="ml-2">Loading agents...</span>
-            </Card.Content>
-          </Card>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-6xl p-4">
+            <Card variant="default">
+              <Card.Content className="flex items-center justify-center py-8">
+                <Spinner size="lg" />
+                <span className="ml-2">Loading agents...</span>
+              </Card.Content>
+            </Card>
+          </div>
         </div>
       </>
     );
@@ -60,15 +62,17 @@ export default function AgentsPage() {
     return (
       <>
         <Navbar />
-        <div className="p-4">
-          <Card className="border border-danger" variant="default">
-            <Card.Header>
-              <Card.Title className="text-danger">Error</Card.Title>
-            </Card.Header>
-            <Card.Content>
-              <p className="text-sm">Failed to load agents: {error}</p>
-            </Card.Content>
-          </Card>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-6xl p-4">
+            <Card className="border border-danger" variant="default">
+              <Card.Header>
+                <Card.Title className="text-danger">Error</Card.Title>
+              </Card.Header>
+              <Card.Content>
+                <p className="text-sm">Failed to load agents: {error}</p>
+              </Card.Content>
+            </Card>
+          </div>
         </div>
       </>
     );
@@ -77,13 +81,18 @@ export default function AgentsPage() {
   return (
     <>
       <Navbar />
-      <div className="p-4 max-w-[95vw] mx-auto">
-        <h1 className="text-2xl font-bold mb-4">Registered Agents</h1>
-        <p className="text-sm text-muted-foreground mb-4">
-          {agents.length} agent(s) available - each handles different task types
-          via the BergAgents harness pipeline.
-        </p>
-        <AgentPanel activeAgent={null} agents={agents} />
+      {/* Scroll region: the app shell (body > #root) never scrolls
+          itself, so each page owns exactly one vertical scroll
+          container that fills the space below the navbar. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-6xl p-4">
+          <h1 className="text-2xl font-bold mb-4">Registered Agents</h1>
+          <p className="text-sm text-muted-foreground mb-4">
+            {agents.length} agent(s) available - each handles different task
+            types via the BergAgents harness pipeline.
+          </p>
+          <AgentPanel activeAgent={null} agents={agents} />
+        </div>
       </div>
     </>
   );

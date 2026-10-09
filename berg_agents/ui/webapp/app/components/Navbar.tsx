@@ -31,8 +31,8 @@ function NavLinks() {
             key={href}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               isActive
-                ? "bg-accent/10 text-accent"
-                : "text-foreground/70 hover:text-foreground hover:bg-surface-soft"
+                ? "bg-white/20 text-white"
+                : "text-white/75 hover:text-white hover:bg-white/10"
             }`}
             href={href}
           >
@@ -51,8 +51,14 @@ function NavLinks() {
  */
 export function Navbar() {
   return (
-    <nav className="border-b border-border bg-surface-secondary px-4 py-2 flex items-center justify-between">
-      <span className="font-bold text-lg text-foreground">Berg Agents</span>
+    // Brand banner: Sofia's purple → blue → teal gradient, same as the
+    // docs header. White text both modes; the gradient pops on its own
+    // so no surface tokens are used here.
+    <nav
+      className="px-4 py-1.5 flex items-center justify-between"
+      style={{ background: "var(--berg-gradient-brand)" }}
+    >
+      <span className="font-bold text-base text-white">Berg Agents</span>
       <Suspense fallback={<div className="flex items-center gap-2" />}>
         <NavLinks />
       </Suspense>

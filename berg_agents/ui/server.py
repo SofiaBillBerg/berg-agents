@@ -49,9 +49,31 @@ def create_app(
     settings = get_settings()
     resolved_harness = harness or Harness(enable_inference=True)
     resolved_provider = active_provider or settings.provider or "ollama"
-    # Default model: first model under the active provider, else empty.
+    # Default model: the configured default wins when it names a
+    # declared model (it may live under a different provider block,
+    # in which case the provider follows the model); otherwise the
+    # first model under the active provider is used.
     if active_model is not None:
         resolved_model = active_model
+    elif settings.default_model:
+        try:
+            from berg_agents.providers.registry import (
+                resolve_model as _resolve_model,
+            )
+
+            resolved = _resolve_model(settings.default_model)
+            resolved_provider = resolved["_provider"]
+            resolved_model = resolved["model"]
+        except KeyError:
+            logger.warning(
+                "default_model %r is not declared in 'providers'; "
+                "falling back to the first model under %r",
+                settings.default_model,
+                resolved_provider,
+            )
+            block = (settings.providers or {}).get(resolved_provider) or {}
+            models = block.get("models") or {}
+            resolved_model = next(iter(models)) if models else ""
     else:
         block = (settings.providers or {}).get(resolved_provider) or {}
         models = block.get("models") or {}
