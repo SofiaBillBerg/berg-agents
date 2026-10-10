@@ -260,6 +260,55 @@ def create_router(
 
         return await _dispatch_with_empty_stream_retry()
 
+    @router.get("/api/tools")
+    async def list_tools() -> dict[str, Any]:
+        """List tools the ``/api/tool/execute`` endpoint can run.
+
+        Workspace file tools (name + one-line description) plus the
+        harness entry points. ``plan_task`` / ``implement_task`` are
+        marked ``delegated``: they run inside the chat turn, so the
+        web UI routes ``/plan`` / ``/implement`` through ``run_task``
+        instead of executing them directly. MCP *servers* are listed
+        separately - their live tool names need a running session.
+
+        :return: Dict with ``tools`` and ``mcp_servers`` lists.
+        """
+        from berg_agents.agents.factory import create_tools
+        from berg_agents.capabilities.mcp_toolsets import list_servers
+
+        tools = [
+            {
+                "name": spec.name,
+                "description": spec.description,
+                "source": "workspace"}
+            for spec in create_tools(
+                root_dir=sessions._harness_root_dir()
+            )
+            if spec.execute is not None
+        ]
+        tools.extend([
+            {
+                "name": "run_task",
+                "description": (
+                    "Run the full harness pipeline on a description."
+                ),
+                "source": "harness"},
+            {
+                "name": "plan_task",
+                "description": (
+                    "Decompose a task into an ordered step plan. "
+                    "Runs in chat; the UI routes /plan through run_task."
+                ),
+                "source": "delegate"},
+            {
+                "name": "implement_task",
+                "description": (
+                    "Execute an approved step plan. Runs in chat; "
+                    "the UI routes /implement through run_task."
+                ),
+                "source": "delegate"}])
+        return {"tools": tools, "mcp_servers": list_servers()}
+
     @router.get("/api/learning-stats")
     async def learning_stats() -> dict[str, Any]:
         """Return learning/outcome statistics.

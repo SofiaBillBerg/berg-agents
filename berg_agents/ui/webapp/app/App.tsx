@@ -234,8 +234,27 @@ function ChatContent() {
     editApprovalArgs,
     revertApproval} = aiChat;
 
+  // Backend tool catalog (powers the slash palette + execution).
+  // Fetched once, before the palette below reads it: workspace file
+  // tools, run_task, and the delegated plan/implement entries, each
+  // with a one-line description.
+  const [backendTools, setBackendTools] = useState<
+    Array<{ name: string; description: string; source: string }>
+  >([]);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/tools`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && Array.isArray(data.tools)) setBackendTools(data.tools);
+      })
+      .catch(() => setBackendTools([]));
+  }, []);
+
   // Commands for the slash-autocomplete palette
   const localCommands: Command[] = [
+    ...backendTools.map((t) => ({
+      name: `/${t.name}`,
+      description: t.description})),
     { name: "/help", description: "Show help info" },
     { name: "/agents", description: "List available agents" },
     { name: "/stats", description: "Show stats" },
@@ -341,16 +360,21 @@ function ChatContent() {
     async (text: string) => {
       if (!text.startsWith("/")) return { handled: false };
 
-      // Split into command token and the rest of the line.
+      // Split into command token and the rest of the line. The
+      // leading slash is stripped so "/read_file" matches the
+      // backend tool "read_file" (it stayed on before, and every
+      // tool command silently fell through to the model).
       const [cmd, ...rest] = text.trim().split(/\s+/);
-      const cmdLower = cmd.toLowerCase();
+      const cmdLower = cmd.toLowerCase().replace(/^\//, "");
       const args = rest.join(" ");
 
       // -----------------------------------------------------------------
       // Backend-backed tool commands - these hit /api/tool/execute.
       // -----------------------------------------------------------------
-      const toolCommands = ["read_file", "write_file", "edit_file", "run_task"];
-      if (toolCommands.includes(cmdLower)) {
+      const tool = backendTools.find(
+        (t) => t.name.toLowerCase() === cmdLower,
+      );
+      if (tool && tool.source !== "delegate") {
         try {
           // Parse the argument string as JSON.  If parsing fails we fall back
           // to sending the raw string as a single-property argument.
@@ -360,13 +384,26 @@ function ChatContent() {
           } catch {
             parsedArgs = args;
           }
-          const result = await executeTool(cmdLower, parsedArgs);
-          // The `result` object already has an `onToggle` that updates
-          // `toolResults`, so we just return a success flag.
-          return { handled: true, card: `✅ ${cmdLower} executed` };
+          await executeTool(tool.name, parsedArgs);
+          return { handled: true, card: `✅ ${tool.name} executed` };
         } catch (e) {
           console.error(e);
-          return { handled: true, card: `❌ ${cmdLower} failed` };
+          return { handled: true, card: `❌ ${tool.name} failed` };
+        }
+      }
+      if (tool && tool.source === "delegate") {
+        // plan_task / implement_task only run inside a chat turn, so
+        // route them through the harness pipeline instead of direct
+        // execution: /plan becomes a planning task, /implement runs
+        // the full pipeline on the description.
+        try {
+          await executeTool("run_task", {
+            description: args || tool.name,
+            task_type: tool.name === "plan_task" ? "plan" : "generic"});
+          return { handled: true, card: `✅ ${tool.name} via run_task` };
+        } catch (e) {
+          console.error(e);
+          return { handled: true, card: `❌ ${tool.name} failed` };
         }
       }
 
@@ -416,7 +453,7 @@ function ChatContent() {
       // -----------------------------------------------------------------
       return { handled: false };
     },
-    [agents, clearMessages, input, learningStats, messages],
+    [agents, backendTools, clearMessages, input, learningStats, messages],
   );
 
   // -------------------------------------------------------------------------

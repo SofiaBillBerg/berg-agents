@@ -88,6 +88,9 @@
         "ornith:9b-q4_K_M": {
           "name": "ornith:9b-q4_K_M"
         },
+        "hf.co/JackAgentLead/Jack-3.8-27B-Coder-16GB-VRAM:latest": {
+          "name": "Jack-3.8-27B-Coder"
+        },
         "gemma4:cloud": {
           "name": "gemma4:cloud"
         },

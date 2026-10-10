@@ -50,6 +50,55 @@ function ReasoningBlock({ text }: { text: string }) {
 }
 
 /**
+ * One assistant turn's tool calls as a single collapsible group.
+ * A lone call or two stays open so progress reads inline; a longer
+ * batch starts collapsed so the answer above it stays followable.
+ * Each call keeps its own Show/Hide + Copy inside.
+ */
+function ToolCallGroup({
+  calls}: {
+  calls: NonNullable<MessageItem["toolCalls"]>;
+}) {
+  const [open, setOpen] = useState(calls.length <= 3);
+  return (
+    <div className="mt-1.5 flex flex-col gap-1 rounded-md border border-border px-1.5 py-1">
+      <button
+        aria-label={
+          open
+            ? `Collapse ${calls.length} tool calls`
+            : `Expand ${calls.length} tool calls`
+        }
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+        onClick={() => setOpen((prev) => !prev)}
+        type="button"
+      >
+        <span aria-hidden>{open ? "▾" : "▸"}</span>
+        <span className="font-mono">
+          🔧 {calls.length} tool call{calls.length === 1 ? "" : "s"}
+        </span>
+        <span className="truncate text-[11px]">
+          {calls.map((c) => c.tool).join(", ")}
+        </span>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-1">
+          {calls.map((call, callIdx) => (
+            <ToolCard
+              key={`tool-${callIdx}-${call.tool}`}
+              tool={call.tool}
+              input={call.input}
+              output={call.output}
+              expanded={false}
+              state={call.state}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * MessageList component.
  * Renders conversation transcript messages with Markdown rendering.
  *
@@ -91,18 +140,7 @@ export function MessageList({ history = [] }: MessageListProps) {
               <MarkdownRenderer content={text} />
             </div>
             {msg.toolCalls && msg.toolCalls.length > 0 && (
-              <div className="mt-1.5 flex flex-col gap-1">
-                {msg.toolCalls.map((call, callIdx) => (
-                  <ToolCard
-                    key={`${msg.id || idx}-tool-${callIdx}`}
-                    tool={call.tool}
-                    input={call.input}
-                    output={call.output}
-                    expanded={false}
-                    state={call.state}
-                  />
-                ))}
-              </div>
+              <ToolCallGroup calls={msg.toolCalls} />
             )}
           </Surface>
         );

@@ -99,6 +99,24 @@ class _ResilientToolset(WrapperToolset[None]):
             return f"Tool {name} is currently unavailable: {exc}"
 
 
+def list_servers() -> list[dict[str, Any]]:
+    """List configured MCP servers without spawning anything.
+
+    Names plus enabled flags only - live tool names need a running
+    session, so the slash palette and Context tab show servers from
+    here and resolve tools at call time.
+
+    :return: List of ``{"name", "enabled"}`` dicts.
+    """
+    return [
+        {
+            "name": name,
+            "enabled": entry.get("enabled", True) is not False}
+        for name, entry in _load_config().items()
+        if isinstance(entry, dict)
+    ]
+
+
 def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
     """Build one toolset per enabled MCP server (cached per process).
 
