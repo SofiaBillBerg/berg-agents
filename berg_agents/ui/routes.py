@@ -5,6 +5,25 @@ The streaming chat endpoint uses :class:`~pydantic_ai.ui.vercel_ai.VercelAIAdapt
 for native Vercel AI SSE protocol - no manual event-loop / SSE translation needed.
 """
 
+#  <one line to give the program's name and a brief idea of what it does.>
+#
+#  Copyright (c) 2026.
+#          Copyright (C) <year>  <name of author>
+#
+#          This program is free software: you can redistribute it and/or modify
+#          it under the terms of the GNU Affero General Public License as
+#          published by the Free Software Foundation, either version 3 of the
+#          License, or (at your option) any later version.
+#
+#          This program is distributed in the hope that it will be useful,
+#          but WITHOUT ANY WARRANTY; without even the implied warranty of
+#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#          GNU Affero General Public License for more details.
+#
+#          You should have received a copy of the GNU Affero General Public License
+#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+
 from __future__ import annotations
 
 import asyncio
@@ -281,9 +300,7 @@ def create_router(
                 "name": spec.name,
                 "description": spec.description,
                 "source": "workspace"}
-            for spec in create_tools(
-                root_dir=sessions._harness_root_dir()
-            )
+            for spec in create_tools(root_dir=sessions._harness_root_dir())
             if spec.execute is not None
         ]
         tools.extend([
@@ -308,6 +325,53 @@ def create_router(
                 ),
                 "source": "delegate"}])
         return {"tools": tools, "mcp_servers": list_servers()}
+
+    @router.get("/api/context")
+    async def context_catalog() -> dict[str, Any]:
+        """Catalog of everything the agent may load as context.
+
+        Memory files (``settings.memory``), skills (parsed frontmatter
+        only, no bodies), and MCP servers (names + enabled flags -
+        live tool names need a running session). Mirrors the TUI
+        ``/memory`` ``/skills`` ``/mcps`` listings for the web UI.
+
+        :return: Dict with ``memory``, ``skills``, ``mcp_servers``,
+            and the active provider/model.
+        """
+        from pathlib import Path
+
+        from berg_agents.capabilities.mcp_toolsets import list_servers
+        from berg_agents.capabilities.skills import list_skills
+        from berg_agents.config.settings import get_settings
+
+        settings = get_settings()
+        root = Path(sessions._harness_root_dir()).expanduser().resolve()
+
+        def _exists(entry: Any) -> bool:
+            raw = (
+                str(entry[0])
+                if isinstance(entry, (list, tuple)) and entry
+                else str(entry or "")
+            )
+            if not raw:
+                return False
+            candidate = Path(raw).expanduser()
+            if candidate.is_absolute():
+                return candidate.is_file()
+            return (root / candidate).is_file()
+
+        return {
+            "memory": [
+                {"path": str(m), "exists": _exists(m)}
+                for m in (settings.memory or [])
+            ],
+            "skills": list_skills(
+                settings.skills, root_dir=sessions._harness_root_dir()
+            ),
+            "mcp_servers": list_servers(),
+            "active": {
+                "provider": sessions.active_provider,
+                "model": sessions.active_model}}
 
     @router.get("/api/learning-stats")
     async def learning_stats() -> dict[str, Any]:

@@ -30,6 +30,24 @@
       "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
       "enabled": false,
       "type": "local"
-    }
+    },
+          "next-devtools": {
+            "type": "local",
+                  "enabled": true,
+            "command": [
+              "npx",
+              "-y",
+              "next-devtools-mcp@latest"
+            ]
+          },
+          "heroui-react": {
+            "type": "local",
+                  "enabled": true,
+            "command": [
+              "npx",
+              "-y",
+              "@heroui/react-mcp@latest"
+            ]
+          }
   }
 }

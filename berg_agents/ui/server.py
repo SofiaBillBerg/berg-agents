@@ -5,6 +5,25 @@ Builds the web application around one injected harness: routes in
 :mod:`berg_agents.ui.sessions`, schemas in :mod:`berg_agents.ui.schemas`.
 """
 
+#  <one line to give the program's name and a brief idea of what it does.>
+#
+#  Copyright (c) 2026.
+#          Copyright (C) <year>  <name of author>
+#
+#          This program is free software: you can redistribute it and/or modify
+#          it under the terms of the GNU Affero General Public License as
+#          published by the Free Software Foundation, either version 3 of the
+#          License, or (at your option) any later version.
+#
+#          This program is distributed in the hope that it will be useful,
+#          but WITHOUT ANY WARRANTY; without even the implied warranty of
+#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#          GNU Affero General Public License for more details.
+#
+#          You should have received a copy of the GNU Affero General Public License
+#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+
 from __future__ import annotations
 
 import logging
@@ -132,7 +151,7 @@ def create_app(
         # will NOT resolve for "/agents" (it only serves index.html inside
         # a matching directory). Explicit routes cover them, with HEAD
         # declared alongside GET.
-        for route_page in ("agents", "stats"):
+        for route_page in ("agents", "context"):
             page_file = _WEB_DIST / f"{route_page}.html"
             if page_file.is_file():
 

@@ -19,16 +19,37 @@ best-effort: a dead server logs a warning and is skipped, never
 breaking chat.
 """
 
+#  <one line to give the program's name and a brief idea of what it does.>
+#
+#  Copyright (c) 2026.
+#          Copyright (C) <year>  <name of author>
+#
+#          This program is free software: you can redistribute it and/or modify
+#          it under the terms of the GNU Affero General Public License as
+#          published by the Free Software Foundation, either version 3 of the
+#          License, or (at your option) any later version.
+#
+#          This program is distributed in the hope that it will be useful,
+#          but WITHOUT ANY WARRANTY; without even the implied warranty of
+#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#          GNU Affero General Public License for more details.
+#
+#          You should have received a copy of the GNU Affero General Public License
+#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+
 from __future__ import annotations
 
 import json
 import logging
 import os
 import re
+
 from pathlib import Path
 from typing import Any
 
 from pydantic_ai.toolsets.wrapper import WrapperToolset
+
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +151,11 @@ def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
     :param refresh: Rebuild instead of reusing cached toolsets.
     :return: Toolsets ready for ``Agent(toolsets=[...])``.
     """
-    from pydantic_ai.mcp import MCPToolset, StdioTransport, StreamableHttpTransport
+    from pydantic_ai.mcp import (
+        MCPToolset,
+        StdioTransport,
+        StreamableHttpTransport,
+    )
 
     from berg_agents.core.mcp import is_sensitive_server
 
@@ -187,9 +212,7 @@ def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
             toolsets[name] = toolset
             logger.info("MCP toolset ready: %s", name)
         except Exception as exc:
-            logger.warning(
-                "MCP server %r unavailable, skipping: %s", name, exc
-            )
+            logger.warning("MCP server %r unavailable, skipping: %s", name, exc)
     _CACHE = toolsets
     _LAST_NAMES = sorted(toolsets)
     return list(toolsets.values())

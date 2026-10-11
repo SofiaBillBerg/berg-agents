@@ -29,7 +29,7 @@
   //"BERG_AGENT_WEB_SEARCH_BACKENDS": "[\"ollama\", \"duckduckgo\", \"direct\"]",
 
   //# BergAgents memory: JSON array of AGENTS.md file paths, always loaded.
-  //"BERG_AGENT_MEMORY": "[\"AGENTS.md\"]",
+  "BERG_AGENT_MEMORY": "[\"BERGMEMORY.md\", \"AGENTS.md\"]",
 
   //# BergAgents todo list: when true (default) the agent gets a write_todos
   //# tool to maintain a structured task list during execution.

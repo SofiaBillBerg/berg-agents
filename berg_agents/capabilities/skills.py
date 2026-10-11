@@ -25,6 +25,25 @@ with a warning; skill bodies are capped so one giant manual cannot
 flood the context window.
 """
 
+#  <one line to give the program's name and a brief idea of what it does.>
+#
+#  Copyright (c) 2026.
+#          Copyright (C) <year>  <name of author>
+#
+#          This program is free software: you can redistribute it and/or modify
+#          it under the terms of the GNU Affero General Public License as
+#          published by the Free Software Foundation, either version 3 of the
+#          License, or (at your option) any later version.
+#
+#          This program is distributed in the hope that it will be useful,
+#          but WITHOUT ANY WARRANTY; without even the implied warranty of
+#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#          GNU Affero General Public License for more details.
+#
+#          You should have received a copy of the GNU Affero General Public License
+#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+
 from __future__ import annotations
 
 import logging
@@ -124,6 +143,57 @@ def _collect_candidates(path: Path) -> list[Path]:
             candidate = child / "SKILL.md"
             if candidate.is_file():
                 found.append(candidate)
+    return found
+
+
+def list_skills(
+    skill_paths: list[str | list[str]] | None,
+    *,
+    root_dir: str | Path = ".",
+) -> list[dict[str, Any]]:
+    """List available skills without building capabilities.
+
+    Name + one-line description + source file per ``SKILL.md`` found,
+    using the same path rules as :func:`load_skill_capabilities`.
+    Powers the ``GET /api/context`` catalog and the TUI ``/skills``
+    listing - no bodies are read beyond frontmatter.
+
+    :param skill_paths: Raw ``settings.skills`` value.
+    :param root_dir: Workspace root for relative path resolution.
+    :return: List of ``{"name", "description", "source"}`` dicts.
+    """
+    if not skill_paths:
+        return []
+    root = Path(root_dir).expanduser().resolve()
+    project_root = Path(__file__).resolve().parent.parent.parent
+    found: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for entry in skill_paths:
+        if isinstance(entry, (list, tuple)):
+            raw_path = str(entry[0]) if entry else ""
+            label = str(entry[1]) if len(entry) > 1 else ""
+        else:
+            raw_path, label = str(entry), ""
+        resolved = _resolve(raw_path, root, project_root)
+        if resolved is None:
+            continue
+        candidates = _collect_candidates(resolved)
+        single = len(candidates) == 1 and (
+            resolved.is_file() or (resolved / "SKILL.md").is_file()
+        )
+        for candidate in candidates:
+            parsed = _parse_skill(candidate)
+            if parsed is None:
+                continue
+            name, description, _body = parsed
+            skill_id = f"skill-{(label if single else '') or name}"
+            if skill_id in seen:
+                continue
+            seen.add(skill_id)
+            found.append({
+                "name": skill_id,
+                "description": description or f"Skill: {label or name}",
+                "source": str(candidate)})
     return found
 
 

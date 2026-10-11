@@ -1,4 +1,25 @@
 /*
+ * <one line to give the program's name and a brief idea of what it does.>
+ *
+ * Copyright (c) 2026.
+ *         Copyright (C) <year>  <name of author>
+ *
+ *         This program is free software: you can redistribute it and/or modify
+ *         it under the terms of the GNU Affero General Public License as
+ *         published by the Free Software Foundation, either version 3 of the
+ *         License, or (at your option) any later version.
+ *
+ *         This program is distributed in the hope that it will be useful,
+ *         but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *         GNU Affero General Public License for more details.
+ *
+ *         You should have received a copy of the GNU Affero General Public License
+ *         along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
+/*
  * App component - uses AI SDK v7's useChat hook directly via useAISDKChat.
  *
  * The backend (/api/chat/stream) uses pydantic_ai's VercelAIAdapter to emit
@@ -259,6 +280,9 @@ function ChatContent() {
     { name: "/agents", description: "List available agents" },
     { name: "/stats", description: "Show stats" },
     { name: "/clear", description: "Clear chat history" },
+    { name: "/memory", description: "Show shared memory files" },
+    { name: "/skills", description: "List agent skills" },
+    { name: "/mcps", description: "Show MCP server status" },
     { name: "/exit", description: "Exit chat" },
     { name: "/read_file", description: "Read a file via the backend" },
     { name: "/list_files", description: "List a directory via the backend" }];
@@ -285,6 +309,14 @@ function ChatContent() {
   // Tool-result handling (used by ChatTranscript)
   // -------------------------------------------------------------------------
   const [toolResults, setToolResults] = useState<ToolResult[]>([]);
+
+  // Slash-command result cards: processSlashCommand answers locally
+  // (help, agents, stats, /memory, tool runs, ...) and the answer
+  // lands here as a dismissible card above the transcript instead
+  // of vanishing into the promise chain.
+  const [cmdCards, setCmdCards] = useState<
+    Array<{ id: number; text: string }>
+  >([]);
 
   // -------------------------------------------------------------------------
   // Sessions + conversation navigation
@@ -408,6 +440,55 @@ function ChatContent() {
       }
 
       // -----------------------------------------------------------------
+      // Context catalog - memory files, skills, MCP servers via
+      // /api/context (mirrors the TUI /memory /skills /mcps).
+      // -----------------------------------------------------------------
+      if (
+        cmdLower === "memory" ||
+        cmdLower === "skills" ||
+        cmdLower === "mcps"
+      ) {
+        try {
+          const res = await fetch(`${API_BASE}/api/context`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const ctx = await res.json();
+          let card = "";
+          if (cmdLower === "memory") {
+            const mem = ctx.memory || [];
+            card =
+              "/memory\n\n" +
+              (mem.length > 0
+                ? mem
+                    .map((m: any) => `${m.exists ? "✅" : "❌"} ${m.path}`)
+                    .join("\n")
+                : "No memory files configured.");
+          } else if (cmdLower === "skills") {
+            const sk = ctx.skills || [];
+            card =
+              "/skills\n\n" +
+              (sk.length > 0
+                ? sk
+                    .map((s: any) => `${s.name} - ${s.description || ""}`)
+                    .join("\n")
+                : "No skills found.");
+          } else {
+            const servers = ctx.mcp_servers || [];
+            card =
+              "/mcps\n\n" +
+              (servers.length > 0
+                ? servers
+                    .map((s: any) => `${s.enabled ? "✅" : "⛔"} ${s.name}`)
+                    .join("\n")
+                : "No MCP servers configured.");
+          }
+          return { handled: true, card };
+        } catch (e) {
+          console.error(e);
+          return { handled: true, card: `❌ /${cmdLower} failed` };
+        }
+      }
+
+      // -----------------------------------------------------------------
       // Local UI commands - these do NOT hit the backend.
       // -----------------------------------------------------------------
       if (cmdLower === "help") {
@@ -493,6 +574,15 @@ function ChatContent() {
         if (!outcome.handled) {
           // Not a recognized command - forward the original text.
           forwardToModel(input.trim());
+          return;
+        }
+        // Handled: clear the box and surface the answer card (if any)
+        // above the transcript. Without this the card is dropped and
+        // every slash command looks like a no-op.
+        setInput("");
+        if (outcome.card) {
+          const text = outcome.card;
+          setCmdCards((prev) => [...prev, { id: Date.now(), text }]);
         }
       });
       return;
@@ -759,6 +849,33 @@ function ChatContent() {
               </div>
             </Card.Content>
           </Card>
+        )}
+
+        {/* Slash-command answer cards - newest last, dismissible. */}
+        {cmdCards.length > 0 && (
+          <div className="mb-1.5 flex shrink-0 flex-col gap-1.5">
+            {cmdCards.map((card) => (
+              <Card key={card.id} variant="secondary">
+                <Card.Content className="flex items-start gap-2 p-2">
+                  <pre className="m-0 flex-1 font-mono text-xs whitespace-pre-wrap">
+                    {card.text}
+                  </pre>
+                  <Button
+                    aria-label="Dismiss answer"
+                    size="sm"
+                    variant="secondary"
+                    onPress={() =>
+                      setCmdCards((prev) =>
+                        prev.filter((c) => c.id !== card.id),
+                      )
+                    }
+                  >
+                    ✕
+                  </Button>
+                </Card.Content>
+              </Card>
+            ))}
+          </div>
         )}
 
         {/* Chat transcript - now receives any tool results */}

@@ -724,6 +724,7 @@ name = "berg-agents"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "jsonschema" },
     { name = "pydantic-ai-harness", extra = ["code-mode"] },
     { name = "pydantic-ai-slim", extra = ["duckduckgo", "web-fetch"] },
 ]
