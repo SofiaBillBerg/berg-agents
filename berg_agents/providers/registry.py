@@ -65,9 +65,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-
 from typing import Any
-
 
 __all__ = ["list_models", "load_providers", "resolve_model"]
 

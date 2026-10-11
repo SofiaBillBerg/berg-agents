@@ -30,5 +30,4 @@ from __future__ import annotations
 
 from .models import resolve_model_instance, resolve_model_string
 
-
 __all__ = ["resolve_model_instance", "resolve_model_string"]

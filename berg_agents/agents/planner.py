@@ -34,13 +34,10 @@ the ``can_handle`` / ``execute`` contract used by callers.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import json
 import logging
-
-from dataclasses import dataclass, field
 from typing import Any, ClassVar
-
-from pydantic_ai import Agent, RunContext
 
 from berg_agents.core.interface import (
     AbstractAgent,
@@ -50,7 +47,7 @@ from berg_agents.core.interface import (
 )
 from berg_agents.providers.models import resolve_model_instance
 from berg_agents.providers.tiers import model_for_complexity
-
+from pydantic_ai import Agent, RunContext
 
 logger = logging.getLogger(__name__)
 

@@ -32,7 +32,6 @@ from typing import Any
 
 from berg_agents.config.settings import get_settings
 
-
 COMPLEXITY_LEVELS = ["trivial", "standard", "complex", "critical"]
 DEFAULT_COMPLEXITY = "standard"
 

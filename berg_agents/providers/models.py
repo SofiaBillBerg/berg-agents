@@ -49,11 +49,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from berg_agents.providers.registry import resolve_model
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
-
-from berg_agents.providers.registry import resolve_model
-
 
 __all__ = ["resolve_model_instance", "resolve_model_string"]
 

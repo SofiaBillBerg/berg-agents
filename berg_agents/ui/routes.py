@@ -27,21 +27,9 @@ for native Vercel AI SSE protocol - no manual event-loop / SSE translation neede
 from __future__ import annotations
 
 import asyncio
-import logging
-
 from functools import cached_property
+import logging
 from typing import Any
-
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import Response
-from pydantic_ai import DeferredToolRequests, DeferredToolResults
-from pydantic_ai.exceptions import UnexpectedModelBehavior
-from pydantic_ai.tools import ToolApproved, ToolDenied
-from pydantic_ai.ui.vercel_ai import VercelAIAdapter
-from pydantic_ai.ui.vercel_ai.request_types import (
-    ToolApprovalResponded,
-    ToolApprovalRespondedPart,
-)
 
 from berg_agents.core.harness import Harness
 from berg_agents.ui.schemas import (
@@ -52,7 +40,16 @@ from berg_agents.ui.schemas import (
     ToolExecuteResponse,
 )
 from berg_agents.ui.sessions import SessionManager
-
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
+from pydantic_ai import DeferredToolRequests, DeferredToolResults
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.tools import ToolApproved, ToolDenied
+from pydantic_ai.ui.vercel_ai import VercelAIAdapter
+from pydantic_ai.ui.vercel_ai.request_types import (
+    ToolApprovalResponded,
+    ToolApprovalRespondedPart,
+)
 
 logger = logging.getLogger(__name__)
 

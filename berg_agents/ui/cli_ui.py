@@ -34,13 +34,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from berg_agents.core.harness import Harness
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-
-from berg_agents.core.harness import Harness
-
 
 __all__ = [
     "SLASH_COMMANDS",

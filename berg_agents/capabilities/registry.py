@@ -26,8 +26,6 @@ Replaces duplicate hardlists previously scattered across
 
 from __future__ import annotations
 
-from typing import ClassVar
-
 
 class _ToolCatalogImpl:
     """Internal tool-routing constants and helpers.

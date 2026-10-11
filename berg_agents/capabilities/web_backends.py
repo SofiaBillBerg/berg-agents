@@ -40,13 +40,11 @@ with a warning.
 
 from __future__ import annotations
 
-import logging
-import os
-
 from collections.abc import Callable
 from dataclasses import dataclass
+import logging
+import os
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +149,6 @@ def _duckduckgo_search(query: str, max_results: int) -> str | None:
 def _direct_fetch(url: str) -> str | None:
     """Plain HTTPS fetch + markdownify; ``None`` on failure."""
     import httpx
-
     from markdownify import markdownify
 
     resp = httpx.get(

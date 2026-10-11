@@ -21,10 +21,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import json
 import logging
-
-from dataclasses import dataclass, field
 from typing import Any
 
 from berg_agents.agents.guardian import GuardianDecision
@@ -33,7 +32,6 @@ from berg_agents.core.hitl import DEFAULT_INTERRUPT_TOOLS
 from berg_agents.core.interface import RiskLevel, TaskComplexity
 from berg_agents.core.learning_gate import LearningGate
 from berg_agents.core.tool_spec import ToolSpec
-
 
 logger = logging.getLogger(__name__)
 

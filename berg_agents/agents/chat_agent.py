@@ -29,9 +29,7 @@ from __future__ import annotations
 
 import logging
 import os
-
 from typing import Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +72,6 @@ def build_chat_agent(
     :param root_dir: Workspace root for file tools.
     :return: A configured ``Agent`` ready for ``VercelAIAdapter``.
     """
-    from pydantic_ai import Agent
-    from pydantic_ai.capabilities import WebFetch, WebSearch
-    from pydantic_ai_harness import Planning
-
     from berg_agents.agents.workspace_toolset import WorkspaceToolset
     from berg_agents.capabilities.mcp_toolsets import build_mcp_toolsets
     from berg_agents.capabilities.skills import load_skill_capabilities
@@ -87,6 +81,9 @@ def build_chat_agent(
     )
     from berg_agents.config.settings import get_settings
     from berg_agents.providers.models import resolve_model_instance
+    from pydantic_ai import Agent
+    from pydantic_ai.capabilities import WebFetch, WebSearch
+    from pydantic_ai_harness import Planning
 
     # Resolve the model from config - resolve_model_instance reads
     # bergagents.jsonc and returns a fully-configured OpenAIChatModel.

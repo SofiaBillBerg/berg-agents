@@ -50,15 +50,13 @@ Design goals
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping, Sequence
 import copy
 import json
+from pathlib import Path
 import re
 import threading
-
-from collections.abc import Iterator, Mapping, Sequence
-from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
-
 
 # ---------------------------------------------------------------------------
 # Public protocol

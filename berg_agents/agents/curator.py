@@ -32,9 +32,7 @@ the gate is closed.
 from __future__ import annotations
 
 import logging
-
 from typing import Any
-
 
 # Module logger covering curator gate skips.
 logger = logging.getLogger(__name__)

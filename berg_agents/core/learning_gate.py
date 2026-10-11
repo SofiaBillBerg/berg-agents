@@ -33,12 +33,10 @@ Key responsibilities:
 from __future__ import annotations
 
 import logging
-
 from typing import Any
 
 from berg_agents.agents.learning import get_outcome_stats, record_outcome
 from berg_agents.core.outcome_db import ensure, insert, load
-
 
 logger = logging.getLogger(__name__)
 

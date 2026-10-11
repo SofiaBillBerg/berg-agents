@@ -27,5 +27,4 @@ from __future__ import annotations
 
 from berg_agents.profiles.router import DEFAULT_PROFILES_CONFIG
 
-
 __all__ = ["DEFAULT_PROFILES_CONFIG"]

@@ -42,15 +42,11 @@ Why a toolset instead of loose ``tool_plain`` registrations:
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
-
 from pathlib import Path
 from typing import Any
 
 from pydantic_ai.toolsets.wrapper import WrapperToolset
-
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +120,8 @@ class WorkspaceToolset(WrapperToolset[None]):
         :param allow_shell: When False, the ``bash`` tool is withheld
             (safe default for untrusted deployments).
         """
-        from pydantic_ai.toolsets import FunctionToolset
-
         from berg_agents.agents.factory import create_tools
+        from pydantic_ai.toolsets import FunctionToolset
 
         inner: FunctionToolset[None] = FunctionToolset()
         for spec in create_tools(root_dir):

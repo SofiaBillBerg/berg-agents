@@ -35,19 +35,14 @@ schema or be persisted to MemPalace.
 
 from __future__ import annotations
 
-import fnmatch
-import inspect
-
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+import fnmatch
+import inspect
 from typing import Any, get_args, get_origin
 
+from berg_agents.capabilities.base import RiskClass  # canonical risk vocabulary
 from pydantic import BaseModel, Field, create_model
-
-from berg_agents.capabilities.base import (
-    RiskClass,  # canonical risk vocabulary
-)
-
 
 # ---------------------------------------------------------------------------
 # Constants

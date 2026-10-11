@@ -43,13 +43,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
-
 from pathlib import Path
+import re
 from typing import Any
 
 from pydantic_ai.toolsets.wrapper import WrapperToolset
-
 
 logger = logging.getLogger(__name__)
 
@@ -151,13 +149,12 @@ def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
     :param refresh: Rebuild instead of reusing cached toolsets.
     :return: Toolsets ready for ``Agent(toolsets=[...])``.
     """
+    from berg_agents.core.mcp import is_sensitive_server
     from pydantic_ai.mcp import (
         MCPToolset,
         StdioTransport,
         StreamableHttpTransport,
     )
-
-    from berg_agents.core.mcp import is_sensitive_server
 
     global _CACHE, _LAST_NAMES
     if _CACHE and not refresh:

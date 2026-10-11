@@ -53,7 +53,9 @@ Design notes
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 import contextlib
+from dataclasses import dataclass, field
 import json
 import logging
 import queue
@@ -61,15 +63,11 @@ import re
 import subprocess
 import threading
 import time
-
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, field
 from typing import Any, Protocol
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from berg_agents.core.tool_spec import ToolParam, ToolSpec
-
 
 # ---------------------------------------------------------------------------
 # Naming convention (must match config/mcp.py byte-for-byte)
@@ -959,15 +957,15 @@ def load_mcp_server_configs(
 
 
 __all__ = [
-    "HttpMcpTransport",
     "MCP_TOOL_PREFIX",
+    "READONLY_SERVERS",
+    "SENSITIVE_SERVERS",
+    "SERVER_SEP",
+    "HttpMcpTransport",
     "McpClient",
     "McpError",
     "McpServerConfig",
     "McpTransport",
-    "READONLY_SERVERS",
-    "SENSITIVE_SERVERS",
-    "SERVER_SEP",
     "StdioMcpTransport",
     "close_all",
     "is_readonly_server",

@@ -38,7 +38,6 @@ from berg_agents.core.loop import BergLoop
 from berg_agents.core.tool_spec import ToolRegistry, ToolSpec, make_tool_spec
 from berg_agents.tools._io import _atomic_write, _normalize_target
 
-
 __all__ = [
     "DEFAULT_SYSTEM_PROMPT",
     "build_agent",

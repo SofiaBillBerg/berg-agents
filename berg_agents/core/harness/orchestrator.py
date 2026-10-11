@@ -28,11 +28,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-import uuid
-
 from typing import Any
-
-from pydantic_ai.exceptions import UnexpectedModelBehavior
+import uuid
 
 from berg_agents.agents.curator import curate_task, curation_confidence
 from berg_agents.agents.guardian import (
@@ -76,7 +73,7 @@ from berg_agents.core.harness._routing import (
 from berg_agents.core.interface import TaskComplexity
 from berg_agents.core.learning_gate import LearningGate
 from berg_agents.providers.registry import resolve_model
-
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 logger = logging.getLogger(__name__)
 

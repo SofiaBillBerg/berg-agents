@@ -25,5 +25,6 @@ CLI to catch all exceptions and print a user-friendly message.
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+
 class CodeAgentError(RuntimeError):
     """Base exception for all berg_agents related errors."""

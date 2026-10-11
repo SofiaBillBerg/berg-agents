@@ -49,12 +49,10 @@ import dataclasses
 import json
 import logging
 import re
-
 from typing import Any
 
 from berg_agents.agents.implementation import ImplementationDeps
 from berg_agents.core.interface import TaskComplexity
-
 
 logger = logging.getLogger(__name__)
 

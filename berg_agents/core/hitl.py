@@ -53,7 +53,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
-
 #: The three actions a human can take on a paused tool call.
 #: ``edit`` requires :attr:`HitlDecision.edited_args`; ``approve`` and
 #: ``reject`` ignore it.
