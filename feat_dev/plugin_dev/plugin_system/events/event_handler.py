@@ -17,26 +17,10 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+
 # Event Filtering & Transformation
 from typing import Any
 
@@ -104,16 +88,16 @@ class EventStore:
         # Implementation would use SQLite, PostgreSQL, etc.
 
     async def query(
-            self,
-            event_type: str | None = None,
-            source: str | None = None,
-            since: datetime | None = None,
-            limit: int = 100,
+        self,
+        event_type: str | None = None,
+        source: str | None = None,
+        since: datetime | None = None,
+        limit: int = 100,
     ) -> list[Event]:
         """Query stored events."""
 
     async def replay(
-            self, event_bus: EventBus, since: datetime | None = None
+        self, event_bus: EventBus, since: datetime | None = None
     ) -> None:
         """Replay events from storage."""
         events = await self.query(since=since)

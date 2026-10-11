@@ -1,3 +1,4 @@
+"""Plugin registry for managing discovered plugins."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -20,11 +21,16 @@
 import asyncio
 import logging
 
-from feat_dev.plugin_dev.plugin_system.exceptions import PluginError
-from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import PluginState
-from feat_dev.plugin_dev.plugin_system.plugin_contract import PluginCapability
 from feat_dev.plugin_dev.plugin_system.discovery.plugin_entry import PluginEntry
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import PluginMetadata, PluginSource
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import (
+    PluginMetadata,
+    PluginSource,
+)
+from feat_dev.plugin_dev.plugin_system.exceptions import PluginError
+from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import (
+    PluginState,
+)
+from feat_dev.plugin_dev.plugin_system.plugin_contract import PluginCapability
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +61,11 @@ class PluginRegistry:
             self._plugins[metadata.id] = entry
             logger.info(f"Registered plugin: {metadata.id} v{metadata.version}")
             return entry
+
+    def update_state(self, plugin_id: str, state: 'PluginState') -> None:
+        """Update plugin state."""
+        if plugin_id in self._plugins:
+            self._plugins[plugin_id].state = state
 
     def get(self, plugin_id: str) -> PluginEntry | None:
         """Get plugin by ID."""

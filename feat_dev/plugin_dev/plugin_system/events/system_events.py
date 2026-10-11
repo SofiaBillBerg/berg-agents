@@ -1,3 +1,5 @@
+"""System events for the plugin system."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -17,22 +19,6 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 
 from dataclasses import dataclass
 from typing import Any
@@ -76,8 +62,8 @@ class SystemEvents:
 class PluginLifecycleEvent(Event):
     """Plugin lifecycle event."""
 
-    plugin_id: str
-    version: str
+    plugin_id: str = "plugin_id"
+    version: str = "version"
 
     def __post_init__(self) -> None:
         self.data["plugin_id"] = self.plugin_id
@@ -88,9 +74,9 @@ class PluginLifecycleEvent(Event):
 class AgentTaskEvent(Event):
     """Agent task event."""
 
-    task_id: str
-    agent_name: str
-    description: str
+    task_id: str = "task_id"
+    agent_name: str = "agent_name"
+    description: str = "description"
 
     def __post_init__(self) -> None:
         self.data.update({
@@ -103,8 +89,8 @@ class AgentTaskEvent(Event):
 class ToolCallEvent(Event):
     """Tool call event."""
 
-    tool_name: str
-    args: dict[str, Any]
+    tool_name: str = "tool_name"
+    args: dict[str, Any] | None = None
     result: Any | None = None
     error: str | None = None
 

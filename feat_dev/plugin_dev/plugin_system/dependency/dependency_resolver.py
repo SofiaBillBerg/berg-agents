@@ -18,18 +18,22 @@
 #
 
 from collections import defaultdict
-from dataclasses import dataclass, field
-
-from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import DependencyVersionError, \
-    DependencyNotEnabledError, DependencyNotFoundError, DependencyGraph, DependencyResolver, VersionConflictError
-from feat_dev.plugin_dev.plugin_system.dependency.version_parsing import Version, VersionConstraint
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import PluginMetadata
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import PluginRegistry
-from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_hooks import PluginNotFoundError
-from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import PluginState
+from dataclasses import field, dataclass
 import logging
 
-logger=logging.getLogger(__name__)
+from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import DependencyGraph, DependencyResolver
+from feat_dev.plugin_dev.plugin_system.dependency.version_parsing import (
+    Version, VersionConstraint,
+)
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import (
+    PluginMetadata,
+)
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import PluginRegistry
+from feat_dev.plugin_dev.plugin_system.exceptions import DependencyVersionError, VersionConflictError, \
+    DependencyNotEnabledError, DependencyNotFoundError, PluginNotFoundError
+from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import PluginState
+
+logger = logging.getLogger(__name__)
 
 # Conflict Resolution
 
@@ -40,7 +44,7 @@ class ConflictResolver:
     """Resolve version conflicts."""
 
     def resolve_conflicts(
-            self, plugins: list[PluginMetadata]
+        self, plugins: list[PluginMetadata]
     ) -> list[PluginMetadata]:
         """Resolve version conflicts.
 
@@ -57,7 +61,9 @@ class ConflictResolver:
             VersionConflictError: If no compatible version exists
         """
         # Group plugins by ID
-        by_id: dict[str, list[PluginMetadata]] = field(default_factory=lambda: defaultdict(list))
+        by_id: dict[str, list[PluginMetadata]] = field(
+            default_factory=lambda: defaultdict(list)
+        )
         for plugin in plugins:
             by_id[plugin.id].append(plugin)
 
@@ -84,8 +90,8 @@ class ConflictResolver:
             for candidate in candidates:
                 version = Version.parse(candidate.version)
                 if all(
-                        VersionConstraint.parse(c).matches(version)
-                        for c in constraints
+                    VersionConstraint.parse(c).matches(version)
+                    for c in constraints
                 ):
                     resolved.append(candidate)
                     break
@@ -108,9 +114,9 @@ class LoadOrderCalculator:
         self.resolver = resolver
 
     async def calculate(
-            self,
-            plugins: list[PluginMetadata],
-            priority_hints: dict[str, int] | None = None,
+        self,
+        plugins: list[PluginMetadata],
+        priority_hints: dict[str, int] | None = None,
     ) -> list[str]:
         """Calculate load order with optional priority hints.
 
@@ -135,7 +141,7 @@ class LoadOrderCalculator:
         return load_order
 
     def _apply_priorities(
-            self, load_order: list[str], priorities: dict[str, int]
+        self, load_order: list[str], priorities: dict[str, int]
     ) -> list[str]:
         """Apply priority hints while respecting dependencies.
 
@@ -249,12 +255,11 @@ PLUGIN_API_VERSIONS = [
         deprecated=["legacy_hook"],
         changed=["BergPlugin", "PluginContext", "PluginCapability"],
         removed=["BergPlugin", "PluginContext", "PluginCapability"],
-
     )]
 
 
 def check_api_compatibility(
-        plugin_api_version: str, current_version: str
+    plugin_api_version: str, current_version: str
 ) -> bool:
     """Check if plugin API version is compatible."""
     plugin_ver = Version.parse(plugin_api_version)

@@ -1,3 +1,4 @@
+"""Security wrappers for plugin operations."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -17,26 +18,29 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-## Security Wrappers
+# Security Wrappers
 import asyncio
-import json
-import logging
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum
+import json
+import logging
+from feat_dev.plugin_dev.plugin_system.exceptions import PermissionDeniedError
 from pathlib import Path
 from typing import Any, Literal
 
-import httpx
-
-from berg_agents.capabilities.base import RiskClass, RISK_HIGH
-from feat_dev.plugin_dev.plugin_system.permissions.permissions import PermissionChecker, PermissionCategory
+from berg_agents.capabilities.base import RISK_HIGH, RiskClass
+from feat_dev.plugin_dev.plugin_system.permissions.permissions import (
+    PermissionCategory,
+    PermissionChecker,
+)
 from feat_dev.plugin_dev.plugin_system.permissions.sandbox import SandboxLevel
+import httpx
 
 logger = logging.getLogger(__name__)
 
 
-### Filesystem Wrapper
+# Filesystem Wrapper
 
 
 class SecureFilesystem:
@@ -49,11 +53,9 @@ class SecureFilesystem:
     async def read_file(self, path: str) -> str:
         """Read file with permission check."""
         if not await self.checker.check(
-                self.plugin_id,
-                PermissionCategory.FILESYSTEM_READ,
-                target=path
+                self.plugin_id, PermissionCategory.FILESYSTEM_READ, target=path
         ):
-            raise PermissionDeniedError(
+            raise PermissionDeniedError( # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied read access to {path}"
             )
 
@@ -66,11 +68,9 @@ class SecureFilesystem:
     async def write_file(self, path: str, content: str) -> None:
         """Write file with permission check."""
         if not await self.checker.check(
-                self.plugin_id,
-                PermissionCategory.FILESYSTEM_WRITE,
-                target=path
+                self.plugin_id, PermissionCategory.FILESYSTEM_WRITE, target=path
         ):
-            raise PermissionDeniedError(
+            raise PermissionDeniedError( # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied write access to {path}"
             )
 
@@ -85,7 +85,7 @@ class SecureFilesystem:
         logger.info(f"[AUDIT] Plugin {self.plugin_id}: {operation} {details}")
 
 
-### Network Wrapper
+# Network Wrapper
 
 
 class SecureNetwork:
@@ -95,27 +95,17 @@ class SecureNetwork:
         self.plugin_id = plugin_id
         self.checker = checker
 
-    async def request(
-            self,
-            method: str,
-            url: str,
-            **kwargs
-    ) -> httpx.Response:
+    async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
         """HTTP request with permission check."""
         if not await self.checker.check(
-                self.plugin_id,
-                PermissionCategory.NETWORK_OUTBOUND,
-                target=url
+                self.plugin_id, PermissionCategory.NETWORK_OUTBOUND, target=url
         ):
-            raise PermissionDeniedError(
+            raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied network access to {url}"
             )
 
         # Audit log
-        await self._audit("http_request", {
-            "method": method,
-            "url": url
-        })
+        await self._audit("http_request", {"method": method, "url": url})
 
         # Perform operation
         async with httpx.AsyncClient() as client:
@@ -126,7 +116,7 @@ class SecureNetwork:
         logger.info(f"[AUDIT] Plugin {self.plugin_id}: {operation} {details}")
 
 
-## Audit System
+# Audit System
 
 
 @dataclass
@@ -159,7 +149,7 @@ class AuditLogger:
             plugin_id: str | None = None,
             operation: str | None = None,
             since: datetime | None = None,
-            limit: int = 100
+            limit: int = 100,
     ) -> list[AuditEntry]:
         """Query audit log."""
         entries = []
@@ -185,13 +175,13 @@ class AuditLogger:
         return entries
 
 
-## HITL Integration
+# HITL Integration
 
 
 class PluginHITL:
     """Human-in-the-loop approval for plugins."""
 
-    def __init__(self, hitl_manager: HITLManager):
+    def __init__(self, hitl_manager: HITLManager):  # TODO: Define HITLRequest class
         self.hitl_manager = hitl_manager
 
     async def request_approval(
@@ -199,7 +189,7 @@ class PluginHITL:
             plugin_id: str,
             operation: str,
             details: dict[str, Any],
-            risk_level: RiskClass = RISK_HIGH
+            risk_level: RiskClass = RISK_HIGH,
     ) -> bool:
         """Request user approval for operation.
 
@@ -213,15 +203,14 @@ class PluginHITL:
             True if approved
         """
         # Build approval request
-        request = HITLRequest(
+        request = HITLRequest( # TODO: Define HITLRequest class
             agent="plugin_system",
             tool=operation,
             args=details,
             risk_level=risk_level,
             context={
                 "plugin_id": plugin_id,
-                "timestamp": datetime.now().isoformat()
-            }
+                "timestamp": datetime.now().isoformat()},
         )
 
         # Show to user and wait for approval
@@ -236,7 +225,7 @@ class PluginHITL:
         return approved
 
 
-## Trust Levels
+# Trust Levels
 
 
 class TrustLevel(str, Enum):
@@ -260,9 +249,7 @@ class TrustManager:
 
     def get_sandbox_level(self, trust: TrustLevel) -> SandboxLevel:
         """Determine sandbox level from trust."""
-        if trust == TrustLevel.BUILTIN:
-            return SandboxLevel.NONE
-        elif trust == TrustLevel.VERIFIED:
+        if trust == TrustLevel.BUILTIN or trust == TrustLevel.VERIFIED:
             return SandboxLevel.NONE
         elif trust == TrustLevel.COMMUNITY:
             return SandboxLevel.PROCESS

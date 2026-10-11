@@ -1,3 +1,4 @@
+"""Dependency management for the plugin system."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -17,17 +18,27 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-import logging
 from collections import defaultdict, deque
 from dataclasses import dataclass
+import logging
 
 # Dependency Types
-from attrs import field
-
-from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import PluginState
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import PluginMetadata
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import PluginRegistry
-from feat_dev.plugin_dev.plugin_system.dependency.version_parsing import Version, VersionConstraint
+from feat_dev.plugin_dev.plugin_system.dependency.version_parsing import (
+    Version,
+    VersionConstraint,
+)
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import (
+    PluginMetadata,
+)
+from feat_dev.plugin_dev.plugin_system.exceptions import (
+    DependencyCycleError,
+    DependencyError,
+    DependencyNotFoundError,
+    DependencyVersionError,
+)
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import (
+    PluginRegistry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +100,11 @@ class DependencyGraph:
         parent = {}
 
         def dfs(node: str) -> list[str] | None:
+            """A recursive function to detect cycle in the graph.
+
+            :param node:
+            :return:
+            """
             visited.add(node)
             rec_stack.add(node)
 
@@ -213,4 +229,3 @@ class DependencyResolver:
             raise DependencyError(f"Circular dependency detected: {e}")
 
         return load_order, warnings
-

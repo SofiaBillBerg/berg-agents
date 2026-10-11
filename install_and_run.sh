@@ -21,17 +21,17 @@
 #
 #
 
-# Avbryt direkt om ett kritiskt kommando misslyckas, men tillåt kontroller
+# Fail the script on any error and treat unset variables as an error
 set -e
 set -o pipefail
 
-# Kolla om användaren skickade med --auto eller -a flaggan
+# Check if user specified --auto or -a flag
 AUTO_MODE=false
 if [[ "$1" == "--auto" || "$1" == "-a" ]]; then
 	AUTO_MODE=true
 fi
 
-# 1. Hitta projektets rot dynamiskt baserat på skriptets placering
+# 1. Find the project root directory and change to it
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE}")" && pwd)"
 cd "$PROJECT_ROOT"
 
@@ -39,7 +39,7 @@ echo "=========================================="
 echo "🚀 Starting Berg Agents Web Application"
 echo "=========================================="
 
-# 2. OS-agnostisk aktivering av virtuell miljö
+# 2. OS detection and virtual environment activation
 echo "▶ Activating virtual environment..."
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]]; then
 	source .venv/Scripts/activate 2>/dev/null || {
@@ -53,7 +53,7 @@ else
 	}
 fi
 
-# Funktion för att hitta nästa lediga port automatiskt med Python
+# 3. Find a free port
 find_free_port() {
 	local start_port=$1
 	python3 -c "
@@ -70,13 +70,13 @@ while True:
 "
 }
 
-# 3. Smart, informativ och interaktiv porthantering
+# 3. Check if the default port 8001 is free, if not, find a free port
 TARGET_PORT=8001
 
 check_and_select_port() {
 	local port=$1
 	if lsof -i :$port >/dev/null 2>&1; then
-		# Hämta information om processen som använder porten
+		# If the port is busy, get the process info
 		local proc_info
 		proc_info=$(lsof -i :$port -sTCP:LISTEN -t | xargs ps -o pid,comm= -p 2>/dev/null | awk '{print "PID: " $1 " (" $2 ")"}')
 		[ -z "$proc_info" ] && proc_info="Unknown process"
@@ -129,7 +129,7 @@ echo "▶ Checking available ports..."
 check_and_select_port 8001
 export bergport=$TARGET_PORT
 
-# 4. Installera och bygg frontend (Next.js)
+# 4. Install and build frontend (Next.js)
 UI_DIR="$PROJECT_ROOT/berg_agents/ui/webapp"
 if [ -d "$UI_DIR" ]; then
 	echo "▶ Building frontend in $UI_DIR..."
@@ -148,14 +148,14 @@ else
 	exit 1
 fi
 
-# 5. Installera Python-beroenden i editerbart läge
+# 5. Install Python dependencies in editable mode
 echo "▶ Syncing Python packages..."
 uv pip install -e . || {
 	echo "❌ Python package installation failed"
 	exit 1
 }
 
-# 6. Starta applikationen
+# 6. Start the application
 echo "=========================================="
 echo "🎯 Success! Launching app on port $bergport..."
 echo "=========================================="

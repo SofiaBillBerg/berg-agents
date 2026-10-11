@@ -1,15 +1,15 @@
-# title: Shared ToDo
-# This a draft for developing plugin system for Berg-Agents. It is a work-in-progress and subject to change.
+# Shared ToDo Plugin for Berg-Agents
 # === Identity (Required) ===
-id: "berg-plugin-shared-todo"           # Unique identifier (kebab-case)
-version: "0.0.1"                   # Semantic version
-name: "Shared ToDo"         # Human-readable name
+id: "berg-plugin-shared-todo"
+version: "0.0.1"
+name: "Shared ToDo"
 
 # === Description (Required) ===
 description: |
-  Collaborative planning and todo list for user - agent developement. This plugin enables user and agent to create, review and edit todo-lists and plans both interactivley and independantly.
-  It provides a shared tool where an agent can propose a plan and todo-list that also the user can edit and change as needed. ToDo-lists and plans are saved as markdown documents in sharedtodo directory.
-
+  Collaborative planning and todo list for user-agent development. This plugin enables user and agent to create, 
+  review and edit todo-lists and plans both interactively and independently.
+  It provides a shared tool where an agent can propose a plan and todo-list that also the user can edit and change 
+  as needed. ToDo-lists and plans are saved as markdown documents in sharedtodo directory.
 
 # === Metadata (Optional) ===
 author:
@@ -17,160 +17,60 @@ author:
   email: "you@example.com"
   url: "https://example.com"
 
-license: "AGPL"                     # SPDX license identifier
+license: "AGPL"
 
-homepage: "https://github.com/org/berg-plugin-github"
-repository: "https://github.com/org/berg-plugin-github"
+homepage: "https://github.com/org/berg-plugin-shared-todo"
+repository: "https://github.com/org/berg-plugin-shared-todo"
 
-tags:                             # Category tags
+tags:
   - "todo"
   - "planning"
   - "productivity"
 
-icon: 📋"                        # Emoji or URL
+icon: "📋"
 
 # === Entry Point (Required) ===
 entry_point: "shared_todo:SharedToDoPlugin"
 
 # === Requirements (Optional) ===
 requirements:
-  python: ">=3.10"                 # Python version constraint
-  berg_agents: ">=0.0.1 <1.0.0"   # Berg agents version constraint
-  
-  # System requirements
-  system:
- #   - "git"
+  python: ">=3.10"
+  berg_agents: ">=0.0.1 <1.0.0"
 
 # === Dependencies (Optional) ===
-dependencies:
-  # Required dependency
-  - id: "berg-plugin-auth"
-    version: "^0.0.1"
-    optional: false
-  
-  # Optional dependency
-  - id: "berg-plugin-notifications"
-    version: ">=0.0.1"
-    optional: true
-  
-  # Peer dependency
-  # - id: "berg-plugin-git"
-  #   version: "*"
-  #   peer: true
+dependencies: []
 
 # === Capabilities (Optional) ===
 capabilities:
-  # Tool capability
   - type: tool
     id: "shared_todo"
     name: "Shared ToDo"
     description: "Manage shared todo lists"
     tools:
-      - "write_todo"
-      - "list_todo"
-      - "edit_todo"
-      - "close_todo"
+      - "create_todo"
+      - "list_todos"
+      - "update_todo"
+      - "complete_todo"
     risk_level: "low"
-    deferred: true
-  
-  # Agent capability
-  - type: agent
-    id: "plan_agent"
-    name: "Plan Agent"
-    description: "Agent for planning and todo operations"
-    complexity: "medium"
-  
-  # Provider capability
-  - type: provider
-    id: ""
-    name: "Models"
-    models:
-      planner:
-        name: ""
-        options: {}
-  
-  # Backend capability
-  - type: backend
-    backend_type: "planning"
-    name: "Planner"
 
 # === Settings Schema (Optional) ===
 settings_schema:
   type: object
   properties:
-    plan_path:
-      type: string
-      description: "Path to directory to use for plans"
-      default: "./sharedtodos/plans/"
-      secret: false
-      required: false
     todo_path:
       type: string
       description: "Path to directory to use for todo-lists"
-      default: "./sharedtodos/todo/"
-  #   rate_limit:
-  #     type: integer
-  #     minimum: 100
-  #     maximum: 5000
-  #     default: 1000
-  # required:
-  #   - token
+      default: "./sharedtodos/"
+      secret: false
+      required: false
 
 # === Permissions (Optional) ===
 permissions:
   - filesystem:read
-  - filesystem:edit:
-    - path:
-      - "$PLAN_PATH/**/*"
-      - "$TODO_PATH/**/*"
-  # - network:outbound:
-  #     domains:
-  #       - "api.github.com"
-  #       - "github.com"
-  - env:read:
-      vars:
-  #      - "GITHUB_TOKEN"
+  - filesystem:write
 
 # === Lifecycle (Optional) ===
 lifecycle:
-  # Auto-enable on load
   auto_enable: false
-  
-  # Deferred loading (default: true)
   deferred: true
-  
-  # Priority (higher loads first)
   priority: 100
-
-# === Sandbox (Optional) ===
-sandbox:
-  # Override default sandbox level
-  level: "process"
-  
-  # Additional constraints
-  constraints:
-    memory_mb: 512
-    cpu_percent: 50
-    network: true
-
-# === Endpoints (Optional) ===
-endpoints:
-  # HTTP endpoints provided by plugin
-  - path: "/planhook/sharedtodo"
-    method: "POST"
-    description: "Hook for SharedToDO receiver"
-
-# === Hooks (Optional) ===
-hooks:
-  # Custom hooks
-  - event: "agent.task.completed"
-    handler: "shared_todo:on_task_completed"
-
-# === Testing (Optional) ===
-testing:
-  # Test files pattern
-  pattern: "tests/**/test_*.py"
-  
-  # Fixtures
-  fixtures:
-    - "tests/fixtures/shared_todo"

@@ -21,14 +21,15 @@
 
 
 import asyncio
-import logging
 from importlib.metadata import entry_points
+import logging
 from pathlib import Path
 from typing import Any
 
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import (
+    PluginMetadata,
+)
 import yaml
-
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import PluginMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ def discover_package_plugins() -> list[PluginMetadata]:
 
 def parse_manifest(manifest_path: Path) -> PluginMetadata:
     """Parse plugin manifest file."""
-    with open(manifest_path, "r") as f:
+    with Path(manifest_path).open() as f:
         manifest = yaml.safe_load(f)
     return PluginMetadata(
         id=manifest.get("id"),
@@ -105,18 +106,37 @@ def discover_local_plugins(plugin_dir: Path) -> list[PluginMetadata]:
 class PluginDiscovery:
     """Plugin discovery coordinator."""
 
-    def __init__(self, config: dict[str, Any]) -> None:
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
+        config = config or {}
         self.plugin_dir = Path(config.get("plugin_dir", "config/plugins"))
         self.cache_dir = Path(config.get("cache_dir", ".cache/plugins"))
 
-    async def discover_all(self) -> list[PluginMetadata]:
-        """Discover plugins from all sources."""
-        results = await asyncio.gather(
-            self._discover_builtin(),
-            self._discover_packages(),
-            self._discover_local(),
-            return_exceptions=True,
-        )
+    async def discover_all(
+        self, search_paths: list[Path] | None = None
+    ) -> list[PluginMetadata]:
+        """Discover plugins from all sources.
+
+        Args:
+            search_paths: Optional list of paths to search. If provided, only searches these paths.
+                         If None, searches built-in, packages, and default local directory.
+
+        Returns:
+            List of discovered plugin metadata
+        """
+        if search_paths:
+            # Search only the specified paths
+            results = await asyncio.gather(
+                *[self._scan_directory(path) for path in search_paths],
+                return_exceptions=True,
+            )
+        else:
+            # Search all default sources
+            results = await asyncio.gather(
+                self._discover_builtin(),
+                self._discover_packages(),
+                self._discover_local(),
+                return_exceptions=True,
+            )
 
         # Flatten and filter errors
         discovered = []
@@ -175,6 +195,58 @@ class PluginDiscovery:
                 except Exception as e:
                     logger.warning(f"Failed to parse {manifest_path}: {e}")
         return discovered
+
+    async def _parse_manifest(self, manifest_path: Path) -> PluginMetadata:
+        """Parse plugin manifest YAML file.
+
+        Args:
+            manifest_path: Path to plugin.yaml file
+
+        Returns:
+            Plugin metadata
+        """
+        with Path(manifest_path).open() as f:
+            data = yaml.safe_load(f)
+
+        # Parse dependencies
+        from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import (
+            PluginDependency,
+        )
+
+        dependencies = []
+        for dep_data in data.get("dependencies", []):
+            dep = PluginDependency(
+                id=dep_data["id"],
+                version=dep_data["version"],
+                optional=dep_data.get("optional", False),
+            )
+            dependencies.append(dep)
+
+        # Get author info
+        author_data = data.get("author", {})
+        author = (
+            author_data.get("name")
+            if isinstance(author_data, dict)
+            else author_data
+        )
+
+        return PluginMetadata(
+            id=data["id"],
+            version=data["version"],
+            name=data["name"],
+            description=data["description"],
+            source="local",
+            path=manifest_path.parent,
+            entry_point=data["entry_point"],
+            author=author,
+            license=data.get("license"),
+            homepage=data.get("homepage"),
+            repository=data.get("repository"),
+            tags=data.get("tags", []),
+            icon=data.get("icon"),
+            dependencies=dependencies,
+            permissions=data.get("permissions", []),
+        )
 
     def _extract_metadata(self, plugin_class, name):
         """Extract metadata from plugin class."""

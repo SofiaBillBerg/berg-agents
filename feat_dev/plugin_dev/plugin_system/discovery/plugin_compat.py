@@ -27,7 +27,10 @@ from feat_dev.plugin_dev.plugin_system.plugin_contract import (
     PluginContext,
     ToolCapability,
 )
-
+from feat_dev.plugin_dev.plugin_system.discovery.compat_funcs import (
+    parse_skill,
+    create_mcp_toolset,
+)
 
 # Skill Adapter
 
@@ -38,12 +41,12 @@ class CapabilityWrapper(PluginCapability):
     """Wrap skill content as a plugin capability PluginCapability."""
 
     def __init__(
-            self,
-            type: str,
-            id: str,
-            description: str,
-            content: str,
-            deferred: bool = True,
+        self,
+        type: str,
+        id: str,
+        description: str,
+        content: str,
+        deferred: bool = True,
     ) -> None:
         self.type = type
         self.id = id
@@ -99,8 +102,6 @@ class MCPPluginAdapter(BergPlugin):
     def get_capabilities(self) -> list[PluginCapability]:
         """Return MCP tools as capabilities."""
         return [
-            ToolCapability(
-                tool=tool, risk_level="medium", deferred=False
-            )
+            ToolCapability(tool=tool, risk_level="medium", deferred=False)
             for tool in self.toolset.tools
         ]

@@ -17,22 +17,25 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-## Runtime health monitoring
+# Runtime health monitoring
 
-### Health Monitoring
+# Health Monitoring
 
 import asyncio
-import logging
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 from typing import Any, Literal
 
 from attrs import field
 from babel.util import UTC
-
-from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_hooks import PluginLifecycle
-from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import PluginState
 from feat_dev.plugin_dev.plugin_system.discovery.plugin_entry import PluginEntry
+from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_hooks import (
+    PluginLifecycle,
+)
+from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import (
+    PluginState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,13 +99,13 @@ class HealthMonitor:
                     # Optionally disable unhealthy plugins
                     # await self.lifecycle.disable(entry.metadata.id)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning(f"Health check timeout: {entry.metadata.id}")
             except Exception as e:
                 logger.error(f"Health check failed: {entry.metadata.id}: {e}")
 
 
-### Hot Reload
+# Hot Reload
 
 
 class PluginReloader:
@@ -144,10 +147,10 @@ class PluginReloader:
             logger.error(f"Reload failed: {plugin_id}: {e}")
 
 
-### Graceful Degradation
+# Graceful Degradation
 
 
-class PluginLoadError:
+class PluginLoadError(Exception):
     """Custom exception for plugin load failures."""
 
     def __init__(self, message: str):
@@ -185,7 +188,7 @@ class DegradationStrategy:
 
     @staticmethod
     async def handle_enable_failure(
-            entry: PluginEntry, error: Exception
+        entry: PluginEntry, error: Exception
     ) -> None:
         """Handle plugin enable failure."""
         logger.error(f"Plugin enable failed: {entry.metadata.id}: {error}")

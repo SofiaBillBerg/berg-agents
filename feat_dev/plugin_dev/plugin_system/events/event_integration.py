@@ -1,3 +1,4 @@
+"""Event integration for the plugin system."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -37,7 +38,10 @@
 from abc import ABC
 from typing import Any
 
-from feat_dev.plugin_dev.plugin_system.events.event_bus import EventBus, EventHandler
+from feat_dev.plugin_dev.plugin_system.events.event_bus import (
+    EventBus,
+    EventHandler,
+)
 from feat_dev.plugin_dev.plugin_system.plugin_contract import PluginContext
 
 
@@ -62,13 +66,15 @@ class EventEmitter:
             correlation_id=correlation_id,
         )
 
+    # TODO: Implement EventHandler
     def subscribe(
             self, event_pattern: str, handler: EventHandler, priority: int = 0
-    ) -> str:
+    ) -> str:  # TODO: Consider returning a subscription ID or handle for unsubscribing
         """Subscribe to events."""
         return self.event_bus.subscribe(event_pattern, handler, priority)
 
-    def unsubscribe(self, event_pattern: str, handler: EventHandler) -> None:
+    def unsubscribe(self, event_pattern: str,
+                    handler: EventHandler) -> None:  # TODO:  Implement a way to unsubscribe using a subscription ID or handle
         """Unsubscribe from events."""
         self.event_bus.unsubscribe(event_pattern, handler)
 

@@ -1,3 +1,4 @@
+"""Sandboxing for the plugin system."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -17,21 +18,29 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-## Sandboxing
+# Sandboxing
 import asyncio
+from enum import Enum
 import json
+import logging
+from feat_dev.plugin_dev.plugin_system.exceptions import PermissionDeniedError
+from typing import Any
 import os
 import sys
-from enum import Enum
 from typing import Any
 
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import PluginError
-from feat_dev.plugin_dev.plugin_system.permissions.permissions import Permission, PermissionCategory
-import logging
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import (
+    PluginError,
+)
+from feat_dev.plugin_dev.plugin_system.permissions.permissions import (
+    Permission,
+    PermissionCategory,
+)
 
 logger = logging.getLogger(__name__)
 
-### Sandbox Levels
+
+# Sandbox Levels
 
 
 class SandboxLevel(str, Enum):
@@ -43,8 +52,7 @@ class SandboxLevel(str, Enum):
     WASM = "wasm"  # WebAssembly (future)
 
 
-### Process Sandbox
-
+# Process Sandbox
 
 
 class ProcessSandbox:
@@ -63,13 +71,16 @@ class ProcessSandbox:
         # Start process
         self.process = await asyncio.create_subprocess_exec(
             sys.executable,
-            "-m", "berg_agents.sandbox.runner",
-            "--plugin-id", self.plugin_id,
-            "--entry-point", entry_point,
+            "-m",
+            "berg_agents.sandbox.runner",
+            "--plugin-id",
+            self.plugin_id,
+            "--entry-point",
+            entry_point,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env=env
+            env=env,
         )
 
         logger.info(f"Started sandbox process for {self.plugin_id}")
@@ -97,12 +108,7 @@ class ProcessSandbox:
             raise RuntimeError("Sandbox not started")
 
         # Send request
-        request = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": method,
-            "params": args
-        }
+        request = {"jsonrpc": "2.0", "id": 1, "method": method, "params": args}
 
         self.process.stdin.write(json.dumps(request).encode() + b"\n")
         await self.process.stdin.drain()
@@ -124,8 +130,7 @@ class ProcessSandbox:
             logger.info(f"Stopped sandbox process for {self.plugin_id}")
 
 
-### Container Sandbox (Future)
-
+# Container Sandbox (Future)
 
 
 class ContainerSandbox:
@@ -140,12 +145,17 @@ class ContainerSandbox:
         """Start plugin container."""
         # Build docker run command
         cmd = [
-            "docker", "run",
+            "docker",
+            "run",
             "-d",  # Detached
-            "--name", f"berg-plugin-{self.plugin_id}",
-            "--network", self._get_network_mode(),
-            "--cpus", "1.0",
-            "--memory", "512m"]
+            "--name",
+            f"berg-plugin-{self.plugin_id}",
+            "--network",
+            self._get_network_mode(),
+            "--cpus",
+            "1.0",
+            "--memory",
+            "512m"]
 
         # Add volume mounts based on permissions
         for perm in self.permissions:
@@ -160,22 +170,23 @@ class ContainerSandbox:
 
         # Start container
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
 
         stdout, _ = await proc.communicate()
         self.container_id = stdout.decode().strip()
 
-        logger.info(f"Started container {self.container_id} for {self.plugin_id}")
+        logger.info(
+            f"Started container {self.container_id} for {self.plugin_id}"
+        )
 
     def _get_network_mode(self) -> str:
         """Determine network mode based on permissions."""
         has_network = any(
-            p.category in (
+            p.category
+            in (
                 PermissionCategory.NETWORK_OUTBOUND,
-                PermissionCategory.NETWORK_INBOUND
+                PermissionCategory.NETWORK_INBOUND,
             )
             for p in self.permissions
         )
@@ -192,5 +203,3 @@ class ContainerSandbox:
                 "docker", "rm", self.container_id
             )
             logger.info(f"Stopped container {self.container_id}")
-
-

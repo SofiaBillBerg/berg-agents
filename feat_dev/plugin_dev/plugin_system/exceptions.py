@@ -17,6 +17,7 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
+
 class ConfigValidationError(Exception):
     """Raised when configuration validation fails."""
 
@@ -75,3 +76,13 @@ class PluginEnableError(Exception):
 
 class ManifestError(Exception):
     """Manifest validation error."""
+
+
+class PermissionDeniedError(Exception):
+    """Raised when a plugin attempts an unauthorized operation."""
+    
+    def __init__(self, message: str, plugin_id: str = "", resource: str = ""):
+        super().__init__(message)
+        self.message = message
+        self.plugin_id = plugin_id
+        self.resource = resource

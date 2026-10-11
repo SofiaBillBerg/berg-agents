@@ -1,3 +1,4 @@
+"""Base class for all berg_agents plugins."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -21,11 +22,14 @@
 
 # All plugins implement a base interface:
 
-import logging
 from abc import ABC, abstractmethod
+import logging
 from typing import Any
 
-from feat_dev.plugin_dev.plugin_system.plugin_contract import PluginCapability, PluginContext
+from feat_dev.plugin_dev.plugin_system.plugin_contract import (
+    PluginCapability,
+    PluginContext,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +64,9 @@ class BergPlugin(ABC):
     """
 
     async def on_config_change(
-            self,
-            context: PluginContext,
-            new_config: dict[str, Any]
+            self, context: PluginContext, new_config: dict[str, Any]
     ) -> None:
         """Called when configuration changes.
 
         Optional hook - implement to support live reconfiguration.
         """
-        pass

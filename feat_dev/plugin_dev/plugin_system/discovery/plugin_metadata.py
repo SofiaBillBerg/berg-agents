@@ -1,3 +1,4 @@
+"""Plugin metadata for the plugin system."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -24,18 +25,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from attrs import field
+from dataclasses import field
+from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import (
+    PluginDependency,
+)
 
-from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import PluginDependency
-
-
-class PluginSource:
-    """Plugin source types."""
-
-    BUILTIN = "builtin"
-    PACKAGE = "package"
-    LOCAL = "local"
-    REMOTE = "remote"
+# Plugin source type (literal string)
+PluginSource = str  # One of: 'builtin', 'package', 'local', 'remote'
 
 
 @dataclass

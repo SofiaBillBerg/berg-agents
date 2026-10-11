@@ -229,7 +229,7 @@ section-order = [
     "first-party",
     "local-folder",
     "third-party"]
-known-third-party = ["berg_agents"]
+known-third-party = ["berg_agents", "feat_dev"]
 split-on-trailing-comma = false
 
 [tool.isort]
@@ -252,7 +252,7 @@ skip_glob = [
     ".ipynb_checkpoints",
     "*support-libs"] # This will tell isort to skip these directories when sorting imports.
 sort_reexports = true # This will sort re-exports (e.g., `from . import module`) separately from regular imports,.
-src_paths = ["berg_agents"]
+src_paths = ["berg_agents","feat_dev"] # This will tell isort to treat these directories as source paths, which will affect how imports are sorted.
 
 
 [tool.ruff.format]
@@ -266,7 +266,7 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 
 [tool.ruff]
-src = ["berg_agents"]
+src = ["berg_agents", "feat_dev"]
 extend-exclude = [
     "_build",
     ".venv",
@@ -424,8 +424,8 @@ python_executable = ".venv/bin/python"
 mode = "default"
 
 [tool.pyrefly]
-project-includes = ["berg_agents/"]
-search-path = ["./stubs", "berg_agents/"]
+project-includes = ["berg_agents/", "feat_dev/"]
+search-path = ["./stubs", "berg_agents/", "feat_dev/"]
 python-interpreter-path = ".venv/bin/python"
 # pyrefly mis-detects Pydantic v2 models and requires `model_config` as a
 # constructor argument; this only affects FileObject (a @dataclass) here.

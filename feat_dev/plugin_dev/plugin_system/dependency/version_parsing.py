@@ -1,3 +1,4 @@
+"""Version parsing utilities for the plugin system."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -36,8 +37,8 @@
 
 # Version Parsing
 
-import re
 from dataclasses import dataclass
+import re
 
 
 @dataclass

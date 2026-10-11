@@ -1,3 +1,4 @@
+"""Secret management for the plugin system."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -17,28 +18,32 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-## Secrets Management
+# Secrets Management
 
-### Secret Detection
+import re
+from pathlib import Path
+from typing import Any
+
+# Secret Detection
+from cryptography.fernet import Fernet
 
 
 class SecretDetector:
     """Detect and protect secrets in configuration."""
 
     SECRET_PATTERNS = [
-        r'token',
-        r'api[_-]?key',
-        r'password',
-        r'secret',
-        r'private[_-]?key',
-        r'credential']
+        r"token",
+        r"api[_-]?key",
+        r"password",
+        r"secret",
+        r"private[_-]?key",
+        r"credential"]
 
     def is_secret_field(self, field_name: str) -> bool:
         """Check if field name suggests a secret."""
         field_lower = field_name.lower()
         return any(
-            re.search(pattern, field_lower)
-            for pattern in self.SECRET_PATTERNS
+            re.search(pattern, field_lower) for pattern in self.SECRET_PATTERNS
         )
 
     def mark_secrets(self, schema: dict[str, Any]) -> dict[str, Any]:
@@ -53,9 +58,7 @@ class SecretDetector:
         return schema
 
 
-### Secret Storage
-
-from cryptography.fernet import Fernet
+# Secret Storage
 
 
 class SecretStore:
@@ -86,26 +89,15 @@ class SecretStore:
         decrypted = self._cipher.decrypt(encrypted_value.encode())
         return decrypted.decode()
 
-    async def store_secret(
-            self,
-            plugin_id: str,
-            key: str,
-            value: str
-    ) -> None:
+    async def store_secret(self, plugin_id: str, key: str, value: str) -> None:
         """Store an encrypted secret."""
         encrypted = self.encrypt(value)
         # Store in secure location (e.g., keyring, vault)
-        pass
 
-    async def retrieve_secret(
-            self,
-            plugin_id: str,
-            key: str
-    ) -> str | None:
+    async def retrieve_secret(self, plugin_id: str, key: str) -> str | None:
         """Retrieve and decrypt a secret."""
         # Retrieve from secure location
-        encrypted = None  # Placeholder
+        encrypted: None = None  # TODO: Implement retrieval logic
         if encrypted:
             return self.decrypt(encrypted)
         return None
-

@@ -17,23 +17,33 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-import asyncio
-import logging
 from abc import ABC, abstractmethod
+import asyncio
 from datetime import datetime
+import logging
 from typing import Any
 
-from feat_dev.plugin_dev.plugin_system.events.event_bus import EventBus
-from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import PluginState
-from feat_dev.plugin_dev.plugin_system.plugin_contract import PluginContext, PluginCapability
 from feat_dev.plugin_dev.plugin_system.discovery.plugin_entry import PluginEntry
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import PluginRegistry
-from feat_dev.plugin_dev.plugin_system.lifecycle.runtime_health import HealthStatus
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import (
+    PluginRegistry,
+)
+from feat_dev.plugin_dev.plugin_system.events.event_bus import EventBus
+from feat_dev.plugin_dev.plugin_system.exceptions import PluginNotFoundError, PluginStateError, PluginEnableError
+from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import (
+    PluginState,
+)
+from feat_dev.plugin_dev.plugin_system.lifecycle.runtime_health import (
+    HealthStatus, PluginLoadError,
+)
+from feat_dev.plugin_dev.plugin_system.plugin_contract import (
+    PluginCapability,
+    PluginContext,
+)
 
 logger = logging.getLogger(__file__)
 
 
-## Lifecycle Hooks
+# Lifecycle Hooks
 
 # Hook Interface
 
@@ -97,10 +107,10 @@ class PluginLifecycle:
     """Manages plugin lifecycle transitions."""
 
     def __init__(
-            self,
-            registry: PluginRegistry,
-            event_bus: EventBus,
-            config: dict[str, Any],
+        self,
+        registry: PluginRegistry,
+        event_bus: EventBus,
+        config: dict[str, Any],
     ):
         self.registry = registry
         self.event_bus = event_bus
@@ -148,7 +158,7 @@ class PluginLifecycle:
 
             logger.info(f"Loaded plugin: {plugin_id}")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await self._handle_error(
                 entry, PluginLoadError(f"Load timeout: {plugin_id}")
             )
@@ -206,7 +216,7 @@ class PluginLifecycle:
 
             logger.info(f"Enabled plugin: {plugin_id}")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await self._handle_error(
                 entry, PluginEnableError(f"Enable timeout: {plugin_id}")
             )

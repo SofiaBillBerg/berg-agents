@@ -17,15 +17,21 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-## Permission System
+# Permission Categories
+# Permission System
 from dataclasses import dataclass
-### Permission Categories
-import logging
 from enum import Enum
+import logging
+from feat_dev.plugin_dev.plugin_system.exceptions import PermissionDeniedError
+from typing import Any
 from typing import Any
 
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import PluginRegistry
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import (
+    PluginRegistry,
+)
+
 logger = logging.getLogger(__name__)
+
 
 class PermissionCategory(str, Enum):
     """Plugin permission categories."""
@@ -63,9 +69,7 @@ class PermissionCategory(str, Enum):
     SECRETS_READ = "secrets:read"
 
 
-
-### Permission Specification
-
+# Permission Specification
 
 
 @dataclass
@@ -85,7 +89,9 @@ class Permission:
         if self.category == PermissionCategory.FILESYSTEM_READ:
             return self._check_path_scope(target, self.scope.get("paths", []))
         elif self.category == PermissionCategory.NETWORK_OUTBOUND:
-            return self._check_domain_scope(target, self.scope.get("domains", []))
+            return self._check_domain_scope(
+                target, self.scope.get("domains", [])
+            )
         elif self.category == PermissionCategory.ENV_READ:
             return target in self.scope.get("vars", [])
         elif self.category == PermissionCategory.SUBPROCESS_SPAWN:
@@ -95,8 +101,8 @@ class Permission:
 
     def _check_path_scope(self, path: str, allowed_patterns: list[str]) -> bool:
         """Check if path matches allowed patterns."""
-        from pathlib import Path
         import fnmatch
+        from pathlib import Path
 
         path_obj = Path(path)
         for pattern in allowed_patterns:
@@ -115,9 +121,7 @@ class Permission:
         return False
 
 
-
-### Permission Checker
-
+# Permission Checker
 
 
 class PermissionChecker:
@@ -128,11 +132,11 @@ class PermissionChecker:
         self.granted: dict[str, set[Permission]] = {}
 
     async def check(
-            self,
-            plugin_id: str,
-            permission: PermissionCategory,
-            target: str | None = None,
-            context: dict[str, Any] | None = None
+        self,
+        plugin_id: str,
+        permission: PermissionCategory,
+        target: str | None = None,
+        context: dict[str, Any] | None = None,
     ) -> bool:
         """Check if plugin has permission.
 
@@ -165,10 +169,7 @@ class PermissionChecker:
         if plugin_id not in self.granted:
             # First request - prompt user
             granted = await self._request_permission(
-                plugin_id,
-                permission,
-                target,
-                context
+                plugin_id, permission, target, context
             )
             if granted:
                 if plugin_id not in self.granted:
@@ -186,11 +187,11 @@ class PermissionChecker:
         return False
 
     async def _request_permission(
-            self,
-            plugin_id: str,
-            permission: PermissionCategory,
-            target: str | None,
-            context: dict[str, Any] | None
+        self,
+        plugin_id: str,
+        permission: PermissionCategory,
+        target: str | None,
+        context: dict[str, Any] | None,
     ) -> bool:
         """Request permission from user (HITL)."""
         # Build prompt
@@ -207,4 +208,3 @@ class PermissionChecker:
         # In real implementation, this would show a UI dialog
         # and wait for user approval
         return True  # Auto-approve for now
-

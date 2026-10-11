@@ -25,11 +25,16 @@ import json
 from pathlib import Path
 
 from attrs import asdict
+from feat_dev.plugin_dev.plugin_system.discovery.discovery_process import (
+    discover_local_plugins,
+    discover_package_plugins,
+)
 
-from feat_dev.plugin_dev.plugin_system.lifecycle.bergplugin import BergPlugin
-from feat_dev.plugin_dev.plugin_system.discovery.discovery_process import discover_package_plugins, discover_local_plugins
 # Lazy Import
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import PluginMetadata
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import (
+    PluginMetadata,
+)
+from feat_dev.plugin_dev.plugin_system.lifecycle.bergplugin import BergPlugin
 
 
 def lazy_import_plugin(entry_point: str) -> type[BergPlugin]:

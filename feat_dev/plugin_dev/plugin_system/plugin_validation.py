@@ -20,13 +20,12 @@
 import importlib
 from pathlib import Path
 
-import yaml
+from feat_dev.plugin_dev.plugin_system.exceptions import ManifestError
+from feat_dev.plugin_dev.plugin_system.plugin_schema import PluginManifest
 from jsonschema import ValidationError as JsonValidationError
 from jsonschema import validate
 from pydantic import ValidationError as PydanticValidationError
-
-from feat_dev.plugin_dev.plugin_system.exceptions import ManifestError
-from feat_dev.plugin_dev.plugin_system.plugin_schema import PluginManifest
+import yaml
 
 
 class ManifestValidator:
@@ -41,7 +40,7 @@ class ManifestValidator:
         return {}  # Placeholder
 
     async def validate_file(
-            self, path: Path
+        self, path: Path
     ) -> tuple[PluginManifest, list[str]]:
         """Validate manifest file.
 
@@ -76,7 +75,7 @@ class ManifestValidator:
         return manifest, warnings
 
     async def _validate_dependencies(
-            self, manifest: PluginManifest, warnings: list[str]
+        self, manifest: PluginManifest, warnings: list[str]
     ) -> None:
         """Validate dependencies are available."""
         for dep in manifest.dependencies:
@@ -85,7 +84,7 @@ class ManifestValidator:
             # Would check registry for dependency
 
     async def _validate_entry_point(
-            self, manifest: PluginManifest, warnings: list[str]
+        self, manifest: PluginManifest, warnings: list[str]
     ) -> None:
         """Validate entry point exists."""
         module_path, class_name = manifest.entry_point.rsplit(":", 1)
@@ -94,5 +93,5 @@ class ManifestValidator:
             module = importlib.import_module(module_path)
             if not hasattr(module, class_name):
                 warnings.append(f"Entry point class not found: {class_name}")
-        except ImportError as e:
+        except ImportError:
             warnings.append(f"Entry point module not found: {module_path}")

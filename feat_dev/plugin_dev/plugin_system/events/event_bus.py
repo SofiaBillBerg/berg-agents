@@ -35,16 +35,14 @@
 #
 
 import asyncio
-import contextlib
-import logging
 from collections.abc import Awaitable, Callable
+import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime
+import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
-
-EventHandler = Callable[[Event], Awaitable[None]]
 
 
 @dataclass
@@ -67,6 +65,10 @@ class Event:
         return fnmatch.fnmatch(self.type, pattern)
 
 
+# Type alias for event handlers - defined after Event class
+EventHandler = Callable[[Event], Awaitable[None]]
+
+
 class EventBus:
     """Async event bus for plugin communication."""
 
@@ -80,10 +82,18 @@ class EventBus:
         self._history: list[Event] = []
         self._max_history = 1000
 
+    async def initialize(self) -> None:
+        """Initialize and start event processing."""
+        await self.start()
+
     async def start(self) -> None:
         """Start event processing."""
         self._processing_task = asyncio.create_task(self._process_events())
         logger.info("Event bus started")
+
+    async def shutdown(self) -> None:
+        """Shutdown event processing."""
+        await self.stop()
 
     async def stop(self) -> None:
         """Stop event processing."""
@@ -94,11 +104,11 @@ class EventBus:
         logger.info("Event bus stopped")
 
     async def emit(
-            self,
-            event_type: str,
-            data: dict[str, Any] | None = None,
-            source: str = "system",
-            correlation_id: str | None = None,
+        self,
+        event_type: str,
+        data: dict[str, Any] | None = None,
+        source: str = "system",
+        correlation_id: str | None = None,
     ) -> None:
         """Emit an event.
 
@@ -126,7 +136,7 @@ class EventBus:
         logger.debug(f"Event emitted: {event_type} from {source}")
 
     def subscribe(
-            self, event_pattern: str, handler: EventHandler, priority: int = 0
+        self, event_pattern: str, handler: EventHandler, priority: int = 0
     ) -> str:
         """Subscribe to events matching pattern.
 
@@ -197,10 +207,10 @@ class EventBus:
                 )
 
     async def wait_for(
-            self,
-            event_pattern: str,
-            timeout: float | None = None,
-            filter_fn: Callable[[Event], bool] | None = None,
+        self,
+        event_pattern: str,
+        timeout: float | None = None,
+        filter_fn: Callable[[Event], bool] | None = None,
     ) -> Event:
         """Wait for a specific event.
 
@@ -229,11 +239,11 @@ class EventBus:
             self.unsubscribe(event_pattern, handler)
 
     def get_history(
-            self,
-            event_type: str | None = None,
-            source: str | None = None,
-            since: datetime | None = None,
-            limit: int = 100,
+        self,
+        event_type: str | None = None,
+        source: str | None = None,
+        since: datetime | None = None,
+        limit: int = 100,
     ) -> list[Event]:
         """Get event history with filters."""
         events = self._history.copy()

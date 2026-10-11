@@ -1,3 +1,5 @@
+"""Configuration validators for the plugin system."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -17,12 +19,14 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-## Configuration Validation
-import re
+# Configuration Validation
+from collections.abc import Callable
 from pathlib import Path
-### Custom Validators
+import re
+from typing import Any
 
-from typing import Callable, Any
+
+# Custom Validators
 
 
 class ConfigValidator:
@@ -36,10 +40,7 @@ class ConfigValidator:
         self.validators[name] = validator
 
     def validate(
-            self,
-            value: Any,
-            validator_name: str,
-            **kwargs
+            self, value: Any, validator_name: str, **kwargs
     ) -> tuple[bool, str | None]:
         """Validate value with custom validator.
 
@@ -57,9 +58,10 @@ class ConfigValidator:
 
 
 # Built-in validators
-def validate_url(value: str, **kwargs) -> None:
+def validate_url(value: str, **kwargs) -> None:  # type: ignore[unused-argument]
     """Validate URL format."""
     from urllib.parse import urlparse
+
     result = urlparse(value)
     if not all([result.scheme, result.netloc]):
         raise ValueError(f"Invalid URL: {value}")
@@ -78,5 +80,3 @@ def validate_regex(value: str, **kwargs) -> None:
         re.compile(value)
     except re.error as e:
         raise ValueError(f"Invalid regex: {e}")
-
-

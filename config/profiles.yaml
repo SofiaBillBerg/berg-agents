@@ -25,7 +25,7 @@
   # Exact names or glob patterns; matches built-ins AND MCP tools
   # (MCP tools are named mcp_<server>__<tool>, e.g. "mcp_memory__*").
   excluded_tools:
-    - "mcp_*"
+    - "mcp_github__*"
   tool_description_overrides:
     read_file: "Read a file from the workspace (read-only)."
     edit_file: "Edit a file in the workspace (read-write)."

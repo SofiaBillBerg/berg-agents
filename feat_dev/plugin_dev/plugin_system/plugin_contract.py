@@ -1,3 +1,4 @@
+"""Plugin contract for the plugin system."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -17,20 +18,20 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-import logging
 from abc import ABC
 from collections.abc import Callable
+import logging
 from pathlib import Path
 from typing import Any
-
-from pydantic_ai.agent.abstract import AbstractAgent
-from pydantic_ai.tools import Tool
 
 from berg_agents import BergAgentsApp, Harness
 from berg_agents.capabilities.base import RiskClass
 from berg_agents.core.interface import TaskComplexity
-from feat_dev.plugin_dev.plugin_system.lifecycle.bergplugin import BergPlugin
 from feat_dev.plugin_dev.plugin_system.events.event_bus import EventBus
+from feat_dev.plugin_dev.plugin_system.lifecycle.bergplugin import BergPlugin
+from pydantic_ai.agent.abstract import AbstractAgent
+from pydantic_ai.tools import Tool
+from feat_dev.plugin_dev.plugin_system.plugin_manager import PluginManager
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,6 @@ class PluginContext:
         :param event:
         :param data:
         """
-        ...
 
     def subscribe(self, event: str, handler: Callable) -> None:
         """
@@ -76,28 +76,24 @@ class PluginContext:
         :param event:
         :param handler:
         """
-        ...
 
     def get_plugin(self, plugin_id: str) -> BergPlugin | None:
         """
 
         :param plugin_id:
         """
-        ...
 
     def register_tool(self, tool: Tool) -> None:
         """
 
         :param tool:
         """
-        ...
 
     def register_agent(self, agent: AbstractAgent) -> None:
         """
 
         :param agent:
         """
-        ...
 
     def get_setting(self, key: str, default: Any = None) -> Any:
         """Get a configuration setting."""
@@ -126,12 +122,18 @@ class PluginContext:
 
 
 class PluginCapability(ABC):
+    """Base class for plugin capabilities."""
+    def __init__(self):
+        self.agent_class = None
+        self.tool = None
+
     """Base for plugin-provided capabilities."""
 
     type: str
 
 
 class ToolCapability(PluginCapability):
+    """A plugin capability that provides a tool."""
     type = "tool"
     tool: Tool
     risk_level: RiskClass
@@ -139,18 +141,21 @@ class ToolCapability(PluginCapability):
 
 
 class AgentCapability(PluginCapability):
+    """A plugin capability that provides an agent."""
     type = "agent"
     agent_class: type[AbstractAgent]
     complexity_level: TaskComplexity
 
 
 class ProviderCapability(PluginCapability):
+    """A plugin capability that provides a provider."""
     type = "provider"
     provider_id: str
     models: dict[str, dict[str, Any]]
 
 
 class BackendCapability(PluginCapability):
+    """A plugin capability that provides a backend."""
     type: str = "backend"
     backend_type: str  # "search", "memory", "storage"
-    backend_class: type
+    backend_class: type[Any]  # Class implementing the backend

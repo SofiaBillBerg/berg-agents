@@ -1,3 +1,4 @@
+"""Configuration manager for the plugin system."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -17,34 +18,60 @@
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 
-## Configuration Manager
+# Configuration Manager
 import logging
 import os
-import re
 from pathlib import Path
+import re
 from typing import Any
-import yaml
-from jsonschema import validate, ValidationError
 
+from jsonschema import ValidationError, validate
+import yaml
+
+from feat_dev.plugin_dev.plugin_system.exceptions import ConfigValidationError
+from feat_dev.plugin_dev.plugin_system.config.file_watcher import FileWatcher
 from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_hooks import PluginLifecycle
 
 logger = logging.getLogger(__name__)
 
 
-
 class PluginConfigManager:
     """Manage plugin configurations."""
 
-    def __init__(self, config_dir: Path):
-        self.config_dir = config_dir
+    def __init__(self, config_dir: Path | None = None):
+        self.config_dir = config_dir or Path.home() / ".berg_agents"
         self._cache: dict[str, dict[str, Any]] = {}
-        self._env_pattern = re.compile(r'\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}')
+        self._env_pattern = re.compile(r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)}")
+        self._initialized = False
+
+    async def initialize(self) -> None:
+        """Initialize the configuration manager."""
+        if self._initialized:
+            return
+
+        # Ensure config directory exists
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        (self.config_dir / "plugins").mkdir(exist_ok=True)
+
+        self._initialized = True
+        logger.info(f"Configuration manager initialized: {self.config_dir}")
+
+    def get_plugin_settings(self, plugin_id: str) -> dict[str, Any]:
+        """Get plugin settings from cache or return empty dict.
+
+        Args:
+            plugin_id: Plugin identifier
+
+        Returns:
+            Plugin settings dictionary
+        """
+        return self._cache.get(plugin_id, {})
 
     async def load_config(
             self,
             plugin_id: str,
             schema: dict[str, Any] | None = None,
-            defaults: dict[str, Any] | None = None
+            defaults: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Load and validate plugin configuration.
 
@@ -154,7 +181,15 @@ class PluginConfigManager:
     def _expand_env_vars(self, config: Any) -> Any:
         """Recursively expand ${env:VAR} references."""
         if isinstance(config, str):
+
             def replace(match):
+                """Replace environment variable references with their values.
+
+                Returns the value of the environment variable or empty string if not found.
+
+                :param match:
+                :return:
+                """
                 var_name = match.group(1)
                 return os.environ.get(var_name, "")
 
@@ -169,7 +204,11 @@ class PluginConfigManager:
     def _deep_merge(self, base: dict, override: dict) -> None:
         """Deep merge override into base (mutates base)."""
         for key, value in override.items():
-            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            if (
+                    key in base
+                    and isinstance(base[key], dict)
+                    and isinstance(value, dict)
+            ):
                 self._deep_merge(base[key], value)
             else:
                 base[key] = value
@@ -188,10 +227,7 @@ class PluginConfigManager:
         return await self.load_config(plugin_id)
 
     async def update(
-            self,
-            plugin_id: str,
-            updates: dict[str, Any],
-            persist: bool = True
+            self, plugin_id: str, updates: dict[str, Any], persist: bool = True
     ) -> None:
         """Update plugin configuration.
 
@@ -214,9 +250,7 @@ class PluginConfigManager:
             await self._save_user_config(plugin_id, current)
 
     async def _save_user_config(
-            self,
-            plugin_id: str,
-            settings: dict[str, Any]
+            self, plugin_id: str, settings: dict[str, Any]
     ) -> None:
         """Save configuration to user config file."""
         config_file = self.config_dir / "plugins" / f"{plugin_id}.yaml"
@@ -238,24 +272,20 @@ class PluginConfigManager:
             yaml.safe_dump(existing, f, default_flow_style=False)
 
 
+# Runtime Configuration
 
-## Runtime Configuration
-
-### Dynamic Reconfiguration
-
+# Dynamic Reconfiguration
 
 
 class PluginConfigWatcher:
     """Watch for configuration changes and reload."""
 
     def __init__(
-            self,
-            config_manager: PluginConfigManager,
-            lifecycle: PluginLifecycle
+            self, config_manager: PluginConfigManager, lifecycle: PluginLifecycle
     ):
         self.config_manager = config_manager
         self.lifecycle = lifecycle
-        self.watchers: dict[str, FileWatcher] = {}
+        self.watchers: dict[str, FileWatcher] = {}  # TODO: Implement FileWatcher class
 
     async def watch(self, plugin_id: str) -> None:
         """Watch plugin configuration for changes."""
@@ -266,7 +296,7 @@ class PluginConfigWatcher:
         if not config_file.exists():
             return
 
-        watcher = FileWatcher(config_file)
+        watcher = FileWatcher(config_file)  # TODO: Implement FileWatcher class
         watcher.on_change(lambda: self._on_config_change(plugin_id))
         self.watchers[plugin_id] = watcher
         await watcher.start()
@@ -292,4 +322,3 @@ class PluginConfigWatcher:
                     )
         except Exception as e:
             logger.error(f"Failed to reload config for {plugin_id}: {e}")
-

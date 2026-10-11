@@ -1,3 +1,4 @@
+"""Inter-plugin communication mechanisms."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -20,7 +21,11 @@
 import asyncio
 from typing import Any
 
-from feat_dev.plugin_dev.plugin_system.events.event_bus import Event, EventBus, EventHandler
+from feat_dev.plugin_dev.plugin_system.events.event_bus import (
+    Event,
+    EventBus,
+    EventHandler,
+)
 
 
 # [Request-Response Pattern](../08-plugin-event-system#Request-Response Pattern)
@@ -89,7 +94,6 @@ class RequestResponsePattern:
             correlation_id=request_event.correlation_id,
         )
 
-
     # # Usage example
     # async def example_request_response() -> None:
     #     pattern = RequestResponsePattern(event_bus=EventBus())
@@ -124,11 +128,10 @@ class PubSubChannel:
             source=source,
         )
 
-    def subscribe(self, topic: str, handler: EventHandler) -> str:
+    def subscribe(self, topic: str, handler: EventHandler) -> str:  # TODO: Implement EventHandler type or interface
         """Subscribe to topic."""
         pattern = f"channel.{self.channel}.{topic}"
         return self.event_bus.subscribe(pattern, handler)
-
 
     # # Usage example
     # notifications = PubSubChannel(event_bus=EventBus(), channel="notifications")
@@ -169,6 +172,10 @@ class EventAggregator:
         collected: list[Event] = []
 
         async def collect(event: Event) -> None:
+            """Aggregate incoming events.
+
+            :param event:
+            """
             collected.append(event)
 
         # Subscribe to all patterns
