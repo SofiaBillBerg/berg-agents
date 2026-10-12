@@ -179,7 +179,7 @@ class SharedToDoPlugin(BergPlugin):
         return [
             ToolCapability(
                 type="tool",
-                id="shared_todo",
+                id="shared-todo",
                 name="Shared ToDo",
                 description="Manage shared todo lists",
                 tool=create_todo,

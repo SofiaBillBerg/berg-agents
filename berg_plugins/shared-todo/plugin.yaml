@@ -30,7 +30,7 @@ tags:
 icon: "📋"
 
 # === Entry Point (Required) ===
-entry_point: "shared_todo:SharedToDoPlugin"
+entry_point: "shared-todo:SharedToDoPlugin"
 
 # === Requirements (Optional) ===
 requirements:
@@ -43,7 +43,7 @@ dependencies: []
 # === Capabilities (Optional) ===
 capabilities:
   - type: tool
-    id: "shared_todo"
+    id: "shared-todo"
     name: "Shared ToDo"
     description: "Manage shared todo lists"
     tools:
