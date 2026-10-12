@@ -11,25 +11,6 @@ Key responsibilities:
 4. Remember: store learnings in MemPalace knowledge graph
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import logging
@@ -39,7 +20,6 @@ from berg_agents.agents.learning import get_outcome_stats, record_outcome
 from berg_agents.core.outcome_db import ensure, insert, load
 
 logger = logging.getLogger(__name__)
-
 
 # Minimum outcomes before routing rules may be adjusted.
 MIN_OUTCOMES_FOR_ADJUSTMENT = 5
@@ -89,12 +69,12 @@ class LearningGate:
         )
 
     def record(
-        self,
-        task: dict[str, Any],
-        result: dict[str, Any],
-        model_used: str,
-        success: bool,
-        user_corrected: bool = False,
+            self,
+            task: dict[str, Any],
+            result: dict[str, Any],
+            model_used: str,
+            success: bool,
+            user_corrected: bool = False,
     ) -> dict[str, Any]:
         """Record a task outcome and generate insights.
 
@@ -150,12 +130,12 @@ class LearningGate:
         return insight
 
     def _create_insight(
-        self,
-        task: dict[str, Any],
-        model: str,
-        success: bool,
-        user_corrected: bool,
-        store_memory: bool = True,
+            self,
+            task: dict[str, Any],
+            model: str,
+            success: bool,
+            user_corrected: bool,
+            store_memory: bool = True,
     ) -> dict[str, Any]:
         """Create a structured insight from an outcome.
 
@@ -250,8 +230,8 @@ class LearningGate:
                 "current_rate": success_rate,
                 "action": f"Upgrade complexity for {task_type} tasks (success rate: {success_rate:.0%})"}
         elif (
-            success_rate > HIGH_SUCCESS_RATE
-            and total >= MIN_OUTCOMES_FOR_DOWNGRADE
+                success_rate > HIGH_SUCCESS_RATE
+                and total >= MIN_OUTCOMES_FOR_DOWNGRADE
         ):
             return {
                 "rule": "complexity_downgrade",

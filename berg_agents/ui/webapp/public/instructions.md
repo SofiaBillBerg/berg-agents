@@ -1,5 +1,6 @@
 Extract this package in <web site>/public/.
-If your site is http://www.example.com, you should be able to access a file named http://www.example.com/public/favicon.ico.
+If your site is http://www.example.com, you should be able to access a file
+named http://www.example.com/public/favicon.ico.
 Insert the following code in the <head> section of your pages:
 
 ```
@@ -14,4 +15,5 @@ Make sure your favicon is properly setup:
 
 https://example.com
 
-Check https://realfavicongenerator.net/logo-maker/your-favicon-is-ready or if your web site runs locally, run npx realfavicon check <port>
+Check https://realfavicongenerator.net/logo-maker/your-favicon-is-ready or if your web site runs locally, run npx
+realfavicon check <port>

@@ -26,43 +26,25 @@ reads the same values from the ``model_dump()`` dict using the ``ollama_*`` /
 ``openai_*`` key convention, so this module is the single source of truth.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import contextlib
-from functools import lru_cache
 import json
 import logging
 import os
-from pathlib import Path
 import re
+from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
-from berg_agents.config.jsonc import loads as jsonc_loads
 from dotenv import dotenv_values, load_dotenv
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import PydanticBaseSettingsSource
 from pydantic_settings.sources.providers.json import JsonConfigSettingsSource
 from pydantic_settings.sources.providers.yaml import YamlConfigSettingsSource
+
+from berg_agents.config.jsonc import loads as jsonc_loads
 
 #: Matches ``${env:VAR}`` or ``${VAR}`` placeholders for env substitution.
 _ENV_PLACEHOLDER_RE = re.compile(r"\$\{(?:env:)?([A-Za-z_][A-Za-z0-9_]*)}")
@@ -283,7 +265,7 @@ class JsoncConfigSettingsSource(JsonConfigSettingsSource):
         )
         for key, value in expanded.items():
             if isinstance(key, str) and key.upper().startswith("BERG_AGENT_"):
-                norm_key = key[len("BERG_AGENT_") :].lower()
+                norm_key = key[len("BERG_AGENT_"):].lower()
                 field = model_fields.get(norm_key)
                 if field is None:
                     continue  # unknown key: stays reachable via extras only
@@ -292,9 +274,9 @@ class JsoncConfigSettingsSource(JsonConfigSettingsSource):
                     continue
                 decoded = value
                 if (
-                    isinstance(value, str)
-                    and value.strip()[:1] in "[{"
-                    and _annotation_is_complex(field.annotation)
+                        isinstance(value, str)
+                        and value.strip()[:1] in "[{"
+                        and _annotation_is_complex(field.annotation)
                 ):
                     # Env vars get JSON-decoded for list/dict-typed fields;
                     # file sources hand raw strings over, so decode here to
@@ -311,10 +293,10 @@ class JsoncConfigSettingsSource(JsonConfigSettingsSource):
         # the first declared model. An explicit ``default_model``
         # key always wins over the alias.
         if (
-            "default_model" not in mirrored
-            and "default_model" not in expanded
-            and isinstance(expanded.get("defaultModel"), str)
-            and expanded["defaultModel"].strip()
+                "default_model" not in mirrored
+                and "default_model" not in expanded
+                and isinstance(expanded.get("defaultModel"), str)
+                and expanded["defaultModel"].strip()
         ):
             mirrored["default_model"] = expanded["defaultModel"].strip()
         return {**expanded, **mirrored}
@@ -343,9 +325,9 @@ class EnvExpandingYamlConfigSettingsSource(YamlConfigSettingsSource):
         # Same camelCase alias as the JSONC source: an explicit
         # ``default_model`` key always wins over ``defaultModel``.
         if (
-            "default_model" not in expanded
-            and isinstance(expanded.get("defaultModel"), str)
-            and expanded["defaultModel"].strip()
+                "default_model" not in expanded
+                and isinstance(expanded.get("defaultModel"), str)
+                and expanded["defaultModel"].strip()
         ):
             expanded["default_model"] = expanded["defaultModel"].strip()
         return expanded
@@ -399,12 +381,12 @@ class Settings(BaseSettings):
 
     @classmethod
     def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Customize the settings source priority.
 
@@ -630,7 +612,7 @@ class Settings(BaseSettings):
             # Create the directory tree if any part of it is missing.
             expanded.mkdir(parents=True, exist_ok=True)
         except (
-            Exception
+                Exception
         ) as exc:  # ruff: ignore[blind-except] -- intentional broad catch
             # Log at WARNING rather than raising: a bad path should not
             # prevent the server from starting (Requirement 6.4).

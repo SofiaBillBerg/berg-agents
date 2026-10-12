@@ -23,25 +23,6 @@ only on the small method surface below: ``execute_task``,
 ``get_learning_stats``.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import asyncio
@@ -93,12 +74,12 @@ def _requested_model_id(metadata: dict[str, Any]) -> str | None:
 
 
 def _inference_prompt(
-    *,
-    description: str,
-    task_type: str,
-    complexity: TaskComplexity,
-    plan: dict[str, Any] | None,
-    steps: list[dict[str, Any]],
+        *,
+        description: str,
+        task_type: str,
+        complexity: TaskComplexity,
+        plan: dict[str, Any] | None,
+        steps: list[dict[str, Any]],
 ) -> str:
     """Render the task prompt for the implementation agent.
 
@@ -132,7 +113,7 @@ def _inference_prompt(
 
 
 async def _await_inference(
-    agent: Any, prompt: str, deps: ImplementationDeps
+        agent: Any, prompt: str, deps: ImplementationDeps
 ) -> Any:
     """Run one implementation-agent call under an explicit timeout.
 
@@ -211,9 +192,9 @@ def _files_changed_from_run(run_result: Any) -> list[str]:
             for key in _FILE_PATH_ARG_KEYS:
                 value = args.get(key)
                 if (
-                    isinstance(value, str)
-                    and value.strip()
-                    and value not in seen
+                        isinstance(value, str)
+                        and value.strip()
+                        and value not in seen
                 ):
                     seen.add(value)
                     touched.append(value)
@@ -275,7 +256,7 @@ def _files_changed_from_text(text: str) -> list[str]:
 
 
 def _merge_files_changed(
-    metadata: dict[str, Any], observed: list[str]
+        metadata: dict[str, Any], observed: list[str]
 ) -> dict[str, Any]:
     """Copy metadata with run-observed paths merged into files_changed.
 
@@ -427,6 +408,5 @@ def _finish_reason(run_result: Any) -> str:
     if isinstance(nested, str) and nested.strip():
         return nested.strip()
     return "unknown"
-
 
 # noinspection unresolved-references

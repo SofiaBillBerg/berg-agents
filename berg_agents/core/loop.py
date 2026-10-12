@@ -42,34 +42,16 @@ the loop will switch to ``adapter.stream_chat(...)`` and emit
 adapter simply has no delta source.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
-from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
-from dataclasses import asdict, dataclass
 import json
 import logging
-import time
-from typing import Any
 import uuid
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
+from dataclasses import asdict, dataclass
+from typing import Any
+
+import time
 
 from berg_agents.core.checkpoint import Checkpointer, make_snapshot
 from berg_agents.core.hitl import (
@@ -282,23 +264,22 @@ class HitlResolved:
 #: on this; we keep it as a ``type`` alias rather than a real ``Union``
 #: because we want ``LoopEvent`` to be importable as a single name.
 LoopEvent = (
-    RunStarted
-    | RunCompleted
-    | RunError
-    | RunCancelled
-    | StepStart
-    | StepEnd
-    | ContentDelta
-    | MessageFinish
-    | ToolCallRequest
-    | ToolCallResult
-    | ToolStart
-    | ToolEnd
-    | ToolError
-    | HitlRequired
-    | HitlResolved
+        RunStarted
+        | RunCompleted
+        | RunError
+        | RunCancelled
+        | StepStart
+        | StepEnd
+        | ContentDelta
+        | MessageFinish
+        | ToolCallRequest
+        | ToolCallResult
+        | ToolStart
+        | ToolEnd
+        | ToolError
+        | HitlRequired
+        | HitlResolved
 )
-
 
 # ---------------------------------------------------------------------------
 # BergLoop
@@ -340,15 +321,15 @@ class BergLoop:
     """
 
     def __init__(
-        self,
-        adapter: Any,
-        tool_registry: ToolRegistry,
-        *,
-        interrupt_on: Mapping[str, bool] | None = None,
-        max_steps: int = 25,
-        on_step: StepCallback | None = None,
-        checkpointer: Checkpointer | None = None,
-        temperature: float = 0.7,
+            self,
+            adapter: Any,
+            tool_registry: ToolRegistry,
+            *,
+            interrupt_on: Mapping[str, bool] | None = None,
+            max_steps: int = 25,
+            on_step: StepCallback | None = None,
+            checkpointer: Checkpointer | None = None,
+            temperature: float = 0.7,
     ) -> None:
         """Store constructor args and validate."""
         if not hasattr(adapter, "chat") or not callable(adapter.chat):
@@ -400,9 +381,9 @@ class BergLoop:
         self._cancel_flags[thread_id] = reason
 
     def run(
-        self,
-        thread_id: str,
-        input_messages: Sequence[Mapping[str, Any]],
+            self,
+            thread_id: str,
+            input_messages: Sequence[Mapping[str, Any]],
     ) -> Generator[
         RunStarted
         | RunCancelled
@@ -510,28 +491,28 @@ class BergLoop:
 
                         # Build a concrete action declaration for HITL visibility.
                         def _hitl_reason(
-                            name: str, args: Mapping[str, Any]
+                                name: str, args: Mapping[str, Any]
                         ) -> str:
                             # File-writing actions: declare the target path.
                             path = (
-                                args.get("path")
-                                or args.get("file_path")
-                                or args.get("filename")
-                                or args.get("target")
+                                    args.get("path")
+                                    or args.get("file_path")
+                                    or args.get("filename")
+                                    or args.get("target")
                             )
                             if (
-                                name
-                                in {"write_file", "edit_file", "delete_file"}
-                                and path
+                                    name
+                                    in {"write_file", "edit_file", "delete_file"}
+                                    and path
                             ):
                                 return f"agent wants to {name.replace('_', ' ')} to {path}"
                             if name == "read_file" and path:
                                 return f"agent wants to read file at {path}"
                             if name in {"run_command", "execute"}:
                                 cmd = (
-                                    args.get("command")
-                                    or args.get("cmd")
-                                    or args.get("args")
+                                        args.get("command")
+                                        or args.get("cmd")
+                                        or args.get("args")
                                 )
                                 return (
                                     f"agent wants to execute shell command: {cmd}"
@@ -540,9 +521,9 @@ class BergLoop:
                                 )
                             # External resource access.
                             url = (
-                                args.get("url")
-                                or args.get("uri")
-                                or args.get("link")
+                                    args.get("url")
+                                    or args.get("uri")
+                                    or args.get("link")
                             )
                             if url:
                                 return f"agent wants to access external resource at {url} (read)"
@@ -627,9 +608,9 @@ class BergLoop:
             )
 
     def resume(
-        self,
-        thread_id: str,
-        decision: HitlDecision,
+            self,
+            thread_id: str,
+            decision: HitlDecision,
     ) -> Generator[LoopEvent, Any, None]:
         """Continue a paused thread after a :class:`HitlDecision`.
 
@@ -731,11 +712,11 @@ class BergLoop:
     # -- Internal helpers --------------------------------------------------
 
     def _continue_cycle(
-        self,
-        thread_id: str,
-        messages: list[dict[str, Any]],
-        steps: int,
-        tool_call_count: int,
+            self,
+            thread_id: str,
+            messages: list[dict[str, Any]],
+            steps: int,
+            tool_call_count: int,
     ) -> Generator[LoopEvent, Any, None]:
         """Resume the main run loop after a HITL decision.
 
@@ -807,23 +788,23 @@ class BergLoop:
                         :return: human-readable reason for HITL pause
                         """
                         path = (
-                            args.get("path")
-                            or args.get("file_path")
-                            or args.get("filename")
-                            or args.get("target")
+                                args.get("path")
+                                or args.get("file_path")
+                                or args.get("filename")
+                                or args.get("target")
                         )
                         if (
-                            name in {"write_file", "edit_file", "delete_file"}
-                            and path
+                                name in {"write_file", "edit_file", "delete_file"}
+                                and path
                         ):
                             return f"agent wants to {name.replace('_', ' ')} to {path}"
                         if name == "read_file" and path:
                             return f"agent wants to read file at {path}"
                         if name in {"run_command", "execute"}:
                             cmd = (
-                                args.get("command")
-                                or args.get("cmd")
-                                or args.get("args")
+                                    args.get("command")
+                                    or args.get("cmd")
+                                    or args.get("args")
                             )
                             return (
                                 f"agent wants to execute shell command: {cmd}"
@@ -831,9 +812,9 @@ class BergLoop:
                                 else f"agent wants to execute {name}"
                             )
                         url = (
-                            args.get("url")
-                            or args.get("uri")
-                            or args.get("link")
+                                args.get("url")
+                                or args.get("uri")
+                                or args.get("link")
                         )
                         if url:
                             return f"agent wants to access external resources, path {url} (read file)"
@@ -894,11 +875,11 @@ class BergLoop:
         )
 
     def _execute_tool(
-        self,
-        call_id: str,
-        name: str,
-        args: Mapping[str, Any],
-        messages: list[dict[str, Any]],
+            self,
+            call_id: str,
+            name: str,
+            args: Mapping[str, Any],
+            messages: list[dict[str, Any]],
     ) -> Iterator[Any]:
         """Dispatch a tool call and yield lifecycle events.
 
@@ -981,13 +962,13 @@ class BergLoop:
         return [spec.to_openai_tool() for spec in self._registry.all()]
 
     def _persist_snapshot(
-        self,
-        thread_id: str,
-        *,
-        messages: list[dict[str, Any]],
-        step: int,
-        tool_calls: int,
-        pending_hitl: HitlRequest | None,
+            self,
+            thread_id: str,
+            *,
+            messages: list[dict[str, Any]],
+            step: int,
+            tool_calls: int,
+            pending_hitl: HitlRequest | None,
     ) -> None:
         """Persist the current state of the loop for resuming later.
 
@@ -1121,9 +1102,9 @@ def _extract_tool_calls(message: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def _tool_result_message(
-    call_id: str,
-    name: str,
-    output: Any,
+        call_id: str,
+        name: str,
+        output: Any,
 ) -> dict[str, Any]:
     """Build a ``tool`` role message that feeds the result back to the model.
 
@@ -1142,9 +1123,9 @@ def _tool_result_message(
 
 
 def _tool_error_message(
-    call_id: str,
-    name: str,
-    error: str,
+        call_id: str,
+        name: str,
+        error: str,
 ) -> dict[str, Any]:
     """Same as :func:`_tool_result_message` but for an error string.
 

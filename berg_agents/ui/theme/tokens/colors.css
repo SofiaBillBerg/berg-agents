@@ -1,24 +1,3 @@
-/*
- * <one line to give the program's name and a brief idea of what it does.>
- *
- * Copyright (c) 2026.
- *         Copyright (C) <year>  <name of author>
- *
- *         This program is free software: you can redistribute it and/or modify
- *         it under the terms of the GNU Affero General Public License as
- *         published by the Free Software Foundation, either version 3 of the
- *         License, or (at your option) any later version.
- *
- *         This program is distributed in the hope that it will be useful,
- *         but WITHOUT ANY WARRANTY; without even the implied warranty of
- *         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *         GNU Affero General Public License for more details.
- *
- *         You should have received a copy of the GNU Affero General Public License
- *         along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
-
 /* Berg Agents colour palette - canonical source.
  * Mirrored as Python in colors.py; synced to docs/styles/ via sync.py.
  *
@@ -26,45 +5,45 @@
  */
 
 :root {
-  /* Brand - the signature gradient stops */
-  --berg-brand-purple: #7d029c;
-  --berg-brand-blue: #3b528b;
-  --berg-brand-teal: #21908c;
+    /* Brand - the signature gradient stops */
+    --berg-brand-purple: #7d029c;
+    --berg-brand-blue: #3b528b;
+    --berg-brand-teal: #21908c;
 
-  /* Accent variants used in borders, callouts, hover states */
-  --berg-accent-orchid: #e841c7;
-  --berg-accent-magenta: #8603a6;
-  --berg-accent-mauve: #440154; /* viridis-magma start */
-  --berg-accent-deep: #1640ab;
-  --berg-accent-cornflower: #3c66d1;
-  --berg-accent-yellow: #fde725; /* callout marker */
-  --berg-accent-amber: #fd9f07; /* warning marker */
+    /* Accent variants used in borders, callouts, hover states */
+    --berg-accent-orchid: #e841c7;
+    --berg-accent-magenta: #8603a6;
+    --berg-accent-mauve: #440154; /* viridis-magma start */
+    --berg-accent-deep: #1640ab;
+    --berg-accent-cornflower: #3c66d1;
+    --berg-accent-yellow: #fde725; /* callout marker */
+    --berg-accent-amber: #fd9f07; /* warning marker */
 
-  /* Neutrals - body copy, surfaces, dividers */
-  --berg-text: #010a13;
-  --berg-bg: #fbf7fb;
-  --berg-surface: #fffafa;
-  --berg-surface-tint: #f1f3f4;
-  --berg-surface-soft: rgba(248, 237, 248, 0.76);
-  --berg-border: #e9ecef;
-  --berg-muted: #551a8b; /* callout label colour */
+    /* Neutrals - body copy, surfaces, dividers */
+    --berg-text: #010a13;
+    --berg-bg: #fbf7fb;
+    --berg-surface: #fffafa;
+    --berg-surface-tint: #f1f3f4;
+    --berg-surface-soft: rgba(248, 237, 248, 0.76);
+    --berg-border: #e9ecef;
+    --berg-muted: #551a8b; /* callout label colour */
 
-  /* Status - aligned to the viridis family used in custom.css callouts */
-  --berg-status-info: #3b528b;
-  --berg-status-success: #21908c;
-  --berg-status-warn: #fd9f07;
-  --berg-status-error: #d73027;
+    /* Status - aligned to the viridis family used in custom.css callouts */
+    --berg-status-info: #3b528b;
+    --berg-status-success: #21908c;
+    --berg-status-warn: #fd9f07;
+    --berg-status-error: #d73027;
 
-  /* Code */
-  --berg-code-bg: rgba(248, 237, 248, 0.76);
-  --berg-code-text: #551a8b;
+    /* Code */
+    --berg-code-bg: rgba(248, 237, 248, 0.76);
+    --berg-code-text: #551a8b;
 
-  /* Gradients */
-  --berg-gradient-brand: linear-gradient(
-    135deg,
-    var(--berg-brand-purple) 0%,
-    var(--berg-brand-blue) 50%,
-    var(--berg-brand-teal) 100%
-  );
-  --berg-gradient-soft: linear-gradient(135deg, #3358b5, #f285d5);
+    /* Gradients */
+    --berg-gradient-brand: linear-gradient(
+            135deg,
+            var(--berg-brand-purple) 0%,
+            var(--berg-brand-blue) 50%,
+            var(--berg-brand-teal) 100%
+    );
+    --berg-gradient-soft: linear-gradient(135deg, #3358b5, #f285d5);
 }

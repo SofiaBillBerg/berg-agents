@@ -32,40 +32,22 @@ Design notes
   the only stdlib modules used for HTTP; threads are stdlib too.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 import contextlib
-from dataclasses import dataclass, field
 import json
 import logging
 import queue
 import re
 import subprocess
 import threading
-import time
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 from urllib import error as urllib_error
 from urllib import request as urllib_request
+
+import time
 
 from berg_agents.core.tool_spec import ToolParam, ToolSpec
 
@@ -88,7 +70,6 @@ SENSITIVE_SERVERS: frozenset[str] = frozenset({"github", "memory"})
 
 #: Servers that are strictly read-only and safe to call autonomously.
 READONLY_SERVERS: frozenset[str] = frozenset({"codegraph", "context7"})
-
 
 # Matches ``mcp_<server>__<tool>`` and captures the server segment.
 _PREFIX_RE = re.compile(
@@ -117,7 +98,7 @@ def server_from_prefixed(tool_name: str) -> str | None:
 
 
 def is_sensitive_server(
-    server_name: str, enabled_servers: frozenset[str] | None = None
+        server_name: str, enabled_servers: frozenset[str] | None = None
 ) -> bool:
     """Return ``True`` if *server_name* is sensitive (approval-required).
 
@@ -135,7 +116,7 @@ def is_sensitive_server(
 
 
 def is_readonly_server(
-    server_name: str, enabled_servers: frozenset[str] | None = None
+        server_name: str, enabled_servers: frozenset[str] | None = None
 ) -> bool:
     """Return ``True`` if *server_name* is read-only (autonomous).
 
@@ -171,11 +152,11 @@ class McpError(RuntimeError):
     """
 
     def __init__(
-        self,
-        message: str,
-        *,
-        code: int | None = None,
-        data: Any = None,
+            self,
+            message: str,
+            *,
+            code: int | None = None,
+            data: Any = None,
     ) -> None:
         """Store *message* and the optional JSON-RPC ``code`` / ``data``."""
         super().__init__(message)
@@ -197,9 +178,9 @@ class McpTransport(Protocol):
     """
 
     def request(
-        self,
-        method: str,
-        params: Mapping[str, Any] | None,
+            self,
+            method: str,
+            params: Mapping[str, Any] | None,
     ) -> Mapping[str, Any]:
         """Send one JSON-RPC request and return the JSON-RPC response.
 
@@ -290,14 +271,14 @@ class StdioMcpTransport:
                     continue
                 self.logger.warning("mcp stderr: %s", line)
         except (
-            Exception
+                Exception
         ) as exc:  # ruff: ignore[blind-except] - drainer never raises
             self.logger.debug("mcp stderr drainer exited: %s", exc)
 
     def request(
-        self,
-        method: str,
-        params: Mapping[str, Any] | None,
+            self,
+            method: str,
+            params: Mapping[str, Any] | None,
     ) -> Mapping[str, Any]:
         """Send a JSON-RPC request and return the response.
 
@@ -305,9 +286,9 @@ class StdioMcpTransport:
             or the server returned a JSON-RPC ``error`` object.
         """
         if (
-            self._proc is None
-            or self._proc.stdin is None
-            or self._proc.stdout is None
+                self._proc is None
+                or self._proc.stdin is None
+                or self._proc.stdout is None
         ):
             raise McpError("stdio transport is not open")
         with self._lock:
@@ -456,9 +437,9 @@ class HttpMcpTransport:
             self._listen_thread.start()
 
     def request(
-        self,
-        method: str,
-        params: Mapping[str, Any] | None,
+            self,
+            method: str,
+            params: Mapping[str, Any] | None,
     ) -> Mapping[str, Any]:
         """Send a JSON-RPC request and return the response.
 
@@ -488,7 +469,7 @@ class HttpMcpTransport:
         )
         try:
             with urllib_request.urlopen(
-                req, timeout=self.timeout_s
+                    req, timeout=self.timeout_s
             ) as resp:  # ruff: ignore[suspicious-url-open-usage]
                 raw = resp.read()
         except urllib_error.URLError as exc:
@@ -526,7 +507,7 @@ class HttpMcpTransport:
         )
         try:  # ruff: ignore[too-many-statements-in-try-clause]
             with urllib_request.urlopen(
-                req, timeout=None
+                    req, timeout=None
             ) as resp:  # ruff: ignore[suspicious-url-open-usage]
                 event_type = "message"
                 data_lines: list[str] = []
@@ -549,10 +530,10 @@ class HttpMcpTransport:
                     if line.startswith(":"):
                         continue  # SSE comment
                     if line.startswith("event:"):
-                        event_type = line[len("event:") :].strip()
+                        event_type = line[len("event:"):].strip()
                         continue
                     if line.startswith("data:"):
-                        data_lines.append(line[len("data:") :].lstrip())
+                        data_lines.append(line[len("data:"):].lstrip())
         except Exception as exc:  # ruff: ignore[blind-except]
             if not self._closed:
                 logging.getLogger("berg_agents.core.mcp.http").debug(
@@ -842,7 +823,7 @@ def _params_from_schema(schema: Mapping[str, Any]) -> tuple[ToolParam, ...]:
 
 
 def iter_servers_to_clients(
-    configs: Iterable[McpServerConfig],
+        configs: Iterable[McpServerConfig],
 ) -> Iterator[McpClient]:
     """Yield one :class:`McpClient` per :class:`McpServerConfig`.
 
@@ -876,7 +857,7 @@ def close_all(clients: Iterable[McpClient]) -> None:
 
 
 def load_mcp_server_configs(
-    cfg: dict[str, Any] | None = None,
+        cfg: dict[str, Any] | None = None,
 ) -> list[McpServerConfig]:
     """Load MCP server configurations from settings into ``McpServerConfig`` list.
 

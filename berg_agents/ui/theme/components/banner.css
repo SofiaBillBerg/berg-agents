@@ -1,46 +1,25 @@
-/*
- * <one line to give the program's name and a brief idea of what it does.>
- *
- * Copyright (c) 2026.
- *         Copyright (C) <year>  <name of author>
- *
- *         This program is free software: you can redistribute it and/or modify
- *         it under the terms of the GNU Affero General Public License as
- *         published by the Free Software Foundation, either version 3 of the
- *         License, or (at your option) any later version.
- *
- *         This program is distributed in the hope that it will be useful,
- *         but WITHOUT ANY WARRANTY; without even the implied warranty of
- *         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *         GNU Affero General Public License for more details.
- *
- *         You should have received a copy of the GNU Affero General Public License
- *         along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
-
 /* Berg Agents - title banner (the signature gradient). */
 
 .berg-title-banner {
-  background: var(--berg-gradient-brand);
-  color: white;
-  padding: var(--berg-sp-6) var(--berg-sp-2);
-  border-radius: var(--berg-radius);
-  box-shadow: var(--berg-shadow-md);
+    background: var(--berg-gradient-brand);
+    color: white;
+    padding: var(--berg-sp-6) var(--berg-sp-2);
+    border-radius: var(--berg-radius);
+    box-shadow: var(--berg-shadow-md);
 }
 
 .berg-title-banner h1,
 .berg-title-banner .title {
-  color: white;
-  font-weight: var(--berg-fw-bold);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  font-size: var(--berg-fs-3xl);
-  margin: 0 0 var(--berg-sp-3) 0;
+    color: white;
+    font-weight: var(--berg-fw-bold);
+    text-shadow: 0 2px 4px rgb(0 0 0 / 10%);
+    font-size: var(--berg-fs-3xl);
+    margin: 0 0 var(--berg-sp-3) 0;
 }
 
 .berg-title-banner .subtitle {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: var(--berg-fs-md);
-  font-weight: var(--berg-fw-regular);
-  margin: 0;
+    color: rgb(255 255 255 / 90%);
+    font-size: var(--berg-fs-md);
+    font-weight: var(--berg-fw-regular);
+    margin: 0;
 }

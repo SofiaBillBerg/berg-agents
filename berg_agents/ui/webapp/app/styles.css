@@ -1,24 +1,3 @@
-/*
- * <one line to give the program's name and a brief idea of what it does.>
- *
- * Copyright (c) 2026.
- *         Copyright (C) <year>  <name of author>
- *
- *         This program is free software: you can redistribute it and/or modify
- *         it under the terms of the GNU Affero General Public License as
- *         published by the Free Software Foundation, either version 3 of the
- *         License, or (at your option) any later version.
- *
- *         This program is distributed in the hope that it will be useful,
- *         but WITHOUT ANY WARRANTY; without even the implied warranty of
- *         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *         GNU Affero General Public License for more details.
- *
- *         You should have received a copy of the GNU Affero General Public License
- *         along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
-
 /* Berg Agents webapp - visual design language.
  *
  * Design tokens come from ./theme.css (Berg canonical) and ./globals.css
@@ -26,131 +5,129 @@
  * actually rendered by the tsx components - no dead styles.
  */
 :root {
-  /* Only the transition tokens are consumed (button transitions
-     below). Everything else resolves straight to the theme.css /
-     globals.css tokens, so no alias layer lives here. */
-  --transition-fast: 0.15s ease;
-  --transition-normal: 0.25s ease;
+    /* Only the transition tokens are consumed (button transitions
+       below). Everything else resolves straight to the theme.css /
+       globals.css tokens, so no alias layer lives here. */
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
 }
 
 html,
 body {
-  background: var(--berg-bg);
-  height: 100%;
-  overflow: hidden; /* the app container scrolls internally; the page never */
+    background: var(--berg-bg);
+    height: 100%;
+    overflow: hidden; /* the app container scrolls internally; the page never */
 }
 
 #root {
-  height: 100%;
+    height: 100%;
 }
 
 body {
-  color: var(--berg-text);
-  font-family: var(--berg-font-sans), sans-serif;
-  font-size: var(--berg-fs-base);
-  line-height: var(--berg-lh-base);
-  margin: 0;
+    color: var(--berg-text);
+    font-family: var(--berg-font-sans), sans-serif;
+    font-size: var(--berg-fs-base);
+    line-height: var(--berg-lh-base);
+    margin: 0;
 }
 
 /* Subtle page-level radial wash so the canvas isn't a flat fill. */
 body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(
-      1200px 600px at 50% -10%,
-      rgba(125, 2, 156, 0.06),
-      transparent 60%
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+            1200px 600px at 50% -10%,
+            rgba(125, 2, 156, 0.06),
+            transparent 60%
     ),
     radial-gradient(
-      900px 500px at 100% 100%,
-      rgba(33, 144, 140, 0.05),
-      transparent 60%
+            900px 500px at 100% 100%,
+            rgba(33, 144, 140, 0.05),
+            transparent 60%
     );
 }
 
 /* Soft scrollbar */
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+    width: 10px;
+    height: 10px;
 }
 
 *::-webkit-scrollbar-track {
-  background: transparent;
+    background: transparent;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(85, 26, 139, 0.25);
-  border-radius: var(--berg-radius);
+    background: rgba(85, 26, 139, 0.25);
+    border-radius: var(--berg-radius);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(85, 26, 139, 0.45);
+    background: rgba(85, 26, 139, 0.45);
 }
 
 ::selection {
-  background: rgba(125, 2, 156, 0.2);
-  color: var(--berg-text);
+    background: rgba(125, 2, 156, 0.2);
+    color: var(--berg-text);
 }
 
 /* =================== App shell =================== */
 
 .app-container {
-  width: 100%;
-  max-width: 95vw;
-  margin: 0 auto;
-  padding: var(--berg-sp-3) var(--berg-sp-5) var(--berg-sp-3);
-  font-family: var(--berg-font-sans), sans-serif;
-  /* Fills the space left below the Navbar inside the flex shell
-     (body > #root). Not 100dvh: that would ignore the navbar height
-     and push the input bar off-screen (the cropped bottom). */
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  color: var(--berg-text);
+    width: 100%;
+    max-width: 95vw;
+    margin: 0 auto;
+    padding: var(--berg-sp-3) var(--berg-sp-5) var(--berg-sp-3);
+    font-family: var(--berg-font-sans), sans-serif;
+    /* Fills the space left below the Navbar inside the flex shell
+       (body > #root). Not 100dvh: that would ignore the navbar height
+       and push the input bar off-screen (the cropped bottom). */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    color: var(--berg-text);
 }
 
 /* =================== Buttons (native elements only) =================== */
 
 button {
-  font-family: var(--berg-font-sans), sans-serif;
-  font-size: var(--berg-fs-sm);
-  font-weight: var(--berg-fw-medium);
-  padding: var(--berg-sp-2) var(--berg-sp-4);
-  border-radius: var(--berg-radius);
-  border: 1px solid var(--berg-border);
-  background: var(--berg-surface);
-  color: var(--berg-text);
-  cursor: pointer;
-  box-shadow: var(--berg-shadow-sm);
-  transition:
-    transform var(--transition-fast),
+    font-family: var(--berg-font-sans), sans-serif;
+    font-size: var(--berg-fs-sm);
+    font-weight: var(--berg-fw-medium);
+    padding: var(--berg-sp-2) var(--berg-sp-4);
+    border-radius: var(--berg-radius);
+    border: 1px solid var(--berg-border);
+    background: var(--berg-surface);
+    color: var(--berg-text);
+    cursor: pointer;
+    box-shadow: var(--berg-shadow-sm);
+    transition: transform var(--transition-fast),
     box-shadow var(--transition-fast),
     background var(--transition-fast),
     border-color var(--transition-fast);
 }
 
 button:hover {
-  background: var(--berg-surface-tint);
-  border-color: rgba(125, 2, 156, 0.4);
-  box-shadow: var(--berg-shadow-md);
-  transform: translateY(-1px);
+    background: var(--berg-surface-tint);
+    border-color: rgba(125, 2, 156, 0.4);
+    box-shadow: var(--berg-shadow-md);
+    transform: translateY(-1px);
 }
 
 button:active {
-  transform: translateY(0);
+    transform: translateY(0);
 }
 
 button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 /* =================== Transcript bubbles (living rules) ===================
@@ -159,8 +136,8 @@ button:disabled {
    for contrast on the pale-pink ground; dark mode keeps surfaces. */
 
 :root:not(.dark) .message-list-item.message-role-agent {
-  background: #fff;
-  border-color: var(--berg-border);
+    background: #fff;
+    border-color: var(--berg-border);
 }
 
 /* Dark input fields shift blue-purple (hue 293), away from the
@@ -168,171 +145,175 @@ button:disabled {
    --field-background token. */
 .dark .input-bar textarea,
 .dark .input-bar-textarea {
-  background: oklch(23.5% 0.045 293);
-  border-color: oklch(36% 0.05 293);
+    background: oklch(23.5% 0.045 293);
+    border-color: oklch(36% 0.05 293);
 }
 
 @keyframes berg-bubble-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 
 /* =================== Input bar =================== */
 
 .input-bar {
-  margin-top: var(--berg-sp-4);
-  display: flex;
-  gap: var(--berg-sp-3);
-  align-items: stretch;
+    margin-top: var(--berg-sp-4);
+    display: flex;
+    gap: var(--berg-sp-3);
+    align-items: stretch;
 }
 
 .input-bar-textarea,
 .input-bar textarea {
-  flex: 1;
-  resize: vertical;
-  padding: var(--berg-sp-3) var(--berg-sp-4);
-  border-radius: var(--berg-radius-lg);
-  border: 1px solid var(--berg-border);
-  font-family: var(--berg-font-sans), sans-serif;
-  font-size: var(--berg-fs-base);
-  background: var(--berg-surface);
-  color: var(--berg-text);
-  box-shadow: var(--berg-shadow-sm);
-  transition:
-    border-color var(--transition-fast),
+    flex: 1;
+    resize: vertical;
+    padding: var(--berg-sp-3) var(--berg-sp-4);
+    border-radius: var(--berg-radius-lg);
+    border: 1px solid var(--berg-border);
+    font-family: var(--berg-font-sans), sans-serif;
+    font-size: var(--berg-fs-base);
+    background: var(--berg-surface);
+    color: var(--berg-text);
+    box-shadow: var(--berg-shadow-sm);
+    transition: border-color var(--transition-fast),
     box-shadow var(--transition-fast);
-  min-height: 3rem;
+    min-height: 3rem;
 }
 
 .input-bar-textarea:focus,
 .input-bar textarea:focus {
-  outline: none;
-  border-color: rgba(125, 2, 156, 0.5);
-  box-shadow: 0 0 0 4px rgba(125, 2, 156, 0.12);
+    outline: none;
+    border-color: rgba(125, 2, 156, 0.5);
+    box-shadow: 0 0 0 4px rgba(125, 2, 156, 0.12);
 }
 
 .input-bar-textarea:disabled,
 .input-bar textarea:disabled {
-  background: var(--berg-surface-tint);
-  color: var(--berg-muted);
+    background: var(--berg-surface-tint);
+    color: var(--berg-muted);
 }
 
 /* =================== Reasoning block (inside message bubble) =================== */
 
 .reasoning-block {
-  margin-bottom: var(--berg-sp-2);
-  font-size: var(--berg-fs-sm);
-  background: rgba(125, 2, 156, 0.05);
-  border-left: 2px solid var(--berg-brand-purple);
-  border-radius: 0 var(--berg-radius) var(--berg-radius) 0;
-  padding: 0 var(--berg-sp-2);
+    margin-bottom: var(--berg-sp-2);
+    font-size: var(--berg-fs-sm);
+    background: rgba(125, 2, 156, 0.05);
+    border-left: 2px solid var(--berg-brand-purple);
+    border-radius: 0 var(--berg-radius) var(--berg-radius) 0;
+    padding: 0 var(--berg-sp-2);
 }
 
 .reasoning-block summary {
-  cursor: pointer;
-  color: var(--berg-brand-purple);
-  padding: var(--berg-sp-2) 0;
-  font-weight: var(--berg-fw-medium);
+    cursor: pointer;
+    color: var(--berg-brand-purple);
+    padding: var(--berg-sp-2) 0;
+    font-weight: var(--berg-fw-medium);
 }
 
 /* =================== Thinking bubble (loading) =================== */
 
 .thinking-bubble {
-  margin: var(--berg-sp-3) 0;
-  display: flex;
-  justify-content: flex-start;
-  animation: berg-bubble-in 0.25s ease both;
+    margin: var(--berg-sp-3) 0;
+    display: flex;
+    justify-content: flex-start;
+    animation: berg-bubble-in 0.25s ease both;
 }
 
 /* =================== Provider selector =================== */
 
 .provider-selector {
-  margin-bottom: var(--berg-sp-4);
+    margin-bottom: var(--berg-sp-4);
 }
 
 .provider-select {
-  padding: var(--berg-sp-2) var(--berg-sp-3);
-  border-radius: var(--berg-radius);
-  border: 1px solid var(--berg-border);
-  font-family: var(--berg-font-sans), sans-serif;
-  background: var(--berg-surface);
-  min-width: min(220px, 40vw);
-  font-size: var(--berg-fs-sm);
+    padding: var(--berg-sp-2) var(--berg-sp-3);
+    border-radius: var(--berg-radius);
+    border: 1px solid var(--berg-border);
+    font-family: var(--berg-font-sans), sans-serif;
+    background: var(--berg-surface);
+    min-width: min(220px, 40vw);
+    font-size: var(--berg-fs-sm);
 }
 
 /* =================== Message list =================== */
 
 .message-list-content {
-  font-size: var(--berg-fs-sm);
-  color: var(--berg-muted);
+    font-size: var(--berg-fs-sm);
+    color: var(--berg-muted);
 }
 
 /* Role-specific transcript styling */
 .message-list-item.message-role-user {
-  border-left: 3px solid var(--berg-brand-blue);
+    border-left: 3px solid var(--berg-brand-blue);
 }
+
 .message-list-item.message-role-user .text-xs.font-semibold {
-  color: var(--berg-brand-blue);
+    color: var(--berg-brand-blue);
 }
+
 .message-list-item.message-role-agent {
-  border-left: 3px solid var(--berg-brand-purple);
+    border-left: 3px solid var(--berg-brand-purple);
 }
+
 .message-list-item.message-role-agent .text-xs.font-semibold {
-  color: var(--berg-brand-purple);
+    color: var(--berg-brand-purple);
 }
+
 .message-list-item.message-role-system {
-  border-left: 3px solid var(--berg-muted);
-  background: rgba(120, 120, 120, 0.06);
+    border-left: 3px solid var(--berg-muted);
+    background: rgba(120, 120, 120, 0.06);
 }
+
 .message-list-item.message-role-system .text-xs.font-semibold {
-  color: var(--berg-muted);
+    color: var(--berg-muted);
 }
 
 /* === Harness Panels === */
 
 .agent-panel {
-  margin: var(--berg-sp-2) 0;
+    margin: var(--berg-sp-2) 0;
 }
 
 .agent-panel.compact {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--berg-sp-1);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--berg-sp-1);
 }
 
 .agent-panel.empty {
-  color: var(--berg-muted);
-  font-style: italic;
+    color: var(--berg-muted);
+    font-style: italic;
 }
 
 /* === Learning Panels === */
 
 .learning-panel {
-  margin: var(--berg-sp-2) 0;
+    margin: var(--berg-sp-2) 0;
 }
 
 .learning-panel.empty {
-  color: var(--berg-muted);
-  font-size: var(--berg-fs-sm);
+    color: var(--berg-muted);
+    font-size: var(--berg-fs-sm);
 }
 
 .learning-panel.compact {
-  display: flex;
-  gap: var(--berg-sp-2);
-  flex-wrap: wrap;
+    display: flex;
+    gap: var(--berg-sp-2);
+    flex-wrap: wrap;
 }
 
 /* The transcript fills free space between header and input and owns
    the only scroll region on the page. Relative sizing only — no
    absolute max-height, so the input bar always stays in view. */
 .conversation-container {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
 }

@@ -1,22 +1,3 @@
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 # noinspection unresolved-references
 """Human-in-the-loop (HITL) surface for the  tool loop.
 
@@ -180,7 +161,7 @@ def is_valid_decision(request: HitlRequest, decision: HitlDecision) -> bool:
 
 # noinspection unresolved-references
 def default_interrupt_on(
-    tools: Mapping[str, Any],
+        tools: Mapping[str, Any],
 ) -> dict[str, bool]:
     """Compute the default ``interrupt_on`` policy for a tool registry.
 
@@ -212,8 +193,8 @@ def default_interrupt_on(
 
 # noinspection unresolved-references
 def apply_decision(
-    request: HitlRequest,
-    decision: HitlDecision,
+        request: HitlRequest,
+        decision: HitlDecision,
 ) -> Mapping[str, Any] | None:
     """Resolve a paused request to the args the loop should use.
 

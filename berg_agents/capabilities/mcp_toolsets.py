@@ -19,32 +19,13 @@ best-effort: a dead server logs a warning and is skipped, never
 breaking chat.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import json
 import logging
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Any
 
 from pydantic_ai.toolsets.wrapper import WrapperToolset
@@ -109,7 +90,7 @@ class _ResilientToolset(WrapperToolset[None]):
             return {}
 
     async def call_tool(
-        self, name: str, tool_args: dict[str, Any], ctx: Any, tool: Any
+            self, name: str, tool_args: dict[str, Any], ctx: Any, tool: Any
     ) -> Any:
         try:
             return await super().call_tool(name, tool_args, ctx, tool)

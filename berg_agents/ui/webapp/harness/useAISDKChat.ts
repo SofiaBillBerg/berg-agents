@@ -1,23 +1,4 @@
-/*
- * <one line to give the program's name and a brief idea of what it does.>
- *
- * Copyright (c) 2026.
- *         Copyright (C) <year>  <name of author>
- *
- *         This program is free software: you can redistribute it and/or modify
- *         it under the terms of the GNU Affero General Public License as
- *         published by the Free Software Foundation, either version 3 of the
- *         License, or (at your option) any later version.
- *
- *         This program is distributed in the hope that it will be useful,
- *         but WITHOUT ANY WARRANTY; without even the implied warranty of
- *         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *         GNU Affero General Public License for more details.
- *
- *         You should have received a copy of the GNU Affero General Public License
- *         along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
+
 
 /*
  * Chat hook - wraps AI SDK v7's useChat to talk to the streaming backend.
@@ -30,14 +11,14 @@
  * tool calls (file operations + run_task), which run the full BergAgents harness.
  */
 
-import type { UIMessage, TextUIPart } from "ai";
-import type { SetStateAction } from "react";
+import type {TextUIPart, UIMessage} from "ai";
+import {DefaultChatTransport} from "ai";
+import type {SetStateAction} from "react";
+import {useEffect, useRef, useState} from "react";
 
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
-import { useEffect, useRef, useState } from "react";
+import {useChat} from "@ai-sdk/react";
 
-import { API_BASE } from "@/envConfig";
+import {API_BASE} from "@/envConfig";
 
 /** localStorage key for the live conversation (shared with History). */
 export const CHAT_MESSAGES_KEY = "berg_chat_messages";

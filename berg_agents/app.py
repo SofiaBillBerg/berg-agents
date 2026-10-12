@@ -15,29 +15,10 @@ Usage:
     # $ python -m berg_agents --tui
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from berg_agents.agents.guardian import GuardianDeps
@@ -58,7 +39,7 @@ class _CreateOptions:
 
 
 def _apply_explicit_config(
-    opts: _CreateOptions, config: dict[str, Any]
+        opts: _CreateOptions, config: dict[str, Any]
 ) -> None:
     """Apply the explicit config dict (highest priority).
 
@@ -84,7 +65,7 @@ def _apply_explicit_config(
 
 
 def _apply_global_settings(
-    opts: _CreateOptions, config: dict[str, Any] | None
+        opts: _CreateOptions, config: dict[str, Any] | None
 ) -> None:
     """Merge bergagents.jsonc settings for options not set explicitly.
 
@@ -117,7 +98,7 @@ def _apply_global_settings(
 
 
 def _guardian_gate_kwargs(
-    hitl_rules: dict[str, Any] | None,
+        hitl_rules: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Build GuardianDeps kwargs from known HITL gate lists.
 
@@ -133,10 +114,10 @@ def _guardian_gate_kwargs(
     gate_kwargs: dict[str, Any] = {}
     if hitl_rules:
         for key in (
-            "auto_execute",
-            "notify_after",
-            "ask_before",
-            "human_leads",
+                "auto_execute",
+                "notify_after",
+                "ask_before",
+                "human_leads",
         ):
             value = hitl_rules.get(key)
             if isinstance(value, list):
@@ -145,7 +126,7 @@ def _guardian_gate_kwargs(
 
 
 def _apply_agent_overrides(
-    harness: Harness, agent_overrides: dict[str, Any] | None
+        harness: Harness, agent_overrides: dict[str, Any] | None
 ) -> None:
     """Apply per-agent preferred-complexity overrides to a harness.
 
@@ -171,11 +152,11 @@ class BergAgentsApp:
     """
 
     def __init__(
-        self,
-        *,
-        harness: Harness | None = None,
-        enable_learning: bool = True,
-        enable_inference: bool = True,
+            self,
+            *,
+            harness: Harness | None = None,
+            enable_learning: bool = True,
+            enable_inference: bool = True,
     ) -> None:
         """Initialize the BergAgents app.
 
@@ -245,7 +226,7 @@ class BergAgentsApp:
         uvicorn.run(create_app(self.harness), host=host, port=port)
 
     def execute(
-        self, description: str, task_type: str = "generic"
+            self, description: str, task_type: str = "generic"
     ) -> dict[str, Any]:
         """Execute a task through the harness.
 

@@ -14,35 +14,17 @@ deliberately small and serialisable so it can ride the wire as a tool-use
 schema or be persisted to MemPalace.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
 import fnmatch
 import inspect
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from typing import Any, get_args, get_origin
 
-from berg_agents.capabilities.base import RiskClass  # canonical risk vocabulary
 from pydantic import BaseModel, Field, create_model
+
+from berg_agents.capabilities.base import RiskClass  # canonical risk vocabulary
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -286,10 +268,10 @@ def _python_type_to_json(annotation: Any) -> str:
 
 
 def _resolve_annotation(
-    annotation: Any,
-    *,
-    func: Callable[..., Any] | None = None,
-    name: str | None = None,
+        annotation: Any,
+        *,
+        func: Callable[..., Any] | None = None,
+        name: str | None = None,
 ) -> Any:
     """Resolve a string annotation to its real type when possible.
 
@@ -319,12 +301,12 @@ def _resolve_annotation(
 
 
 def _param_from_signature(
-    name: str,
-    annotation: Any,
-    default: Any,
-    docstring_param_desc: str,
-    *,
-    func: Callable[..., Any] | None = None,
+        name: str,
+        annotation: Any,
+        default: Any,
+        docstring_param_desc: str,
+        *,
+        func: Callable[..., Any] | None = None,
 ) -> ToolParam:
     """Build a :class:`ToolParam` from a function-signature entry.
 
@@ -367,7 +349,7 @@ def _parse_param_descriptions(docstring: str | None) -> dict[str, str]:
         stripped = line.strip()
         # reST-style: ":param name: description"
         if stripped.startswith(":param"):
-            rest = stripped[len(":param") :].strip()
+            rest = stripped[len(":param"):].strip()
             if ":" in rest:
                 pname, pdesc = rest.split(":", 1)
                 descriptions[pname.strip()] = pdesc.strip()
@@ -385,12 +367,12 @@ def _parse_param_descriptions(docstring: str | None) -> dict[str, str]:
 
 
 def make_tool_spec(
-    func: Callable[..., Any],
-    *,
-    name: str | None = None,
-    description: str | None = None,
-    tags: Iterable[str] = (),
-    risk_class: RiskClass | None = None,
+        func: Callable[..., Any],
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        tags: Iterable[str] = (),
+        risk_class: RiskClass | None = None,
 ) -> ToolSpec:
     """Build a :class:`ToolSpec` from a plain function.
 
@@ -580,8 +562,8 @@ def effective_risk_class(tool: ToolSpec) -> RiskClass:
 
 
 def filter_specs_by_model(
-    tools: Iterable[ToolSpec],
-    model_id: str,
+        tools: Iterable[ToolSpec],
+        model_id: str,
 ) -> list[ToolSpec]:
     """Filter specs by the model's ``excluded_tools`` patterns.
 

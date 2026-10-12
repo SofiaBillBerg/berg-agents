@@ -12,25 +12,6 @@ string literal, so ``//`` or ``/* */`` sequences that appear inside string
 values are preserved verbatim.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import json
@@ -86,7 +67,7 @@ def strip_comments(text: str) -> str:
             continue
 
         if (
-            ch == ","
+                ch == ","
         ):  # trailing comma before } or ] -> drop it (skip whitespace + comments)
             j = i + 1
             # Skip whitespace and comments (// line, /* block) before checking for } / ]
@@ -102,7 +83,7 @@ def strip_comments(text: str) -> str:
                 if text[j] == "/" and j + 1 < n and text[j + 1] == "*":
                     j += 2
                     while j + 1 < n and not (
-                        text[j] == "*" and text[j + 1] == "/"
+                            text[j] == "*" and text[j + 1] == "/"
                     ):
                         j += 1
                     j += 2

@@ -5,41 +5,13 @@ The streaming chat endpoint uses :class:`~pydantic_ai.ui.vercel_ai.VercelAIAdapt
 for native Vercel AI SSE protocol - no manual event-loop / SSE translation needed.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import asyncio
-from functools import cached_property
 import logging
+from functools import cached_property
 from typing import Any
 
-from berg_agents.core.harness import Harness
-from berg_agents.ui.schemas import (
-    ActiveProvider,
-    ProviderInfo,
-    ProviderListResponse,
-    ToolExecuteRequest,
-    ToolExecuteResponse,
-)
-from berg_agents.ui.sessions import SessionManager
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic_ai import DeferredToolRequests, DeferredToolResults
@@ -50,6 +22,16 @@ from pydantic_ai.ui.vercel_ai.request_types import (
     ToolApprovalResponded,
     ToolApprovalRespondedPart,
 )
+
+from berg_agents.core.harness import Harness
+from berg_agents.ui.schemas import (
+    ActiveProvider,
+    ProviderInfo,
+    ProviderListResponse,
+    ToolExecuteRequest,
+    ToolExecuteResponse,
+)
+from berg_agents.ui.sessions import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -104,9 +86,9 @@ class BergVercelAIAdapter(VercelAIAdapter):
 
 
 def _register_provider_routes(
-    router: APIRouter,
-    sessions: SessionManager,
-    providers: list[dict[str, Any]],
+        router: APIRouter,
+        sessions: SessionManager,
+        providers: list[dict[str, Any]],
 ) -> None:
     """Register provider listing and selection endpoints.
 
@@ -148,10 +130,10 @@ def _register_provider_routes(
 
 
 def create_router(
-    harness: Harness,
-    sessions: SessionManager,
-    *,
-    providers: list[dict[str, Any]],
+        harness: Harness,
+        sessions: SessionManager,
+        *,
+        providers: list[dict[str, Any]],
 ) -> APIRouter:
     """Build the API router with injected dependencies.
 
@@ -187,7 +169,7 @@ def create_router(
 
     @router.post("/api/chat/stream")
     async def chat_stream(
-        request: Request,
+            request: Request,
     ) -> Response:
         """Agentic streaming chat - native Vercel AI protocol via pydantic_ai.
 
@@ -215,7 +197,7 @@ def create_router(
 
         # Model override via query param (the body is consumed by the adapter).
         model_id = (
-            request.query_params.get("model") or sessions.active_model or ""
+                request.query_params.get("model") or sessions.active_model or ""
         )
         agent = build_chat_agent(
             model_id, root_dir=sessions._harness_root_dir()
@@ -417,7 +399,7 @@ def create_router(
                 return ToolExecuteResponse(
                     tool=name,
                     output="Missing 'description': tell me what to do, "
-                    'e.g. /run_task {"description": "summarize README"}.',
+                           'e.g. /run_task {"description": "summarize README"}.',
                     status="error",
                 )
             result = await asyncio.to_thread(
@@ -443,7 +425,7 @@ def create_router(
             raise HTTPException(
                 status_code=404,
                 detail=f"Unknown tool '{name}'. "
-                f"Available: {', '.join(sorted(specs))}, run_task.",
+                       f"Available: {', '.join(sorted(specs))}, run_task.",
             )
         try:
             result = spec.execute(**args)
@@ -456,7 +438,7 @@ def create_router(
             return ToolExecuteResponse(
                 tool=name,
                 output=f"Bad arguments for {name}: {exc}. "
-                f'Send {{"file_path": ..., "content": ...}} where needed.',
+                       f'Send {{"file_path": ..., "content": ...}} where needed.',
                 status="error",
             )
         except Exception as exc:  # Defensive: never leak tracebacks.

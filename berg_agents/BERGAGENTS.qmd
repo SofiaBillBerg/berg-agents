@@ -8,15 +8,23 @@ format: html
 # BergAgents
 
 A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration.
-A task engine (**Harness**) drives specialized subagents against any OpenAI-compatible provider, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
+Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture. The
+system follows a harness-based execution model with multiple specialized agents working together.
+
+The system is designed to work against any OpenAI-compatible provider, surfaced through an interactive TUI and a
+Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
 ## Engine
 
-- **Harness** (`berg_agents/core/harness.py`): guardian → planner → implementation → curator, plus a learning gate recording task → model → outcome.
+- **Harness** (`berg_agents/core/harness.py`): guardian → planner → implementation → curator, plus a learning gate
+  recording task → model → outcome.
   Results are `completed`, `needs_human_review`, or `failed` dicts.
-- **Loop** (`berg_agents/core/loop.py`): framework-free LLM↔tool cycle yielding typed events, with HITL pause/resume, cancel, and `max_steps`.
+- **Loop** (`berg_agents/core/loop.py`): framework-free LLM↔tool cycle yielding typed events, with HITL pause/resume,
+  cancel, and `max_steps`.
   Adapters expose `chat(messages, *, tools, temperature)`.
-- **Tools** (`berg_agents/core/tool_spec.py`, `agents/factory.py`): native `ToolSpec` registry - `read_file` (low risk), `edit_file` / `write_file` (high risk) - wrapped as audited capabilities; MCP servers add `mcp_<server>__<tool>` tools.
+- **Tools** (`berg_agents/core/tool_spec.py`, `agents/factory.py`): native `ToolSpec` registry - `read_file` (low risk),
+  `edit_file` / `write_file` (high risk) - wrapped as audited capabilities; MCP servers add `mcp_<server>__<tool>`
+  tools.
 - **Providers** (`berg_agents/providers/registry.py`): the provider resolves FROM the model id.
   No hardcoded providers, no global provider flag.
 
@@ -36,7 +44,8 @@ app.execute("Fix the flaky sync test", task_type="standard")
 
 ## Configure
 
-`config/bergagents.jsonc` - `providers`, `harness`, `model_routing` (models per complexity), `hitl_rules`, `hitl_rules` (auto_execute / notify_after / ask_before / human_leads), `plugins`, per-agent complexity.
+`config/bergagents.jsonc` - `providers`, `harness`, `model_routing` (models per complexity), `hitl_rules`, `hitl_rules`
+(auto_execute / notify_after / ask_before / human_leads), `plugins`, per-agent complexity.
 Secrets in `.env` via `${env:VAR}`; `BERG_AGENT_*` env vars override everything.
 Full reference in [Configuration](../docs/CONFIGURATION.qmd).
 

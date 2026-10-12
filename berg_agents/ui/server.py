@@ -5,39 +5,21 @@ Builds the web application around one injected harness: routes in
 :mod:`berg_agents.ui.sessions`, schemas in :mod:`berg_agents.ui.schemas`.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import logging
 from pathlib import Path
 from typing import Any
 
-from berg_agents.config.settings import get_settings
-from berg_agents.core.harness import Harness
-from berg_agents.ui.routes import create_router
-from berg_agents.ui.sessions import SessionManager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+from berg_agents.config.settings import get_settings
+from berg_agents.core.harness import Harness
+from berg_agents.ui.routes import create_router
+from berg_agents.ui.sessions import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +29,11 @@ _WEB_DIST = Path(__file__).resolve().parent / "webapp" / "dist"
 
 
 def create_app(
-    harness: Harness | None = None,
-    *,
-    providers: list[dict[str, Any]] | None = None,
-    active_provider: str | None = None,
-    active_model: str | None = None,
+        harness: Harness | None = None,
+        *,
+        providers: list[dict[str, Any]] | None = None,
+        active_provider: str | None = None,
+        active_model: str | None = None,
 ) -> FastAPI:
     """Create the BergAgents FastAPI application.
 
@@ -151,9 +133,8 @@ def create_app(
         for route_page in ("agents", "context"):
             page_file = _WEB_DIST / f"{route_page}.html"
             if page_file.is_file():
-
                 def _serve_page(
-                    _path: Path = page_file,
+                        _path: Path = page_file,
                 ) -> FileResponse:
                     return FileResponse(_path, media_type="text/html")
 

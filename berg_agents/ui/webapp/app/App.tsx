@@ -1,23 +1,4 @@
-/*
- * <one line to give the program's name and a brief idea of what it does.>
- *
- * Copyright (c) 2026.
- *         Copyright (C) <year>  <name of author>
- *
- *         This program is free software: you can redistribute it and/or modify
- *         it under the terms of the GNU Affero General Public License as
- *         published by the Free Software Foundation, either version 3 of the
- *         License, or (at your option) any later version.
- *
- *         This program is distributed in the hope that it will be useful,
- *         but WITHOUT ANY WARRANTY; without even the implied warranty of
- *         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *         GNU Affero General Public License for more details.
- *
- *         You should have received a copy of the GNU Affero General Public License
- *         along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- */
+
 
 /*
  * App component - uses AI SDK v7's useChat hook directly via useAISDKChat.
@@ -28,30 +9,26 @@
  * no RealHarness wrapper - pure AI SDK v7.
  */
 
-import type { AgentInfo } from "@/harness/webhook";
-import type { PendingApproval } from "@/harness";
-import type { Command } from "./components/SlashCommandAutocomplete";
-import type { ToolResult } from "./components/ChatTranscript";
+import type {AgentInfo} from "@/harness/webhook";
+import type {PendingApproval} from "@/harness";
+import {useAISDKChat} from "@/harness";
+import type {Command} from "./components/SlashCommandAutocomplete";
+import {SlashCommandAutocomplete} from "./components/SlashCommandAutocomplete";
+import type {ToolResult} from "./components/ChatTranscript";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Card, Toast, toast } from "@heroui/react";
-
-import { useAISDKChat } from "@/harness";
-import { API_BASE } from "@/envConfig";
-import { buildExportMarkdown } from "@/utils/utils";
+import React, {useCallback, useEffect, useRef, useState} from "react";
+import {Button, Card, Toast, toast} from "@heroui/react";
+import {API_BASE} from "@/envConfig";
+import {buildExportMarkdown} from "@/utils/utils";
 
 import InputBar from "./components/InputBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
 import AgentPanel from "./components/AgentPanel.tsx";
 import LearningPanel from "./components/LearningPanel.tsx";
-import ChatTranscript, {
-  CHAT_SCROLL_ID} from "./components/ChatTranscript.tsx";
+import ChatTranscript, {CHAT_SCROLL_ID} from "./components/ChatTranscript.tsx";
 import Navbar from "./components/Navbar.tsx";
-import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
-import {
-  ConversationHistory,
-  snapshotLiveChat} from "./components/ConversationHistory";
+import {ConversationHistory, snapshotLiveChat} from "./components/ConversationHistory";
 
 /*
  * Error boundary for lazy-loaded components.

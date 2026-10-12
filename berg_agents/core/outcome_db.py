@@ -10,31 +10,12 @@ this SQLite file is the local restart-survival cache, and
 ``notes/current_goals.md`` is the human-shareable projection.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 import sqlite3
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -112,8 +93,8 @@ def load(path: str, table: str, limit: int = 500) -> list[dict[str, Any]]:
         con = sqlite3.connect(path)
         cur = con.cursor()
         for (data,) in cur.execute(
-            f"SELECT data FROM {table} ORDER BY id DESC LIMIT ?",
-            (limit,),
+                f"SELECT data FROM {table} ORDER BY id DESC LIMIT ?",
+                (limit,),
         ):
             try:
                 parsed = json.loads(data)

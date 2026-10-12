@@ -10,25 +10,6 @@ in the task metadata. The harness (subtask 11) must call
 the gate is closed.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import logging
@@ -84,7 +65,7 @@ KNOWLEDGE_TARGET = "context/technical-domain.md"
 
 
 def should_run_curator(
-    metadata: dict[str, Any] | None,
+        metadata: dict[str, Any] | None,
 ) -> bool:
     """Gate the curator step on ``files_changed`` metadata.
 
@@ -135,9 +116,9 @@ def curation_confidence(task: dict[str, Any]) -> float:
 
 
 def determine_actions(
-    task: dict[str, Any],
-    metadata: dict[str, Any],
-    complexity: str = "standard",
+        task: dict[str, Any],
+        metadata: dict[str, Any],
+        complexity: str = "standard",
 ) -> list[dict[str, Any]]:
     """Derive curation actions from task metadata.
 
@@ -206,7 +187,7 @@ def determine_actions(
 
 
 def build_update_plan(
-    actions: list[dict[str, Any]],
+        actions: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Order curation actions into numbered update steps.
 
@@ -273,8 +254,8 @@ def build_update_plan(
 
 
 def curate_task(
-    task: dict[str, Any],
-    metadata: dict[str, Any] | None,
+        task: dict[str, Any],
+        metadata: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Run the files_changed-gated curation step (harness entry).
 

@@ -22,38 +22,20 @@ used for nuanced cases: it can call the deterministic
 ``GuardianDecision``.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
-from dataclasses import dataclass
-from dataclasses import field as dc_field
 import logging
 import re
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from typing import Any
 
-from berg_agents.core.interface import RiskLevel, TaskComplexity
-from berg_agents.providers.models import resolve_model_instance
 from pydantic import BaseModel
 from pydantic import Field as PydField
 from pydantic_ai import Agent, RunContext
+
+from berg_agents.core.interface import RiskLevel, TaskComplexity
+from berg_agents.providers.models import resolve_model_instance
 
 logger = logging.getLogger(__name__)
 
@@ -148,8 +130,8 @@ class GuardianDecision(BaseModel):
 
 
 def assess_risk(
-    description: str,
-    task_type: str = "generic",
+        description: str,
+        task_type: str = "generic",
 ) -> RiskLevel:
     """Assess the risk level of a task (pure function).
 
@@ -193,11 +175,11 @@ def assess_risk(
 
 
 def decide_hitl(
-    task_type: str,
-    complexity: TaskComplexity | str,
-    risk: RiskLevel,
-    confidence: float = 1.0,
-    deps: GuardianDeps | None = None,
+        task_type: str,
+        complexity: TaskComplexity | str,
+        risk: RiskLevel,
+        confidence: float = 1.0,
+        deps: GuardianDeps | None = None,
 ) -> tuple[bool, list[str]]:
     """Apply the core HITL decision matrix (pure function).
 
@@ -263,11 +245,11 @@ def decide_hitl(
 
 
 def guard_review(
-    description: str,
-    task_type: str = "generic",
-    complexity: TaskComplexity | str = TaskComplexity.STANDARD,
-    confidence: float = 1.0,
-    deps: GuardianDeps | None = None,
+        description: str,
+        task_type: str = "generic",
+        complexity: TaskComplexity | str = TaskComplexity.STANDARD,
+        confidence: float = 1.0,
+        deps: GuardianDeps | None = None,
 ) -> GuardianDecision:
     """Run the deterministic review gate (pure function).
 
@@ -329,8 +311,8 @@ _GUARDIAN_INSTRUCTIONS = (
 
 
 def build_guardian_agent(
-    model_id: str | None = None,
-    cfg: dict[str, Any] | None = None,
+        model_id: str | None = None,
+        cfg: dict[str, Any] | None = None,
 ) -> Agent[GuardianDeps, GuardianDecision]:
     """Build the Guardian Pydantic AI agent.
 
@@ -361,9 +343,9 @@ def build_guardian_agent(
 
     @agent.tool
     def assess_task_risk(
-        ctx: RunContext[GuardianDeps],
-        description: str,
-        task_type: str = "generic",
+            ctx: RunContext[GuardianDeps],
+            description: str,
+            task_type: str = "generic",
     ) -> str:
         """Assess a task's risk level deterministically.
 
@@ -383,8 +365,8 @@ def build_guardian_agent(
 
     @agent.tool
     def check_hitl_policy(
-        ctx: RunContext[GuardianDeps],
-        task_type: str,
+            ctx: RunContext[GuardianDeps],
+            task_type: str,
     ) -> str:
         """Report the HITL policy gate for a task type.
 

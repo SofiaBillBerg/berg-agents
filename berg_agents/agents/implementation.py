@@ -10,29 +10,15 @@ as a ``provider:model`` string via
 :func:`berg_agents.providers.models.resolve_model_string`.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
+import logging
 
+logger = logging.getLogger(__name__)
 from dataclasses import dataclass
 from typing import Any, Literal
+
+from pydantic import BaseModel
+from pydantic_ai import Agent, RunContext
 
 from berg_agents.capabilities.registry import ToolCatalog
 from berg_agents.providers.models import (
@@ -41,8 +27,6 @@ from berg_agents.providers.models import (
 )
 from berg_agents.providers.tiers import model_for_complexity
 from berg_agents.tools._io import _atomic_write, _normalize_target
-from pydantic import BaseModel
-from pydantic_ai import Agent, RunContext
 
 __all__ = [
     "EXECUTABLE_TASK_TYPES",
@@ -143,8 +127,8 @@ class PlanStep(BaseModel):
 
 
 def resolve_implementation_model(
-    complexity: str = "standard",
-    cfg: dict[str, Any] | None = None,
+        complexity: str = "standard",
+        cfg: dict[str, Any] | None = None,
 ) -> str:
     """Resolve the ``provider:model`` string for a complexity level.
 
@@ -207,12 +191,12 @@ def estimate_confidence(task_type: str, description: str) -> float:
 
 
 def build_implementation_agent(
-    *,
-    complexity: str = "standard",
-    model_id: str | None = None,
-    cfg: dict[str, Any] | None = None,
-    instructions: str | None = None,
-    read_only: bool = False,
+        *,
+        complexity: str = "standard",
+        model_id: str | None = None,
+        cfg: dict[str, Any] | None = None,
+        instructions: str | None = None,
+        read_only: bool = False,
 ) -> Agent[ImplementationDeps, str]:
     """Build the implementation Pydantic AI agent.
 
@@ -277,7 +261,7 @@ def build_implementation_agent(
 
     @agent.tool
     def build_execution_plan(
-        ctx: RunContext[ImplementationDeps], task_type: str
+            ctx: RunContext[ImplementationDeps], task_type: str
     ) -> str:
         """Build the step-by-step execution plan for a task type.
 
@@ -300,7 +284,7 @@ def build_implementation_agent(
 
     @agent.tool
     def required_tools(
-        ctx: RunContext[ImplementationDeps], task_type: str
+            ctx: RunContext[ImplementationDeps], task_type: str
     ) -> str:
         """List the tools a task type requires.
 
@@ -318,9 +302,9 @@ def build_implementation_agent(
 
     @agent.tool
     def task_confidence(
-        ctx: RunContext[ImplementationDeps],
-        task_type: str,
-        description: str,
+            ctx: RunContext[ImplementationDeps],
+            task_type: str,
+            description: str,
     ) -> str:
         """Score how confidently this agent handles a task.
 
@@ -339,8 +323,8 @@ def build_implementation_agent(
 
     @agent.tool
     def read_file(
-        ctx: RunContext[ImplementationDeps],
-        file_path: str,
+            ctx: RunContext[ImplementationDeps],
+            file_path: str,
     ) -> str:
         """Read a file from the workspace.
 
@@ -379,8 +363,8 @@ def build_implementation_agent(
 
     @agent.tool
     def list_files(
-        ctx: RunContext[ImplementationDeps],
-        file_path: str = ".",
+            ctx: RunContext[ImplementationDeps],
+            file_path: str = ".",
     ) -> str:
         """List files and subdirectories in a workspace directory.
 
@@ -424,9 +408,9 @@ def build_implementation_agent(
 
     @agent.tool
     def bash(
-        ctx: RunContext[ImplementationDeps],
-        command: str,
-        timeout: int = 30,
+            ctx: RunContext[ImplementationDeps],
+            command: str,
+            timeout: int = 30,
     ) -> str:
         """Run a shell command in the workspace root.
 
@@ -472,16 +456,16 @@ def build_implementation_agent(
         )
         if len(combined) > 8000:
             combined = (
-                combined[:8000] + f"\n... output truncated "
-                f"({len(combined)} chars total)"
+                    combined[:8000] + f"\n... output truncated "
+                                      f"({len(combined)} chars total)"
             )
         return f"[exit {proc.returncode}]\n{combined}".strip()
 
     @agent.tool
     def search_code(
-        ctx: RunContext[ImplementationDeps],
-        pattern: str,
-        directory: str = ".",
+            ctx: RunContext[ImplementationDeps],
+            pattern: str,
+            directory: str = ".",
     ) -> str:
         """Search file contents under a workspace directory.
 
@@ -564,9 +548,9 @@ def build_implementation_agent(
 
         @agent.tool
         def write_file(
-            ctx: RunContext[ImplementationDeps],
-            file_path: str,
-            content: str,
+                ctx: RunContext[ImplementationDeps],
+                file_path: str,
+                content: str,
         ) -> str:
             """Create or overwrite a file in the workspace.
 
@@ -584,9 +568,9 @@ def build_implementation_agent(
 
         @agent.tool
         def edit_file(
-            ctx: RunContext[ImplementationDeps],
-            file_path: str,
-            content: str,
+                ctx: RunContext[ImplementationDeps],
+                file_path: str,
+                content: str,
         ) -> str:
             """Replace the contents of an existing file in the workspace.
 
@@ -604,10 +588,10 @@ def build_implementation_agent(
 
         @agent.tool
         def patch_file(
-            ctx: RunContext[ImplementationDeps],
-            file_path: str,
-            old_text: str,
-            new_text: str,
+                ctx: RunContext[ImplementationDeps],
+                file_path: str,
+                old_text: str,
+                new_text: str,
         ) -> str:
             """Replace one block of text inside an existing file.
 
@@ -669,11 +653,13 @@ try:
     implementation_agent: Agent[ImplementationDeps, str] = (
         build_implementation_agent()
     )
-except Exception:
+except Exception as e:
+    logger.error(f"Error building implementation agent: {e}")
     try:
         # Retry with explicit first-declared model (None = first in registry)
         implementation_agent = build_implementation_agent(model_id=None)
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error building implementation agent (retry): {e}")
         # Last resort: known declared model that always exists in this repo
         implementation_agent = build_implementation_agent(
             model_id="nemotron-3-nano:30b-cloud"

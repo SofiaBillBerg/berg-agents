@@ -19,31 +19,12 @@ the chain adapts without code changes. Unknown names are skipped
 with a warning.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
 import logging
 import os
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -192,7 +173,7 @@ DEFAULT_BACKEND_ORDER = ["ollama", "duckduckgo", "direct"]
 
 
 def _ordered_backends(
-    order: list[str] | None, *, kind: str
+        order: list[str] | None, *, kind: str
 ) -> list[WebBackend]:
     """Resolve configured names to backends supporting *kind*."""
     names = order or DEFAULT_BACKEND_ORDER
@@ -241,18 +222,18 @@ def make_web_search(order: list[str] | None = None) -> Callable[..., str]:
             if result:
                 return result
         return (
-            f"No web results for {query!r} "
-            f"(tried: {', '.join(attempted) or 'no backends'})."
-            + (
-                ""
-                if any(
-                    (BACKENDS[n].key_var or "")
-                    and _env(BACKENDS[n].key_var or "")
-                    for n in attempted
-                    if n in BACKENDS
+                f"No web results for {query!r} "
+                f"(tried: {', '.join(attempted) or 'no backends'})."
+                + (
+                    ""
+                    if any(
+                        (BACKENDS[n].key_var or "")
+                        and _env(BACKENDS[n].key_var or "")
+                        for n in attempted
+                        if n in BACKENDS
+                    )
+                    else " Set OLLAMA_API_KEY to enable the Ollama index."
                 )
-                else " Set OLLAMA_API_KEY to enable the Ollama index."
-            )
         )
 
     # Distinct __name__ keeps tool schemas readable per configuration.

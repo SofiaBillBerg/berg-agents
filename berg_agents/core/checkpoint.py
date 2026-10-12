@@ -29,34 +29,16 @@ Design goals
 
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
 import copy
 import json
-from pathlib import Path
 import re
 import threading
+from collections.abc import Iterator, Mapping, Sequence
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
+
 
 # ---------------------------------------------------------------------------
 # Public protocol
@@ -330,13 +312,13 @@ class FileCheckpointer:
 
 
 def make_snapshot(
-    *,
-    thread_id: str,
-    messages: Sequence[Mapping[str, Any]],
-    step: int,
-    tool_calls: int,
-    pending_hitl: Mapping[str, Any] | None = None,
-    metadata: Mapping[str, Any] | None = None,
+        *,
+        thread_id: str,
+        messages: Sequence[Mapping[str, Any]],
+        step: int,
+        tool_calls: int,
+        pending_hitl: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a snapshot dict in the canonical shape the loop expects.
 
@@ -373,7 +355,7 @@ def make_snapshot(
 
 
 def iter_snapshots(
-    checkpointer: Checkpointer,
+        checkpointer: Checkpointer,
 ) -> Iterator[tuple[str, dict[str, Any]]]:
     """Yield ``(thread_id, snapshot)`` for every thread in *checkpointer*.
 

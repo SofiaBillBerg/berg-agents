@@ -4,32 +4,15 @@ Imports inference and routing helpers from sibling modules. Keeps the public
 `Harness` API identical so `from berg_agents.core.harness import Harness` still works.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import asyncio
 import logging
-import time
-from typing import Any
 import uuid
+from typing import Any
+
+import time
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 from berg_agents.agents.curator import curate_task, curation_confidence
 from berg_agents.agents.guardian import (
@@ -47,7 +30,6 @@ from berg_agents.agents.implementation import (
 )
 from berg_agents.agents.planner import Planner, build_plan, estimate_complexity
 from berg_agents.capabilities.registry import ToolCatalog
-
 # Imported helpers (split modules)
 from berg_agents.core.harness._inference import (
     _await_inference,
@@ -73,7 +55,6 @@ from berg_agents.core.harness._routing import (
 from berg_agents.core.interface import TaskComplexity
 from berg_agents.core.learning_gate import LearningGate
 from berg_agents.providers.registry import resolve_model
-from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 logger = logging.getLogger(__name__)
 
@@ -88,12 +69,12 @@ class Harness:
     """
 
     def __init__(
-        self,
-        *,
-        enable_learning: bool = True,
-        enable_inference: bool = False,
-        hitl_gates: GuardianDeps | None = None,
-        model_cfg: dict[str, Any] | None = None,
+            self,
+            *,
+            enable_learning: bool = True,
+            enable_inference: bool = False,
+            hitl_gates: GuardianDeps | None = None,
+            model_cfg: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the harness.
 
@@ -157,18 +138,18 @@ class Harness:
             )}
 
     def _chat_bypass_result(
-        self,
-        *,
-        task: dict[str, Any],
-        task_type: str,
-        description: str,
-        complexity: TaskComplexity,
-        metadata: dict[str, Any],
-        resolved_id: str,
-        verdict: GuardianDecision,
-        confidence: float,
-        planner_score: float,
-        impl_score: float,
+            self,
+            *,
+            task: dict[str, Any],
+            task_type: str,
+            description: str,
+            complexity: TaskComplexity,
+            metadata: dict[str, Any],
+            resolved_id: str,
+            verdict: GuardianDecision,
+            confidence: float,
+            planner_score: float,
+            impl_score: float,
     ) -> dict[str, Any] | None:
         """Run the direct-model chat bypass when eligible.
 
@@ -206,11 +187,11 @@ class Harness:
                 impl_score=impl_score,
             )
             if (
-                planned
-                and isinstance(planned, list)
-                and len(planned) > 0
-                and isinstance(planned[0], dict)
-                and "args" in planned[0]
+                    planned
+                    and isinstance(planned, list)
+                    and len(planned) > 0
+                    and isinstance(planned[0], dict)
+                    and "args" in planned[0]
             ):
                 return {
                     "status": "needs_human_review",
@@ -321,9 +302,9 @@ class Harness:
         return result
 
     def execute_task(
-        self,
-        task: dict[str, Any],
-        task_id: str | None = None,
+            self,
+            task: dict[str, Any],
+            task_id: str | None = None,
     ) -> dict[str, Any]:
         """Run one task through guardian to learning.
 
@@ -366,7 +347,7 @@ class Harness:
         # (the human edited the arguments, then approved).
         approved = metadata.get("hitl_decision") in {"approve", "edit"}
         resolved_id = (
-            task_id or str(task.get("task_id", "") or "") or self._new_id()
+                task_id or str(task.get("task_id", "") or "") or self._new_id()
         )
         complexity = estimate_complexity(description, task_type)
         # Both routing signals are pure; the stronger one
@@ -410,10 +391,10 @@ class Harness:
         # and approve/edit operate on real arguments.
         planned_actions: list[dict[str, Any]] | None = None
         if (
-            verdict.needs_human_review
-            and not approved
-            and self._wants_inference(metadata)
-            and _task_plans_mutation(task_type, description)
+                verdict.needs_human_review
+                and not approved
+                and self._wants_inference(metadata)
+                and _task_plans_mutation(task_type, description)
         ):
             planned_actions = self._plan_mutating_actions(
                 description=description,
@@ -580,12 +561,12 @@ class Harness:
         return metadata.get("run_model") is True
 
     def _plan_mutating_actions(
-        self,
-        *,
-        description: str,
-        task_type: str,
-        complexity: TaskComplexity,
-        metadata: dict[str, Any],
+            self,
+            *,
+            description: str,
+            task_type: str,
+            complexity: TaskComplexity,
+            metadata: dict[str, Any],
     ) -> list[dict[str, Any]] | None:
         """Ask the model (read-only) what mutating actions it intends.
 
@@ -649,14 +630,14 @@ class Harness:
         return _extract_planned_actions(getattr(run_result, "output", ""))
 
     def _run_inference(
-        self,
-        *,
-        description: str,
-        task_type: str,
-        complexity: TaskComplexity,
-        plan: dict[str, Any] | None,
-        steps: list[dict[str, Any]],
-        metadata: dict[str, Any],
+            self,
+            *,
+            description: str,
+            task_type: str,
+            complexity: TaskComplexity,
+            plan: dict[str, Any] | None,
+            steps: list[dict[str, Any]],
+            metadata: dict[str, Any],
     ) -> tuple[str, dict[str, Any]]:
         """Run the implementation agent synchronously.
 
@@ -807,14 +788,14 @@ class Harness:
             "usage": _usage_dict(run_result),
             "finish_reason": _finish_reason(run_result),
             "files_changed": _files_changed_from_run(run_result)
-            or _files_changed_from_text(answer)}
+                             or _files_changed_from_text(answer)}
         return answer, model_run
 
     @staticmethod
     def _select_agent(
-        task: dict[str, Any],
-        planner_score: float,
-        impl_score: float,
+            task: dict[str, Any],
+            planner_score: float,
+            impl_score: float,
     ) -> str:
         """Pick the executor from confidence scores.
 

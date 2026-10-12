@@ -1,29 +1,10 @@
 """Routing helpers for Harness - HITL gates, mutation checks, agent selection."""
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
 import logging
+from dataclasses import dataclass, field
 from typing import Any
 
 from berg_agents.agents.guardian import GuardianDecision
@@ -113,31 +94,31 @@ def _task_plans_mutation(task_type: str, description: str = "") -> bool:
     if _tool_is_mutating(task_type):
         return True
     if any(
-        _tool_is_mutating(name)
-        for name in ToolCatalog.tools_for(task_type, description)
+            _tool_is_mutating(name)
+            for name in ToolCatalog.tools_for(task_type, description)
     ):
         return True
     if description:
         lowered = description.lower()
         if any(
-            kw in lowered
-            for kw in (
-                "write",
-                "edit",
-                "create",
-                "modify",
-                "delete",
-                "run",
-                "execute",
-                "implement",
-            )
+                kw in lowered
+                for kw in (
+                        "write",
+                        "edit",
+                        "create",
+                        "modify",
+                        "delete",
+                        "run",
+                        "execute",
+                        "implement",
+                )
         ):
             return True
     return False
 
 
 def _confidence_gate_bypassed(
-    verdict: GuardianDecision, task_type: str, description: str = ""
+        verdict: GuardianDecision, task_type: str, description: str = ""
 ) -> bool:
     """Check whether a review verdict skips the human gate.
 
@@ -160,15 +141,15 @@ def _confidence_gate_bypassed(
 
 
 def _failed_result(
-    *,
-    resolved_id: str,
-    task_type: str,
-    description: str,
-    complexity: TaskComplexity,
-    verdict: GuardianDecision,
-    model: str,
-    error: str,
-    learning_gate: LearningGate | None,
+        *,
+        resolved_id: str,
+        task_type: str,
+        description: str,
+        complexity: TaskComplexity,
+        verdict: GuardianDecision,
+        model: str,
+        error: str,
+        learning_gate: LearningGate | None,
 ) -> dict[str, Any]:
     """Build the model-unavailable failure result.
 
@@ -237,7 +218,7 @@ def _extract_planned_actions(raw: Any) -> list[dict[str, Any]] | None:
     if start == -1 or end == -1 or end <= start:
         return None
     try:
-        parsed = json.loads(text[start : end + 1])
+        parsed = json.loads(text[start: end + 1])
     except (json.JSONDecodeError, ValueError):
         return None
     if not isinstance(parsed, list) or not parsed:
@@ -261,7 +242,7 @@ def _extract_planned_actions(raw: Any) -> list[dict[str, Any]] | None:
 
 
 def _apply_mutation_guard(
-    verdict: GuardianDecision, task_type: str, description: str
+        verdict: GuardianDecision, task_type: str, description: str
 ) -> GuardianDecision:
     """Force the HITL gate for mutating tool plans.
 
@@ -290,14 +271,14 @@ def _apply_mutation_guard(
 
 
 def _review_gate_result(
-    *,
-    verdict: GuardianDecision,
-    task_type: str,
-    description: str,
-    resolved_id: str,
-    confidence: float,
-    approved: bool,
-    action_requests: list[dict[str, Any]] | None = None,
+        *,
+        verdict: GuardianDecision,
+        task_type: str,
+        description: str,
+        resolved_id: str,
+        confidence: float,
+        approved: bool,
+        action_requests: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """Apply the human-review gate.
 

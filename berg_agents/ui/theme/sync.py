@@ -14,29 +14,11 @@ working when ``docs/`` is published as a static export without the rest
 of the repository.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
 import sys
 
 _THEME_DIR = Path(__file__).resolve().parent
@@ -60,17 +42,17 @@ def _build_custom_css() -> str:
         " */\n\n"
     )
     body = (
-        _read("tokens/colors.css")
-        + "\n"
-        + _read("tokens/typography.css")
-        + "\n"
-        + _read("tokens/spacing.css")
-        + "\n"
-        + _read("components/base.css")
-        + "\n"
-        + _read("components/banner.css")
-        + "\n"
-        + _read("presets/light.css")
+            _read("tokens/colors.css")
+            + "\n"
+            + _read("tokens/typography.css")
+            + "\n"
+            + _read("tokens/spacing.css")
+            + "\n"
+            + _read("components/base.css")
+            + "\n"
+            + _read("components/banner.css")
+            + "\n"
+            + _read("presets/light.css")
     )
     return header + body
 

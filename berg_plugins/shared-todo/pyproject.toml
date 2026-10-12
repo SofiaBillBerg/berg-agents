@@ -1,0 +1,42 @@
+[project]
+name = "berg-plugin-shared-todo"
+version = "0.0.1"
+description = "Shared ToDo lists and planning for Berg Agents"
+authors = [
+    {name = "Berg Agents Team", email = "team@berg-agents.dev"}
+]
+license = "AGPL-3.0-only"
+readme = "README.md"
+requires-python = ">=3.12"
+
+dependencies = [
+    "berg-agents",
+    "httpx>=0.27.0"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0"]
+
+[project.entry-points."berg_plugins"]
+github = "shared_todo:SharedToDoPlugin"
+
+
+[build-system]
+requires = ["uv-build>=0.11.26,<0.22"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = ["shared_todo"]
+namespace = true
+
+[tool.uv.sources]
+berg-agents = { path = "/home/sofiabillberg/code-projects/berg-agents/dist/berg_agents-0.1.0.tar.gz" }
+
+
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

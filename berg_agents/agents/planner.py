@@ -13,31 +13,14 @@ model through tools, and the :class:`Planner` facade keeps
 the ``can_handle`` / ``execute`` contract used by callers.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
 import logging
+from dataclasses import dataclass, field
 from typing import Any, ClassVar
+
+from pydantic_ai import Agent, RunContext
 
 from berg_agents.core.interface import (
     AbstractAgent,
@@ -47,7 +30,6 @@ from berg_agents.core.interface import (
 )
 from berg_agents.providers.models import resolve_model_instance
 from berg_agents.providers.tiers import model_for_complexity
-from pydantic_ai import Agent, RunContext
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +105,7 @@ class Subtask:
 
     @classmethod
     def simple(
-        cls, subtask_id: str, description: str, task_type: str = "generic"
+            cls, subtask_id: str, description: str, task_type: str = "generic"
     ) -> Subtask:
         """Create a subtask with default STANDARD complexity."""
         # Single-step fallback for tasks matching no template.
@@ -141,7 +123,7 @@ class PlannerDeps:
 
 
 def estimate_complexity(
-    description: str, task_type: str = "generic"
+        description: str, task_type: str = "generic"
 ) -> TaskComplexity:
     """Estimate task complexity from keywords.
 
@@ -377,7 +359,7 @@ def plan_depth(ordered: list[Subtask]) -> int:
 
 
 def suggest_planning_hint(
-    plan: dict[str, Any], complexity: TaskComplexity
+        plan: dict[str, Any], complexity: TaskComplexity
 ) -> dict[str, Any] | None:
     """Suggest harness Planning capability when multi-step planning is needed."""
     if complexity in {TaskComplexity.COMPLEX, TaskComplexity.CRITICAL}:
@@ -395,9 +377,9 @@ def suggest_planning_hint(
 
 
 def build_plan(
-    description: str,
-    task_type: str = "generic",
-    complexity: TaskComplexity = TaskComplexity.STANDARD,
+        description: str,
+        task_type: str = "generic",
+        complexity: TaskComplexity = TaskComplexity.STANDARD,
 ) -> dict[str, Any]:
     """Build a full ordered plan dictionary for a task.
 
@@ -430,7 +412,7 @@ def build_plan(
 
 
 def build_planner_agent(
-    model_id: str | None = None, cfg: dict[str, Any] | None = None
+        model_id: str | None = None, cfg: dict[str, Any] | None = None
 ) -> Agent:
     """Build the planner Pydantic AI agent.
 
@@ -467,9 +449,9 @@ except Exception:
 
 @planner_agent.tool
 def decompose_task(
-    ctx: RunContext[PlannerDeps],
-    description: str,
-    task_type: str = "generic",
+        ctx: RunContext[PlannerDeps],
+        description: str,
+        task_type: str = "generic",
 ) -> str:
     """Decompose a task into an ordered JSON plan.
 
@@ -489,9 +471,9 @@ def decompose_task(
 
 @planner_agent.tool
 def estimate_task_complexity(
-    ctx: RunContext[PlannerDeps],
-    description: str,
-    task_type: str = "generic",
+        ctx: RunContext[PlannerDeps],
+        description: str,
+        task_type: str = "generic",
 ) -> str:
     """Grade a task's complexity level.
 
@@ -554,10 +536,10 @@ class Planner(AbstractAgent):
     # Instance method required by the AbstractAgent contract.
     # ruff: ignore[no-self-use]
     def execute(
-        self,
-        task: dict[str, Any],
-        context: TaskContext,
-        model: Any = None,
+            self,
+            task: dict[str, Any],
+            context: TaskContext,
+            model: Any = None,
     ) -> AgentResult:
         """Break down the task into ordered subtasks.
 

@@ -25,30 +25,11 @@ with a warning; skill bodies are capped so one giant manual cannot
 flood the context window.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -88,7 +69,7 @@ def _parse_skill(path: Path) -> tuple[str, str, str] | None:
             name = value
         elif key == "description" and not description:
             description = value
-    body = text[match.end() :].strip()
+    body = text[match.end():].strip()
     if not name or not body:
         logger.warning("Skill file %s missing name or body, skipping", path)
         return None
@@ -145,9 +126,9 @@ def _collect_candidates(path: Path) -> list[Path]:
 
 
 def list_skills(
-    skill_paths: list[str | list[str]] | None,
-    *,
-    root_dir: str | Path = ".",
+        skill_paths: list[str | list[str]] | None,
+        *,
+        root_dir: str | Path = ".",
 ) -> list[dict[str, Any]]:
     """List available skills without building capabilities.
 
@@ -177,7 +158,7 @@ def list_skills(
             continue
         candidates = _collect_candidates(resolved)
         single = len(candidates) == 1 and (
-            resolved.is_file() or (resolved / "SKILL.md").is_file()
+                resolved.is_file() or (resolved / "SKILL.md").is_file()
         )
         for candidate in candidates:
             parsed = _parse_skill(candidate)
@@ -198,9 +179,9 @@ def list_skills(
 
 
 def load_skill_capabilities(
-    skill_paths: list[str | list[str]] | None,
-    *,
-    root_dir: str | Path = ".",
+        skill_paths: list[str | list[str]] | None,
+        *,
+        root_dir: str | Path = ".",
 ) -> list[Any]:
     """Build one deferred capability per ``SKILL.md`` found.
 
@@ -233,7 +214,7 @@ def load_skill_capabilities(
         # keeps each skill's own frontmatter name - otherwise every
         # skill would collapse onto one id and dedup would eat them.
         single = len(candidates) == 1 and (
-            resolved.is_file() or (resolved / "SKILL.md").is_file()
+                resolved.is_file() or (resolved / "SKILL.md").is_file()
         )
         for candidate in candidates:
             parsed = _parse_skill(candidate)

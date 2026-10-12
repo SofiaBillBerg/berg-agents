@@ -16,29 +16,10 @@ The learning behavior is defined here, in this module:
   with at least 5 samples.
 """
 
-#  <one line to give the program's name and a brief idea of what it does.>
-#
-#  Copyright (c) 2026.
-#          Copyright (C) <year>  <name of author>
-#
-#          This program is free software: you can redistribute it and/or modify
-#          it under the terms of the GNU Affero General Public License as
-#          published by the Free Software Foundation, either version 3 of the
-#          License, or (at your option) any later version.
-#
-#          This program is distributed in the hope that it will be useful,
-#          but WITHOUT ANY WARRANTY; without even the implied warranty of
-#          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#          GNU Affero General Public License for more details.
-#
-#          You should have received a copy of the GNU Affero General Public License
-#          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import logging
+from dataclasses import dataclass, field
 from typing import Any
 
 from berg_agents.core.outcome_db import ensure, insert, load
@@ -84,10 +65,10 @@ class OutcomeStore:
     learnings: list[dict[str, Any]] = field(default_factory=list)
 
     def __init__(
-        self,
-        outcomes: list[dict[str, Any]] | None = None,
-        learnings: list[dict[str, Any]] | None = None,
-        db_path: str | None = None,
+            self,
+            outcomes: list[dict[str, Any]] | None = None,
+            learnings: list[dict[str, Any]] | None = None,
+            db_path: str | None = None,
     ) -> None:
         """Initialize the store, reloading persisted rows when available."""
         self._db_path = ensure(db_path)
@@ -103,12 +84,12 @@ class OutcomeStore:
         )
 
     def record_outcome(
-        self,
-        task_type: str,
-        model: str,
-        success: bool,
-        user_corrected: bool = False,
-        complexity: str = "standard",
+            self,
+            task_type: str,
+            model: str,
+            success: bool,
+            user_corrected: bool = False,
+            complexity: str = "standard",
     ) -> dict[str, Any]:
         """Record an outcome and return the learning summary.
 
@@ -191,11 +172,11 @@ class OutcomeStore:
 
 
 def build_learning_entry(
-    task_type: str,
-    complexity: str,
-    model: str,
-    success: bool,
-    user_corrected: bool = False,
+        task_type: str,
+        complexity: str,
+        model: str,
+        success: bool,
+        user_corrected: bool = False,
 ) -> dict[str, Any]:
     """Build a structured learning entry from an outcome.
 
@@ -245,7 +226,7 @@ def build_learning_entry(
 
 
 def recommendation_from_stats(
-    task_type: str, stats: dict[str, Any]
+        task_type: str, stats: dict[str, Any]
 ) -> str | None:
     """Derive a complexity-change recommendation from stats.
 
@@ -278,8 +259,8 @@ def recommendation_from_stats(
         )
     # Sustained success with depth may allow saving cost.
     if (
-        success_rate > DOWNGRADE_RATE_ABOVE
-        and total >= MIN_SAMPLES_FOR_DOWNGRADE
+            success_rate > DOWNGRADE_RATE_ABOVE
+            and total >= MIN_SAMPLES_FOR_DOWNGRADE
     ):
         return (
             f"High success rate ({success_rate:.0%}) for "
@@ -294,11 +275,11 @@ _default_store = OutcomeStore()
 
 
 def record_outcome(
-    task_type: str,
-    model: str,
-    success: bool,
-    user_corrected: bool = False,
-    complexity: str = "standard",
+        task_type: str,
+        model: str,
+        success: bool,
+        user_corrected: bool = False,
+        complexity: str = "standard",
 ) -> dict[str, Any]:
     """Record an outcome in the default store.
 
