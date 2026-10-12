@@ -95,6 +95,7 @@ class EventStore:
         limit: int = 100,
     ) -> list[Event]:
         """Query stored events."""
+        
 
     async def replay(
         self, event_bus: EventBus, since: datetime | None = None

@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 class BergPlugin:
     """Base interface for all berg_agents plugins."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the plugin."""
         self.context: Any = None
 
@@ -63,7 +63,14 @@ class BergPlugin:
 class ToolCapability:
     """Tool capability provided by a plugin."""
 
-    def __init__(self, type="tool", id="", name="", description="", tool=None):
+    def __init__(
+        self,
+        type: str = "tool",
+        id: str = "",
+        name: str = "",
+        description: str = "",
+        tool=None,
+    ) -> None:
         self.type = type
         self.id = id
         self.name = name

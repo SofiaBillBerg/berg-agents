@@ -50,7 +50,7 @@ class PluginMetadata:
     path: Path
     settings: dict
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.settings is None:
             self.settings = {}
 
@@ -58,7 +58,7 @@ class PluginMetadata:
 class SimplePluginManager:
     """Simplified plugin manager that actually works."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.plugins = {}  # id -> plugin instance
         self.metadata = {}  # id -> metadata
 

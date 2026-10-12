@@ -1,4 +1,5 @@
 """Security wrappers for plugin operations."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -25,11 +26,11 @@ from datetime import datetime
 from enum import Enum
 import json
 import logging
-from feat_dev.plugin_dev.plugin_system.exceptions import PermissionDeniedError
 from pathlib import Path
 from typing import Any, Literal
 
 from berg_agents.capabilities.base import RISK_HIGH, RiskClass
+from feat_dev.plugin_dev.plugin_system.exceptions import PermissionDeniedError
 from feat_dev.plugin_dev.plugin_system.permissions.permissions import (
     PermissionCategory,
     PermissionChecker,
@@ -46,16 +47,16 @@ logger = logging.getLogger(__name__)
 class SecureFilesystem:
     """Filesystem operations with permission checking."""
 
-    def __init__(self, plugin_id: str, checker: PermissionChecker):
+    def __init__(self, plugin_id: str, checker: PermissionChecker) -> None:
         self.plugin_id = plugin_id
         self.checker = checker
 
     async def read_file(self, path: str) -> str:
         """Read file with permission check."""
         if not await self.checker.check(
-                self.plugin_id, PermissionCategory.FILESYSTEM_READ, target=path
+            self.plugin_id, PermissionCategory.FILESYSTEM_READ, target=path
         ):
-            raise PermissionDeniedError( # TODO: Define PermissionDeniedError
+            raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied read access to {path}"
             )
 
@@ -68,9 +69,9 @@ class SecureFilesystem:
     async def write_file(self, path: str, content: str) -> None:
         """Write file with permission check."""
         if not await self.checker.check(
-                self.plugin_id, PermissionCategory.FILESYSTEM_WRITE, target=path
+            self.plugin_id, PermissionCategory.FILESYSTEM_WRITE, target=path
         ):
-            raise PermissionDeniedError( # TODO: Define PermissionDeniedError
+            raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied write access to {path}"
             )
 
@@ -91,14 +92,14 @@ class SecureFilesystem:
 class SecureNetwork:
     """Network operations with permission checking."""
 
-    def __init__(self, plugin_id: str, checker: PermissionChecker):
+    def __init__(self, plugin_id: str, checker: PermissionChecker) -> None:
         self.plugin_id = plugin_id
         self.checker = checker
 
     async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
         """HTTP request with permission check."""
         if not await self.checker.check(
-                self.plugin_id, PermissionCategory.NETWORK_OUTBOUND, target=url
+            self.plugin_id, PermissionCategory.NETWORK_OUTBOUND, target=url
         ):
             raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied network access to {url}"
@@ -134,7 +135,7 @@ class AuditEntry:
 class AuditLogger:
     """Audit log for plugin actions."""
 
-    def __init__(self, log_file: Path):
+    def __init__(self, log_file: Path) -> None:
         self.log_file = log_file
         self._lock = asyncio.Lock()
 
@@ -145,11 +146,11 @@ class AuditLogger:
                 f.write(json.dumps(asdict(entry), default=str) + "\n")
 
     async def query(
-            self,
-            plugin_id: str | None = None,
-            operation: str | None = None,
-            since: datetime | None = None,
-            limit: int = 100,
+        self,
+        plugin_id: str | None = None,
+        operation: str | None = None,
+        since: datetime | None = None,
+        limit: int = 100,
     ) -> list[AuditEntry]:
         """Query audit log."""
         entries = []
@@ -181,15 +182,17 @@ class AuditLogger:
 class PluginHITL:
     """Human-in-the-loop approval for plugins."""
 
-    def __init__(self, hitl_manager: HITLManager):  # TODO: Define HITLRequest class
+    def __init__(
+        self, hitl_manager: HITLManager
+    ) -> None:  # TODO: Define HITLRequest class
         self.hitl_manager = hitl_manager
 
     async def request_approval(
-            self,
-            plugin_id: str,
-            operation: str,
-            details: dict[str, Any],
-            risk_level: RiskClass = RISK_HIGH,
+        self,
+        plugin_id: str,
+        operation: str,
+        details: dict[str, Any],
+        risk_level: RiskClass = RISK_HIGH,
     ) -> bool:
         """Request user approval for operation.
 
@@ -203,7 +206,7 @@ class PluginHITL:
             True if approved
         """
         # Build approval request
-        request = HITLRequest( # TODO: Define HITLRequest class
+        request = HITLRequest(  # TODO: Define HITLRequest class
             agent="plugin_system",
             tool=operation,
             args=details,
@@ -240,7 +243,7 @@ class TrustLevel(str, Enum):
 class TrustManager:
     """Manage plugin trust levels."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.trust_levels: dict[str, TrustLevel] = {}
 
     def get_trust_level(self, plugin_id: str) -> TrustLevel:

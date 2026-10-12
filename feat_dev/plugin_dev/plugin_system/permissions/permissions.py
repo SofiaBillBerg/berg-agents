@@ -22,8 +22,6 @@
 from dataclasses import dataclass
 from enum import Enum
 import logging
-from feat_dev.plugin_dev.plugin_system.exceptions import PermissionDeniedError
-from typing import Any
 from typing import Any
 
 from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import (
@@ -127,7 +125,7 @@ class Permission:
 class PermissionChecker:
     """Check plugin permissions at runtime."""
 
-    def __init__(self, registry: PluginRegistry):
+    def __init__(self, registry: PluginRegistry) -> None:
         self.registry = registry
         self.granted: dict[str, set[Permission]] = {}
 

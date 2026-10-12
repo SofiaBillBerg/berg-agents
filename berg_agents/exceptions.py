@@ -5,7 +5,6 @@ that callers can catch a single exception type.  This also allows the
 CLI to catch all exceptions and print a user-friendly message.
 """
 
-
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.

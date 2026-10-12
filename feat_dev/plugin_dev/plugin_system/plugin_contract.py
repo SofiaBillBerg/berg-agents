@@ -1,4 +1,5 @@
 """Plugin contract for the plugin system."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -16,146 +17,62 @@
 #
 #          You should have received a copy of the GNU Affero General Public License
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 
-from abc import ABC
-from collections.abc import Callable
+from dataclasses import dataclass
 import logging
-from pathlib import Path
 from typing import Any
 
-from berg_agents import BergAgentsApp, Harness
 from berg_agents.capabilities.base import RiskClass
 from berg_agents.core.interface import TaskComplexity
-from feat_dev.plugin_dev.plugin_system.events.event_bus import EventBus
-from feat_dev.plugin_dev.plugin_system.lifecycle.bergplugin import BergPlugin
 from pydantic_ai.agent.abstract import AbstractAgent
 from pydantic_ai.tools import Tool
-from feat_dev.plugin_dev.plugin_system.plugin_manager import PluginManager
 
 logger = logging.getLogger(__name__)
-
-
-# 5. Plugin Context
-
-# Plugins receive a context object with access to:
-
-
-class PluginContext:
-    """Runtime context provided to plugins."""
-
-    # Plugin metadata
-    plugin_id: str
-    plugin_version: str
-    plugin_dir: Path
-
-    # Berg agents access
-    app: BergAgentsApp
-    harness: Harness
-    config: dict[str, Any]
-
-    # Plugin system
-    plugin_manager: PluginManager
-    event_bus: EventBus
-    logger: logging.Logger
-
-    # Settings
-    settings: dict[str, Any]  # Plugin-specific settings
-
-    # Methods
-    def emit_event(self, event: str, data: Any) -> None:
-        """
-
-        :param event:
-        :param data:
-        """
-
-    def subscribe(self, event: str, handler: Callable) -> None:
-        """
-
-        :param event:
-        :param handler:
-        """
-
-    def get_plugin(self, plugin_id: str) -> BergPlugin | None:
-        """
-
-        :param plugin_id:
-        """
-
-    def register_tool(self, tool: Tool) -> None:
-        """
-
-        :param tool:
-        """
-
-    def register_agent(self, agent: AbstractAgent) -> None:
-        """
-
-        :param agent:
-        """
-
-    def get_setting(self, key: str, default: Any = None) -> Any:
-        """Get a configuration setting."""
-        keys = key.split(".")
-        value = self.settings
-
-        for k in keys:
-            if isinstance(value, dict):
-                value = value.get(k)
-            else:
-                return default
-
-            if value is None:
-                return default
-
-        return value
-
-    def has_setting(self, key: str) -> bool:
-        """Check if setting exists."""
-        return self.get_setting(key) is not None
-
 
 # 6. Capability Types
 
 # Plugins expose capabilities through typed interfaces:
 
 
-class PluginCapability(ABC):
+@dataclass
+class PluginCapability:
     """Base class for plugin capabilities."""
-    def __init__(self):
-        self.agent_class = None
-        self.tool = None
-
-    """Base for plugin-provided capabilities."""
 
     type: str
 
 
+@dataclass
 class ToolCapability(PluginCapability):
     """A plugin capability that provides a tool."""
-    type = "tool"
-    tool: Tool
-    risk_level: RiskClass
+
+    type: str = "tool"
+    tool: Tool = None
+    risk_level: RiskClass = "medium"
     deferred: bool = True
 
 
+@dataclass
 class AgentCapability(PluginCapability):
     """A plugin capability that provides an agent."""
-    type = "agent"
-    agent_class: type[AbstractAgent]
-    complexity_level: TaskComplexity
+
+    type: str = "agent"
+    agent_class: type[AbstractAgent] = None
+    complexity_level: TaskComplexity = "medium"
 
 
+@dataclass
 class ProviderCapability(PluginCapability):
     """A plugin capability that provides a provider."""
-    type = "provider"
-    provider_id: str
-    models: dict[str, dict[str, Any]]
+
+    type: str = "provider"
+    provider_id: str = ""
+    models: dict[str, dict[str, Any]] = None
 
 
+@dataclass
 class BackendCapability(PluginCapability):
     """A plugin capability that provides a backend."""
+
     type: str = "backend"
-    backend_type: str  # "search", "memory", "storage"
-    backend_class: type[Any]  # Class implementing the backend
+    backend_type: str = ""  # "search", "memory", "storage"
+    backend_class: type[Any] = None

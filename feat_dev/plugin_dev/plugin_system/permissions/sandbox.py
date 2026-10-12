@@ -1,4 +1,5 @@
 """Sandboxing for the plugin system."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -23,8 +24,6 @@ import asyncio
 from enum import Enum
 import json
 import logging
-from feat_dev.plugin_dev.plugin_system.exceptions import PermissionDeniedError
-from typing import Any
 import os
 import sys
 from typing import Any
@@ -58,7 +57,7 @@ class SandboxLevel(str, Enum):
 class ProcessSandbox:
     """Run plugin in isolated process."""
 
-    def __init__(self, plugin_id: str, permissions: set[Permission]):
+    def __init__(self, plugin_id: str, permissions: set[Permission]) -> None:
         self.plugin_id = plugin_id
         self.permissions = permissions
         self.process: asyncio.subprocess.Process | None = None
@@ -136,7 +135,7 @@ class ProcessSandbox:
 class ContainerSandbox:
     """Run plugin in Docker/Podman container."""
 
-    def __init__(self, plugin_id: str, permissions: set[Permission]):
+    def __init__(self, plugin_id: str, permissions: set[Permission]) -> None:
         self.plugin_id = plugin_id
         self.permissions = permissions
         self.container_id: str | None = None

@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # **Discovery mechanism:**
 
 
-def extract_metadata(plugin_class):
+def extract_metadata(plugin_class) -> PluginMetadata:
     """Extract metadata from plugin class."""
     return PluginMetadata(
         id=getattr(plugin_class, "plugin_id", None),
@@ -209,7 +209,7 @@ class PluginDiscovery:
             data = yaml.safe_load(f)
 
         # Parse dependencies
-        from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import (
+        from feat_dev.plugin_dev.plugin_system.dependency.plugin_dependency import (
             PluginDependency,
         )
 
@@ -248,7 +248,7 @@ class PluginDiscovery:
             permissions=data.get("permissions", []),
         )
 
-    def _extract_metadata(self, plugin_class, name):
+    def _extract_metadata(self, plugin_class, name: str) -> PluginMetadata:
         """Extract metadata from plugin class."""
         return PluginMetadata(
             id=getattr(plugin_class, "plugin_id", name),

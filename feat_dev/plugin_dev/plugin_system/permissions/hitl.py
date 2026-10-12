@@ -8,10 +8,10 @@ Integrates with berg_agents approval system when available.
 """
 
 import asyncio
-import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class HITLStatus(str, Enum):
     """HITL request status."""
+
     PENDING = "pending"
     APPROVED = "approved"
     DENIED = "denied"
@@ -28,13 +29,13 @@ class HITLStatus(str, Enum):
 @dataclass
 class HITLRequest:
     """Human-in-the-loop approval request."""
-    
+
     plugin_id: str
     action: str
     description: str
     risk_level: str
     context: dict[str, Any] = field(default_factory=dict)
-    
+
     id: str = ""
     status: HITLStatus = HITLStatus.PENDING
     created_at: datetime = field(default_factory=datetime.now)
@@ -45,16 +46,16 @@ class HITLRequest:
 
 class HITLManager:
     """Manage human-in-the-loop approval requests for plugins.
-    
+
     Integrates with berg_agents approval system if available.
     """
-    
-    def __init__(self, app: Any = None):
+
+    def __init__(self, app: Any = None) -> None:
         self.app = app
         self.requests: dict[str, HITLRequest] = {}
         self.pending: asyncio.Queue[HITLRequest] = asyncio.Queue()
         self._counter = 0
-    
+
     async def request_approval(
         self,
         plugin_id: str,
@@ -65,10 +66,10 @@ class HITLManager:
         timeout: float = 300.0,
     ) -> bool:
         """Request approval for a plugin action.
-        
+
         Auto-approves low-risk actions. For higher risk, integrates with
         berg_agents approval system if available, otherwise queues for manual approval.
-        
+
         Args:
             plugin_id: Plugin requesting approval
             action: Action to perform
@@ -76,7 +77,7 @@ class HITLManager:
             risk_level: Risk level (low, medium, high, critical)
             context: Additional context
             timeout: Timeout in seconds
-            
+
         Returns:
             True if approved, False if denied/timeout
         """
@@ -84,7 +85,7 @@ class HITLManager:
         if risk_level == "low":
             logger.debug(f"Auto-approved low-risk: {action}")
             return True
-        
+
         # Create request
         self._counter += 1
         request = HITLRequest(
@@ -95,11 +96,11 @@ class HITLManager:
             risk_level=risk_level,
             context=context or {},
         )
-        
+
         self.requests[request.id] = request
-        
+
         # Try to use berg_agents approval if available
-        if self.app and hasattr(self.app, 'request_approval'):
+        if self.app and hasattr(self.app, "request_approval"):
             try:
                 approved = await self.app.request_approval(
                     action=action,
@@ -108,28 +109,31 @@ class HITLManager:
                     context=context,
                     timeout=timeout,
                 )
-                request.status = HITLStatus.APPROVED if approved else HITLStatus.DENIED
+                request.status = (
+                    HITLStatus.APPROVED if approved else HITLStatus.DENIED
+                )
                 request.resolved_at = datetime.now()
                 return approved
             except Exception as e:
                 logger.warning(f"berg_agents approval failed: {e}")
-        
+
         # Fallback: queue for manual approval
         await self.pending.put(request)
-        logger.info(f"Approval requested for {plugin_id}: {action} (risk: {risk_level})")
-        
+        logger.info(
+            f"Approval requested for {plugin_id}: {action} (risk: {risk_level})"
+        )
+
         try:
             result = await asyncio.wait_for(
-                self._wait_for_approval(request.id),
-                timeout=timeout
+                self._wait_for_approval(request.id), timeout=timeout
             )
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"Approval request {request.id} timed out")
             request.status = HITLStatus.TIMEOUT
             request.resolved_at = datetime.now()
             return False
-    
+
     async def _wait_for_approval(self, request_id: str) -> bool:
         """Wait for approval decision."""
         while True:
@@ -141,8 +145,10 @@ class HITLManager:
             elif request.status in (HITLStatus.DENIED, HITLStatus.TIMEOUT):
                 return False
             await asyncio.sleep(0.1)
-    
-    def approve(self, request_id: str, approver: str = "user", reason: str = "") -> bool:
+
+    def approve(
+        self, request_id: str, approver: str = "user", reason: str = ""
+    ) -> bool:
         """Approve a pending request."""
         request = self.requests.get(request_id)
         if not request or request.status != HITLStatus.PENDING:
@@ -153,8 +159,10 @@ class HITLManager:
         request.reason = reason
         logger.info(f"Approved {request_id} by {approver}")
         return True
-    
-    def deny(self, request_id: str, approver: str = "user", reason: str = "") -> bool:
+
+    def deny(
+        self, request_id: str, approver: str = "user", reason: str = ""
+    ) -> bool:
         """Deny a pending request."""
         request = self.requests.get(request_id)
         if not request or request.status != HITLStatus.PENDING:
@@ -165,7 +173,9 @@ class HITLManager:
         request.reason = reason
         logger.info(f"Denied {request_id} by {approver}")
         return True
-    
+
     def get_pending_requests(self) -> list[HITLRequest]:
         """Get all pending approval requests."""
-        return [r for r in self.requests.values() if r.status == HITLStatus.PENDING]
+        return [
+            r for r in self.requests.values() if r.status == HITLStatus.PENDING
+        ]

@@ -40,7 +40,7 @@ import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime
 import logging
-from typing import Any
+from typing import Any, Callable, Awaitable
 
 logger = logging.getLogger(__name__)
 

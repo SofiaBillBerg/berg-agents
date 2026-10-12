@@ -629,7 +629,9 @@ class Settings(BaseSettings):
         try:
             # Create the directory tree if any part of it is missing.
             expanded.mkdir(parents=True, exist_ok=True)
-        except Exception as exc:  # ruff: ignore[blind-except] -- intentional broad catch
+        except (
+            Exception
+        ) as exc:  # ruff: ignore[blind-except] -- intentional broad catch
             # Log at WARNING rather than raising: a bad path should not
             # prevent the server from starting (Requirement 6.4).
             logging.getLogger(__name__).warning(

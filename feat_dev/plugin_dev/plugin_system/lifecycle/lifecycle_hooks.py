@@ -15,7 +15,8 @@
 #
 #          You should have received a copy of the GNU Affero General Public License
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
+
+"""Plugin lifecycle management hooks."""
 
 from abc import ABC, abstractmethod
 import asyncio
@@ -28,79 +29,22 @@ from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import (
     PluginRegistry,
 )
 from feat_dev.plugin_dev.plugin_system.events.event_bus import EventBus
-from feat_dev.plugin_dev.plugin_system.exceptions import PluginNotFoundError, PluginStateError, PluginEnableError
+from feat_dev.plugin_dev.plugin_system.exceptions import (
+    PluginEnableError,
+    PluginLoadError,
+    PluginNotFoundError,
+    PluginStateError,
+)
+from feat_dev.plugin_dev.plugin_system.lifecycle.health_status import HealthStatus
 from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import (
     PluginState,
 )
-from feat_dev.plugin_dev.plugin_system.lifecycle.runtime_health import (
-    HealthStatus, PluginLoadError,
-)
 from feat_dev.plugin_dev.plugin_system.plugin_contract import (
     PluginCapability,
-    PluginContext,
 )
+from feat_dev.plugin_dev.plugin_system.plugin_context import PluginContext
 
-logger = logging.getLogger(__file__)
-
-
-# Lifecycle Hooks
-
-# Hook Interface
-
-
-class BergPlugin(ABC):
-    """Base plugin interface with lifecycle hooks."""
-
-    @abstractmethod
-    async def on_load(self, context: PluginContext) -> None:
-        """Called when plugin is loaded.
-
-        Initialize plugin, parse configuration, validate dependencies.
-        Do NOT start services or register capabilities here.
-
-        Raises:
-            PluginLoadError: If plugin cannot be loaded
-        """
-
-    async def on_enable(self, context: PluginContext) -> None:
-        """Called when plugin is enabled.
-
-        Start services, register capabilities, connect to external resources.
-
-        Raises:
-            PluginEnableError: If plugin cannot be enabled
-        """
-
-    async def on_disable(self, context: PluginContext) -> None:
-        """Called when plugin is disabled.
-
-        Stop services, unregister capabilities, disconnect resources.
-        Should be idempotent - safe to call multiple times.
-        """
-
-    async def on_unload(self, context: PluginContext) -> None:
-        """Called when plugin is unloaded.
-
-        Final cleanup, close connections, free resources.
-        Should be idempotent - safe to call multiple times.
-        """
-
-    async def on_error(self, context: PluginContext, error: Exception) -> None:
-        """Called when plugin encounters an error.
-
-        Log error, attempt recovery, notify users.
-        """
-
-    async def health_check(self, context: PluginContext) -> HealthStatus:
-        """Check plugin health.
-
-        Returns:
-            HealthStatus with status and optional message
-        """
-        return HealthStatus(status="healthy", checked_at=datetime.now())
-
-
-# Hook Execution
+logger = logging.getLogger(__name__)
 
 
 class PluginLifecycle:
@@ -143,29 +87,28 @@ class PluginLifecycle:
 
             # Call on_load hook with timeout
             await asyncio.wait_for(
-                instance.on_load(context), timeout=self.timeout
+                instance.on_load(context),
+                timeout=self.timeout,
             )
+
+            # Set event bus on plugin
+            instance._set_event_bus(self.event_bus, plugin_id)
 
             # Transition to LOADED
             await self._set_state(entry, PluginState.LOADED)
             entry.loaded_at = datetime.now()
 
             # Emit event
-            await self.event_bus.emit(
-                "plugin.loaded",
-                {"plugin_id": plugin_id, "version": entry.metadata.version},
-            )
+            await self.event_bus.emit("plugin.loaded", {
+                "plugin_id": plugin_id,
+                "version": entry.metadata.version})
 
             logger.info(f"Loaded plugin: {plugin_id}")
 
-        except TimeoutError:
-            await self._handle_error(
-                entry, PluginLoadError(f"Load timeout: {plugin_id}")
-            )
+        except asyncio.TimeoutError:
+            await self._handle_error(entry, PluginLoadError(f"Load timeout: {plugin_id}"))
         except Exception as e:
-            await self._handle_error(
-                entry, PluginLoadError(f"Load failed: {e}")
-            )
+            await self._handle_error(entry, PluginLoadError(f"Load failed: {e}"))
 
     async def enable(self, plugin_id: str) -> None:
         """Enable a plugin."""
@@ -194,7 +137,8 @@ class PluginLifecycle:
 
             # Call on_enable hook
             await asyncio.wait_for(
-                entry.instance.on_enable(context), timeout=self.timeout
+                entry.instance.on_enable(context),
+                timeout=self.timeout,
             )
 
             # Register capabilities
@@ -209,21 +153,16 @@ class PluginLifecycle:
             entry.metadata.enabled = True
 
             # Emit event
-            await self.event_bus.emit(
-                "plugin.enabled",
-                {"plugin_id": plugin_id, "capabilities": len(capabilities)},
-            )
+            await self.event_bus.emit("plugin.enabled", {
+                "plugin_id": plugin_id,
+                "capabilities": len(capabilities)})
 
             logger.info(f"Enabled plugin: {plugin_id}")
 
-        except TimeoutError:
-            await self._handle_error(
-                entry, PluginEnableError(f"Enable timeout: {plugin_id}")
-            )
+        except asyncio.TimeoutError:
+            await self._handle_error(entry, PluginEnableError(f"Enable timeout: {plugin_id}"))
         except Exception as e:
-            await self._handle_error(
-                entry, PluginEnableError(f"Enable failed: {e}")
-            )
+            await self._handle_error(entry, PluginEnableError(f"Enable failed: {e}"))
 
     async def disable(self, plugin_id: str) -> None:
         """Disable a plugin."""
@@ -248,7 +187,8 @@ class PluginLifecycle:
 
             # Call on_disable hook
             await asyncio.wait_for(
-                entry.instance.on_disable(context), timeout=self.timeout
+                entry.instance.on_disable(context),
+                timeout=self.timeout,
             )
 
             # Transition to DISABLED
@@ -257,16 +197,13 @@ class PluginLifecycle:
             entry.metadata.enabled = False
 
             # Emit event
-            await self.event_bus.emit(
-                "plugin.disabled", {"plugin_id": plugin_id}
-            )
+            await self.event_bus.emit("plugin.disabled", {
+                "plugin_id": plugin_id})
 
             logger.info(f"Disabled plugin: {plugin_id}")
 
-        except TimeoutError:
-            logger.error(
-                f"Disable timeout for {plugin_id}, forcing state change"
-            )
+        except asyncio.TimeoutError:
+            logger.error(f"Disable timeout for {plugin_id}, forcing state change")
             await self._set_state(entry, PluginState.ERROR)
         except Exception as e:
             logger.error(f"Disable failed for {plugin_id}: {e}")
@@ -282,13 +219,8 @@ class PluginLifecycle:
         if entry.state == PluginState.ENABLED:
             await self.disable(plugin_id)
 
-        if entry.state not in {
-            PluginState.LOADED,
-            PluginState.DISABLED,
-            PluginState.ERROR}:
-            logger.debug(
-                f"Plugin {plugin_id} cannot be unloaded from state {entry.state}"
-            )
+        if entry.state not in (PluginState.LOADED, PluginState.DISABLED, PluginState.ERROR):
+            logger.debug(f"Plugin {plugin_id} cannot be unloaded from state {entry.state}")
             return
 
         # Transition to UNLOADING
@@ -300,20 +232,20 @@ class PluginLifecycle:
 
                 # Call on_unload hook
                 await asyncio.wait_for(
-                    entry.instance.on_unload(context), timeout=self.timeout
+                    entry.instance.on_unload(context),
+                    timeout=self.timeout,
                 )
 
             # Remove from registry
             await self.registry.unregister(plugin_id)
 
             # Emit event
-            await self.event_bus.emit(
-                "plugin.unloaded", {"plugin_id": plugin_id}
-            )
+            await self.event_bus.emit("plugin.unloaded", {
+                "plugin_id": plugin_id})
 
             logger.info(f"Unloaded plugin: {plugin_id}")
 
-        except TimeoutError:
+        except asyncio.TimeoutError:
             logger.error(f"Unload timeout for {plugin_id}, forcing removal")
             await self.registry.unregister(plugin_id)
         except Exception as e:
@@ -339,45 +271,49 @@ class PluginLifecycle:
                 logger.error(f"on_error hook failed: {e}")
 
         # Emit event
-        await self.event_bus.emit(
-            "plugin.error",
-            {"plugin_id": entry.metadata.id, "error": str(error)},
-        )
+        await self.event_bus.emit("plugin.error", {
+            "plugin_id": entry.metadata.id,
+            "error": str(error)})
 
     async def _set_state(self, entry: PluginEntry, state: PluginState) -> None:
         """Set plugin state."""
         old_state = entry.state
         entry.state = state
-        logger.debug(f"Plugin {entry.metadata.id}: {old_state} → {state}")
+        logger.debug(f"Plugin {entry.metadata.id}: {old_state} -> {state}")
 
-    async def _create_context(self, entry: PluginEntry):
-        """Create plugin context."""
-        return PluginContext(
-            plugin_id=entry.metadata.id,
-            version=entry.metadata.version,
-            config=self.config.get("plugin_configs", {}).get(
-                entry.metadata.id, {}
-            ),
-            event_bus=self.event_bus,
-        )
-
-    async def _register_capability_with_system(self, entry, cap):
-        """Register capability with the system."""
-        # Placeholder for actual registration logic
-        logger.debug(
-            f"Registering capability {cap.name} for plugin {entry.metadata.id}"
-        )
-        return PluginCapability(type=cap.type)
-
-    def _import_plugin(self, entry_point):
-        """Dynamically import plugin class from entry point."""
-        module_name, class_name = entry_point.rsplit(".", 1)
-        module = __import__(module_name, fromlist=[class_name])
+    def _import_plugin(self, entry_point: str) -> type:
+        """Import plugin class from entry point."""
+        module_path, class_name = entry_point.rsplit(":", 1)
+        import importlib
+        module = importlib.import_module(module_path)
         return getattr(module, class_name)
 
-    async def _unregister_capability_from_system(self, entry, cap):
-        """Unregister capability from the system."""
-        # Placeholder for actual unregistration logic
-        logger.debug(
-            f"Unregistering capability {cap.name} for plugin {entry.metadata.id}"
+    async def _create_context(self, entry: PluginEntry) -> PluginContext:
+        """Create plugin context."""
+        from berg_agents import BergAgentsApp, Harness
+
+        return PluginContext(
+            plugin_id=entry.metadata.id,
+            plugin_version=entry.metadata.version,
+            plugin_dir=entry.metadata.path,
+            app=BergAgentsApp(),  # Will be set by plugin manager
+            harness=Harness(),
+            config=self.config,
+            plugin_manager=None,  # Will be set by plugin manager
+            event_bus=self.event_bus,
+            logger=logger,
+            settings=entry.metadata.settings_schema or {},
         )
+
+    async def _register_capability_with_system(
+        self, entry: PluginEntry, capability: PluginCapability
+    ) -> None:
+        """Register capability with berg_agents system."""
+        # This would integrate with berg_agents capability system
+        pass
+
+    async def _unregister_capability_from_system(
+        self, entry: PluginEntry, capability: PluginCapability
+    ) -> None:
+        """Unregister capability from berg_agents system."""
+        pass

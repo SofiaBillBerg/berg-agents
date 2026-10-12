@@ -33,12 +33,13 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from berg_agents import BergAgentsApp, Harness, app
+from berg_agents import BergAgentsApp, Harness
 from feat_dev.plugin_dev.plugin_system.config.config_manager import (
     PluginConfigManager,
 )
-from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import DependencyResolver
-
+from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import (
+    DependencyResolver,
+)
 from feat_dev.plugin_dev.plugin_system.discovery.discovery_process import (
     PluginDiscovery,
 )
@@ -59,7 +60,7 @@ from feat_dev.plugin_dev.plugin_system.lifecycle.bergplugin import BergPlugin
 from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import (
     PluginState,
 )
-from feat_dev.plugin_dev.plugin_system.plugin_contract import PluginContext
+from feat_dev.plugin_dev.plugin_system.plugin_context import PluginContext
 
 logger = logging.getLogger(__name__)
 
@@ -67,25 +68,25 @@ logger = logging.getLogger(__name__)
 class PluginManager:
     """Central plugin system orchestrator.
 
-        Manages the complete plugin lifecycle from discovery through cleanup.
-        Coordinates between discovery, registry, dependency resolution, and
-        lifecycle management subsystems.
+    Manages the complete plugin lifecycle from discovery through cleanup.
+    Coordinates between discovery, registry, dependency resolution, and
+    lifecycle management subsystems.
 
-        Example:
-                >>> manager = PluginManager(app, harness)
-                >>> await manager.initialize()
-                >>> await manager.discover_plugins(["./plugins"])
-                >>> await manager.load_all()
-                >>> await manager.enable_plugin("my-plugin")
+    Example:
+            >>> manager = PluginManager(app, harness)
+            >>> await manager.initialize()
+            >>> await manager.discover_plugins(["./plugins"])
+            >>> await manager.load_all()
+            >>> await manager.enable_plugin("my-plugin")
 
-        """
+    """
 
     def __init__(
-            self,
-            app: BergAgentsApp,
-            harness: Harness,
-            config: dict[str, Any] | None = None,
-    ):
+        self,
+        app: BergAgentsApp,
+        harness: Harness,
+        config: dict[str, Any] | None = None,
+    ) -> None:
         """Initialize plugin manager.
 
         Args:
@@ -131,13 +132,13 @@ class PluginManager:
         await self.config_manager.initialize()
 
         # Subscribe to system events
-        await self.event_bus.subscribe("plugin.*", self._handle_plugin_event)
+        self.event_bus.subscribe("plugin.*", self._handle_plugin_event)
 
         self._initialized = True
         logger.info("Plugin system initialized")
 
     async def discover_plugins(
-            self, search_paths: list[Path | str]
+        self, search_paths: list[Path | str]
     ) -> list[PluginMetadata]:
         """Discover plugins in the specified paths.
 
@@ -266,9 +267,7 @@ class PluginManager:
 
             try:
                 # Update state
-                self.registry.update_state(
-                    plugin_id, PluginState.ENABLING
-                )
+                self.registry.update_state(plugin_id, PluginState.ENABLING)
 
                 plugin = self._plugins[plugin_id]
                 context = self._contexts[plugin_id]
@@ -313,9 +312,7 @@ class PluginManager:
             logger.info(f"Disabling plugin: {plugin_id}")
 
             try:
-                self.registry.update_state(
-                    plugin_id, PluginState.DISABLING
-                )
+                self.registry.update_state(plugin_id, PluginState.DISABLING)
 
                 plugin = self._plugins[plugin_id]
                 context = self._contexts[plugin_id]
@@ -372,9 +369,7 @@ class PluginManager:
                 del self._plugins[plugin_id]
                 del self._contexts[plugin_id]
 
-                self.registry.update_state(
-                    plugin_id, PluginState.DISCOVERED
-                )
+                self.registry.update_state(plugin_id, PluginState.DISCOVERED)
 
                 logger.info(f"Plugin unloaded: {plugin_id}")
 
@@ -419,7 +414,9 @@ class PluginManager:
             try:
                 await self.load_plugin(metadata.id or "unknown")
             except Exception as e:
-                logger.error(f"Failed to load {metadata.id or 'unknown'}, continuing: {e}")
+                logger.error(
+                    f"Failed to load {metadata.id or 'unknown'}, continuing: {e}"
+                )
 
         logger.info("Plugin loading complete")
 
@@ -435,7 +432,9 @@ class PluginManager:
             try:
                 await self.enable_plugin(entry.plugin_id or "unknown")
             except Exception as e:
-                logger.error(f"Failed to enable {entry.plugin_id or 'unknown'}: {e}")
+                logger.error(
+                    f"Failed to enable {entry.plugin_id or 'unknown'}: {e}"
+                )
 
         logger.info("Plugin enabling complete")
 
@@ -499,7 +498,7 @@ class PluginManager:
             "enabled": entry.state == PluginState.ENABLED}
 
     async def list_plugins(
-            self, state: PluginState | None = None
+        self, state: PluginState | None = None
     ) -> list[dict[str, Any]]:
         """List all plugins.
 
@@ -558,8 +557,8 @@ class PluginManager:
                 )
 
             if dep_entry.state not in (
-                    PluginState.LOADED,
-                    PluginState.ENABLED,
+                PluginState.LOADED,
+                PluginState.ENABLED,
             ):
                 # Try to load dependency first
                 await self.load_plugin(dep.id or "unknown")
@@ -609,12 +608,14 @@ class PluginManager:
             Plugin context
         """
         # Get plugin settings from config
-        settings = self.config_manager.get_plugin_settings(entry.plugin_id or "{}")
+        settings = self.config_manager.get_plugin_settings(
+            entry.plugin_id or "{}"
+        )
 
         context = PluginContext()
         context.plugin_id = entry.plugin_id or "unknown"
         context.plugin_version = entry.metadata.version
-        context.plugin_dir = entry.metadata.path or Path(".")
+        context.plugin_dir = entry.metadata.path or Path()
 
         context.app = self.app
         context.harness = self.harness
@@ -629,7 +630,7 @@ class PluginManager:
         return context
 
     async def _register_capabilities(
-            self, plugin_id: str, plugin: BergPlugin
+        self, plugin_id: str, plugin: BergPlugin
     ) -> None:
         """Register plugin capabilities with berg_agents.
 

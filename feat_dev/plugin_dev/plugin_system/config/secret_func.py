@@ -1,4 +1,5 @@
 """Secret management for the plugin system."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -20,8 +21,8 @@
 
 # Secrets Management
 
-import re
 from pathlib import Path
+import re
 from typing import Any
 
 # Secret Detection
@@ -64,7 +65,7 @@ class SecretDetector:
 class SecretStore:
     """Encrypted storage for plugin secrets."""
 
-    def __init__(self, key_file: Path):
+    def __init__(self, key_file: Path) -> None:
         self.key_file = key_file
         self._cipher = self._load_or_create_key()
 

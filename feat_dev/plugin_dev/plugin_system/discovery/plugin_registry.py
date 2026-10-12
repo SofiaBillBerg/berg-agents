@@ -1,4 +1,5 @@
 """Plugin registry for managing discovered plugins."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -62,7 +63,7 @@ class PluginRegistry:
             logger.info(f"Registered plugin: {metadata.id} v{metadata.version}")
             return entry
 
-    def update_state(self, plugin_id: str, state: 'PluginState') -> None:
+    def update_state(self, plugin_id: str, state: "PluginState") -> None:
         """Update plugin state."""
         if plugin_id in self._plugins:
             self._plugins[plugin_id].state = state
@@ -72,10 +73,10 @@ class PluginRegistry:
         return self._plugins.get(plugin_id)
 
     def list_plugins(
-            self,
-            state: PluginState | None = None,
-            source: PluginSource | None = None,
-            tag: str | None = None,
+        self,
+        state: PluginState | None = None,
+        source: PluginSource | None = None,
+        tag: str | None = None,
     ) -> list[PluginEntry]:
         """List plugins with optional filters."""
         plugins = list(self._plugins.values())
@@ -90,7 +91,7 @@ class PluginRegistry:
         return plugins
 
     async def register_capability(
-            self, plugin_id: str, capability: PluginCapability
+        self, plugin_id: str, capability: PluginCapability
     ) -> None:
         """Register a plugin capability."""
         async with self._lock:
@@ -99,7 +100,7 @@ class PluginRegistry:
             self._capabilities[plugin_id].append(capability)
 
     def get_capabilities(
-            self, plugin_id: str | None = None, capability_type: str | None = None
+        self, plugin_id: str | None = None, capability_type: str | None = None
     ) -> list[PluginCapability]:
         """Get capabilities with optional filters."""
         if plugin_id:

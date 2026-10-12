@@ -15,13 +15,12 @@
 #
 #          You should have received a copy of the GNU Affero General Public License
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 
 
 class ConfigValidationError(Exception):
     """Raised when configuration validation fails."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str) -> None:
         super().__init__(message)
         self.message = message
 
@@ -80,9 +79,20 @@ class ManifestError(Exception):
 
 class PermissionDeniedError(Exception):
     """Raised when a plugin attempts an unauthorized operation."""
-    
-    def __init__(self, message: str, plugin_id: str = "", resource: str = ""):
+
+    def __init__(
+        self, message: str, plugin_id: str = "", resource: str = ""
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.plugin_id = plugin_id
         self.resource = resource
+
+
+# Missing exception classes that lifecycle_hooks.py expects
+class HealthStatus:
+    """Health status for plugins - stub class, real one in runtime_health"""
+
+
+class PluginUnloadError(Exception):
+    """Raised when a plugin fails to unload."""

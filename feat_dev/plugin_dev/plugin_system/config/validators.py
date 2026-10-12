@@ -25,14 +25,13 @@ from pathlib import Path
 import re
 from typing import Any
 
-
 # Custom Validators
 
 
 class ConfigValidator:
     """Custom configuration validators."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.validators: dict[str, Callable] = {}
 
     def register(self, name: str, validator: Callable) -> None:
@@ -40,7 +39,7 @@ class ConfigValidator:
         self.validators[name] = validator
 
     def validate(
-            self, value: Any, validator_name: str, **kwargs
+        self, value: Any, validator_name: str, **kwargs
     ) -> tuple[bool, str | None]:
         """Validate value with custom validator.
 

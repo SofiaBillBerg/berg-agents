@@ -73,17 +73,19 @@ IMPLEMENTATION_AGENT_NAME = "implementation"
 ComplexityLevel = Literal["trivial", "standard", "complex", "critical"]
 
 # Task types this agent executes with high confidence.
-EXECUTABLE_TASK_TYPES: frozenset[str] = frozenset({
-    "edit_file",
-    "new_file",
-    "read_file",
-    "delete_file",
-    "generate_test",
-    "format_code",
-    "execute_command",
-    "refactor",
-    "implement",
-    "fix"})
+EXECUTABLE_TASK_TYPES: frozenset[str] = frozenset(
+    {
+        "edit_file",
+        "new_file",
+        "read_file",
+        "delete_file",
+        "generate_test",
+        "format_code",
+        "execute_command",
+        "refactor",
+        "implement",
+        "fix"}
+)
 
 # Step-by-step execution plans per task type.
 _PLAN_STEPS: dict[str, list[dict[str, str]]] = {

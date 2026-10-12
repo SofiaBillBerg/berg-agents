@@ -1,4 +1,5 @@
 """Version parsing utilities for the plugin system."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -145,7 +146,7 @@ class VersionConstraint:
         # Comparison operators
         for op in [">=", "<=", ">", "<", "="]:
             if constraint.startswith(op):
-                version = Version.parse(constraint[len(op):])
+                version = Version.parse(constraint[len(op) :])
                 if op == ">=":
                     return [lambda v: v >= version]
                 elif op == "<=":

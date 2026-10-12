@@ -1,4 +1,5 @@
 """Configuration manager for the plugin system."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -25,12 +26,13 @@ from pathlib import Path
 import re
 from typing import Any
 
+from feat_dev.plugin_dev.plugin_system.config.file_watcher import FileWatcher
+from feat_dev.plugin_dev.plugin_system.exceptions import ConfigValidationError
+from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_hooks import (
+    PluginLifecycle,
+)
 from jsonschema import ValidationError, validate
 import yaml
-
-from feat_dev.plugin_dev.plugin_system.exceptions import ConfigValidationError
-from feat_dev.plugin_dev.plugin_system.config.file_watcher import FileWatcher
-from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_hooks import PluginLifecycle
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,7 @@ logger = logging.getLogger(__name__)
 class PluginConfigManager:
     """Manage plugin configurations."""
 
-    def __init__(self, config_dir: Path | None = None):
+    def __init__(self, config_dir: Path | None = None) -> None:
         self.config_dir = config_dir or Path.home() / ".berg_agents"
         self._cache: dict[str, dict[str, Any]] = {}
         self._env_pattern = re.compile(r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)}")
@@ -68,10 +70,10 @@ class PluginConfigManager:
         return self._cache.get(plugin_id, {})
 
     async def load_config(
-            self,
-            plugin_id: str,
-            schema: dict[str, Any] | None = None,
-            defaults: dict[str, Any] | None = None,
+        self,
+        plugin_id: str,
+        schema: dict[str, Any] | None = None,
+        defaults: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Load and validate plugin configuration.
 
@@ -142,7 +144,7 @@ class PluginConfigManager:
                 continue
 
             # Extract setting key
-            setting_key = key[len(prefix):].lower()
+            setting_key = key[len(prefix) :].lower()
 
             # Handle nested keys (FEATURES__ISSUES → features.issues)
             parts = setting_key.split("__")
@@ -182,7 +184,7 @@ class PluginConfigManager:
         """Recursively expand ${env:VAR} references."""
         if isinstance(config, str):
 
-            def replace(match):
+            def replace(match) -> str:
                 """Replace environment variable references with their values.
 
                 Returns the value of the environment variable or empty string if not found.
@@ -205,9 +207,9 @@ class PluginConfigManager:
         """Deep merge override into base (mutates base)."""
         for key, value in override.items():
             if (
-                    key in base
-                    and isinstance(base[key], dict)
-                    and isinstance(value, dict)
+                key in base
+                and isinstance(base[key], dict)
+                and isinstance(value, dict)
             ):
                 self._deep_merge(base[key], value)
             else:
@@ -227,7 +229,7 @@ class PluginConfigManager:
         return await self.load_config(plugin_id)
 
     async def update(
-            self, plugin_id: str, updates: dict[str, Any], persist: bool = True
+        self, plugin_id: str, updates: dict[str, Any], persist: bool = True
     ) -> None:
         """Update plugin configuration.
 
@@ -250,7 +252,7 @@ class PluginConfigManager:
             await self._save_user_config(plugin_id, current)
 
     async def _save_user_config(
-            self, plugin_id: str, settings: dict[str, Any]
+        self, plugin_id: str, settings: dict[str, Any]
     ) -> None:
         """Save configuration to user config file."""
         config_file = self.config_dir / "plugins" / f"{plugin_id}.yaml"
@@ -281,16 +283,18 @@ class PluginConfigWatcher:
     """Watch for configuration changes and reload."""
 
     def __init__(
-            self, config_manager: PluginConfigManager, lifecycle: PluginLifecycle
-    ):
+        self, config_manager: PluginConfigManager, lifecycle: PluginLifecycle
+    ) -> None:
         self.config_manager = config_manager
         self.lifecycle = lifecycle
-        self.watchers: dict[str, FileWatcher] = {}  # TODO: Implement FileWatcher class
+        self.watchers: dict[
+            str, FileWatcher
+        ] = {}  # TODO: Implement FileWatcher class
 
     async def watch(self, plugin_id: str) -> None:
         """Watch plugin configuration for changes."""
         config_file = (
-                self.config_manager.config_dir / "plugins" / f"{plugin_id}.yaml"
+            self.config_manager.config_dir / "plugins" / f"{plugin_id}.yaml"
         )
 
         if not config_file.exists():

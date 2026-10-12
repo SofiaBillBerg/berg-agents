@@ -15,21 +15,12 @@
 #
 #          You should have received a copy of the GNU Affero General Public License
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 
 # Runtime health monitoring
 
-# Health Monitoring
-
 import asyncio
-from dataclasses import dataclass
-from datetime import datetime
 import logging
-from typing import Any, Literal
 
-from attrs import field
-from babel.util import UTC
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_entry import PluginEntry
 from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_hooks import (
     PluginLifecycle,
 )
@@ -40,20 +31,12 @@ from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class HealthStatus:
-    """Plugin health status."""
-
-    status: Literal["healthy", "degraded", "unhealthy"]
-    checked_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    message: str | None = None
-    details: dict[str, Any] | None = None
-
-
 class HealthMonitor:
     """Monitor plugin health."""
 
-    def __init__(self, lifecycle: PluginLifecycle, interval: float = 60.0):
+    def __init__(
+        self, lifecycle: PluginLifecycle, interval: float = 60.0
+    ) -> None:
         self.lifecycle = lifecycle
         self.interval = interval
         self.task: asyncio.Task | None = None
@@ -66,7 +49,10 @@ class HealthMonitor:
         """Stop health monitoring."""
         if self.task:
             self.task.cancel()
-            await self.task
+            try:
+                await self.task
+            except asyncio.CancelledError:
+                pass
 
     async def _monitor_loop(self) -> None:
         """Periodic health check loop."""
@@ -89,7 +75,8 @@ class HealthMonitor:
             try:
                 context = await self.lifecycle._create_context(entry)
                 status = await asyncio.wait_for(
-                    entry.instance.health_check(context), timeout=10.0
+                    entry.instance.health_check(context),
+                    timeout=10.0,
                 )
 
                 if status.status == "unhealthy":
@@ -103,99 +90,3 @@ class HealthMonitor:
                 logger.warning(f"Health check timeout: {entry.metadata.id}")
             except Exception as e:
                 logger.error(f"Health check failed: {entry.metadata.id}: {e}")
-
-
-# Hot Reload
-
-
-class PluginReloader:
-    """Hot reload plugins during development."""
-
-    def __init__(self, lifecycle: PluginLifecycle) -> None:
-        self.lifecycle = lifecycle
-        self.watchers: dict[str, FileSystemWatcher] = {}
-
-    async def watch(self, plugin_id: str) -> None:
-        """Watch plugin for changes and auto-reload."""
-        entry = self.lifecycle.registry.get(plugin_id)
-        if not entry or not entry.metadata.path:
-            raise ValueError(f"Cannot watch plugin: {plugin_id}")
-
-        watcher = FileSystemWatcher(entry.metadata.path)
-        watcher.on_change(lambda: self._reload(plugin_id))
-        self.watchers[plugin_id] = watcher
-        await watcher.start()
-
-    async def _reload(self, plugin_id: str) -> None:
-        """Reload a plugin."""
-        logger.info(f"Reloading plugin: {plugin_id}")
-
-        try:
-            # Unload
-            await self.lifecycle.unload(plugin_id)
-
-            # Rediscover
-            # ... (would need to re-run discovery for this plugin)
-
-            # Load and enable
-            await self.lifecycle.load(plugin_id)
-            await self.lifecycle.enable(plugin_id)
-
-            logger.info(f"Plugin reloaded: {plugin_id}")
-
-        except Exception as e:
-            logger.error(f"Reload failed: {plugin_id}: {e}")
-
-
-# Graceful Degradation
-
-
-class PluginLoadError(Exception):
-    """Custom exception for plugin load failures."""
-
-    def __init__(self, message: str):
-        super().__init__(message)
-
-
-async def _enable_partial(entry: PluginEntry):
-    """Attempt to enable a plugin with reduced capabilities."""
-    # This is a placeholder for partial enable logic
-    # For example, disable certain features or capabilities
-    logger.info(f"Attempting partial enable for plugin: {entry.metadata.id}")
-    # Simulate partial enable
-    await asyncio.sleep(1)
-    entry.state = PluginState.ENABLED
-    logger.info(f"Plugin partially enabled: {entry.metadata.id}")
-
-
-class DegradationStrategy:
-    """Handle plugin failures gracefully."""
-
-    @staticmethod
-    async def handle_load_failure(entry: PluginEntry, error: Exception) -> None:
-        """Handle plugin load failure."""
-        logger.error(f"Plugin load failed: {entry.metadata.id}: {error}")
-
-        # Mark as optional if not critical
-        if not entry.metadata.get("critical", False):
-            logger.info(f"Continuing without plugin: {entry.metadata.id}")
-            return
-
-        # For critical plugins, raise
-        raise PluginLoadError(
-            f"Critical plugin failed to load: {entry.metadata.id}"
-        ) from error
-
-    @staticmethod
-    async def handle_enable_failure(
-        entry: PluginEntry, error: Exception
-    ) -> None:
-        """Handle plugin enable failure."""
-        logger.error(f"Plugin enable failed: {entry.metadata.id}: {error}")
-
-        # Try partial enable - load without some capabilities
-        try:
-            await _enable_partial(entry)
-            logger.info(f"Plugin partially enabled: {entry.metadata.id}")
-        except Exception as e:
-            logger.warning(f"Partial enable failed: {entry.metadata.id}, {e}")

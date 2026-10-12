@@ -188,10 +188,12 @@ def list_skills(
             if skill_id in seen:
                 continue
             seen.add(skill_id)
-            found.append({
-                "name": skill_id,
-                "description": description or f"Skill: {label or name}",
-                "source": str(candidate)})
+            found.append(
+                {
+                    "name": skill_id,
+                    "description": description or f"Skill: {label or name}",
+                    "source": str(candidate)}
+            )
     return found
 
 

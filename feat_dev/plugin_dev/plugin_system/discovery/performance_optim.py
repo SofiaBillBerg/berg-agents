@@ -53,12 +53,12 @@ def discover_builtin():
     return discover_builtin()
 
 
-def discover_packages():
+def discover_packages() -> list[PluginMetadata]:
     """Discover plugins from installed packages."""
     return discover_package_plugins()
 
 
-def discover_local():
+def discover_local() -> list[PluginMetadata]:
     """Discover local plugins."""
     return discover_local_plugins(plugin_dir=Path("./config/plugins"))
 

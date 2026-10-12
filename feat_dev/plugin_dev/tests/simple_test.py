@@ -27,6 +27,8 @@ import logging
 from pathlib import Path
 import sys
 
+import pytest
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -34,13 +36,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-import pytest
 
 @pytest.fixture
-def test_env():
+def test_env() -> dict[str, str]:
     return {
         "PLUGIN_PATH": str(Path(__file__).parent.parent / "berg_plugins"),
         "TODO_PATH": "./test_todos/"}
+
 
 async def test_discovery():
     """Test plugin discovery directly."""
@@ -51,7 +53,9 @@ async def test_discovery():
 
     try:
         # Import just the discovery module
-        from feat_dev.plugin_dev.plugin_system.discovery.discovery_process import PluginDiscovery
+        from feat_dev.plugin_dev.plugin_system.discovery.discovery_process import (
+            PluginDiscovery,
+        )
 
         logger.info("Creating PluginDiscovery...")
         discovery = PluginDiscovery()

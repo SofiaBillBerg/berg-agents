@@ -1,4 +1,3 @@
-"""Plugin metadata for the plugin system."""
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -16,22 +15,19 @@
 #
 #          You should have received a copy of the GNU Affero General Public License
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 
 # Plugin Metadata
 
-
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from dataclasses import field
-from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import (
+from feat_dev.plugin_dev.plugin_system.dependency.plugin_dependency import (
     PluginDependency,
 )
-
-# Plugin source type (literal string)
-PluginSource = str  # One of: 'builtin', 'package', 'local', 'remote'
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_sources import (
+    PluginSource,
+)
 
 
 @dataclass

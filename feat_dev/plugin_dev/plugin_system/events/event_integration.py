@@ -1,4 +1,5 @@
 """Event integration for the plugin system."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -53,10 +54,10 @@ class EventEmitter:
         self.event_bus = event_bus
 
     async def emit(
-            self,
-            event_type: str,
-            data: dict[str, Any] | None = None,
-            correlation_id: str | None = None,
+        self,
+        event_type: str,
+        data: dict[str, Any] | None = None,
+        correlation_id: str | None = None,
     ) -> None:
         """Emit an event from this plugin."""
         await self.event_bus.emit(
@@ -68,13 +69,16 @@ class EventEmitter:
 
     # TODO: Implement EventHandler
     def subscribe(
-            self, event_pattern: str, handler: EventHandler, priority: int = 0
-    ) -> str:  # TODO: Consider returning a subscription ID or handle for unsubscribing
+        self, event_pattern: str, handler: EventHandler, priority: int = 0
+    ) -> (
+        str
+    ):  # TODO: Consider returning a subscription ID or handle for unsubscribing
         """Subscribe to events."""
         return self.event_bus.subscribe(event_pattern, handler, priority)
 
-    def unsubscribe(self, event_pattern: str,
-                    handler: EventHandler) -> None:  # TODO:  Implement a way to unsubscribe using a subscription ID or handle
+    def unsubscribe(
+        self, event_pattern: str, handler: EventHandler
+    ) -> None:  # TODO:  Implement a way to unsubscribe using a subscription ID or handle
         """Unsubscribe from events."""
         self.event_bus.unsubscribe(event_pattern, handler)
 

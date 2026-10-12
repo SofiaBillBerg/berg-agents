@@ -1,4 +1,5 @@
 """Plugin entry for the plugin system."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -20,13 +21,7 @@
 
 # Plugin Entry
 
-
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import PluginMetadata
-    from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import PluginState
 from datetime import datetime
 import logging
 
@@ -53,7 +48,6 @@ class PluginEntry:
     enabled_at: datetime | None = None
     error: Exception | None = None
     plugin_id: str | None = None
-
 
     def is_enabled(self) -> bool:
         """Check if plugin is enabled."""

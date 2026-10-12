@@ -1,4 +1,5 @@
 """Dependency management for the plugin system."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -16,13 +17,10 @@
 #
 #          You should have received a copy of the GNU Affero General Public License
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 
-from collections import defaultdict, deque
-from dataclasses import dataclass
+from collections import defaultdict
 import logging
 
-# Dependency Types
 from feat_dev.plugin_dev.plugin_system.dependency.version_parsing import (
     Version,
     VersionConstraint,
@@ -30,38 +28,18 @@ from feat_dev.plugin_dev.plugin_system.dependency.version_parsing import (
 from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import (
     PluginMetadata,
 )
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import (
+    PluginRegistry,
+)
 from feat_dev.plugin_dev.plugin_system.exceptions import (
     DependencyCycleError,
     DependencyError,
     DependencyNotFoundError,
     DependencyVersionError,
-)
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import (
-    PluginRegistry,
+    VersionConflictError,
 )
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class PluginDependency:
-    """Plugin dependency specification."""
-
-    id: str  # Plugin ID
-    version: str  # Version constraint
-    optional: bool = False  # Can be missing
-    peer: bool = False  # Must exist, not managed
-
-    def is_satisfied_by(self, available_version: str) -> bool:
-        """Check if available version satisfies constraint."""
-        constraint = VersionConstraint.parse(self.version)
-        version = Version.parse(available_version)
-        return constraint.matches(version)
-
-
-# Dependency Resolution Algorithm
-
-# Dependency Graph
 
 
 class DependencyGraph:
@@ -100,11 +78,6 @@ class DependencyGraph:
         parent = {}
 
         def dfs(node: str) -> list[str] | None:
-            """A recursive function to detect cycle in the graph.
-
-            :param node:
-            :return:
-            """
             visited.add(node)
             rec_stack.add(node)
 
@@ -147,19 +120,16 @@ class DependencyGraph:
         # Check for cycles first
         cycle = self.has_cycle()
         if cycle:
-            raise DependencyCycleError(
-                f"Circular dependency: {' → '.join(cycle)}"
-            )
+            raise DependencyCycleError(f"Circular dependency: {' -> '.join(cycle)}")
 
         # Kahn's algorithm
+        from collections import deque
         in_degree = dict.fromkeys(self.nodes, 0)
         for node in self.nodes:
             for neighbor in self.edges.get(node, []):
                 in_degree[neighbor] += 1
 
-        queue = deque([
-            node for node, degree in in_degree.items() if degree == 0
-        ])
+        queue = deque([node for node, degree in in_degree.items() if degree == 0])
         result = []
 
         while queue:
@@ -181,7 +151,8 @@ class DependencyResolver:
         self.registry = registry
 
     async def resolve(
-            self, plugins: list[PluginMetadata]
+        self,
+        plugins: list[PluginMetadata],
     ) -> tuple[list[str], list[str]]:
         """Resolve dependencies and return load order.
 
@@ -207,11 +178,11 @@ class DependencyResolver:
                 if dep.id not in graph.nodes:
                     if dep.optional:
                         warnings.append(
-                            f"Optional dependency missing: {plugin.id} → {dep.id}"
+                            f"Optional dependency missing: {plugin.id} -> {dep.id}"
                         )
                     else:
                         raise DependencyNotFoundError(
-                            f"Required dependency missing: {plugin.id} → {dep.id}"
+                            f"Required dependency missing: {plugin.id} -> {dep.id}"
                         )
                 else:
                     # Check version compatibility
@@ -229,3 +200,68 @@ class DependencyResolver:
             raise DependencyError(f"Circular dependency detected: {e}")
 
         return load_order, warnings
+
+
+class ConflictResolver:
+    """Resolve version conflicts."""
+
+    def resolve_conflicts(
+        self,
+        plugins: list[PluginMetadata],
+    ) -> list[PluginMetadata]:
+        """Resolve version conflicts.
+
+        When multiple plugins require different versions of the same
+        dependency, choose the highest version that satisfies all constraints.
+
+        Args:
+            plugins: List of plugin metadata
+
+        Returns:
+            Resolved plugin list
+
+        Raises:
+            VersionConflictError: If no compatible version exists
+        """
+        # Group plugins by ID
+        by_id: dict[str, list[PluginMetadata]] = defaultdict(list)
+        for plugin in plugins:
+            by_id[plugin.id].append(plugin)
+
+        resolved = []
+
+        for plugin_id, versions in by_id.items():
+            if len(versions) == 1:
+                resolved.append(versions[0])
+                continue
+
+            # Multiple versions - find highest compatible
+            candidates = sorted(
+                versions,
+                key=lambda p: Version.parse(p.version),
+                reverse=True,
+            )
+
+            # Collect all constraints for this plugin
+            constraints = []
+            for plugin in plugins:
+                for dep in plugin.dependencies:
+                    if dep.id == plugin_id:
+                        constraints.append(dep.version)
+
+            # Find version that satisfies all constraints
+            for candidate in candidates:
+                version = Version.parse(candidate.version)
+                if all(
+                    VersionConstraint.parse(c).matches(version)
+                    for c in constraints
+                ):
+                    resolved.append(candidate)
+                    break
+            else:
+                raise VersionConflictError(
+                    f"No compatible version found for {plugin_id}. "
+                    f"Constraints: {', '.join(constraints)}"
+                )
+
+        return resolved

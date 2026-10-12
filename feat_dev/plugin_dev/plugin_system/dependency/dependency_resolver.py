@@ -18,20 +18,33 @@
 #
 
 from collections import defaultdict
-from dataclasses import field, dataclass
+from dataclasses import dataclass, field
 import logging
 
-from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import DependencyGraph, DependencyResolver
+from feat_dev.plugin_dev.plugin_system.dependency.dependency_management import (
+    DependencyGraph,
+    DependencyResolver,
+)
 from feat_dev.plugin_dev.plugin_system.dependency.version_parsing import (
-    Version, VersionConstraint,
+    Version,
+    VersionConstraint,
 )
 from feat_dev.plugin_dev.plugin_system.discovery.plugin_metadata import (
     PluginMetadata,
 )
-from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import PluginRegistry
-from feat_dev.plugin_dev.plugin_system.exceptions import DependencyVersionError, VersionConflictError, \
-    DependencyNotEnabledError, DependencyNotFoundError, PluginNotFoundError
-from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import PluginState
+from feat_dev.plugin_dev.plugin_system.discovery.plugin_registry import (
+    PluginRegistry,
+)
+from feat_dev.plugin_dev.plugin_system.exceptions import (
+    DependencyNotEnabledError,
+    DependencyNotFoundError,
+    DependencyVersionError,
+    PluginNotFoundError,
+    VersionConflictError,
+)
+from feat_dev.plugin_dev.plugin_system.lifecycle.lifecycle_states import (
+    PluginState,
+)
 
 logger = logging.getLogger(__name__)
 

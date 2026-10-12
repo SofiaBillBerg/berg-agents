@@ -38,12 +38,13 @@ Tests:
 """
 
 import asyncio
-import logging
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 import sys
-import pytest
+
 from feat_dev.plugin_dev.plugin_system.plugin_manager import PluginManager
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
@@ -59,8 +60,9 @@ logger = logging.getLogger(__name__)
 
 # setup test environment variables for the plugin system and mark for testing
 
+
 @pytest.fixture
-def test_env():
+def test_env() -> dict[str, str]:
     return {
         "PLUGIN_PATH": str(Path(__file__).parent.parent / "berg_plugins"),
         "TODO_PATH": "./test_todos/"}
@@ -70,14 +72,15 @@ def test_env():
 class MockBergAgentsApp:
     """Mock BergAgentsApp for testing."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "test-app"
+
 
 @dataclass
 class MockHarness:
     """Mock Harness for testing."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.name = "test-harness"
 
 

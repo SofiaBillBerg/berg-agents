@@ -5,41 +5,43 @@
 """File watching utilities for configuration hot-reloading."""
 
 import asyncio
+from collections.abc import Awaitable, Callable
 import logging
 from pathlib import Path
-from typing import Callable, Awaitable
 
 logger = logging.getLogger(__name__)
 
 
 class FileWatcher:
     """Watch a file for changes and trigger callbacks."""
-    
-    def __init__(self, filepath: Path):
+
+    def __init__(self, filepath: Path) -> None:
         self.filepath = filepath
         self.last_mtime = self._get_mtime()
         self.callbacks: list[Callable[[], Awaitable[None]]] = []
         self.task: asyncio.Task | None = None
         self._running = False
-    
+
     def _get_mtime(self) -> float:
         """Get file modification time."""
         try:
-            return self.filepath.stat().st_mtime if self.filepath.exists() else 0.0
+            return (
+                self.filepath.stat().st_mtime if self.filepath.exists() else 0.0
+            )
         except Exception:
             return 0.0
-    
+
     def on_change(self, callback: Callable[[], Awaitable[None]]) -> None:
         """Register a callback for file changes."""
         self.callbacks.append(callback)
-    
+
     async def start(self) -> None:
         """Start watching the file."""
         if self._running:
             return
         self._running = True
         self.task = asyncio.create_task(self._watch_loop())
-    
+
     async def stop(self) -> None:
         """Stop watching the file."""
         self._running = False
@@ -49,7 +51,7 @@ class FileWatcher:
                 await self.task
             except asyncio.CancelledError:
                 pass
-    
+
     async def _watch_loop(self) -> None:
         """Main watch loop."""
         while self._running:
@@ -71,11 +73,13 @@ class FileWatcher:
 
 class FileSystemWatcher:
     """Watch multiple files for changes."""
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         self.watchers: dict[str, FileWatcher] = {}
-    
-    async def watch_file(self, filepath: Path, callback: Callable[[], Awaitable[None]]) -> None:
+
+    async def watch_file(
+        self, filepath: Path, callback: Callable[[], Awaitable[None]]
+    ) -> None:
         """Watch a file for changes."""
         key = str(filepath)
         if key not in self.watchers:
@@ -83,7 +87,7 @@ class FileSystemWatcher:
             self.watchers[key] = watcher
             await watcher.start()
         self.watchers[key].on_change(callback)
-    
+
     async def stop_all(self) -> None:
         """Stop all watchers."""
         for watcher in self.watchers.values():

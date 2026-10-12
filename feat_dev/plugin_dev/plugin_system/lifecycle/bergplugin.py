@@ -1,4 +1,5 @@
 """Base class for all berg_agents plugins."""
+
 #  <one line to give the program's name and a brief idea of what it does.>
 #
 #  Copyright (c) 2026.
@@ -16,26 +17,30 @@
 #
 #          You should have received a copy of the GNU Affero General Public License
 #          along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
 
-# 4. Plugin Interface Contract
-
-# All plugins implement a base interface:
-
-from abc import ABC, abstractmethod
 import logging
-from typing import Any
+from abc import ABC, abstractmethod
+from typing import Any, TYPE_CHECKING
 
+from feat_dev.plugin_dev.plugin_system.plugin_context import PluginContext
 from feat_dev.plugin_dev.plugin_system.plugin_contract import (
     PluginCapability,
-    PluginContext,
 )
+
+if TYPE_CHECKING:
+    from feat_dev.plugin_dev.plugin_system.events.event_bus import EventBus
 
 logger = logging.getLogger(__name__)
 
 
 class BergPlugin(ABC):
-    """Base interface for all berg_agents plugins."""
+    """Base class for all berg_agents plugins."""
+
+    def __init__(self) -> None:
+        self._event_bus: "EventBus | None" = None
+        self._plugin_id: str | None = None
+
+    # === Lifecycle Hooks ===
 
     @abstractmethod
     async def on_load(self, context: PluginContext) -> None:
@@ -50,23 +55,70 @@ class BergPlugin(ABC):
     async def on_unload(self, context: PluginContext) -> None:
         """Called when plugin is unloaded."""
 
+    async def on_error(
+        self, context: PluginContext, error: Exception
+    ) -> None:
+        """Called when plugin encounters an error."""
+
+    async def on_config_change(
+        self, context: PluginContext, new_config: dict[str, Any]
+    ) -> None:
+        """Called when plugin configuration changes."""
+
+    async def health_check(self, context: PluginContext) -> Any:
+        """Check plugin health."""
+        from feat_dev.plugin_dev.plugin_system.lifecycle.health_status import (
+            HealthStatus,
+        )
+
+        return HealthStatus(status="healthy")
+
+    # === Capabilities ===
+
     def get_capabilities(self) -> list[PluginCapability]:
-        """Return plugin capabilities (tools, agents, etc.)."""
+        """Return plugin capabilities."""
         return []
 
     def get_settings_schema(self) -> dict[str, Any] | None:
         """Return JSON schema for plugin settings."""
         return None
 
-    """Called when configuration changes.
-    
-    Optional hook - implement to support live reconfiguration.
-    """
+    # === Event Helpers ===
 
-    async def on_config_change(
-            self, context: PluginContext, new_config: dict[str, Any]
+    async def emit(
+        self,
+        event_type: str,
+        data: dict[str, Any] | None = None,
+        correlation_id: str | None = None,
     ) -> None:
-        """Called when configuration changes.
+        """Emit an event from this plugin."""
+        if self._event_bus and self._plugin_id:
+            await self._event_bus.emit(
+                event_type=event_type,
+                data=data,
+                source=self._plugin_id,
+                correlation_id=correlation_id,
+            )
 
-        Optional hook - implement to support live reconfiguration.
-        """
+    def subscribe(
+        self,
+        event_pattern: str,
+        handler: Any,
+        priority: int = 0,
+    ) -> str:
+        """Subscribe to events."""
+        if self._event_bus:
+            return self._event_bus.subscribe(event_pattern, handler, priority)
+        return ""
+
+    def unsubscribe(self, event_pattern: str, handler: Any) -> None:
+        """Unsubscribe from events."""
+        if self._event_bus:
+            self._event_bus.unsubscribe(event_pattern, handler)
+
+    # === Internal methods ===
+
+    def _set_event_bus(self, event_bus: "EventBus", plugin_id: str) -> None:
+        """Set the event bus (called by PluginContext)."""
+        self._event_bus = event_bus
+        self._plugin_id = plugin_id

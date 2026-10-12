@@ -300,27 +300,29 @@ def create_router(
             for spec in create_tools(root_dir=sessions._harness_root_dir())
             if spec.execute is not None
         ]
-        tools.extend([
-            {
-                "name": "run_task",
-                "description": (
-                    "Run the full harness pipeline on a description."
-                ),
-                "source": "harness"},
-            {
-                "name": "plan_task",
-                "description": (
-                    "Decompose a task into an ordered step plan. "
-                    "Runs in chat; the UI routes /plan through run_task."
-                ),
-                "source": "delegate"},
-            {
-                "name": "implement_task",
-                "description": (
-                    "Execute an approved step plan. Runs in chat; "
-                    "the UI routes /implement through run_task."
-                ),
-                "source": "delegate"}])
+        tools.extend(
+            [
+                {
+                    "name": "run_task",
+                    "description": (
+                        "Run the full harness pipeline on a description."
+                    ),
+                    "source": "harness"},
+                {
+                    "name": "plan_task",
+                    "description": (
+                        "Decompose a task into an ordered step plan. "
+                        "Runs in chat; the UI routes /plan through run_task."
+                    ),
+                    "source": "delegate"},
+                {
+                    "name": "implement_task",
+                    "description": (
+                        "Execute an approved step plan. Runs in chat; "
+                        "the UI routes /implement through run_task."
+                    ),
+                    "source": "delegate"}]
+        )
         return {"tools": tools, "mcp_servers": list_servers()}
 
     @router.get("/api/context")
