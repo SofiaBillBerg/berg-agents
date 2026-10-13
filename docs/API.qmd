@@ -41,7 +41,7 @@ Guardian (risk gate), Planner (breakdown), Implementation (edits), Curator (revi
   | --------                    | ------                                                                                                                                |
   | `providers`                 | `registry` (`load_providers`, `resolve_model`, `list_models`), `base`, `models` - provider-centric resolution, no hardcoded providers |
   | `capabilities`              | `tool_adapter` (`tool_to_capability`), audited capability registry                                                                    |
-  | `config`                    | `settings` (typed `Settings`, `BERG_AGENT_*` env), `mcp` (server lists), `jsonc` loader                                               |
+  | `../.berg_config`                    | `settings` (typed `Settings`, `BERG_AGENT_*` env), `mcp` (server lists), `jsonc` loader                                               |
   | `profiles`                  | Per-provider / per-model prompt and tool-visibility tuning                                                                            |
   | `tools`                     | `_io` file helpers (atomic write, target normalization)                                                                               |
   | `backends`                  | Framework adapter surface (implementations plug in here)                                                                              |

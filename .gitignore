@@ -1,4 +1,5 @@
 
+**/*.db
 /berg_plugins/plugin_dev/
 /.run/
 /project_utils/licence/

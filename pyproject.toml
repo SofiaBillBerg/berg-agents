@@ -19,7 +19,8 @@ classifiers = [
 dependencies = [
     "jsonschema>=4.26.0",
     "pydantic-ai-harness[code-mode]==0.55.0",
-    "pydantic-ai-slim[duckduckgo,web-fetch]>=2.51.0"] # use dependency groups
+    "pydantic-ai-slim[duckduckgo,web-fetch]>=2.51.0",
+    "pyyaml>=6.0.3"] # use dependency groups
 
 [build-system]
 requires = ["uv-build>=0.11.26,<0.22"]
@@ -609,7 +610,7 @@ strict = false
 # Individual commands to run code quality checks and generate reports
 #  pyrefly check --remove-unused-ignores --check-unannotated-defs=true --infer-return-types=checked --use-ignore-files=true --summary=full  --dependency-graph=./.code_quality_outputs/pyrefly_deps_graph.json --color=always --python-interpreter-path .venv/bin/python3 --verbose --output=.code_quality_outputs/pyrefly_report.txt
 
-#  pyrefly stubgen --output-dir ./stubs --include-docstrings --include-private --check-unannotated-defs=true --infer-return-types=checked --use-ignore-files=true --verbose --color=always --config pyproject.toml --permissive-ignores=true
+#  pyrefly stubgen --output-dir ./stubs --include-docstrings --include-private --check-unannotated-defs=true --infer-return-types=checked --use-ignore-files=true --verbose --color=always --.berg_config pyproject.toml --permissive-ignores=true
 
 # stubgen -p scripts -v --include-docstrings --include-private --out stubs
 
@@ -617,15 +618,15 @@ strict = false
 
 # isort . -s .venv  -s ./node_modules/ --float-to-top
 
-# .venv/bin/uv tool run pyanalyze --config-file pyproject.toml --find-unused --find-unused-attributes --markdown-output=.code_quality_outputs/pyanalyze_reports_0.md --verbose --enable-all  --autofix
+# .venv/bin/uv tool run pyanalyze --.berg_config-file pyproject.toml --find-unused --find-unused-attributes --markdown-output=.code_quality_outputs/pyanalyze_reports_0.md --verbose --enable-all  --autofix
 
-# pyanalyze --config-file pyproject.toml --find-unused --find-unused-attributes  --markdown-output=./.code_quality_outputs/pyanalyze_report.txt --run-fixer
+# pyanalyze --.berg_config-file pyproject.toml --find-unused --find-unused-attributes  --markdown-output=./.code_quality_outputs/pyanalyze_report.txt --run-fixer
 
 # flake8   berg_agents --show-source --verbose --extend-exclude "_build, .venv, *cache*, node_modules, dist, build, .ipynb_checkpoints, *support-libs"  --enable-extensions pycodestyle --format=pylint --max-line-length 80   --output-file "./.code_quality_outputs/flake_report.txt" --max-doc-length 100 --statistics --tee --color always --count --doctests
 
-# skylos   berg_agents --model auto-free-stack --api-base http://localhost:20128/v1 --tree --output .code_quality_outputs/skylos.md --quality --trace --format rich --llm --verbose --ai-defects --config-file pyproject.toml --exclude=.*/**,.venv/,**/**/node_modules,**/data,**/*.json,**/.*
+# skylos   berg_agents --model auto-free-stack --api-base http://localhost:20128/v1 --tree --output .code_quality_outputs/skylos.md --quality --trace --format rich --llm --verbose --ai-defects --.berg_config-file pyproject.toml --exclude=.*/**,.venv/,**/**/node_modules,**/data,**/*.json,**/.*
 
 # skylos . -i --comment-out
 
-# pytype berg_agents --config pyproject.toml -v 2 --use-fiddle-overlay --precise-return --protocols --overriding-renamed-parameter-count-checks  --unresolved
+# pytype berg_agents --.berg_config pyproject.toml -v 2 --use-fiddle-overlay --precise-return --protocols --overriding-renamed-parameter-count-checks  --unresolved
 # uv export --format requirements.txt --output-file requirements.txt

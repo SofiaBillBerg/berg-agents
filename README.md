@@ -81,7 +81,7 @@ The following short tutorials walk through common use-cases:
 3.  **Using MCP tools**
 
     ``` jsonc
-    // config/mcp.json
+    // .berg_config/mcp.json
     {
       "github__search": {
         "type": "stdio",
@@ -96,7 +96,7 @@ The following short tutorials walk through common use-cases:
     python -m berg_agents --task "Search for repos about 'BergAgents' on GitHub"
     ```
 
-4.  **Customizing the Harness via `bergagents.jsonc`**
+4. **Customizing the Harness via `bergagents.jsonc`**
 
     ``` jsonc
     {
@@ -117,22 +117,22 @@ The following short tutorials walk through common use-cases:
     }
     ```
 
-    This file lives in `config/bergagents.jsonc` and is automatically
-    merged with environment overrides.
+    This file lives in `.berg_config` and is automatically
+   merged with environment overrides.
 
 ## Configuration
 
 ``` bash
-config/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
+.berg_config/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
 .env                      # secrets referenced as `${env:VAR_NAME}`
 ```
 
 | Layer | Source |
 |----------------------------------|--------------------------------------|
-| Config file | `config/bergagents.jsonc` - `providers` block + `harness`/`model_routing`/`hitl_rules` |
+| Config file | `.berg_config` - `providers` block + `harness`/`model_routing`/`hitl_rules` |
 | Secrets | `.env` file, referenced with `${env:VAR_NAME}` |
 | Overrides | `BERG_AGENT_*` environment variables |
-| External tools | `config/mcp.json` for MCP server configuration |
+| External tools | `.berg_config` for MCP server configuration |
 
 See [docs/CONFIGURATION.qmd] for the full reference.
 

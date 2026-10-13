@@ -63,7 +63,7 @@ assert result["status"] in ("completed", "needs_human_review", "failed")
 app.list_agents()  # agent catalog
 app.get_learning_stats()  # task → model → outcome stats
 
-# Custom config (highest precedence; falls back to bergagents.jsonc)
+# Custom .berg_config (highest precedence; falls back to bergagents.jsonc)
 app = BergAgentsApp.create({"harness": {"enable_learning": False}})
 ```
 

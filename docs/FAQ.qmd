@@ -13,7 +13,7 @@ Inspect via `/stats` in the TUI or `GET /api/learning-stats`.
 
 ## Can I use a cloud LLM instead of Ollama?
 
-Yes - add any OpenAI-compatible endpoint under `providers` in `config/bergagents.jsonc`:
+Yes - add any OpenAI-compatible endpoint under `providers` in `../.berg_config`:
 
 ```jsonc
 "providers": {
@@ -50,7 +50,7 @@ It is the honest placeholder, not an error - the tool results are still shown.
 
 ## How do I configure MCP servers?
 
-Point `BERG_AGENT_MCP_SERVERS` at a JSON file (default `config/mcp.json`) and reference secrets with `${env:VAR}`.
+Point `BERG_AGENT_MCP_SERVERS` at a JSON file (default `../.berg_config`) and reference secrets with `${env:VAR}`.
 See [Configuration](CONFIGURATION.qmd).
 
 ## What Python version do I need?

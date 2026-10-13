@@ -12,10 +12,10 @@ never from a global provider flag.
 
 Layers (increasing precedence):
 
-1. **Config file**: `config/bergagents.jsonc` - `providers` + `harness`/`model_routing`/`hitl_rules`/`plugins`/`agents`
+1. **Config file**: `../.berg_config` - `providers` + `harness`/`model_routing`/`hitl_rules`/`plugins`/`agents`
 2. **`.env` file**: values referenced from config with `${env:VAR_NAME}` or `{env:VAR}`
 3. **Environment variables**: `BERG_AGENT_*` override config and `.env`
-4. **MCP config**: `config/mcp.json` (via `BERG_AGENT_MCP_SERVERS`) for MCP servers
+4. **MCP config**: `../.berg_config` (via `BERG_AGENT_MCP_SERVERS`) for MCP servers
 
 ![Berg-Agents Config](visualizations/png/packages_berg_agents.png "Berg Agents Config Modules")
 
@@ -99,7 +99,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
 
 ## MCP Configuration
 
-External MCP servers live in the file pointed at by `BERG_AGENT_MCP_SERVERS` (default `config/mcp.json`):
+External MCP servers live in the file pointed at by `BERG_AGENT_MCP_SERVERS` (default `../.berg_config`):
 
 ```json
 [
@@ -119,7 +119,7 @@ Sensitive servers (`github`, `memory`) pause for approval; read-only servers (`c
 
 ## Profiles
 
-`config/profiles.yaml` tunes prompt suffixes and tool visibility per provider or per `provider:model`:
+`../.berg_config` tunes prompt suffixes and tool visibility per provider or per `provider:model`:
 
 ```yaml
 "ollama":

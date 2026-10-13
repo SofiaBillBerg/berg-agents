@@ -12,7 +12,7 @@ format: html
 
 ```
 my_project/
-├─ config/
+├─ .berg_config/
 │  ├─ bergagents.jsonc          # global config
 │  ├─ mcp.jsonc                 # MCP server definitions
 │  └─ agents.toml               # agent registrations
@@ -26,7 +26,7 @@ my_project/
 └─ pyproject.toml
 ```
 
-- **Never mix** production code with `docs/` or `config/` files.
+- **Never mix** production code with `docs/` or `../.berg_config` files.
 - Keep **custom agents** under `src/.../agents/` and **tools** under `src/.../tools/`.
 - All **environment-specific secrets** belong in `.env`; reference them with `${env:VAR}`.
 
@@ -37,7 +37,7 @@ my_project/
   | **Never hard-code API keys**             | Use `${env:OPENAI_API_KEY}` (or provider-specific placeholder) and keep the real values in `.env` (which is git-ignored). |
   | **Version your `bergagents.jsonc`**      | Add a top-level `"config_version": "1.2"` field; bump it whenever you add a new provider or change a schema.              |
   | **Prefer `providers` over global flags** | Each model ID carries its provider; there is no global "use OpenAI" toggle.                                               |
-  | **Separate per-environment configs**     | Use `config/beta.jsonc`, `config/prod.jsonc`, and switch via `BERG_AGENT_CONFIG=$(pwd)/config/beta.jsonc`.                |
+  | **Separate per-environment configs**     | Use `../.berg_config`, `../.berg_config`, and switch via `BERG_AGENT_CONFIG=$(pwd)/.berg_config/beta.jsonc`.                |
 
 ## 3️⃣ Writing Custom Agents
 
@@ -45,10 +45,10 @@ my_project/
 2. **Implement `async def run(self, event: LoopEvents) -> None`**.
 3. **Emit structured events** with `await self.emit(event_name, payload)`.
 4. **Never perform I/O outside the sandbox** - all filesystem operations must go through the built-in `fs__*` tools.
-5. **Register the agent** in `config/agents.toml` (or via Python `register_agent`).
+5. **Register the agent** in `../.berg_config` (or via Python `register_agent`).
 
 ```toml
-# config/agents.toml
+# .berg_config/agents.toml
 [agents.my_custom_agent]
 module = "my_package.agents.my_agent"
 class = "MyCustomAgent"
@@ -57,11 +57,11 @@ class = "MyCustomAgent"
 ## 4️⃣ Writing Custom Tools
 
 - Create a **`ToolSpec`** subclass in `berg_agents.capabilities`.
-- Register it in the **`ToolRegistry`** (usually via `config/tools.toml`).
+- Register it in the **`ToolRegistry`** (usually via `../.berg_config`).
 - Mark it with `pause: true` if it mutates state or requires HITL approval.
 
 ```toml
-# config/tools.toml
+# .berg_config/tools.toml
 [tools.my_sql_query]
 module = "my_package.tools.sql"
 class = "SQLQueryTool"
@@ -111,7 +111,7 @@ jobs:
   | Step   | Action                                                                                                         |
   | ------ | --------                                                                                                       |
   | 1      | Replace `from langchain.agents import AgentType` with `from berg_agents.agents.factory import register_agent`. |
-  | 2      | Map `AgentType.CHAT_GPT` → a **provider-centric** entry in `config/bergagents.jsonc`.                          |
+  | 2      | Map `AgentType.CHAT_GPT` → a **provider-centric** entry in `../.berg_config`.                          |
   | 3      | Replace `Chain` objects with **`Harness`** sub-agents (Planner → Implementation).                              |
   | 4      | Update tool calls: `@tool` → `make_tool_spec` + registration.                                                  |
   | 5      | Convert `memory` objects to **checkpoint-aware** storage via `checkpoint.save_state`.                          |

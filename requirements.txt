@@ -3223,7 +3223,7 @@ pydantic-settings==2.15.0 \
     # via
     #   chromadb
     #   fastmcp-slim
-    #   pydantic-config
+    #   pydantic-.berg_config
 pydispatcher==2.0.7 ; platform_python_implementation == 'CPython' \
     --hash=sha256:96543bea04115ffde08f851e1d45cacbfd1ee866ac42127d9b476dc5aefa7de0 \
     --hash=sha256:b777c6ad080dc1bad74a4c29d6a46914fa6701ac70f94b0d66fbcfde62f5be31

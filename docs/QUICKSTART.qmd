@@ -33,7 +33,7 @@ uv pip install -e .
 Copy the example config and point it at your provider:
 
 ```bash
-cp config/bergagents.jsonc config/bergagents.local.jsonc
+cp .berg_config/bergagents.jsonc .berg_config/bergagents.local.jsonc
 ```
 
 Minimal `providers` block (Ollama):

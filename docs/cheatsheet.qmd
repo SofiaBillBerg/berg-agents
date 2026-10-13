@@ -50,7 +50,7 @@ A quick reference for everyday BergAgents usage.
 1. **Explicit dict** passed to `BergAgentsApp.create()` (highest).
 2. **Environment variables** (`BERG_AGENT_*`).
 3. **`.env`** file (plain key-value pairs).
-4. **`config/bergagents.jsonc`** (default config).
+4. **`../.berg_config`** (default config).
 
 ## 🗝️ Common Environment Variables
 
@@ -83,7 +83,7 @@ A quick reference for everyday BergAgents usage.
 - [ ] Code passes `ruff check` and `ruff format --check`.
 - [ ] Unit tests exist and run (`pytest`).
 - [ ] Documentation pages updated (new API, tutorials, or changes).
-- [ ] Version bump in `pyproject.toml` and `config/bergagents.jsonc`.
+- [ ] Version bump in `pyproject.toml` and `../.berg_config`.
 - [ ] Changelog entry added.
 - [ ] All new concepts documented in the appropriate tutorial or best-practice page.
 
