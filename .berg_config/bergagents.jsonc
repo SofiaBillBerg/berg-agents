@@ -16,7 +16,7 @@
   "BERG_AGENT_ROOT_DIR": "${env:BERG_AGENT_ROOT_DIR}",
   "BERG_AGENT_VERBOSE": true,
   "BERG_AGENT_LOG_LEVEL": "info",
-  "BERG_AGENT_MCP_SERVERS": "config/mcp.json",
+  "BERG_AGENT_MCP_SERVERS": ".berg_config/mcp.json",
   //# BergAgents skills: JSON array of paths (or [path, label] pairs) to
   //# SKILL.md directories, loaded progressively by the harness.
   //# Paths must live under the mounted workspace (BERG_AGENT_ROOT_DIR).
@@ -30,6 +30,7 @@
 
   //# BergAgents memory: JSON array of AGENTS.md file paths, always loaded.
   "BERG_AGENT_MEMORY": "[\"BERGMEMORY.md\", \"AGENTS.md\"]",
+  "BERG_AGENT_PLUGINS": "[\"./.shared_todo/\"]",
 
   //# BergAgents todo list: when true (default) the agent gets a write_todos
   //# tool to maintain a structured task list during execution.
@@ -65,7 +66,7 @@
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "${env:UNSLOTH_BASE_URL}",
-        "apiKey": "${env:UNSLOTH_STUDIO_AUTH_TOKEN}",
+        "apiKey": "${env:UNSLOTH_API_KEY}",
         "timeout": 120000
       },
       "models": {
@@ -240,7 +241,7 @@
     }
   }
   //# ---------------------------------------------------------------------------
-  //# PRESETS (config-driven toolsets/capabilities - optional, all additive).
+  //# PRESETS (.berg_config-driven toolsets/capabilities - optional, all additive).
   //# Uncomment and adapt. Schema: berg_agents/capabilities/specs.py.
   //# NOTE: when uncommenting the block below, add a trailing comma to the
   //# closing "}" of "agents" above (JSONC allows comments, not stray commas).

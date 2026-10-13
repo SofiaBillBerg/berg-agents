@@ -1,0 +1,4 @@
+todo_path: "./sharedtodos/"
+
+SH_TODO_ENABLED: TRUE
+SH_TODO_LOG_LEVEL: INFO
