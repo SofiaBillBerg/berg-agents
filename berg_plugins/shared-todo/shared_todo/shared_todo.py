@@ -20,62 +20,35 @@ Shared ToDo Plugin for Berg Agents
 
 Provides collaborative todo list management between user and agent.
 Todos are stored as Markdown files for easy editing by both parties.
+
+
+In the function on_load(), the plugin performs several validation checks to ensure that it is configured correctly and can operate as expected. The following table summarizes the key validation steps, where they occur, and what happens if they fail:
+
+-------------------------------------------------------
+# Check -> Where it happens -> What it raises if it fails
+----------------------------------------------------------
+    - Plugin settings schema -> TodoSettings(**context.settings) -> RuntimeError with ValidationError details
+    - User env and config file -> validate_user_config() -> RuntimeError with a clear “User config error” message
+    - Distribution mode	-> is_plugin_installable() vs is_integrated_into_berg_agents() -> Logs a friendly note – no exception
+    - Extra config‑field validation	-> validate_shared_todo_config(your_extra_dict) (optional) -> RuntimeError with Pydantic validation errors
 """
 
 import logging
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel
+# NOTE: Use the real plugin base classes so PluginManager's
+# isinstance(plugin, BergPlugin) check passes. The previous local
+# dummy BergPlugin/ToolCapability stubs broke discovery.
+from berg_agents.plugin_system.lifecycle.bergplugin import BergPlugin
+from berg_agents.plugin_system.plugin_context import PluginContext
+from berg_agents.plugin_system.plugin_contract import ToolCapability
+from pydantic import BaseModel, ValidationError
+
+from shared_todo.shared_todo_distribution import is_plugin_installable, is_integrated_into_berg_agents
+from shared_todo.shared_todo_user_cfg import validate_user_config
 
 logger = logging.getLogger(__name__)
-
-
-# Simple base classes to avoid circular imports
-class BergPlugin:
-    """Base interface for all berg_agents plugins."""
-
-    def __init__(self) -> None:
-        """Initialize the plugin."""
-        self.context: Any = None
-
-    async def on_load(self, context) -> None:
-        """Called when plugin is loaded."""
-
-    async def on_enable(self, context) -> None:
-        """Called when plugin is enabled."""
-
-    async def on_disable(self, context) -> None:
-        """Called when plugin is disabled."""
-
-    async def on_unload(self, context) -> None:
-        """Called when plugin is unloaded."""
-
-    def get_capabilities(self) -> list[Any]:
-        """Return plugin capabilities (tools, agents, etc.)."""
-        return []
-
-    def get_settings_schema(self) -> dict[str, Any] | None:
-        """Return JSON schema for plugin settings."""
-        return None
-
-
-class ToolCapability:
-    """Tool capability provided by a plugin."""
-
-    def __init__(
-        self,
-        type: str = "tool",
-        id: str = "",
-        name: str = "",
-        description: str = "",
-        tool=None,
-    ) -> None:
-        self.type = type
-        self.id = id
-        self.name = name
-        self.description = description
-        self.tool = tool
 
 
 class TodoSettings(BaseModel):
@@ -105,11 +78,13 @@ class SharedToDoPlugin(BergPlugin):
 
     def __init__(self) -> None:
         """Initialize the plugin."""
+        # NOTE: Base class tracks event bus + plugin id internally.
+        super().__init__()
         self.settings: TodoSettings | None = None
         self.todo_dir: Path | None = None
-        self.context: Any = None
+        self.context: PluginContext | None = None
 
-    async def on_load(self, context: Any) -> None:
+    async def on_load(self, context: PluginContext) -> None:
         """Load plugin and initialize todo directory.
 
         Args:
@@ -118,10 +93,51 @@ class SharedToDoPlugin(BergPlugin):
         logger.info(f"Loading {context.plugin_id}")
 
         self.context = context
+        self._set_event_bus(context.event_bus, context.plugin_id)
 
-        # Parse settings - use defaults if no settings provided
-        settings_dict = getattr(context, "settings", {})
-        self.settings = TodoSettings(**settings_dict)
+        # --------------------------------------------------------------
+        # Validate the plugin’s own settings (TodoSettings)
+        # --------------------------------------------------------------
+        try:
+            # Parse settings - use defaults if no settings provided.
+            # PluginContext.settings is a plain dict from the config manager.
+            settings_dict = context.settings or {}
+            # context.settings is a plain dict; coerce it to our config model
+            self.settings = TodoSettings(**context.settings or {})
+            logger.info(f"Plugin settings validated: {self.settings}")
+        except ValidationError as ve:
+            raise RuntimeError(f"Invalid plugin settings: {ve}") from ve
+
+        # --------------------------------------------------------------
+        # Validate the *configuration* that may be supplied by the user
+        # --------------------------------------------------------------
+        try:
+            user_cfg = validate_user_config()  # reads env + ~/.shared_todo/config.yaml
+            logger.info(f"User configuration validated: {user_cfg}")
+        except ValueError as cfg_err:
+            raise RuntimeError(f"User config error – aborting plugin load: {cfg_err}") from cfg_err
+
+        # --------------------------------------------------------------
+        # Detect distribution mode (stand‑alone plugin vs. integrated)
+        # --------------------------------------------------------------
+        if is_plugin_installable():
+            logger.info("⚡ Running as a **stand‑alone installable plugin**.")
+        elif is_integrated_into_berg_agents():
+            logger.info("⚡ Running **integrated** inside berg‑agents.")
+        else:
+            logger.warning("⚠️  Could not determine distribution mode – proceeding anyway.")
+
+        # --------------------------------------------------------------
+        # 4️⃣ Validate that all required configuration fields are present
+        # --------------------------------------------------------------
+        # Example: you might have extra required keys in your own config.
+        # If you need extra validation, build a small dict and call:
+        #   validated = validate_shared_todo_config(extra_cfg)
+        # Any ValidationError will be raised automatically.
+
+        logger.info("✅ Shared ToDo plugin loaded successfully")
+
+
 
         # Initialize todo directory
         self.todo_dir = Path(self.settings.todo_path)
@@ -130,7 +146,7 @@ class SharedToDoPlugin(BergPlugin):
         logger.info(f"Todo directory: {self.todo_dir}")
         logger.info("Shared ToDo plugin loaded successfully")
 
-    async def on_enable(self, context: Any) -> None:
+    async def on_enable(self, context: PluginContext) -> None:
         """Enable plugin and register tools.
 
         Args:
@@ -143,7 +159,7 @@ class SharedToDoPlugin(BergPlugin):
 
         logger.info("Shared ToDo plugin enabled")
 
-    async def on_disable(self, context: Any) -> None:
+    async def on_disable(self, context: PluginContext) -> None:
         """Disable plugin.
 
         Args:
@@ -154,7 +170,7 @@ class SharedToDoPlugin(BergPlugin):
         # Unsubscribe from events
         # await context.event_bus.unsubscribe("task.*", self._on_task_event)
 
-    async def on_unload(self, context: Any) -> None:
+    async def on_unload(self, context: PluginContext) -> None:
         """Unload plugin.
 
         Args:
@@ -165,46 +181,36 @@ class SharedToDoPlugin(BergPlugin):
     def get_capabilities(self) -> list[ToolCapability]:
         """Return plugin capabilities.
 
+        Each todo function is wrapped in a pydantic-ai Tool so the
+        agent runtime can call it with a generated JSON schema.
+
         Returns:
             List of tool capabilities
         """
-        # Return tool capability with our todo management functions
-        from feat_dev.plugin_dev.berg_plugins.shared_todo.tools import (
+        # NOTE: Absolute package import works when the plugin dir is
+        # on sys.path (see PluginManager._import_plugin).
+        from pydantic_ai.tools import Tool
+
+        from shared_todo.tools import (
+            add_subtask,
             complete_todo,
             create_todo,
+            delete_subtask,
+            delete_todo,
             list_todos,
+            set_subtask_done,
             update_todo,
         )
 
         return [
-            ToolCapability(
-                type="tool",
-                id="shared-todo",
-                name="Shared ToDo",
-                description="Manage shared todo lists",
-                tool=create_todo,
-            ),
-            ToolCapability(
-                type="tool",
-                id="list_todos",
-                name="List Todos",
-                description="List all todos",
-                tool=list_todos,
-            ),
-            ToolCapability(
-                type="tool",
-                id="update_todo",
-                name="Update Todo",
-                description="Update a todo item",
-                tool=update_todo,
-            ),
-            ToolCapability(
-                type="tool",
-                id="complete_todo",
-                name="Complete Todo",
-                description="Mark a todo as completed",
-                tool=complete_todo,
-            )]
+            ToolCapability(tool=Tool(create_todo), risk_level="low"),
+            ToolCapability(tool=Tool(list_todos), risk_level="low"),
+            ToolCapability(tool=Tool(update_todo), risk_level="low"),
+            ToolCapability(tool=Tool(complete_todo), risk_level="low"),
+            ToolCapability(tool=Tool(delete_todo), risk_level="low"),
+            ToolCapability(tool=Tool(add_subtask), risk_level="low"),
+            ToolCapability(tool=Tool(set_subtask_done), risk_level="low"),
+            ToolCapability(tool=Tool(delete_subtask), risk_level="low")]
 
     def get_settings_schema(self) -> dict[str, Any] | None:
         """Return settings schema.

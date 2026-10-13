@@ -30,7 +30,8 @@ tags:
 icon: "📋"
 
 # === Entry Point (Required) ===
-entry_point: "shared-todo:SharedToDoPlugin"
+# NOTE: Must be an importable module path (no hyphens).
+entry_point: "shared_todo.shared_todo:SharedToDoPlugin"
 
 # === Requirements (Optional) ===
 requirements:
@@ -51,6 +52,10 @@ capabilities:
       - "list_todos"
       - "update_todo"
       - "complete_todo"
+      - "delete_todo"
+      - "add_subtask"
+      - "set_subtask_done"
+      - "delete_subtask"
     risk_level: "low"
 
 # === Settings Schema (Optional) ===

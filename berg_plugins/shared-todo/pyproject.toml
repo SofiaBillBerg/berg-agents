@@ -11,7 +11,9 @@ requires-python = ">=3.12"
 
 dependencies = [
     "berg-agents",
-    "httpx>=0.27.0"]
+    "dotenv>=0.9.9",
+    "httpx>=0.27.0",
+    "pydantic-settings>=2.15.0"]
 
 [project.optional-dependencies]
 dev = [
@@ -20,7 +22,7 @@ dev = [
     "pytest-cov>=4.1.0"]
 
 [project.entry-points."berg_plugins"]
-github = "shared_todo:SharedToDoPlugin"
+shared_todo = "shared_todo.shared_todo:SharedToDoPlugin"
 
 
 [build-system]

@@ -20,7 +20,7 @@ except ValidationError as e:
     print("❌ Configuration validation failed:\n", e)
 """
 
-from pydantic import BaseModel, ValidationError, Field
+from pydantic import BaseModel, Field
 
 
 class SharedTodoConfig(BaseModel):
