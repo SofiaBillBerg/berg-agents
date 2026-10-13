@@ -1,32 +1,33 @@
 <!-- README.md is generated from README.qmd. Please edit that file -->
 
-\`\`\`{r} #\| include: false
+```{r} #| include: false
 
 knitr::opts_chunk$set( collapse = TRUE, comment = “#\>” )
+```
+# berg_agents
 
-    # berg_agents
+<!-- badges: start -->
 
-    <!-- badges: start -->
+> BergAgents - a local, LLM-driven code assistant with a framework-agnostic core and provider-centric configuration.
 
-    > BergAgents - a local, LLM-driven code assistant with a framework-agnostic core and provider-centric configuration.
+<!-- badges: end -->
 
-    <!-- badges: end -->
+![Berg-Agents Overview](docs/visualizations/png/packages_berg_agents.png "Berg Agents overview")
 
-    ![Berg-Agents Overview](docs/visualizations/png/packages_berg_agents.png "Berg Agents overview")
+## Quick Start
 
-    ## Quick Start
+```bash
+# Install dependencies (uv is recommended)
+  uv venv .venv
+  source .venv/bin/activate
+  uv pip install -e .
 
-    ```bash
-    # Install dependencies (uv is recommended)
-    uv venv .venv
-    source .venv/bin/activate
-    uv pip install -e .
+# Interactive terminal UI
+  python -m berg_agents --tui
 
-    # Interactive terminal UI
-    python -m berg_agents --tui
-
-    # Web UI (default: http://127.0.0.1:8001)
-    python -m berg_agents --web
+# Web UI (default: http://127.0.0.1:8001)
+  python -m berg_agents --web
+```
 
 ## What it is
 
@@ -170,7 +171,7 @@ testing, and the submission process.
 
 ## License
 
-**Version**: 0.2.0 \| **License**: MIT
+**Version**: 0.2.0 | **License**: AGPL-3.0-only
 
   [docs/USAGE.qmd]: docs/USAGE.qmd
   [docs/CONFIGURATION.qmd]: docs/CONFIGURATION.qmd

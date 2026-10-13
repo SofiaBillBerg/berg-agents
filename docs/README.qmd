@@ -19,7 +19,10 @@ knitr::opts_chunk$set(
 
 <!-- badges: start -->
 
-> BergAgents - a local, LLM-driven code assistant with a framework-agnostic core and provider-centric configuration.
+> BergAgents - A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration.
+Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+
+The system is designed to work against any OpenAI-compatible provider, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
 <!-- badges: end -->
 
@@ -155,4 +158,4 @@ Please read our [CONTRIBUTING](../docs/CONTRIBUTING.qmd) guide for details on co
 
 ## License
 
-**Version**: 0.2.0 \| **License**: MIT
+**Version**: 0.2.0 \| **License**: GNU Affero General Public License

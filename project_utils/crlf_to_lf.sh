@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 echo "Configuring Git to handle line endings..."
 if ! git config --global core.eol | grep -q "lf"; then
 	git config --global core.eol lf

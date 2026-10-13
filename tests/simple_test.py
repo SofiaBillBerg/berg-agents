@@ -81,25 +81,25 @@ async def test_shared_todo_standalone():
         result = create_todo(
             title="Test Standalone Tools",
             description="Testing the shared todo tools directly",
-            todo_path="../test_standalone_todos/",
+            todo_path="../berg_plugins/shared_todo/example/test_standalone_todos/",
         )
         logger.info(f"Result: {result}")
 
         # List todos
         logger.info("\nListing todos...")
-        todos = list_todos(todo_path="../test_standalone_todos/")
+        todos = list_todos(todo_path="../berg_plugins/shared_todo/example/test_standalone_todos/")
         logger.info(f"\n{todos}")
 
         # Complete the todo
         logger.info("\nCompleting todo...")
         result = complete_todo(
-            "test_standalone_tools", todo_path="../test_standalone_todos/"
+            "test_standalone_tools", todo_path="../berg_plugins/shared_todo/example/test_standalone_todos/"
         )
         logger.info(f"Result: {result}")
 
         # List completed todos
         logger.info("\nListing completed todos...")
-        todos = list_todos(status="done", todo_path="../test_standalone_todos/")
+        todos = list_todos(status="done", todo_path="../berg_plugins/shared_todo/example/test_standalone_todos/")
         logger.info(f"\n{todos}")
 
         logger.info("\n✓ SharedToDo tools work correctly!")

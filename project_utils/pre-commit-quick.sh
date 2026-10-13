@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+
+
 set -euo pipefail
 
 chmod +x ./project_utils/run_autofix.sh

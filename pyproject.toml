@@ -18,7 +18,7 @@ classifiers = [
     "Operating System :: OS Independent"]
 dependencies = [
     "jsonschema>=4.26.0",
-    "pydantic-ai-harness[code-mode]>=0.36.0",
+    "pydantic-ai-harness[code-mode]==0.55.0",
     "pydantic-ai-slim[duckduckgo,web-fetch]>=2.51.0"] # use dependency groups
 
 [build-system]
@@ -28,7 +28,9 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-root = ""
 module-name = ["berg_agents"]
-namespace = true
+source-exclude = ["**/*.bin", ".*/*", "**/dist", "**/build", "**/_build", ".venv", "**/node_modules", "**/archive", "**/*cache*", "**/support-libs", "**/.next/**", "**/.ipynb_checkpoints/**", "berg_agent_outputs/**", "_extensions/**", "notes/**", "scripts/**", "project_utils/**", "tmp/**", "feat_dev/**", "berg_plugsins/**"]
+
+#namespace = true
 
 
 [dependency-groups]
@@ -87,7 +89,8 @@ dev = [
     "ty>=0.0.71",
     "uv>=0.12.9",
     "pytype>=2024.10.11",
-    "pyanalyze>=0.13.1"]
+    "pyanalyze>=0.13.1",
+    "types-pyyaml>=6.0.12.20260906"]
 tests = [
     "coverage>=7.16.0",
     "hypothesis>=6.165.10",
@@ -98,7 +101,8 @@ tests = [
     "pytest-twisted>=1.14.3",
     "twisted>=26.4.0"]
 
-
+[optional-dependencies]
+dev-usage= ["berg-plugin-shared-todo"]
 # [project.scripts]
 # berg_agents = "berg_agents.cli:main"
 
@@ -121,6 +125,7 @@ torch = [
 torchvision = [
     { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
     { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }]
+berg-plugin-shared-todo = { path = "berg_plugins/shared_todo/dist/berg_plugin_shared_todo-0.0.1.tar.gz" }
 
 
 [[tool.uv.index]]
@@ -229,7 +234,7 @@ section-order = [
     "first-party",
     "local-folder",
     "third-party"]
-known-third-party = ["berg_agents", "feat_dev"]
+known-third-party = ["berg_agents"]
 split-on-trailing-comma = false
 
 [tool.isort]
@@ -252,7 +257,7 @@ skip_glob = [
     ".ipynb_checkpoints",
     "*support-libs"] # This will tell isort to skip these directories when sorting imports.
 sort_reexports = true # This will sort re-exports (e.g., `from . import module`) separately from regular imports,.
-src_paths = ["berg_agents","feat_dev"] # This will tell isort to treat these directories as source paths, which will affect how imports are sorted.
+src_paths = ["berg_agents"] # This will tell isort to treat these directories as source paths, which will affect how imports are sorted.
 
 
 [tool.ruff.format]
@@ -266,7 +271,7 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 
 [tool.ruff]
-src = ["berg_agents", "feat_dev"]
+src = ["berg_agents"]
 extend-exclude = [
     "_build",
     ".venv",
@@ -376,7 +381,6 @@ ignore-words-list = [
 [tool.mypy]
 disallow_any_generics = true
 disallow_untyped_defs = true
-enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 exclude_gitignore = true
 follow_imports = "normal"
 hide_error_codes = false
@@ -424,8 +428,8 @@ python_executable = ".venv/bin/python"
 mode = "default"
 
 [tool.pyrefly]
-project-includes = ["berg_agents/", "feat_dev/"]
-search-path = ["./stubs", "berg_agents/", "feat_dev/"]
+project-includes = ["berg_agents/"]
+search-path = ["./stubs", "berg_agents/"]
 python-interpreter-path = ".venv/bin/python"
 # pyrefly mis-detects Pydantic v2 models and requires `model_config` as a
 # constructor argument; this only affects FileObject (a @dataclass) here.

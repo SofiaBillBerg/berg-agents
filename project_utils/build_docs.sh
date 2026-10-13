@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 if ! command -v quarto >/dev/null 2>&1; then
 	echo "Quarto not found in PATH. Install Quarto." >&2

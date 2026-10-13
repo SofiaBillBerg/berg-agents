@@ -165,7 +165,7 @@ async def main():
         update_todo,
     )
 
-    test_path = "../minimal_test_todos/"
+    test_path = "../berg_plugins/shared_todo/example/minimal_test_todos/"
 
     # Create todos
     logger.info("1. Creating todos...")
