@@ -160,4 +160,4 @@ echo "=========================================="
 echo "🎯 Success! Launching app on port $bergport..."
 echo "=========================================="
 
-uv run -m berg_agents --web --port $bergport
+uv run -m berg_agents --web --port $bergport --debug --log-level=info
