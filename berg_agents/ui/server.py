@@ -8,6 +8,8 @@ Builds the web application around one injected harness: routes in
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -24,16 +26,34 @@ from berg_agents.ui.sessions import SessionManager
 logger = logging.getLogger(__name__)
 
 # Static export of the Next.js webapp: ``bun run next build`` writes
-# ``berg_agents/ui/webapp/dist/`` (see ``next.config.mjs`` distDir).
+# ``berg_agents/ui/webapp/dist/`` (see ``next..berg_config.mjs`` distDir).
 _WEB_DIST = Path(__file__).resolve().parent / "webapp" / "dist"
 
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Warm the plugin tool cache at server startup.
+
+    Failure-isolated: plugin errors only log, the server always starts.
+    """
+    try:
+        from berg_agents.plugin_system.chat_integration import (
+            get_chat_plugin_tools,
+        )
+
+        tools = await get_chat_plugin_tools()
+        logger.info("Plugin tools warmed: %d tools", len(tools))
+    except Exception as exc:
+        logger.warning("Plugin warmup skipped: %s", exc)
+    yield
+
+
 def create_app(
-        harness: Harness | None = None,
-        *,
-        providers: list[dict[str, Any]] | None = None,
-        active_provider: str | None = None,
-        active_model: str | None = None,
+    harness: Harness | None = None,
+    *,
+    providers: list[dict[str, Any]] | None = None,
+    active_provider: str | None = None,
+    active_model: str | None = None,
 ) -> FastAPI:
     """Create the BergAgents FastAPI application.
 
@@ -99,7 +119,25 @@ def create_app(
         root_dir=settings.root_dir,
     )
 
-    app = FastAPI(title="BergAgents")
+    app = FastAPI(title="BergAgents", lifespan=_lifespan)
+
+    @app.middleware("http")
+    async def _no_cache_documents(request: Any, call_next: Any) -> Any:
+        """Keep browsers from running stale frontend vintages.
+
+        HTML documents are entry points (they reference hashed JS/CSS),
+        so they must revalidate every load; the hashed assets under
+        /_next/static stay long-cached. Without this, one tab can run
+        last week's App next to a fresh page (observed: old chat UI
+        beside the new history page on the same origin).
+        """
+        response = await call_next(request)
+        if not request.url.path.startswith("/api"):
+            content_type = response.headers.get("content-type", "")
+            if "text/html" in content_type:
+                response.headers["Cache-Control"] = "no-cache"
+        return response
+
     # Local dev CORS: `next dev` (any localhost port) talks to this
     # backend directly when NEXT_PUBLIC_API_BASE_URL is set.
     # Production serves the static export same-origin, so this is
@@ -130,11 +168,12 @@ def create_app(
         # will NOT resolve for "/agents" (it only serves index.html inside
         # a matching directory). Explicit routes cover them, with HEAD
         # declared alongside GET.
-        for route_page in ("agents", "context"):
+        for route_page in ("agents", "context", "history"):
             page_file = _WEB_DIST / f"{route_page}.html"
             if page_file.is_file():
+
                 def _serve_page(
-                        _path: Path = page_file,
+                    _path: Path = page_file,
                 ) -> FileResponse:
                     return FileResponse(_path, media_type="text/html")
 

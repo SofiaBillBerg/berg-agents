@@ -1,5 +1,3 @@
-
-
 /*
  * App component - uses AI SDK v7's useChat hook directly via useAISDKChat.
  *
@@ -9,26 +7,31 @@
  * no RealHarness wrapper - pure AI SDK v7.
  */
 
-import type {AgentInfo} from "@/harness/webhook";
-import type {PendingApproval} from "@/harness";
-import {useAISDKChat} from "@/harness";
-import type {Command} from "./components/SlashCommandAutocomplete";
-import {SlashCommandAutocomplete} from "./components/SlashCommandAutocomplete";
-import type {ToolResult} from "./components/ChatTranscript";
+import type { AgentInfo } from "@/harness/webhook";
+import type { PendingApproval } from "@/harness";
+import { useAISDKChat } from "@/harness";
+import type { Command } from "./components/SlashCommandAutocomplete";
+import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
+import type { ToolResult } from "./components/ChatTranscript";
 
-import React, {useCallback, useEffect, useRef, useState} from "react";
-import {Button, Card, Toast, toast} from "@heroui/react";
-import {API_BASE} from "@/envConfig";
-import {buildExportMarkdown} from "@/utils/utils";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Button, Alert, Card, Toast, toast } from "@heroui/react";
+import { API_BASE } from "@/envConfig";
+import { buildExportMarkdown } from "@/utils/utils";
 
 import InputBar from "./components/InputBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
 import AgentPanel from "./components/AgentPanel.tsx";
 import LearningPanel from "./components/LearningPanel.tsx";
-import ChatTranscript, {CHAT_SCROLL_ID} from "./components/ChatTranscript.tsx";
+import ChatTranscript, {
+  CHAT_SCROLL_ID} from "./components/ChatTranscript.tsx";
+import { TODO_TOOL_NAMES, TodoPanel } from "./components/TodoPanel.tsx";
+import { PluginCatalog } from "./components/PluginCatalog.tsx";
 import Navbar from "./components/Navbar.tsx";
-import {ConversationHistory, snapshotLiveChat} from "./components/ConversationHistory";
+import {
+  ConversationHistory,
+  snapshotLiveChat} from "./components/ConversationHistory";
 
 /*
  * Error boundary for lazy-loaded components.
@@ -230,7 +233,12 @@ function ChatContent() {
     respondToApproval,
     respondToAllApprovals,
     editApprovalArgs,
-    revertApproval} = aiChat;
+    revertApproval,
+    systemNotice,
+    dismissSystemNotice,
+    sessionId,
+    sessionTitle,
+    newServerChat} = aiChat;
 
   // Backend tool catalog (powers the slash palette + execution).
   // Fetched once, before the palette below reads it: workspace file
@@ -291,9 +299,9 @@ function ChatContent() {
   // (help, agents, stats, /memory, tool runs, ...) and the answer
   // lands here as a dismissible card above the transcript instead
   // of vanishing into the promise chain.
-  const [cmdCards, setCmdCards] = useState<
-    Array<{ id: number; text: string }>
-  >([]);
+  const [cmdCards, setCmdCards] = useState<Array<{ id: number; text: string }>>(
+    [],
+  );
 
   // -------------------------------------------------------------------------
   // Sessions + conversation navigation
@@ -303,6 +311,37 @@ function ChatContent() {
 
   /** Show/hide the inline Details & Activity panel. */
   const [showDetails, setShowDetails] = useState(false);
+
+  // -------------------------------------------------------------------------
+  // Shared-todo plugin surface (side-panel + canvas views)
+  // -------------------------------------------------------------------------
+  /** Right-hand surface: todos, plugin catalog, or closed. */
+  const [sideSurface, setSideSurface] = useState<"todos" | "plugins" | null>(
+    null,
+  );
+  /** Panel (narrow) vs canvas (wide) presentation. */
+  const [todoView, setTodoView] = useState<"panel" | "canvas">("panel");
+  /** Bump to force the panel to refetch after agent todo calls. */
+  const [todoRefreshKey, setTodoRefreshKey] = useState(0);
+  /** Open-todo count reported by the panel (toggle badge). */
+  const [openTodoCount, setOpenTodoCount] = useState(0);
+
+  // Completed todo tool calls anywhere in the transcript refresh the
+  // panel, so agent edits appear without manual reloads.
+  const todoActivity = messages.reduce(
+    (n, m) =>
+      n +
+      (m.toolCalls?.filter((c) => TODO_TOOL_NAMES.includes(c.tool)).length ??
+        0),
+    0,
+  );
+  const seenTodoActivity = useRef(0);
+  useEffect(() => {
+    if (todoActivity > seenTodoActivity.current) {
+      seenTodoActivity.current = todoActivity;
+      setTodoRefreshKey((k) => k + 1);
+    }
+  }, [todoActivity]);
 
   /** Scroll the transcript (the page itself never scrolls). */
   const scrollChatTo = (where: "top" | "bottom") => {
@@ -315,8 +354,10 @@ function ChatContent() {
   const startNewChat = () => {
     stop();
     snapshotLiveChat();
-    clearMessages();
     setShowHistory(false);
+    // NOTE: Server session first (numbered title); local clear only
+    // when the backend is unreachable.
+    void newServerChat().catch(() => clearMessages());
   };
 
   /*
@@ -380,9 +421,7 @@ function ChatContent() {
       // -----------------------------------------------------------------
       // Backend-backed tool commands - these hit /api/tool/execute.
       // -----------------------------------------------------------------
-      const tool = backendTools.find(
-        (t) => t.name.toLowerCase() === cmdLower,
-      );
+      const tool = backendTools.find((t) => t.name.toLowerCase() === cmdLower);
       if (tool && tool.source !== "delegate") {
         try {
           // Parse the argument string as JSON.  If parsing fails we fall back
@@ -631,6 +670,14 @@ function ChatContent() {
           >
             Berg Agents Chat
           </h1>
+          {sessionTitle && (
+            <span
+              className="truncate text-xs text-muted-foreground max-w-64"
+              title={`Session: ${sessionTitle}${sessionId ? ` (${sessionId.slice(0, 8)})` : ""}`}
+            >
+              {sessionTitle}
+            </span>
+          )}
           {/* Status lives inline in the title row so the transcript
               keeps the pixels (was its own row before). */}
           <span className="flex items-center gap-1" title={statusInfo.label}>
@@ -673,6 +720,28 @@ function ChatContent() {
             onPress={() => scrollChatTo("bottom")}
           >
             ↓ Bottom
+          </Button>
+          <Button
+            aria-label={sideSurface === "todos" ? "Hide todos" : "Show todos"}
+            size="sm"
+            variant="secondary"
+            onPress={() =>
+              setSideSurface((prev) => (prev === "todos" ? null : "todos"))
+            }
+          >
+            📋 Todos{openTodoCount > 0 ? ` (${openTodoCount})` : ""}
+          </Button>
+          <Button
+            aria-label={
+              sideSurface === "plugins" ? "Hide plugins" : "Show plugins"
+            }
+            size="sm"
+            variant="secondary"
+            onPress={() =>
+              setSideSurface((prev) => (prev === "plugins" ? null : "plugins"))
+            }
+          >
+            🔌 Plugins
           </Button>
           <span className="flex-1" />
           <ThemeToggle />
@@ -828,6 +897,26 @@ function ChatContent() {
           </Card>
         )}
 
+        {/* System recovery notice - a failed send auto-rejected its
+            orphaned approvals (see the hook). Visible, dismissible,
+            and never part of the message list, so it cannot poison
+            future sends. Cleared on the next send. */}
+        {systemNotice && (
+          <Alert className="mb-1.5 shrink-0" status="warning">
+            <Alert.Indicator />
+            <Alert.Title>⚠️ Tool run recovered</Alert.Title>
+            <Alert.Description>{systemNotice}</Alert.Description>
+            <Button
+              aria-label="Dismiss recovery notice"
+              size="sm"
+              variant="secondary"
+              onPress={dismissSystemNotice}
+            >
+              Dismiss
+            </Button>
+          </Alert>
+        )}
+
         {/* Slash-command answer cards - newest last, dismissible. */}
         {cmdCards.length > 0 && (
           <div className="mb-1.5 flex shrink-0 flex-col gap-1.5">
@@ -855,13 +944,48 @@ function ChatContent() {
           </div>
         )}
 
-        {/* Chat transcript - now receives any tool results */}
-        <ChatTranscript
-          hitlRequest={undefined}
-          isExecuting={isStreaming}
-          toolResults={toolResults}
-          transcript={messages}
-        />
+        {/* Chat transcript + plugin surface side by side when open:
+            todos (narrow side-panel by default, wide canvas on toggle)
+            or the plugin catalog. The transcript keeps its own flex
+            column so heights match. */}
+        {sideSurface !== null ? (
+          <div className="mb-2 flex min-h-0 flex-1 gap-2">
+            <div className="flex min-w-0 flex-1 flex-col">
+              <ChatTranscript
+                hitlRequest={undefined}
+                isExecuting={isStreaming}
+                toolResults={toolResults}
+                transcript={messages}
+              />
+            </div>
+            {sideSurface === "todos" ? (
+              <TodoPanel
+                className={
+                  todoView === "canvas" ? "flex-1" : "w-[340px] shrink-0"
+                }
+                onClose={() => setSideSurface(null)}
+                onCount={setOpenTodoCount}
+                onToggleView={() =>
+                  setTodoView((v) => (v === "panel" ? "canvas" : "panel"))
+                }
+                refreshKey={todoRefreshKey}
+                view={todoView}
+              />
+            ) : (
+              <PluginCatalog
+                className="w-[340px] shrink-0"
+                onClose={() => setSideSurface(null)}
+              />
+            )}
+          </div>
+        ) : (
+          <ChatTranscript
+            hitlRequest={undefined}
+            isExecuting={isStreaming}
+            toolResults={toolResults}
+            transcript={messages}
+          />
+        )}
 
         {/* Input bar - always visible at the bottom. shrink-0 so a
             tall transcript can never squeeze it out of view (the

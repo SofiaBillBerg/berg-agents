@@ -6,7 +6,7 @@ Pydantic AI agent modules into one deterministic flow:
 1. Guardian ``guard_review`` risk/HITL gate with early return.
 2. Planner ``build_plan`` decomposition for complex/critical work.
 3. Model selection via ``resolve_implementation_model`` (provider
-   prefix always comes from config, never a global flag).
+   prefix always comes from .berg_config, never a global flag).
 4. Agent selection from ``can_handle``/confidence scores, with
     implementation as the default executor.
 5. Synchronous implementation-agent inference whenever the

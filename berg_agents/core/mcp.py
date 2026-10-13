@@ -52,7 +52,7 @@ import time
 from berg_agents.core.tool_spec import ToolParam, ToolSpec
 
 # ---------------------------------------------------------------------------
-# Naming convention (must match config/mcp.py byte-for-byte)
+# Naming convention (must match .berg_config/mcp.py byte-for-byte)
 # ---------------------------------------------------------------------------
 
 #: Prefix namespace for every MCP-sourced tool so names never collide with
@@ -102,12 +102,12 @@ def is_sensitive_server(
 ) -> bool:
     """Return ``True`` if *server_name* is sensitive (approval-required).
 
-    When *enabled_servers* is provided (from loaded MCP server config),
+    When *enabled_servers* is provided (from loaded MCP server .berg_config),
     a server not in the enabled set is treated as not sensitive.
 
     :param server_name: MCP server key.
     :param enabled_servers: Optional set of server names that are configured
-        and enabled. When provided, classification respects config.
+        and enabled. When provided, classification respects .berg_config.
     :return: Whether every tool from this server must be approved by a human.
     """
     if enabled_servers is not None and server_name not in enabled_servers:
@@ -120,12 +120,12 @@ def is_readonly_server(
 ) -> bool:
     """Return ``True`` if *server_name* is read-only (autonomous).
 
-    When *enabled_servers* is provided (from loaded MCP server config),
+    When *enabled_servers* is provided (from loaded MCP server .berg_config),
     a server not in the enabled set is treated as not read-only.
 
     :param server_name: MCP server key.
     :param enabled_servers: Optional set of server names that are configured
-        and enabled. When provided, classification respects config.
+        and enabled. When provided, classification respects .berg_config.
     :return: Whether every tool from this server is safe to call without
         human approval.
     """
@@ -609,7 +609,7 @@ class HttpMcpTransport:
 
 
 # ---------------------------------------------------------------------------
-# Server config + client
+# Server .berg_config + client
 # ---------------------------------------------------------------------------
 
 
@@ -848,11 +848,11 @@ def close_all(clients: Iterable[McpClient]) -> None:
     for client in clients:
         with contextlib.suppress(Exception):  # ruff: ignore[blind-except]
             client.close()
-        logger.debug("closed MCP client %s", getattr(client, "config", None))
+        logger.debug("closed MCP client %s", getattr(client, ".berg_config", None))
 
 
 # ---------------------------------------------------------------------------
-# Server config loading and client construction
+# Server .berg_config loading and client construction
 # ---------------------------------------------------------------------------
 
 
@@ -863,13 +863,13 @@ def load_mcp_server_configs(
 
     Reads ``mcp_servers`` from *cfg* (or from application settings when
     *cfg* is ``None``). The value is either a JSON-encoded list of server
-    config dicts or a path to a JSON file containing that list. Each entry
+    .berg_config dicts or a path to a JSON file containing that list. Each entry
     is validated and converted to a :class:`McpServerConfig`. The ``enabled``
     flag (when present) populates the enabled set used by the ``enabled_servers``
     parameter of :func:`is_sensitive_server` and :func:`is_readonly_server`
     so MCP enabled flags participate in sensitive/read-only classification.
 
-    :param cfg: Optional config dict override.
+    :param cfg: Optional .berg_config dict override.
     :return: List of :class:`McpServerConfig`.
     """
     if cfg is None:

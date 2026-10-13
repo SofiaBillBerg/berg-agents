@@ -103,3 +103,13 @@ class PluginRegistry:
             if plugin_id in self._capabilities:
                 del self._capabilities[plugin_id]
                 logger.info(f"Removed capabilities for plugin: {plugin_id}")
+
+    async def clear_capabilities(self, plugin_id: str) -> None:
+        """Drop stored capabilities without touching registration.
+
+        Keeps enable idempotent (register is append-only) and makes
+        disable actually unregister. Descriptors must not rely on
+        stored caps alone — see chat_integration fallbacks.
+        """
+        async with self._lock:
+            self._capabilities.pop(plugin_id, None)

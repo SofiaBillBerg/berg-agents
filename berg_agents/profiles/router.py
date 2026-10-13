@@ -12,20 +12,20 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-#: Default location of the user-editable profiles config, resolved from the
+#: Default location of the user-editable profiles .berg_config, resolved from the
 #: package root so it works regardless of the process working directory.
 DEFAULT_PROFILES_CONFIG = (
-        Path(__file__).resolve().parent.parent.parent / "config" / "profiles.yaml"
+        Path(__file__).resolve().parent.parent.parent / ".berg_config" / "profiles.yaml"
 )
 
 #: Stateful registry of profile keys this router has registered, mapping
-#: ``provider:model`` key -> source label (``"settings"`` or ``"config-file"``).
+#: ``provider:model`` key -> source label (``"settings"`` or ``".berg_config-file"``).
 #: Used by :func:`resolve_profile` to report where a profile came from.
 _registered: dict[str, str] = {}
 
 
 def load_profiles_from_config_file() -> dict[str, Any]:
-    """Load the profiles config file and return a dict of profile entries.
+    """Load the profiles .berg_config file and return a dict of profile entries.
 
     Reads :data:`DEFAULT_PROFILES_CONFIG` (YAML; JSON is a YAML subset) and
     returns its top-level mapping.  Returns an empty dict when the file does

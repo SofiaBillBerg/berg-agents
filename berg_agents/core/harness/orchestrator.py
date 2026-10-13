@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 class Harness:
     """Deterministic orchestration engine over agent modules.
 
-    Holds the HITL gate overrides, the model-config override,
+    Holds the HITL gate overrides, the model-.berg_config override,
     the agent registry, and the learning gate. All stage
     inputs/outputs are plain dicts so the flow stays testable
     without models or network.

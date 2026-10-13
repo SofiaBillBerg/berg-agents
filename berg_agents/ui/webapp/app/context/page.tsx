@@ -16,6 +16,7 @@ import {API_BASE} from "@/envConfig";
 
 import {LearningPanel} from "../components/LearningPanel.tsx";
 import {Navbar} from "../components/Navbar.tsx";
+import type {PluginInfo} from "../components/PluginCatalog.tsx";
 
 interface MemoryEntry {
   path: string;
@@ -41,11 +42,50 @@ interface ContextData {
 }
 
 /**
+ * Normalize a skill name for cross-source matching: the context
+ * catalog uses `skill-<name>` ids while plugin metadata carries the
+ * bare catalog name (occasionally with different casing).
+ */
+function skillKey(name: string): string {
+  return name.toLowerCase().replace(/^skill-/, "");
+}
+
+/**
+ * Index plugins by kind for the runtime overlays below.
+ *
+ * @param plugins - Descriptors from /api/plugins.
+ * @returns MCP server map, skill map, and tool-plugin list.
+ */
+function indexPlugins(plugins: PluginInfo[]): {
+  mcp: Map<string, PluginInfo>;
+  skills: Map<string, PluginInfo>;
+  toolPlugins: PluginInfo[];
+} {
+  const mcp = new Map<string, PluginInfo>();
+  const skills = new Map<string, PluginInfo>();
+  const toolPlugins: PluginInfo[] = [];
+  for (const p of plugins) {
+    if (p.tools.length > 0) toolPlugins.push(p);
+    for (const c of p.capabilities) {
+      if (c.type === "mcp" && c.id) mcp.set(c.id, p);
+      if (c.type === "skill") skills.set(skillKey(c.name ?? c.id ?? ""), p);
+    }
+    // Disabled plugins carry synthesized descriptors (or none for
+    // tool plugins) — still index MCP/skill identity by plugin id.
+    if (p.id.startsWith("berg-plugin-mcp-")) {
+      mcp.set(p.id.replace("berg-plugin-mcp-", ""), p);
+    }
+  }
+  return {mcp, skills, toolPlugins};
+}
+
+/**
  * ContextPage - client component showing the shared context catalog:
  * memory files, skills, MCP servers, and compact learning stats.
  */
 export default function ContextPage() {
   const [data, setData] = useState<ContextData | null>(null);
+  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
   const [stats, setStats] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,12 +93,19 @@ export default function ContextPage() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [ctxRes, statsRes] = await Promise.all([
+        // NOTE: /api/plugins is best-effort — the .berg_config-driven
+        // catalog below still renders when the plugin system is down.
+        const [ctxRes, statsRes, pluginsRes] = await Promise.all([
           fetch(`${API_BASE}/api/context`),
-          fetch(`${API_BASE}/api/learning-stats`)]);
+          fetch(`${API_BASE}/api/learning-stats`),
+          fetch(`${API_BASE}/api/plugins`)]);
         if (!ctxRes.ok) throw new Error(`HTTP ${ctxRes.status}`);
         setData(await ctxRes.json());
         if (statsRes.ok) setStats(await statsRes.json());
+        if (pluginsRes.ok) {
+          const body = await pluginsRes.json();
+          if (Array.isArray(body.plugins)) setPlugins(body.plugins);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Network error");
       } finally {
@@ -120,9 +167,17 @@ export default function ContextPage() {
             {data.active
               ? ` (chatting via ${data.active.provider} / ${data.active.model})`
               : ""}
+            . Runtime state comes from the plugin system
+            {plugins.length > 0 ? ` (${plugins.length} plugins)` : ""}
             .
           </p>
-          <div className="grid gap-3 md:grid-cols-2">
+          {/* NOTE: Runtime overlay — .berg_config lists what exists, the
+              plugin map adds live state (toggled off, approval flags). */}
+          {(() => {
+            const {mcp, skills, toolPlugins} = indexPlugins(plugins);
+            return (
+              <>
+                <div className="grid gap-3 md:grid-cols-2">
             <Card variant="default">
               <Card.Header>
                 <Card.Title>Memory files</Card.Title>
@@ -164,20 +219,35 @@ export default function ContextPage() {
               <Card.Content className="flex flex-wrap gap-1.5">
                 {data.mcp_servers.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    None configured in config/mcp.json.
+                    None configured in .berg_config/mcp.json.
                   </p>
                 )}
-                {data.mcp_servers.map((s) => (
-                  <Chip
-                    color={s.enabled ? "success" : "default"}
-                    key={s.name}
-                    size="sm"
-                    variant="soft"
-                  >
-                    {s.name}
-                    {s.enabled ? "" : " (off)"}
-                  </Chip>
-                ))}
+                {data.mcp_servers.map((s) => {
+                  const plugin = mcp.get(s.name);
+                  const runtimeOff = plugin && plugin.state !== "enabled";
+                  const sensitive = plugin?.capabilities.some(
+                    (c) => c.type === "mcp" && c.sensitive,
+                  );
+                  return (
+                    <Chip
+                      color={
+                        !s.enabled || runtimeOff ? "default" : "success"
+                      }
+                      key={s.name}
+                      size="sm"
+                      variant="soft"
+                      title={
+                        plugin
+                          ? `${plugin.state}${sensitive ? " · tools need approval" : ""}`
+                          : "plugin system unavailable"
+                      }
+                    >
+                      {s.name}
+                      {!s.enabled || runtimeOff ? " (off)" : ""}
+                      {sensitive ? " 🔒" : ""}
+                    </Chip>
+                  );
+                })}
               </Card.Content>
             </Card>
           </div>
@@ -195,20 +265,71 @@ export default function ContextPage() {
                   directory.
                 </p>
               )}
-              {data.skills.map((s) => (
-                <div className="text-sm" key={s.name}>
-                  <span className="font-mono font-semibold">{s.name}</span>
-                  <span className="text-muted-foreground">
-                    {" "}
-                    — {s.description || "no description"}
-                  </span>
-                </div>
-              ))}
+              {data.skills.map((s) => {
+                const plugin = skills.get(skillKey(s.name));
+                return (
+                  <div className="text-sm" key={s.name}>
+                    <span className="font-mono font-semibold">{s.name}</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      — {s.description || "no description"}
+                    </span>{" "}
+                    {plugin && (
+                      <Chip
+                        color={
+                          plugin.state === "enabled" ? "success" : "default"
+                        }
+                        size="sm"
+                        variant="soft"
+                      >
+                        {plugin.state}
+                      </Chip>
+                    )}
+                  </div>
+                );
+              })}
             </Card.Content>
           </Card>
+          {toolPlugins.length > 0 && (
+            <Card className="mt-3" variant="default">
+              <Card.Header>
+                <Card.Title>
+                  Tool plugins ({toolPlugins.length})
+                </Card.Title>
+                <Card.Description>
+                  Plugin tools offered to the chat agent
+                </Card.Description>
+              </Card.Header>
+              <Card.Content className="flex flex-col gap-2">
+                {toolPlugins.map((p) => (
+                  <div className="text-sm" key={p.id}>
+                    <span className="font-semibold">{p.name}</span>{" "}
+                    <Chip size="sm" variant="soft">
+                      v{p.version}
+                    </Chip>{" "}
+                    <Chip
+                      color={
+                        p.state === "enabled" ? "success" : "default"
+                      }
+                      size="sm"
+                      variant="soft"
+                    >
+                      {p.state}
+                    </Chip>
+                    <div className="font-mono text-[11px] text-muted-foreground">
+                      {p.tools.join(", ")}
+                    </div>
+                  </div>
+                ))}
+              </Card.Content>
+            </Card>
+          )}
           <div className="mt-3">
             <LearningPanel compact stats={stats as never} />
           </div>
+              </>
+            );
+          })()}
         </div>
       </div>
     </>

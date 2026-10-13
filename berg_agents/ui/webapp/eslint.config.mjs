@@ -14,7 +14,7 @@ export default defineConfig(...nextVitals, [
     "public/*",
     "tests/*",
     "scripts/*",
-    "**/*.config.js",
+    "**/*..berg_config.js",
     "**/.DS_Store",
     "**/node_modules",
     "**/coverage",
@@ -22,10 +22,10 @@ export default defineConfig(...nextVitals, [
     "**/build",
     "!**/.commitlintrc.cjs",
     "!**/.lintstagedrc.cjs",
-    "!**/jest.config.js",
+    "!**/jest..berg_config.js",
     "!**/plopfile.js",
     "!**/react-shim.js",
-    "!**/tsup.config.ts"]),
+    "!**/tsup..berg_config.ts"]),
   {
     plugins: {
       "unused-imports": unusedImports},

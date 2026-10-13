@@ -76,7 +76,7 @@ MEDIUM_RISK_PATTERNS: list[str] = [
     r"env\s+var"]
 
 # Default HITL task-type gates. Mirror the ``hitl_rules``
-# block of ``config/bergagents.jsonc`` (the config is the
+# block of ``.berg_config/bergagents.jsonc`` (the .berg_config is the
 # source of truth; these are import-safe fallbacks so the
 # pure decision functions never need file access).
 AUTO_EXECUTE: list[str] = ["read_file", "list_files", "search_code"]
@@ -97,7 +97,7 @@ class GuardianDeps:
     """Dependency bundle injected into the Guardian agent.
 
     Carries the HITL task-type gates so deployments can
-    override them (e.g. from ``hitl_rules`` config)
+    override them (e.g. from ``hitl_rules`` .berg_config)
     without touching module constants.
     """
 
@@ -323,13 +323,13 @@ def build_guardian_agent(
     Args:
         model_id: Model id as declared under a provider
             ``models`` map. None selects the default.
-        cfg: Optional config override for resolution.
+        cfg: Optional .berg_config override for resolution.
 
     Returns:
         A Pydantic AI Agent named "guardian" with the
         risk-assessment tool and structured decisions.
     """
-    # Explicit model instance: construction reads config only,
+    # Explicit model instance: construction reads .berg_config only,
     # never the process environment, and makes no network calls.
     model = resolve_model_instance(model_id, cfg)
 
@@ -390,7 +390,7 @@ def build_guardian_agent(
 
 
 # Default agent instance for the harness.
-# Built at import: model string resolution is offline (config only, no network).
+# Built at import: model string resolution is offline (.berg_config only, no network).
 # Fallback keeps import safe when default model is not declared.
 try:
     guardian_agent: Agent[GuardianDeps, GuardianDecision] = (

@@ -73,9 +73,9 @@ SLASH_COMMANDS: list[dict[str, str]] = [
         "name": "/context",
         "description": "Show current context",
         "category": "context"},
-    {"name": "/settings", "description": "Show settings", "category": "config"},
-    {"name": "/skills", "description": "List skills", "category": "config"},
-    {"name": "/mcps", "description": "MCP server status", "category": "config"},
+    {"name": "/settings", "description": "Show settings", "category": ".berg_config"},
+    {"name": "/skills", "description": "List skills", "category": ".berg_config"},
+    {"name": "/mcps", "description": "MCP server status", "category": ".berg_config"},
     {
         "name": "/harness",
         "description": "Run task through harness",
@@ -481,7 +481,7 @@ def run_cli_ui(
 
 
 def run_tui() -> None:
-    """Start the interactive terminal session from application config.
+    """Start the interactive terminal session from application .berg_config.
 
     Zero-argument entry point used by ``python -m berg_agents --tui``: builds
     the application :class:`Harness` from configuration and runs the

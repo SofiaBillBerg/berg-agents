@@ -90,7 +90,7 @@ class PluginDiscovery:
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         config = config or {}
-        self.plugin_dir = Path(config.get("plugin_dir", "config/plugins"))
+        self.plugin_dir = Path(config.get("plugin_dir", ".berg_config/plugins"))
         self.cache_dir = Path(config.get("cache_dir", ".cache/plugins"))
 
     async def discover_all(

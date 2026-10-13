@@ -60,3 +60,39 @@ class BackendCapability(PluginCapability):
     type: str = "backend"
     backend_type: str = ""  # "search", "memory", "storage"
     backend_class: type[Any] = None
+
+
+@dataclass
+class SkillCapability(PluginCapability):
+    """A plugin capability that provides a skill (SKILL.md manual).
+
+    Skills stay deferred by default: the model sees the one-line
+    catalog entry (id + description) and loads the full content only
+    when the task calls for it — same pattern as the chat agent's
+    skill capabilities.
+    """
+
+    type: str = "skill"
+    id: str = ""
+    name: str = ""
+    description: str = ""
+    content: str = ""
+    deferred: bool = True
+
+
+@dataclass
+class MCPCapability(PluginCapability):
+    """A plugin capability that fronts one MCP server.
+
+    Live tool names need a running session, so the capability carries
+    the server descriptor (not tool objects): the chat agent already
+    attaches the server's toolset, and this record gives it plugin
+    lifecycle, events, and UI visibility.
+    """
+
+    type: str = "mcp"
+    id: str = ""  # MCP server key from .berg_config /mcp.json
+    server_type: str = ""  # "remote" or "local"
+    enabled: bool = True
+    sensitive: bool = False  # every tool requires human approval
+    tool_prefix: str = ""  # e.g. "mcp_github_"

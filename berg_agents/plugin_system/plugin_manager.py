@@ -16,10 +16,13 @@ This class manages the complete plugin lifecycle:
 import asyncio
 import importlib
 import logging
+import sys
 from pathlib import Path
 from typing import Any
 
-from berg_agents import BergAgentsApp, Harness
+# NOTE: app/harness are typed as Any to avoid a circular import
+# (berg_agents/__init__ -> app -> harness -> plugin_system -> app).
+# At runtime they are BergAgentsApp and Harness instances.
 from berg_agents.plugin_system.config.config_manager import (
     PluginConfigManager,
 )
@@ -61,15 +64,15 @@ class PluginManager:
 
     def __init__(
             self,
-            app: BergAgentsApp,
-            harness: Harness,
+            app: Any,
+            harness: Any,
             config: dict[str, Any] | None = None,
     ) -> None:
         """Initialize plugin manager.
 
         Args:
-            app: Berg agents application instance
-            harness: Harness instance for agent orchestration
+            app: Berg agents application instance (BergAgentsApp).
+            harness: Harness instance for agent orchestration (Harness).
             config: Optional configuration overrides
         """
         self.app = app
@@ -96,7 +99,7 @@ class PluginManager:
     async def initialize(self) -> None:
         """Initialize the plugin system.
 
-        Sets up event bus, config manager, and prepares for plugin discovery.
+        Sets up event bus, .berg_config manager, and prepares for plugin discovery.
         Must be called before any other operations.
         """
         if self._initialized:
@@ -322,14 +325,32 @@ class PluginManager:
         """
         self._ensure_initialized()
 
+        # NOTE: disable-then-unload is inlined here instead of calling
+        # disable_plugin(), because both methods take self._lock and
+        # asyncio.Lock is not re-entrant (nested acquire = deadlock).
         async with self._lock:
             entry = self.registry.get(plugin_id)  # Not async
             if not entry:
                 return
 
-            # Disable first if enabled
             if entry.state == PluginState.ENABLED:
-                await self.disable_plugin(plugin_id)
+                logger.info(f"Disabling plugin before unload: {plugin_id}")
+                try:
+                    plugin_enabled = self._plugins.get(plugin_id)
+                    context_enabled = self._contexts.get(plugin_id)
+                    if plugin_enabled is not None and context_enabled is not None:
+                        await plugin_enabled.on_disable(context_enabled)
+                    await self._unregister_capabilities(plugin_id)
+                    self.registry.update_state(plugin_id, PluginState.LOADED)
+                    entry = self.registry.get(plugin_id) or entry
+                    await self.event_bus.emit(
+                        "plugin.disabled",
+                        {"plugin_id": plugin_id},
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to disable plugin {plugin_id}: {e}")
+                    self.registry.update_state(plugin_id, PluginState.ERROR)
+                    return
 
             if entry.state != PluginState.LOADED:
                 return
@@ -378,9 +399,14 @@ class PluginManager:
         # Get metadata for dependency resolution
         metadata_list = [entry.metadata for entry in entries]
 
-        # Resolve dependencies and get load order
+        # Resolve dependencies and get load order.
+        # NOTE: resolve() returns (load_order_ids, warnings), not metadata.
         try:
-            load_order = await self.dependency_resolver.resolve(metadata_list)
+            load_order, warnings = await self.dependency_resolver.resolve(
+                metadata_list
+            )
+            for warning in warnings:
+                logger.warning(warning)
         except DependencyError as e:
             logger.error(f"Failed to resolve dependencies: {e}")
             raise
@@ -388,12 +414,12 @@ class PluginManager:
         logger.info(f"Resolved load order for {len(load_order)} plugins")
 
         # Load plugins in dependency order
-        for metadata in load_order:
+        for plugin_id in load_order:
             try:
-                await self.load_plugin(metadata.id or "unknown")
+                await self.load_plugin(plugin_id or "unknown")
             except Exception as e:
                 logger.error(
-                    f"Failed to load {metadata.id or 'unknown'}, continuing: {e}"
+                    f"Failed to load {plugin_id or 'unknown'}, continuing: {e}"
                 )
 
         logger.info("Plugin loading complete")
@@ -408,10 +434,10 @@ class PluginManager:
 
         for entry in entries:
             try:
-                await self.enable_plugin(entry.plugin_id or "unknown")
+                await self.enable_plugin(entry.metadata.id or "unknown")
             except Exception as e:
                 logger.error(
-                    f"Failed to enable {entry.plugin_id or 'unknown'}: {e}"
+                    f"Failed to enable {entry.metadata.id or 'unknown'}: {e}"
                 )
 
         logger.info("Plugin enabling complete")
@@ -424,17 +450,17 @@ class PluginManager:
         entries = self.registry.list_plugins(state=PluginState.ENABLED)
         for entry in entries:
             try:
-                await self.disable_plugin(entry.plugin_id or "unknown")
+                await self.disable_plugin(entry.metadata.id or "unknown")
             except Exception as e:
-                logger.error(f"Error disabling {entry.plugin_id}: {e}")
+                logger.error(f"Error disabling {entry.metadata.id}: {e}")
 
         # Unload all loaded plugins
         entries = self.registry.list_plugins(state=PluginState.LOADED)
         for entry in entries:
             try:
-                await self.unload_plugin(entry.plugin_id or "unknown")
+                await self.unload_plugin(entry.metadata.id or "unknown")
             except Exception as e:
-                logger.error(f"Error unloading {entry.plugin_id}: {e}")
+                logger.error(f"Error unloading {entry.metadata.id}: {e}")
 
         # Shutdown event bus
         await self.event_bus.shutdown()
@@ -462,12 +488,12 @@ class PluginManager:
         Returns:
             Plugin info dict or None if not found
         """
-        entry = await self.registry.get(plugin_id or "unknown")
+        entry = self.registry.get(plugin_id or "unknown")
         if not entry:
             return None
 
         return {
-            "id": entry.plugin_id,
+            "id": entry.metadata.id,
             "name": entry.metadata.name,
             "version": entry.metadata.version,
             "state": entry.state,
@@ -489,7 +515,7 @@ class PluginManager:
         entries = self.registry.list_plugins(state=state)
         return [
             {
-                "id": entry.plugin_id,
+                "id": entry.metadata.id,
                 "name": entry.metadata.name,
                 "version": entry.metadata.version,
                 "state": entry.state,
@@ -527,8 +553,8 @@ class PluginManager:
             if dep.optional:
                 continue
 
-            # Check if dependency is loaded
-            dep_entry = await self.registry.get(dep.id or "unknown")
+            # Check if dependency is loaded (registry.get is sync).
+            dep_entry = self.registry.get(dep.id or "unknown")
             if not dep_entry:
                 raise DependencyError(
                     f"Required dependency not found: {dep.id}"
@@ -554,8 +580,17 @@ class PluginManager:
             PluginError: If import fails
         """
         try:
-            # Parse entry point: "module.path:ClassName"
+            # Parse entry point: "module.path:ClassName".
             module_path, class_name = entry.metadata.entry_point.split(":")
+
+            # Ensure the plugin directory is importable so local
+            # plugins (e.g. berg_plugins/shared-todo) resolve without
+            # requiring an installed distribution.
+            plugin_dir = entry.metadata.path
+            if plugin_dir is not None:
+                plugin_dir_str = str(Path(plugin_dir))
+                if plugin_dir_str not in sys.path:
+                    sys.path.insert(0, plugin_dir_str)
 
             # Import module
             logger.debug(f"Importing {module_path}")
@@ -585,25 +620,26 @@ class PluginManager:
         Returns:
             Plugin context
         """
-        # Get plugin settings from config
+        # Get plugin settings from .berg_config
         settings = self.config_manager.get_plugin_settings(
-            entry.plugin_id or "{}"
+            entry.metadata.id or "{}"
         )
 
-        context = PluginContext()
-        context.plugin_id = entry.plugin_id or "unknown"
-        context.plugin_version = entry.metadata.version
-        context.plugin_dir = entry.metadata.path or Path()
-
-        context.app = self.app
-        context.harness = self.harness
-        context.config = self._config
-
-        context.plugin_manager = self
-        context.event_bus = self.event_bus
-        context.logger = logging.getLogger(f"plugin.{entry.plugin_id}")
-
-        context.settings = settings
+        # PluginContext requires all fields at construction time.
+        context = PluginContext(
+            plugin_id=entry.metadata.id or "unknown",
+            plugin_version=entry.metadata.version,
+            plugin_dir=entry.metadata.path or Path(),
+            app=self.app,
+            harness=self.harness,
+            config=self._config,
+            plugin_manager=self,
+            event_bus=self.event_bus,
+            logger=logging.getLogger(
+                f"plugin.{entry.metadata.id}"
+            ),
+            settings=settings,
+        )
 
         return context
 
@@ -626,11 +662,18 @@ class PluginManager:
             f"Registering {len(capabilities)} capabilities for {plugin_id}"
         )
 
+        # NOTE: Register is append-only — clear first so re-enable
+        # after disable cannot duplicate capabilities.
+        await self.registry.clear_capabilities(plugin_id)
+
         for cap in capabilities:
             try:
+                # Persist every capability in the registry so pilots
+                # and UI bridges can enumerate plugin tools/agents.
+                await self.registry.register_capability(plugin_id, cap)
                 if cap.type == "tool":
-                    # Register tool with harness
-                    # This would integrate with berg_agents tool system
+                    # Tool registration with the harness happens here
+                    # once ToolCatalog gains a plugin-tool slot (later).
                     logger.debug(f"Registering tool: {cap.tool}")
                 elif cap.type == "agent":
                     # Register agent
@@ -647,7 +690,7 @@ class PluginManager:
             plugin_id: Plugin identifier
         """
         logger.debug(f"Unregistering capabilities for {plugin_id}")
-        # Implementation would remove tools/agents from berg_agents
+        await self.registry.clear_capabilities(plugin_id)
 
     async def _handle_plugin_event(self, event: Any) -> None:
         """Handle plugin system events.

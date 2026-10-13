@@ -22,7 +22,7 @@ def model_for_complexity(
 ) -> str | None:
     """Return the first model id declared for a complexity level.
 
-    Reads ``model_routing.models`` from config; each level carries
+    Reads ``model_routing.models`` from .berg_config; each level carries
     its own ``models`` list plus ``max_tokens``.
 
     Args:

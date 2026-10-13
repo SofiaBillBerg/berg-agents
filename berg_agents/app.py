@@ -41,7 +41,7 @@ class _CreateOptions:
 def _apply_explicit_config(
         opts: _CreateOptions, config: dict[str, Any]
 ) -> None:
-    """Apply the explicit config dict (highest priority).
+    """Apply the explicit .berg_config dict (highest priority).
 
     Args:
         opts: Option bundle mutated in place.
@@ -71,7 +71,7 @@ def _apply_global_settings(
 
     Args:
         opts: Option bundle mutated in place.
-        config: Explicit config dict (used to detect overrides).
+        config: Explicit .berg_config dict (used to detect overrides).
     """
     try:
         from berg_agents.config.settings import get_settings
@@ -187,11 +187,11 @@ class BergAgentsApp:
         """
         opts = _CreateOptions()
 
-        # 1) Explicit config dict (highest priority)
+        # 1) Explicit .berg_config dict (highest priority)
         if config:
             _apply_explicit_config(opts, config)
 
-        # 2) Global config (bergagents.jsonc via settings) if not set
+        # 2) Global .berg_config (bergagents.jsonc via settings) if not set
         _apply_global_settings(opts, config)
 
         harness = Harness(

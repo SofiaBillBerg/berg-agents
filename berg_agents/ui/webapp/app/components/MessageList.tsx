@@ -3,6 +3,7 @@ import {Surface} from "@heroui/react";
 
 import {MarkdownRenderer} from "./MarkdownRenderer.tsx";
 import {ToolCard} from "./ToolCard.tsx";
+import {TODO_TOOL_NAMES} from "./TodoPanel.tsx";
 
 export interface MessageToolCall {
   tool: string;
@@ -60,6 +61,12 @@ function ToolCallGroup({
   calls: NonNullable<MessageItem["toolCalls"]>;
 }) {
   const [open, setOpen] = useState(calls.length <= 3);
+  // NOTE: Plugin tool calls render under their own marker so todo
+  // activity reads as plugin work, not generic tool output. The full
+  // interactive surface lives in the side-panel/canvas (TodoPanel).
+  const isTodoGroup =
+    calls.length > 0 &&
+    calls.every((c) => TODO_TOOL_NAMES.includes(c.tool));
   return (
     <div className="mt-1.5 flex flex-col gap-1 rounded-md border border-border px-1.5 py-1">
       <button
@@ -74,7 +81,8 @@ function ToolCallGroup({
       >
         <span aria-hidden>{open ? "▾" : "▸"}</span>
         <span className="font-mono">
-          🔧 {calls.length} tool call{calls.length === 1 ? "" : "s"}
+          {isTodoGroup ? "📋" : "🔧"} {calls.length} tool call
+          {calls.length === 1 ? "" : "s"}
         </span>
         <span className="truncate text-[11px]">
           {calls.map((c) => c.tool).join(", ")}

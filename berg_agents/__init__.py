@@ -23,7 +23,7 @@ from berg_agents.core import (
     TaskContext,
 )
 
-# Load config/.env into the process environment first: agent modules
+# Load .berg_config/.env into the process environment first: agent modules
 # below construct their Pydantic AI models at import time, and the
 # provider SDKs read endpoint configuration from the environment.
 ensure_env_loaded()

@@ -41,7 +41,7 @@ def discover_packages() -> list[PluginMetadata]:
 
 def discover_local() -> list[PluginMetadata]:
     """Discover local plugins."""
-    return discover_local_plugins(plugin_dir=Path("./config/plugins"))
+    return discover_local_plugins(plugin_dir=Path("./.berg_config/plugins"))
 
 
 async def discover_all_parallel() -> list[PluginMetadata]:

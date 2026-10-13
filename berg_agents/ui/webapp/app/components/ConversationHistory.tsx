@@ -1,11 +1,11 @@
-
-
 "use client";
 
-import {useEffect, useState} from "react";
-import {Button, Card, Chip} from "@heroui/react";
+import { useEffect, useState } from "react";
+import { Button, Card, Chip } from "@heroui/react";
 
-import {CHAT_MESSAGES_KEY} from "@/harness/useAISDKChat";
+import {
+  CHAT_MESSAGES_KEY,
+  slimUIMessagesForPersist} from "@/harness/useAISDKChat";
 
 /** localStorage key for named snapshots (live chat key lives in the hook). */
 const HISTORY_KEY = "berg_agents_chat_history";
@@ -66,10 +66,15 @@ export function readSnapshots(): ChatSnapshot[] {
   }
 }
 
-/** Persist snapshots (newest first, capped). */
+/** Persist snapshots (newest first, capped, slimmed for quota safety). */
 export function writeSnapshots(sessions: ChatSnapshot[]): void {
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(sessions.slice(0, 50)));
+    const slimmed = sessions.slice(0, 50).map((s) => ({
+      ...s,
+      messages: slimUIMessagesForPersist(
+        Array.isArray(s.messages) ? s.messages : [],
+      )}));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(slimmed));
   } catch {
     // Quota exceeded - in-memory state is the caller's job.
   }
@@ -106,6 +111,29 @@ export function snapshotLiveChat(): ChatSnapshot | null {
 }
 
 /**
+ * Park the live chat, then stage snapshot messages as the live
+ * conversation (slimmed for quota safety). Callers navigate to `/`
+ * (chat restores from the live key on mount) or feed the messages to
+ * the live hook directly.
+ *
+ * @param messages - Snapshot messages to stage.
+ */
+export function restoreSnapshotToLive(messages: unknown[]): void {
+  // Never lose the live conversation: park it first (deduped).
+  snapshotLiveChat();
+  try {
+    localStorage.setItem(
+      CHAT_MESSAGES_KEY,
+      JSON.stringify(
+        slimUIMessagesForPersist(Array.isArray(messages) ? messages : []),
+      ),
+    );
+  } catch {
+    // Quota exceeded - callers still restore in memory.
+  }
+}
+
+/**
  * Sidebar widget that snapshots the live chat into localStorage and
  * restores snapshots back into it. Sessions persist across tab
  * switches and reloads; selecting one replaces the live conversation.
@@ -114,22 +142,24 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
   const [sessions, setSessions] = useState<ChatSnapshot[]>([]);
 
   useEffect(() => {
+    const reread = () => setSessions(readSnapshots());
     try {
-      const raw = localStorage.getItem(HISTORY_KEY);
-      const parsed: unknown = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(parsed)) setSessions(parsed as ChatSnapshot[]);
+      reread();
     } catch {
       // Corrupt storage - start empty.
     }
+    // NOTE: Snapshots written from another tab (e.g. the /history
+    // page) never re-render this widget otherwise — same browser,
+    // different answer. The storage event fires only in the tabs
+    // that did NOT write, which is exactly the stale ones.
+    window.addEventListener("storage", reread);
+    return () => window.removeEventListener("storage", reread);
   }, []);
 
   const persist = (next: ChatSnapshot[]) => {
     setSessions(next);
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(next.slice(0, 50)));
-    } catch {
-      // Quota exceeded - keep in-memory state only.
-    }
+    // NOTE: Slimmed via writeSnapshots (quota safety).
+    writeSnapshots(next);
   };
 
   const saveCurrent = () => {
@@ -140,13 +170,8 @@ export const ConversationHistory = ({ onSelect }: ConversationHistoryProps) => {
   const restore = (session: ChatSnapshot) => {
     // Never lose the live conversation: park it as a session first
     // (deduped inside snapshotLiveChat) before replacing it.
-    snapshotLiveChat();
+    restoreSnapshotToLive(session.messages);
     setSessions(readSnapshots());
-    try {
-      localStorage.setItem(CHAT_MESSAGES_KEY, JSON.stringify(session.messages));
-    } catch {
-      // Quota exceeded - still restore in memory.
-    }
     onSelect(session.messages);
   };
 

@@ -4,7 +4,7 @@ This module is the *single* source of truth for turning a model id into
 a dictionary of chat-model constructor kwargs.  There are **no**
 hardcoded provider names here: every provider (Ollama, Omniroute, vLLM,
 LM Studio, ...) is just an entry in the ``providers`` block of
-``config/bergagents.jsonc``::
+``.berg_config/bergagents.jsonc``::
 
     "providers": {
       "ollama": {
@@ -63,14 +63,14 @@ _DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
 
 def _expand_value(value: Any) -> Any:
-    """Recursively expand ``${env:VAR}`` / ``${VAR}`` placeholders in config values.
+    """Recursively expand ``${env:VAR}`` / ``${VAR}`` placeholders in .berg_config values.
 
     A string that is exactly ``${env:VAR}`` or ``${VAR}`` expands to the environment
     variable's value, or ``""`` when unset.  Non-string values and dicts /
     lists are handled recursively. Falls back to `.env` file when the var
     is not yet in the process env (import-time before dotenv loads).
 
-    :param value: Raw config value.
+    :param value: Raw .berg_config value.
     :return: Value with placeholders expanded.
     """
     if isinstance(value, str):
@@ -117,7 +117,7 @@ def _normalize_options(options: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_providers(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Load the ``providers`` block from config.
+    """Load the ``providers`` block from .berg_config.
 
     When *cfg* is ``None`` the global application settings are used.  Every
     active setup declares a ``providers`` block directly; this function
@@ -190,7 +190,7 @@ def resolve_model(
     :param model_id: Model identifier exactly as declared under a provider's
         ``models`` map (e.g. ``"qwen3.5:9b"``).  When ``None`` (or empty),
         the first declared model is used as the default.
-    :param cfg: Optional config dict override (defaults to app settings).
+    :param cfg: Optional .berg_config dict override (defaults to app settings).
     :return: Flat kwargs ready for a chat-model constructor.
     :raises KeyError: If *model_id* is not declared in any provider block.
     """
@@ -211,7 +211,7 @@ def resolve_model(
         raise KeyError(
             f"Model '{model_id}' is not declared in any provider block. "
             f"Known models: {known}. Add it to 'providers' in "
-            "config/bergagents.jsonc."
+            ".berg_config/bergagents.jsonc."
         )
 
     #: No explicit id -> first declared model is the default.
@@ -225,14 +225,14 @@ def resolve_model(
             **kwargs}
     raise KeyError(
         "No models configured. Declare a 'providers' block with at least "
-        "one model in config/bergagents.jsonc."
+        "one model in .berg_config/bergagents.jsonc."
     )
 
 
 def list_models(cfg: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     """List every declared model for UI selectors.
 
-    :param cfg: Optional config dict override.
+    :param cfg: Optional .berg_config dict override.
     :return: List of ``{"provider", "model", "base_url", "display_name"}``
             dicts in declaration order.
     """

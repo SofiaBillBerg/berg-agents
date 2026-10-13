@@ -35,6 +35,9 @@ def build_chat_agent(
         model_id: str | None = None,
         *,
         root_dir: str = ".",
+        plugin_tools: list[Any] | None = None,
+        disabled_mcp: frozenset[str] = frozenset(),
+        disabled_skills: frozenset[str] = frozenset(),
 ) -> Any:
     """Build a pydantic_ai ``Agent`` for the streaming chat endpoint.
 
@@ -42,15 +45,20 @@ def build_chat_agent(
     :class:`~berg_agents.agents.workspace_toolset.WorkspaceToolset`
     (id ``"workspace"``): file/shell tools plus staged ``plan_task``
     / ``implement_task`` subagent delegates, with per-tool approval
-    flags and a usage guide carried by the toolset itself.
+    flags and a usage guide carried by the toolset itself. Enabled
+    plugin tools (e.g. shared-todo) are attached as plain tools.
 
     System prompt, model, and temperature all come from configuration
-    (``config/bergagents.jsonc`` and ``config/profiles.yaml``) - never
+    (``.berg_config/bergagents.jsonc`` and ``.berg_config/profiles.yaml``) - never
     hardcoded.
 
     :param model_id: Model identifier to resolve; falls back to the session's
         or settings' default.
     :param root_dir: Workspace root for file tools.
+    :param plugin_tools: Extra pydantic-ai tools from enabled plugins;
+        pass ``None`` (or omit) for a plugin-free agent.
+    :param disabled_mcp: MCP server keys to withhold (disabled toggles).
+    :param disabled_skills: Chat skill ids (``skill-<name>``) to withhold.
     :return: A configured ``Agent`` ready for ``VercelAIAdapter``.
     """
     from berg_agents.agents.workspace_toolset import WorkspaceToolset
@@ -66,11 +74,11 @@ def build_chat_agent(
     from pydantic_ai.capabilities import WebFetch, WebSearch
     from pydantic_ai_harness import Planning
 
-    # Resolve the model from config - resolve_model_instance reads
+    # Resolve the model from .berg_config - resolve_model_instance reads
     # bergagents.jsonc and returns a fully-configured OpenAIChatModel.
     model = resolve_model_instance(model_id or "")
 
-    # Build the system prompt from settings (config-driven, not hardcoded).
+    # Build the system prompt from settings (.berg_config-driven, not hardcoded).
     settings = get_settings()
     system_prompt = (
         settings.system_prompt.format(root_dir=root_dir)
@@ -98,7 +106,10 @@ def build_chat_agent(
         # request, and the frontend answers it with an approval
         # response. Every approval is collected through the UI.
         retries={"output": 3},
-        toolsets=[toolset, *build_mcp_toolsets()],
+        # NOTE: Enabled plugin tools (shared-todo pilot). Empty by
+        # default — low-risk tools need no HITL approval.
+        tools=list(plugin_tools) if plugin_tools else [],
+        toolsets=[toolset, *build_mcp_toolsets(exclude=disabled_mcp)],
         capabilities=[
             # Provider-adaptive web tools: provider-native first where
             # the model supports it, local implementation otherwise.
@@ -114,7 +125,15 @@ def build_chat_agent(
             # Repo skills (SKILL.md manuals) as deferred capabilities:
             # one-line catalog entries until the model loads one.
             # Point BERG_AGENT_SKILLS at e.g. ".agents/skills".
-            *load_skill_capabilities(settings.skills, root_dir=root_dir)],
+            # Disabled skill plugins are withheld here so the toggle
+            # is honest end to end.
+            *[
+                cap
+                for cap in load_skill_capabilities(
+                    settings.skills, root_dir=root_dir
+                )
+                if getattr(cap, "id", "") not in disabled_skills
+            ]],
     )
 
     return agent

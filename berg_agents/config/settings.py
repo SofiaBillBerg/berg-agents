@@ -1,4 +1,4 @@
-"""Typed application configuration loaded from environment / ``.env`` / config.
+"""Typed application configuration loaded from environment / ``.env`` / .berg_config.
 
 All runtime configuration for the agent is centralized in a single
 :class:`Settings` model built on ``pydantic_settings.BaseSettings``. Values are
@@ -7,18 +7,18 @@ sourced, in decreasing precedence, from:
 1. the process environment variables, and
 2. a ``.env`` file at the project root (``BERG_AGENT_OLLAMA_PORT``,
    ``BERG_AGENT_OPENAI_API_KEY`` ...), and
-3. a ``bergagents.jsonc`` (or ``.json``/``.yml``/``.yaml``) file in ``config/``.
+3. a ``bergagents.jsonc`` (or ``.json``/``.yml``/``.yaml``) file in ``.berg_config/``.
 
 The JSONC file is parsed by :class:`JsoncConfigSettingsSource`, a
 JSONC-aware variant of pydantic-settings' ``JsonConfigSettingsSource`` that
-understands comments and trailing commas via :mod:`berg_agents.config.jsonc`.
+understands comments and trailing commas via :mod:`berg_agents..berg_config.jsonc`.
 
 Sensible defaults live on the model so the application runs with zero
 configuration, while every value can be overridden per environment without
 touching code. Secrets (e.g. ``BERG_AGENT_OPENAI_API_KEY``) are never
-hardcoded - they are read from the environment / config / ``.env`` only,
+hardcoded - they are read from the environment / .berg_config / ``.env`` only,
 satisfying the project's security requirement that provider credentials come
-from config, not source.
+from .berg_config, not source.
 
 Field names map to upper-case environment variables with the ``BERG_AGENT_``
 prefix (``ollama_port`` -> ``BERG_AGENT_OLLAMA_PORT``). The provider layer
@@ -51,7 +51,7 @@ _ENV_PLACEHOLDER_RE = re.compile(r"\$\{(?:env:)?([A-Za-z_][A-Za-z0-9_]*)}")
 
 
 class _EnvUnset:
-    """Sentinel marking a config value that referenced an unset env var."""
+    """Sentinel marking a .berg_config value that referenced an unset env var."""
 
 
 #: Singleton sentinel returned for unset single-placeholder values so the
@@ -60,7 +60,7 @@ _ENV_UNSET = _EnvUnset()
 
 
 def _load_substitution_env() -> dict[str, str]:
-    """Build the env mapping used for ``${env:VAR}`` substitution in config.
+    """Build the env mapping used for ``${env:VAR}`` substitution in .berg_config.
 
     Merges the project ``.env`` (read without mutating :data:`os.environ`)
     under the current process environment, so explicit environment variables
@@ -86,7 +86,7 @@ def _expand_env_vars(value: Any, env: dict[str, str]) -> Any:
     key and let the field default (or a higher-precedence source) apply.
     Other strings have any embedded placeholders expanded in place.
 
-    :param value: Parsed config node (str / dict / list / scalar).
+    :param value: Parsed .berg_config node (str / dict / list / scalar).
     :param env: Environment mapping to resolve placeholders against.
     :return: The value with placeholders expanded, or :data:`_ENV_UNSET`.
     """
@@ -130,7 +130,7 @@ def ensure_env_loaded() -> None:
     ``BERG_AGENT_OLLAMA_SCHEME`` / ``HOST`` / ``PORT`` pieces when
     no explicit value is configured, so provider SDKs that read
     the process environment resolve the local endpoint from
-    project config instead of failing at import time.
+    project .berg_config instead of failing at import time.
 
     Safe to call repeatedly; variables that are already set
     (by the environment or a previous call) are left alone.
@@ -147,11 +147,11 @@ if TYPE_CHECKING:
     from importlib.abc import Traversable
 #: Project root (parent of the ``berg_agents`` package), where ``.env`` lives.
 # Repo root (parent of the ``berg_agents`` package), where ``.env`` and
-# ``config/`` live.  ``settings.py`` sits at ``berg_agents/config/settings.py``,
+# ``.berg_config/`` live.  ``settings.py`` sits at ``berg_agents/.berg_config/settings.py``,
 # so the root is three parents up.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-#: Default system prompt used when none is supplied via config / ``.env``.
+#: Default system prompt used when none is supplied via .berg_config / ``.env``.
 DEFAULT_SYSTEM_PROMPT = """You are a coding agent. Use tools for every filesystem action.
 
 ROOT DIRECTORY: {root_dir}
@@ -213,7 +213,7 @@ EXTERNAL MCP TOOLS (security policy):
 def _annotation_is_complex(annotation: Any) -> bool:
     """Return True when *annotation* is (or unions in) a ``list``/``dict`` type.
 
-    Used to decide whether a raw config-file string value should be
+    Used to decide whether a raw .berg_config-file string value should be
     JSON-decoded before validation, matching how environment variables are
     handled for complex-typed fields.
 
@@ -234,7 +234,7 @@ class JsoncConfigSettingsSource(JsonConfigSettingsSource):
     """JSONC-aware variant of pydantic-settings ``JsonConfigSettingsSource``.
 
     Reads the ``json_file`` configured on the settings model (by default
-    ``config/bergagents.jsonc``) and parses it with :func:`berg_agents.config.jsonc.loads`
+    ``.berg_config/bergagents.jsonc``) and parses it with :func:`berg_agents.config.jsonc.loads`
     so comments and trailing commas are accepted, unlike strict JSON.
     """
 
@@ -252,7 +252,7 @@ class JsoncConfigSettingsSource(JsonConfigSettingsSource):
         # in ``extra`` and never populate their typed fields (unlike env
         # vars, which honor ``env_prefix``).  Add de-prefixed, lowercased
         # mirrors of every prefixed key that corresponds to a declared
-        # field, so config-file entries behave exactly like their env-var
+        # field, so .berg_config-file entries behave exactly like their env-var
         # counterparts.  Original keys are preserved for ``extra="allow"``.
         mirrored: dict[str, Any] = {}
         # ``settings_cls`` is not uniformly exposed across pydantic-settings
@@ -280,7 +280,7 @@ class JsoncConfigSettingsSource(JsonConfigSettingsSource):
                 ):
                     # Env vars get JSON-decoded for list/dict-typed fields;
                     # file sources hand raw strings over, so decode here to
-                    # keep config-file entries on par with env variables.
+                    # keep .berg_config-file entries on par with env variables.
                     # Leave as-is on decode failure; pydantic reports the real error.
                     with contextlib.suppress(ValueError):
                         decoded = json.loads(value)
@@ -303,12 +303,12 @@ class JsoncConfigSettingsSource(JsonConfigSettingsSource):
 
 
 class EnvExpandingYamlConfigSettingsSource(YamlConfigSettingsSource):
-    """YAML config source that expands ``${env:VAR}`` placeholders.
+    """YAML .berg_config source that expands ``${env:VAR}`` placeholders.
 
-    Reads ``config/bergagents.yaml`` and substitutes ``${env:VAR}`` / ``${VAR}``
+    Reads ``.berg_config/bergagents.yaml`` and substitutes ``${env:VAR}`` / ``${VAR}``
     references against the process environment (with ``.env`` merged in) before
     pydantic-settings consumes the values, so secrets can live in ``.env`` and
-    be referenced from the YAML config.
+    be referenced from the YAML .berg_config.
     """
 
     def _read_file(self, file_path: Path | Traversable) -> dict[str, Any]:
@@ -364,7 +364,7 @@ class Settings(BaseSettings):
     .. note::
         Provider credentials are **not** hardcoded - they are read from the
         environment / ``.env`` only, satisfying the project's security
-        requirement that provider credentials come from config, not source.
+        requirement that provider credentials come from .berg_config, not source.
     """
 
     model_config = SettingsConfigDict(
@@ -372,8 +372,8 @@ class Settings(BaseSettings):
         env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="allow",
-        json_file=PROJECT_ROOT / "config" / "bergagents.jsonc",
-        yaml_file=PROJECT_ROOT / "config" / "bergagents.yaml",
+        json_file=PROJECT_ROOT / ".berg_config" / "bergagents.jsonc",
+        yaml_file=PROJECT_ROOT / ".berg_config" / "bergagents.yaml",
         json_file_encoding="utf-8",
         yaml_file_encoding="utf-8",
         case_sensitive=False,
@@ -395,10 +395,10 @@ class Settings(BaseSettings):
         1. ``init_settings`` - values passed to ``Settings(...)`` directly
         2. ``env_settings`` - ``BERG_AGENT_*`` environment variables
         3. ``dotenv_settings`` - the ``.env`` file at the project root
-        4. ``JsoncConfigSettingsSource`` - ``config/bergagents.jsonc``
+        4. ``JsoncConfigSettingsSource`` - ``.berg_config/bergagents.jsonc``
 
         The default JSON source is replaced with the JSONC-aware variant so the
-        config file may contain comments and trailing commas.
+        .berg_config file may contain comments and trailing commas.
         """
         return (
             init_settings,
@@ -456,7 +456,7 @@ class Settings(BaseSettings):
     provider_list: list[dict] | None = None
 
     #: --- Provider/model registry (preferred configuration) ------------------
-    #: Declared directly in ``config/bergagents.jsonc`` as a ``providers``
+    #: Declared directly in ``.berg_config/bergagents.jsonc`` as a ``providers``
     #: block. Each provider carries connection ``options`` (baseURL,
     #: apiKey, ...) and a ``models`` map. The provider is derived from the
     #: selected model id - see :mod:`berg_agents.providers.registry`.
@@ -479,7 +479,7 @@ class Settings(BaseSettings):
     #: Declare harness profiles as either a JSON string or a dict mapping
     #: ``provider:model`` keys to profile kwargs accepted by the profile
     #: router (:mod:`berg_agents.profiles.router`), which merges them with
-    #: ``config/profiles.yaml`` before graph construction so the harness can
+    #: ``.berg_config/profiles.yaml`` before graph construction so the harness can
     #: tune prompts, tool visibility, and middleware per model.
     #:
     #: Example JSON::
@@ -565,7 +565,7 @@ class Settings(BaseSettings):
     memory_backend: str = "mempalace"
     memory_autosave: bool = False
 
-    #: --- BergAgents presets (config-driven toolsets/capabilities) -----------
+    #: --- BergAgents presets (.berg_config-driven toolsets/capabilities) -----------
     #: Named toolset definitions (default / builtin / custom tool name lists).
     #: Maps to ``toolsets`` in bergagents.jsonc.
     toolsets: dict[str, Any] | None = None

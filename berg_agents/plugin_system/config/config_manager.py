@@ -33,7 +33,7 @@ class PluginConfigManager:
         if self._initialized:
             return
 
-        # Ensure config directory exists
+        # Ensure .berg_config directory exists
         self.config_dir.mkdir(parents=True, exist_ok=True)
         (self.config_dir / "plugins").mkdir(exist_ok=True)
 
@@ -70,7 +70,7 @@ class PluginConfigManager:
         # Start with defaults
         config = dict(defaults) if defaults else {}
 
-        # Load from user config file
+        # Load from user .berg_config file
         user_config = await self._load_user_config(plugin_id)
         if user_config:
             self._deep_merge(config, user_config)
@@ -109,7 +109,7 @@ class PluginConfigManager:
                 data = yaml.safe_load(f)
                 return data.get("settings", {}) if data else {}
         except Exception as e:
-            logger.warning(f"Failed to load config for {plugin_id}: {e}")
+            logger.warning(f"Failed to load .berg_config for {plugin_id}: {e}")
             return None
 
     def _load_env_config(self, plugin_id: str) -> dict[str, Any]:
@@ -218,9 +218,9 @@ class PluginConfigManager:
         Args:
             plugin_id: Plugin ID
             updates: Configuration updates
-            persist: Write to config file
+            persist: Write to .berg_config file
         """
-        # Get current config
+        # Get current .berg_config
         current = self._cache.get(plugin_id, {})
 
         # Merge updates
@@ -236,7 +236,7 @@ class PluginConfigManager:
     async def _save_user_config(
             self, plugin_id: str, settings: dict[str, Any]
     ) -> None:
-        """Save configuration to user config file."""
+        """Save configuration to user .berg_config file."""
         config_file = self.config_dir / "plugins" / f"{plugin_id}.yaml"
 
         # Ensure directory exists
@@ -292,7 +292,7 @@ class PluginConfigWatcher:
         logger.info(f"Configuration changed for {plugin_id}")
 
         try:
-            # Reload config
+            # Reload .berg_config
             new_config = await self.config_manager.reload(plugin_id)
 
             # Notify plugin
@@ -307,4 +307,4 @@ class PluginConfigWatcher:
                         f"Plugin {plugin_id} does not support live reconfiguration"
                     )
         except Exception as e:
-            logger.error(f"Failed to reload config for {plugin_id}: {e}")
+            logger.error(f"Failed to reload .berg_config for {plugin_id}: {e}")

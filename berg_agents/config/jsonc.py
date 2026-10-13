@@ -2,7 +2,7 @@
 
 The project uses ``bergagents.jsonc`` as its primary configuration file, so
 both :func:`berg_agents.main.load_config` and the pydantic-settings source in
-:mod:`berg_agents.config.settings` need a loader that understands JSONC.  The standard
+:mod:`berg_agents..berg_config.settings` need a loader that understands JSONC.  The standard
 :mod:`json` module rejects comments and trailing commas, so this module
 provides a small, string-aware pre-processor that strips them before handing
 the text to :func:`json.loads`.

@@ -14,7 +14,7 @@ return ``str`` on success or ``None`` to pass to the next backend:
 Order comes from ``settings.web_search_backends``
 (``BERG_AGENT_WEB_SEARCH_BACKENDS``, default
 ``["ollama", "duckduckgo"]`` for search and the fetch-capable subset
-thereof for fetch). Add, remove, or reorder providers in config -
+thereof for fetch). Add, remove, or reorder providers in .berg_config -
 the chain adapts without code changes. Unknown names are skipped
 with a warning.
 """
@@ -150,7 +150,7 @@ class WebBackend:
     fetch: Callable[[str], str | None] | None = None
 
 
-#: Registry - data, not branches. Add providers here; select via config.
+#: Registry - data, not branches. Add providers here; select via .berg_config.
 BACKENDS: dict[str, WebBackend] = {
     "ollama": WebBackend(
         name="ollama",

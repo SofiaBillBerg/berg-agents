@@ -44,7 +44,7 @@ app.execute("Fix the flaky sync test", task_type="standard")
 
 ## Configure
 
-`config/bergagents.jsonc` - `providers`, `harness`, `model_routing` (models per complexity), `hitl_rules`, `hitl_rules`
+`.berg_config/bergagents.jsonc` - `providers`, `harness`, `model_routing` (models per complexity), `hitl_rules`, `hitl_rules`
 (auto_execute / notify_after / ask_before / human_leads), `plugins`, per-agent complexity.
 Secrets in `.env` via `${env:VAR}`; `BERG_AGENT_*` env vars override everything.
 Full reference in [Configuration](../docs/CONFIGURATION.qmd).

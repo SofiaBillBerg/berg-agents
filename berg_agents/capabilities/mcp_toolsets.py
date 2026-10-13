@@ -1,6 +1,6 @@
 """MCP servers as pydantic-ai toolsets for chat agents.
 
-Reads ``config/mcp.json`` in its native ``{"mcpServers": {...}}``
+Reads ``.berg_config /mcp.json`` in its native ``{"mcpServers": {...}}``
 shape (Claude-style dict — *not* the list shape
 :func:`~berg_agents.core.mcp.load_mcp_server_configs` expects, which
 is why that file was previously configured but consumed by nothing):
@@ -47,9 +47,9 @@ def _expand(value: Any) -> Any:
 
 
 def _config_path() -> Path | None:
-    """Locate ``config/mcp.json`` under the repo root."""
+    """Locate ``.berg_config /mcp.json`` under the repo root."""
     root = Path(__file__).resolve().parent.parent.parent
-    candidate = root / "config" / "mcp.json"
+    candidate = root / ".berg_config" / "mcp.json"
     return candidate if candidate.is_file() else None
 
 
@@ -61,7 +61,7 @@ def _load_config() -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        logger.warning("MCP config unreadable (%s): %s", path, exc)
+        logger.warning("MCP .berg_config unreadable (%s): %s", path, exc)
         return {}
     servers = data.get("mcpServers") if isinstance(data, dict) else None
     return servers if isinstance(servers, dict) else {}
@@ -117,7 +117,9 @@ def list_servers() -> list[dict[str, Any]]:
     ]
 
 
-def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
+def build_mcp_toolsets(
+        *, refresh: bool = False, exclude: frozenset[str] = frozenset()
+) -> list[Any]:
     """Build one toolset per enabled MCP server (cached per process).
 
     Toolset objects are shared across requests; the stdio transports
@@ -127,7 +129,16 @@ def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
     resilient wrapper degrades a dead server to "no tools" rather
     than failing the turn.
 
+    Enablement lives in plugin state, not the .berg_config flag: every
+    configured server builds unless listed in *exclude*. The chat
+    loader syncs ``enabled: false`` .berg_config entries to disabled plugin
+    state at warmup, so the .berg_config kill-switch keeps working through
+    the same mechanism as the UI toggles.
+
     :param refresh: Rebuild instead of reusing cached toolsets.
+    :param exclude: Server keys to withhold (disabled plugin toggles).
+        Filtering applies on top of the full cache, so toggling needs
+        no rebuild and never disturbs live transports.
     :return: Toolsets ready for ``Agent(toolsets=[...])``.
     """
     from berg_agents.core.mcp import is_sensitive_server
@@ -139,14 +150,16 @@ def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
 
     global _CACHE, _LAST_NAMES
     if _CACHE and not refresh:
-        return list(_CACHE.values())
+        # NOTE: Exclusion filters the cached build (see docstring).
+        return [ts for name, ts in _CACHE.items() if name not in exclude]
 
     toolsets: dict[str, Any] = {}
     for name, entry in _load_config().items():
         if not isinstance(entry, dict):
             continue
-        if entry.get("enabled", True) is False:
-            continue
+        # NOTE: No .berg_config `enabled` check here — enablement is plugin
+        # state (see docstring); the loader syncs .berg_config-off servers
+        # to disabled plugins at warmup.
         try:
             server_type = str(entry.get("type", "")).strip().lower()
             if server_type == "remote" and entry.get("url"):
@@ -193,6 +206,8 @@ def build_mcp_toolsets(*, refresh: bool = False) -> list[Any]:
             logger.warning("MCP server %r unavailable, skipping: %s", name, exc)
     _CACHE = toolsets
     _LAST_NAMES = sorted(toolsets)
+    if exclude:
+        return [ts for name, ts in toolsets.items() if name not in exclude]
     return list(toolsets.values())
 
 

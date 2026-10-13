@@ -1,5 +1,3 @@
-
-
 /*
  * Chat hook - wraps AI SDK v7's useChat to talk to the streaming backend.
  *
@@ -11,20 +9,86 @@
  * tool calls (file operations + run_task), which run the full BergAgents harness.
  */
 
-import type {TextUIPart, UIMessage} from "ai";
-import {DefaultChatTransport} from "ai";
-import type {SetStateAction} from "react";
-import {useEffect, useRef, useState} from "react";
+import type { TextUIPart, UIMessage } from "ai";
+import { DefaultChatTransport } from "ai";
+import type { SetStateAction } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import {useChat} from "@ai-sdk/react";
+import { useChat } from "@ai-sdk/react";
 
-import {API_BASE} from "@/envConfig";
+import { API_BASE } from "@/envConfig";
 
 /** localStorage key for the live conversation (shared with History). */
 export const CHAT_MESSAGES_KEY = "berg_chat_messages";
 
+/** localStorage key for the active server-side session id. */
+export const SESSION_ID_KEY = "berg_session_id";
+
 /** Max messages persisted (keeps quota usage bounded). */
 const MAX_PERSISTED_MESSAGES = 200;
+
+/** Max chars kept per tool input/output in storage (display caps lower). */
+const MAX_STORED_PART_CHARS = 2000;
+
+/** Soft budget for the whole persisted payload (well under quota). */
+const MAX_STORED_JSON_CHARS = 700_000;
+
+/**
+ * Slim a UIMessage list for localStorage: tool inputs/outputs are
+ * truncated, so one big `read_file` can never blow the quota and
+ * silently leave stale state behind (the restore "lottery").
+ * Approval flow needs no old outputs, only part identities.
+ *
+ * @param msgs - Raw UI messages.
+ * @returns JSON-safe slimmed copies.
+ */
+export function slimUIMessagesForPersist(msgs: unknown[]): unknown[] {
+  const trim = (value: unknown): unknown => {
+    if (typeof value === "string" && value.length > MAX_STORED_PART_CHARS) {
+      return `${value.slice(0, MAX_STORED_PART_CHARS)}\n… (stored truncated)`;
+    }
+    return value;
+  };
+  return msgs.map((m) => {
+    if (typeof m !== "object" || m === null) return m;
+    const msg = m as { parts?: unknown };
+    if (!Array.isArray(msg.parts)) return m;
+    return {
+      ...msg,
+      parts: msg.parts.map((p) => {
+        if (typeof p !== "object" || p === null) return p;
+        const part = p as { input?: unknown; output?: unknown };
+        const next: Record<string, unknown> = { ...part };
+        if ("input" in next) next.input = trim(next.input);
+        if ("output" in next) next.output = trim(next.output);
+        return next;
+      })};
+  });
+}
+
+/**
+ * Serialize messages to a quota-safe JSON string: slim first, then
+ * drop oldest messages until under budget. Deterministic — the newest
+ * turn always survives, so restores stop being a lottery.
+ *
+ * @param msgs - Raw UI messages (newest last).
+ * @returns JSON string, or null when nothing serializable remains.
+ */
+export function serializeForPersist(msgs: unknown[]): string | null {
+  let slim = slimUIMessagesForPersist(
+    msgs.slice(-MAX_PERSISTED_MESSAGES),
+  ) as unknown[];
+  try {
+    let json = JSON.stringify(slim);
+    while (json.length > MAX_STORED_JSON_CHARS && slim.length > 1) {
+      slim = slim.slice(Math.ceil(slim.length / 2));
+      json = JSON.stringify(slim);
+    }
+    return json;
+  } catch {
+    return null;
+  }
+}
 
 export interface ChatMessage {
   id: string;
@@ -140,6 +204,18 @@ export interface UseAISDKChatReturn {
   editApprovalArgs: (id: string, args: unknown) => void;
   /** Withdraw a per-item decision before the batch resumes. */
   revertApproval: (id: string) => void;
+  /** Visible system-recovery notice (failed-send auto-rejects). */
+  systemNotice: string | null;
+  /** Dismiss the system notice. */
+  dismissSystemNotice: () => void;
+  /** Active server-side session id (source of truth across browsers). */
+  sessionId: string | null;
+  /** Active session title for the chrome row. */
+  sessionTitle: string | null;
+  /** Start a new server-side session (clears the live chat). */
+  newServerChat: () => Promise<void>;
+  /** Open a server-side session by id (loads its transcript). */
+  openSession: (id: string) => Promise<void>;
 }
 
 /**
@@ -263,6 +339,12 @@ function messageText(msg: UIMessage): string {
  * dead run (observed as cryptic failures). Parts answered but never
  * executed revert to `approval-requested` so the user is asked again;
  * malformed parts are dropped.
+ *
+ * Restores (`preserveLatest === false`) go further: the backend is
+ * stateless, so EVERY restored approval id belongs to a dead run.
+ * Their ids are stripped, which renders them as expired and makes
+ * them unanswerable — a reload can never resurrect a blocking
+ * approval card again.
  */
 function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
   return msgs
@@ -278,25 +360,57 @@ function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
       if (preserveLatest && index === all.length - 1) return m;
       return {
         ...m,
-        parts: (m.parts as unknown[]).filter((p) => {
-          if (typeof p !== "object" || p === null) return false;
-          const part = p as { type?: unknown; state?: unknown };
-          if (typeof part.type !== "string") return false;
+        parts: (m.parts as unknown[]).flatMap((p) => {
+          if (typeof p !== "object" || p === null) return [];
+          const part = p as {
+            type?: unknown;
+            state?: unknown;
+            approval?: unknown;
+          };
+          // Malformed parts can never resume — drop them.
+          if (typeof part.type !== "string") return [];
+          const isTool =
+            part.type === "dynamic-tool" || part.type.startsWith("tool-");
           if (
-            (part.type === "dynamic-tool" || part.type.startsWith("tool-")) &&
+            isTool &&
             part.state === "approval-responded" &&
             (part as { output?: unknown }).output === undefined
           ) {
             // Answered but never executed: re-ask instead of replaying.
-            return {
-              ...part,
-              state: "approval-requested",
-              approval: undefined};
+            return [
+              {
+                ...part,
+                state: "approval-requested",
+                approval: undefined}];
           }
-          return { ...part };
+          if (
+            !preserveLatest &&
+            isTool &&
+            part.state === "approval-requested"
+          ) {
+            // Dead run (see docstring): expire instead of replaying.
+            const { approval: _dropped, ...rest } = part as Record<
+              string,
+              unknown
+            >;
+            return [rest];
+          }
+          return [{ ...part }];
         })};
     });
 }
+
+/**
+ * Reason used for system-initiated rejections (failed sends, see the
+ * error effect below). Deliberately retry-friendly: unlike an
+ * explicit user rejection, a dead run says nothing about the action
+ * itself, so the model should feel free to try again.
+ */
+const SYSTEM_RETRY_REASON =
+  "System: the previous tool run failed before completing " +
+  "(mismatched or interrupted approval state). This rejection is " +
+  "automatic cleanup, NOT a human decision — you may retry the same " +
+  "action with corrected arguments.";
 
 /**
  * Main chat hook - wraps AI SDK v7's useChat to talk to /api/chat/stream.
@@ -312,6 +426,12 @@ export function useAISDKChat(): UseAISDKChatReturn {
   // state separately and call sendMessage directly.
   const [input, setInput] = useState("");
 
+  // Server-side session: the authoritative conversation record shared
+  // by every browser. Declared before useChat so the transport body
+  // below always carries the current id.
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionTitle, setSessionTitle] = useState<string | null>(null);
+
   const {
     messages: uiMessages,
     sendMessage: sdkSendMessage,
@@ -325,12 +445,15 @@ export function useAISDKChat(): UseAISDKChatReturn {
       // Strip stale approval answers before every send. Anything
       // answered in an EARLIER message belongs to a dead run; only
       // the live last message may carry answers to the backend.
+      // sessionId tells the backend which server-side session this
+      // turn belongs to (any browser, any profile).
       prepareSendMessagesRequest: ({ id, messages, trigger, messageId }) => ({
         body: {
           id,
           messages: sanitizeHistory(messages as unknown as unknown[], true),
           trigger,
-          messageId}})}),
+          messageId,
+          sessionId}})}),
     // Resume a paused run after approvals. Per-item answers mark parts
     // one at a time; the resend fires once every pending part in the
     // paused message is answered (stepwise decisions never fire a
@@ -551,9 +674,65 @@ export function useAISDKChat(): UseAISDKChatReturn {
 
   // Restore a snapshot (e.g. from ConversationHistory) into the live chat.
   // Stored snapshots predate this load, so no paused run can be live.
+  // Duplicate message ids (e.g. one request dumped to two UI messages)
+  // are suffixed — React keys must be unique and ids are otherwise opaque.
   const restoreMessages = (msgs: unknown[]) => {
     if (!Array.isArray(msgs)) return;
-    setUIMessages(sanitizeHistory(msgs, false) as unknown as UIMessage[]);
+    const clean = sanitizeHistory(msgs, false) as unknown as Array<{
+      id?: unknown;
+    }>;
+    const seen = new Set<string>();
+    for (const m of clean) {
+      if (typeof m !== "object" || m === null || typeof m.id !== "string") {
+        continue;
+      }
+      let id: string = m.id;
+      if (seen.has(id)) {
+        let n = 2;
+        while (seen.has(`${id}-dup${n}`)) n += 1;
+        id = `${id}-dup${n}`;
+        m.id = id;
+      }
+      seen.add(id);
+    }
+    setUIMessages(clean as unknown as UIMessage[]);
+  };
+
+  // Open a server-side session: load its transcript, adopt its id.
+  const openSession = async (id: string) => {
+    const resp = await fetch(
+      `${API_BASE}/api/sessions/${encodeURIComponent(id)}`,
+    );
+    if (!resp.ok) throw new Error(`Session ${id}: HTTP ${resp.status}`);
+    const data = await resp.json();
+    restoreMessages(Array.isArray(data.messages) ? data.messages : []);
+    setSessionId(id);
+    if (data.session && typeof data.session.title === "string") {
+      setSessionTitle(data.session.title);
+    }
+    try {
+      localStorage.setItem(SESSION_ID_KEY, id);
+    } catch {
+      // Private mode - session id stays in memory only.
+    }
+  };
+
+  // Start a new server-side session (numbered title from the backend).
+  const newServerChat = async () => {
+    const resp = await fetch(`${API_BASE}/api/sessions`, { method: "POST" });
+    if (!resp.ok) throw new Error(`New session: HTTP ${resp.status}`);
+    const data = await resp.json();
+    setUIMessages([]);
+    setSessionId(typeof data.id === "string" ? data.id : null);
+    setSessionTitle(typeof data.title === "string" ? data.title : null);
+    try {
+      if (typeof data.id === "string") {
+        localStorage.setItem(SESSION_ID_KEY, data.id);
+        localStorage.removeItem(CHAT_MESSAGES_KEY);
+      }
+    } catch {
+      // Private mode - chat still works in memory.
+    }
   };
 
   // Tracks whether the mount-restore below has run. The persist effect
@@ -562,33 +741,162 @@ export function useAISDKChat(): UseAISDKChatReturn {
   // conversation (this is what erased chats on tab switches).
   const restoredRef = useRef(false);
 
+  // Visible notice for system-initiated recovery (failed sends, see
+  // below). Rendered as an Alert by App — never smuggled into the
+  // message list, so it can never poison a future send.
+  const [systemNotice, setSystemNotice] = useState<string | null>(null);
+
   // Persist the live conversation so tab switches and reloads keep it.
+  // Settled turns only: mid-stream states (half-written tool parts)
+  // are never stored, so storage always holds a clean turn boundary.
+  // Slimmed + budgeted (see serializeForPersist), so a big transcript
+  // shrinks deterministically instead of failing quota and silently
+  // keeping stale state behind.
   useEffect(() => {
     if (!restoredRef.current) return;
+    if (status === "streaming" || status === "submitted") return;
     try {
-      localStorage.setItem(
-        CHAT_MESSAGES_KEY,
-        JSON.stringify(uiMessages.slice(-MAX_PERSISTED_MESSAGES)),
-      );
+      const json = serializeForPersist(uiMessages as unknown as unknown[]);
+      if (json !== null) localStorage.setItem(CHAT_MESSAGES_KEY, json);
     } catch {
-      // Quota exceeded or private mode - chat still works in memory.
+      // Private mode - chat still works in memory.
     }
-  }, [uiMessages]);
+  }, [uiMessages, status]);
 
-  // Restore the persisted conversation once, after mount.
+  // Failed-send recovery: the backend is stateless, so any approval
+  // parts pending when a send errors belong to a run that can never
+  // resume — replaying them only reproduces the mismatch error
+  // forever. Auto-reject them with the retry-friendly system reason
+  // (NOT the firm user-rejection text) and tell the user visibly;
+  // sendAutomaticallyWhen then resumes and the model may retry.
+  // Already-handled ids are never touched twice, so a persistently
+  // failing backend cannot loop sends forever.
+  const handledErrorRef = useRef<unknown>(null);
+  const autoRejectedIds = useRef<Set<string>>(new Set());
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(CHAT_MESSAGES_KEY);
-      if (!raw) return;
-      const parsed: unknown = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        setUIMessages(sanitizeHistory(parsed, false) as unknown as UIMessage[]);
+    if (!error || handledErrorRef.current === error) return;
+    handledErrorRef.current = error;
+    const ids: string[] = [];
+    for (const msg of uiMessages) {
+      if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
+      for (const part of msg.parts) {
+        const p = part as unknown as Record<string, unknown>;
+        if (
+          typeof p !== "object" ||
+          p === null ||
+          (p.state !== "approval-requested" && p.state !== "approval-responded")
+        ) {
+          continue;
+        }
+        const approval = p.approval as { id?: unknown } | undefined;
+        if (
+          typeof approval?.id === "string" &&
+          !autoRejectedIds.current.has(approval.id)
+        ) {
+          ids.push(approval.id);
+        }
       }
-    } catch {
-      // Corrupt storage - start with an empty conversation.
-    } finally {
-      restoredRef.current = true;
     }
+    if (ids.length === 0) return;
+    for (const id of ids) autoRejectedIds.current.add(id);
+    const stopped =
+      /abort|cancel/i.test(String(error)) || status === "streaming";
+    for (const id of ids) {
+      void addToolApprovalResponse({
+        id,
+        approved: false,
+        reason: stopped
+          ? "System: the run was stopped by the user before completing. " +
+            "This rejection is automatic cleanup — you may retry on request."
+          : SYSTEM_RETRY_REASON});
+    }
+    setSystemNotice(
+      stopped
+        ? "Run stopped — pending tool approvals were rejected as cleanup. Send a message to continue."
+        : `A tool run failed (${String(error).slice(0, 200)}). Its pending approvals were auto-rejected so the conversation can continue — ask the model to retry.`,
+    );
+  }, [error, uiMessages, status]);
+
+  // Restore the persisted conversation once, after mount. Server
+  // first (shared across browsers), localStorage as offline fallback.
+  // With no stored session id, mint one for this chat — the backend
+  // creates the row lazily on the first send, so empty mounts never
+  // spam numbered sessions.
+  useEffect(() => {
+    let cancelled = false;
+    const restore = async () => {
+      try {
+        const storedId = localStorage.getItem(SESSION_ID_KEY);
+        if (storedId) {
+          try {
+            const resp = await fetch(
+              `${API_BASE}/api/sessions/${encodeURIComponent(storedId)}`,
+            );
+            if (resp.ok && !cancelled) {
+              const data = await resp.json();
+              if (Array.isArray(data.messages) && data.messages.length > 0) {
+                setUIMessages(
+                  sanitizeHistory(
+                    data.messages,
+                    false,
+                  ) as unknown as UIMessage[],
+                );
+              }
+              setSessionId(storedId);
+              if (data.session && typeof data.session.title === "string") {
+                setSessionTitle(data.session.title);
+              }
+              return;
+            }
+          } catch {
+            // Server unreachable - fall through to local cache.
+          }
+        } else {
+          // No session yet: adopt the project's active session when one
+          // exists (every window converges), else mint an id for this
+          // chat — the backend creates the row lazily on first send.
+          // Either way, fall through to adopt any local transcript.
+          try {
+            const currentResp = await fetch(`${API_BASE}/api/sessions/current`);
+            if (currentResp.ok && !cancelled) {
+              const current = await currentResp.json();
+              if (typeof current.id === "string" && current.id) {
+                await openSession(current.id);
+                return;
+              }
+            }
+          } catch {
+            // Server unreachable - mint locally below.
+          }
+          try {
+            const minted = crypto.randomUUID();
+            localStorage.setItem(SESSION_ID_KEY, minted);
+            if (!cancelled) setSessionId(minted);
+          } catch {
+            // Private mode - session stays server-minted per send.
+          }
+        }
+      } finally {
+        if (!cancelled) restoredRef.current = true;
+      }
+      // Local fallback (offline, or unknown server session).
+      try {
+        const raw = localStorage.getItem(CHAT_MESSAGES_KEY);
+        if (!raw) return;
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setUIMessages(
+            sanitizeHistory(parsed, false) as unknown as UIMessage[],
+          );
+        }
+      } catch {
+        // Corrupt storage - start with an empty conversation.
+      }
+    };
+    void restore();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // handleInputChange for a textarea/input - reads e.target.value.
@@ -600,10 +908,13 @@ export function useAISDKChat(): UseAISDKChatReturn {
 
   // handleSend sends the current input via AI SDK's sendMessage.
   // Clears the box immediately so the sent text doesn't linger.
+  // A manual send resets recovery state: the user is driving again.
   const handleSend = () => {
     if (!input.trim() || isStreaming) return;
     const text = input;
     setInput("");
+    setSystemNotice(null);
+    autoRejectedIds.current.clear();
     void sdkSendMessage({ text });
   };
 
@@ -612,6 +923,8 @@ export function useAISDKChat(): UseAISDKChatReturn {
   const sendMessage = async (content: string) => {
     if (!content.trim() || isStreaming) return;
     setInput((prev) => (prev.trim() === content.trim() ? "" : prev));
+    setSystemNotice(null);
+    autoRejectedIds.current.clear();
     await sdkSendMessage({ text: content });
   };
 
@@ -622,6 +935,8 @@ export function useAISDKChat(): UseAISDKChatReturn {
     if (!content.trim()) return;
     stop();
     setInput("");
+    setSystemNotice(null);
+    autoRejectedIds.current.clear();
     await sdkSendMessage({ text: content });
   };
 
@@ -645,5 +960,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
     respondToApproval,
     respondToAllApprovals,
     editApprovalArgs,
-    revertApproval};
+    revertApproval,
+    systemNotice,
+    dismissSystemNotice: () => setSystemNotice(null),
+    sessionId,
+    sessionTitle,
+    newServerChat,
+    openSession};
 }

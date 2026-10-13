@@ -5,7 +5,7 @@ task type, reports which tools the task needs, and scores how
 confidently this agent can handle a task.
 
 Model selection resolves the task complexity directly onto a model
-from ``config/bergagents.jsonc`` (``model_routing.models``), formatted
+from ``.berg_config/bergagents.jsonc`` (``model_routing.models``), formatted
 as a ``provider:model`` string via
 :func:`berg_agents.providers.models.resolve_model_string`.
 """
@@ -226,7 +226,7 @@ def build_implementation_agent(
     """
     # Explicit model ids bypass routing; otherwise the complexity's
     # model is resolved. The id is then built into an explicit
-    # OpenAI-compatible model instance - config only, no env lookups.
+    # OpenAI-compatible model instance - .berg_config only, no env lookups.
     if model_id is None:
         model_id = model_for_complexity(complexity, cfg)
     model = resolve_model_instance(model_id, cfg)

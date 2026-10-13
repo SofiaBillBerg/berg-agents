@@ -49,7 +49,7 @@ __all__ = [
 PLANNER_NAME = "planner"
 
 #: Preferred complexity for planning (mirrors the ``agents``
-#: block of ``config/bergagents.jsonc``).
+#: block of ``.berg_config/bergagents.jsonc``).
 PLANNER_COMPLEXITY = "complex"
 
 #: Keywords mapping a task onto CRITICAL complexity.

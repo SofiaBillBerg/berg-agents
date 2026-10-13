@@ -11,11 +11,12 @@ import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {Suspense} from "react";
 
-/** Navigation items - links to the three main pages. */
+/** Navigation items - links to the main pages. */
 const NAV_ITEMS = [
   { href: "/", label: "Chat", icon: "💬" },
   { href: "/agents", label: "Agents", icon: "🤖" },
-  { href: "/context", label: "Context", icon: "📚" }];
+  { href: "/context", label: "Context", icon: "📚" },
+  { href: "/history", label: "History", icon: "🕘" }];
 
 /**
  * Inner nav links - isolated so `usePathname` always renders inside a
