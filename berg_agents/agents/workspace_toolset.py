@@ -85,11 +85,11 @@ class WorkspaceToolset(WrapperToolset[None]):
     """
 
     def __init__(
-            self,
-            root_dir: str | Path,
-            *,
-            read_only: bool = False,
-            allow_shell: bool = True,
+        self,
+        root_dir: str | Path,
+        *,
+        read_only: bool = False,
+        allow_shell: bool = True,
     ) -> None:
         """Initialize the workspace toolset.
 
@@ -171,11 +171,11 @@ class WorkspaceToolset(WrapperToolset[None]):
         return _WORKSPACE_INSTRUCTIONS
 
     async def call_tool(
-            self,
-            name: str,
-            tool_args: dict[str, Any],
-            ctx: Any,
-            tool: Any,
+        self,
+        name: str,
+        tool_args: dict[str, Any],
+        ctx: Any,
+        tool: Any,
     ) -> Any:
         """Audit-log every invocation, then delegate to the toolset.
 

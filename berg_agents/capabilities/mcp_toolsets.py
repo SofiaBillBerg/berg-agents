@@ -1,6 +1,6 @@
 """MCP servers as pydantic-ai toolsets for chat agents.
 
-Reads ``.berg_config /mcp.json`` in its native ``{"mcpServers": {...}}``
+Reads ``.berg-agents /mcp.json`` in its native ``{"mcpServers": {...}}``
 shape (Claude-style dict — *not* the list shape
 :func:`~berg_agents.core.mcp.load_mcp_server_configs` expects, which
 is why that file was previously configured but consumed by nothing):
@@ -24,8 +24,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 from pathlib import Path
+import re
 from typing import Any
 
 from pydantic_ai.toolsets.wrapper import WrapperToolset
@@ -47,9 +47,15 @@ def _expand(value: Any) -> Any:
 
 
 def _config_path() -> Path | None:
-    """Locate ``.berg_config /mcp.json`` under the repo root."""
-    root = Path(__file__).resolve().parent.parent.parent
-    candidate = root / ".berg_config" / "mcp.json"
+    """Locate ``mcp.json`` inside the resolved config directory.
+
+    Uses the shared resolver (``BERG_AGENTS_CONFIG_DIR`` → project
+    ``.berg-agents/`` → ``~/.berg-agents/``), so MCP config follows the
+    same rule as everything else instead of re-deriving the repo root.
+    """
+    from berg_agents.config.paths import resolve_config_dir
+
+    candidate = resolve_config_dir() / "mcp.json"
     return candidate if candidate.is_file() else None
 
 
@@ -61,7 +67,7 @@ def _load_config() -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        logger.warning("MCP .berg_config unreadable (%s): %s", path, exc)
+        logger.warning("MCP configuration unreadable (%s): %s", path, exc)
         return {}
     servers = data.get("mcpServers") if isinstance(data, dict) else None
     return servers if isinstance(servers, dict) else {}
@@ -90,7 +96,7 @@ class _ResilientToolset(WrapperToolset[None]):
             return {}
 
     async def call_tool(
-            self, name: str, tool_args: dict[str, Any], ctx: Any, tool: Any
+        self, name: str, tool_args: dict[str, Any], ctx: Any, tool: Any
     ) -> Any:
         try:
             return await super().call_tool(name, tool_args, ctx, tool)
@@ -118,7 +124,7 @@ def list_servers() -> list[dict[str, Any]]:
 
 
 def build_mcp_toolsets(
-        *, refresh: bool = False, exclude: frozenset[str] = frozenset()
+    *, refresh: bool = False, exclude: frozenset[str] = frozenset()
 ) -> list[Any]:
     """Build one toolset per enabled MCP server (cached per process).
 
@@ -129,10 +135,10 @@ def build_mcp_toolsets(
     resilient wrapper degrades a dead server to "no tools" rather
     than failing the turn.
 
-    Enablement lives in plugin state, not the .berg_config flag: every
+    Enablement lives in plugin state, not the configuration flag: every
     configured server builds unless listed in *exclude*. The chat
-    loader syncs ``enabled: false`` .berg_config entries to disabled plugin
-    state at warmup, so the .berg_config kill-switch keeps working through
+    loader syncs ``enabled: false`` configuration entries to disabled plugin
+    state at warmup, so the configuration kill-switch keeps working through
     the same mechanism as the UI toggles.
 
     :param refresh: Rebuild instead of reusing cached toolsets.
@@ -157,8 +163,8 @@ def build_mcp_toolsets(
     for name, entry in _load_config().items():
         if not isinstance(entry, dict):
             continue
-        # NOTE: No .berg_config `enabled` check here — enablement is plugin
-        # state (see docstring); the loader syncs .berg_config-off servers
+        # NOTE: No config `enabled` check here — enablement is plugin
+        # state (see docstring); the loader syncs config-off servers
         # to disabled plugins at warmup.
         try:
             server_type = str(entry.get("type", "")).strip().lower()

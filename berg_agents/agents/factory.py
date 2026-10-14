@@ -220,8 +220,8 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
         )
         if len(combined) > 8000:
             combined = (
-                    combined[:8000] + f"\n... output truncated "
-                                      f"({len(combined)} chars total)"
+                combined[:8000] + f"\n... output truncated "
+                f"({len(combined)} chars total)"
             )
         return f"[exit {proc.returncode}]\n{combined}".strip()
 
@@ -306,13 +306,13 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
 
 
 def build_loop(
-        adapter: Any,
-        tools: Sequence[ToolSpec] | None = None,
-        *,
-        root_dir: str | Path = ".",
-        interrupt_on: Mapping[str, bool] | None = None,
-        max_steps: int = 25,
-        checkpointer: Checkpointer | None = None,
+    adapter: Any,
+    tools: Sequence[ToolSpec] | None = None,
+    *,
+    root_dir: str | Path = ".",
+    interrupt_on: Mapping[str, bool] | None = None,
+    max_steps: int = 25,
+    checkpointer: Checkpointer | None = None,
 ) -> BergLoop:
     """Build a BergLoop wired for this project.
 
@@ -346,14 +346,14 @@ def build_loop(
 
 
 def build_agent(
-        adapter: Any,
-        tools: Sequence[ToolSpec] | None = None,
-        *,
-        root_dir: str | Path = ".",
-        system_prompt: str | None = None,
-        interrupt_on: Mapping[str, bool] | None = None,
-        max_steps: int = 25,
-        checkpointer: Checkpointer | None = None,
+    adapter: Any,
+    tools: Sequence[ToolSpec] | None = None,
+    *,
+    root_dir: str | Path = ".",
+    system_prompt: str | None = None,
+    interrupt_on: Mapping[str, bool] | None = None,
+    max_steps: int = 25,
+    checkpointer: Checkpointer | None = None,
 ) -> BergLoop:
     """Build an agent loop with a system prompt.
 

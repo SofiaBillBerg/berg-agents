@@ -15,12 +15,10 @@ the ``can_handle`` / ``execute`` contract used by callers.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import json
 import logging
-from dataclasses import dataclass, field
 from typing import Any, ClassVar
-
-from pydantic_ai import Agent, RunContext
 
 from berg_agents.core.interface import (
     AbstractAgent,
@@ -30,6 +28,7 @@ from berg_agents.core.interface import (
 )
 from berg_agents.providers.models import resolve_model_instance
 from berg_agents.providers.tiers import model_for_complexity
+from pydantic_ai import Agent, RunContext
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ __all__ = [
 PLANNER_NAME = "planner"
 
 #: Preferred complexity for planning (mirrors the ``agents``
-#: block of ``.berg_config/bergagents.jsonc``).
+#: block of ``.berg-agents/bergagents.jsonc``).
 PLANNER_COMPLEXITY = "complex"
 
 #: Keywords mapping a task onto CRITICAL complexity.
@@ -105,7 +104,7 @@ class Subtask:
 
     @classmethod
     def simple(
-            cls, subtask_id: str, description: str, task_type: str = "generic"
+        cls, subtask_id: str, description: str, task_type: str = "generic"
     ) -> Subtask:
         """Create a subtask with default STANDARD complexity."""
         # Single-step fallback for tasks matching no template.
@@ -123,7 +122,7 @@ class PlannerDeps:
 
 
 def estimate_complexity(
-        description: str, task_type: str = "generic"
+    description: str, task_type: str = "generic"
 ) -> TaskComplexity:
     """Estimate task complexity from keywords.
 
@@ -359,7 +358,7 @@ def plan_depth(ordered: list[Subtask]) -> int:
 
 
 def suggest_planning_hint(
-        plan: dict[str, Any], complexity: TaskComplexity
+    plan: dict[str, Any], complexity: TaskComplexity
 ) -> dict[str, Any] | None:
     """Suggest harness Planning capability when multi-step planning is needed."""
     if complexity in {TaskComplexity.COMPLEX, TaskComplexity.CRITICAL}:
@@ -377,9 +376,9 @@ def suggest_planning_hint(
 
 
 def build_plan(
-        description: str,
-        task_type: str = "generic",
-        complexity: TaskComplexity = TaskComplexity.STANDARD,
+    description: str,
+    task_type: str = "generic",
+    complexity: TaskComplexity = TaskComplexity.STANDARD,
 ) -> dict[str, Any]:
     """Build a full ordered plan dictionary for a task.
 
@@ -412,7 +411,7 @@ def build_plan(
 
 
 def build_planner_agent(
-        model_id: str | None = None, cfg: dict[str, Any] | None = None
+    model_id: str | None = None, cfg: dict[str, Any] | None = None
 ) -> Agent:
     """Build the planner Pydantic AI agent.
 
@@ -449,9 +448,9 @@ except Exception:
 
 @planner_agent.tool
 def decompose_task(
-        ctx: RunContext[PlannerDeps],
-        description: str,
-        task_type: str = "generic",
+    ctx: RunContext[PlannerDeps],
+    description: str,
+    task_type: str = "generic",
 ) -> str:
     """Decompose a task into an ordered JSON plan.
 
@@ -471,9 +470,9 @@ def decompose_task(
 
 @planner_agent.tool
 def estimate_task_complexity(
-        ctx: RunContext[PlannerDeps],
-        description: str,
-        task_type: str = "generic",
+    ctx: RunContext[PlannerDeps],
+    description: str,
+    task_type: str = "generic",
 ) -> str:
     """Grade a task's complexity level.
 
@@ -536,10 +535,10 @@ class Planner(AbstractAgent):
     # Instance method required by the AbstractAgent contract.
     # ruff: ignore[no-self-use]
     def execute(
-            self,
-            task: dict[str, Any],
-            context: TaskContext,
-            model: Any = None,
+        self,
+        task: dict[str, Any],
+        context: TaskContext,
+        model: Any = None,
     ) -> AgentResult:
         """Break down the task into ordered subtasks.
 

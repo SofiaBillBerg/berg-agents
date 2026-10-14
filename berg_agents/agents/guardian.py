@@ -24,18 +24,17 @@ used for nuanced cases: it can call the deterministic
 
 from __future__ import annotations
 
-import logging
-import re
 from dataclasses import dataclass
 from dataclasses import field as dc_field
+import logging
+import re
 from typing import Any
-
-from pydantic import BaseModel
-from pydantic import Field as PydField
-from pydantic_ai import Agent, RunContext
 
 from berg_agents.core.interface import RiskLevel, TaskComplexity
 from berg_agents.providers.models import resolve_model_instance
+from pydantic import BaseModel
+from pydantic import Field as PydField
+from pydantic_ai import Agent, RunContext
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +75,7 @@ MEDIUM_RISK_PATTERNS: list[str] = [
     r"env\s+var"]
 
 # Default HITL task-type gates. Mirror the ``hitl_rules``
-# block of ``.berg_config/bergagents.jsonc`` (the .berg_config is the
+# block of ``.berg-agents/bergagents.jsonc`` (the .berg-agents is the
 # source of truth; these are import-safe fallbacks so the
 # pure decision functions never need file access).
 AUTO_EXECUTE: list[str] = ["read_file", "list_files", "search_code"]
@@ -87,7 +86,7 @@ HUMAN_LEADS: list[str] = [
     "production_deploy",
     "data_migration"]
 
-# Confidence below this forces human review, whatever
+# Confidence below this score forces human review, whatever
 # the risk level says.
 LOW_CONFIDENCE_THRESHOLD = 0.6
 
@@ -97,7 +96,7 @@ class GuardianDeps:
     """Dependency bundle injected into the Guardian agent.
 
     Carries the HITL task-type gates so deployments can
-    override them (e.g. from ``hitl_rules`` .berg_config)
+    override them (e.g. from ``hitl_rules`` configuration)
     without touching module constants.
     """
 
@@ -130,8 +129,8 @@ class GuardianDecision(BaseModel):
 
 
 def assess_risk(
-        description: str,
-        task_type: str = "generic",
+    description: str,
+    task_type: str = "generic",
 ) -> RiskLevel:
     """Assess the risk level of a task (pure function).
 
@@ -175,11 +174,11 @@ def assess_risk(
 
 
 def decide_hitl(
-        task_type: str,
-        complexity: TaskComplexity | str,
-        risk: RiskLevel,
-        confidence: float = 1.0,
-        deps: GuardianDeps | None = None,
+    task_type: str,
+    complexity: TaskComplexity | str,
+    risk: RiskLevel,
+    confidence: float = 1.0,
+    deps: GuardianDeps | None = None,
 ) -> tuple[bool, list[str]]:
     """Apply the core HITL decision matrix (pure function).
 
@@ -245,11 +244,11 @@ def decide_hitl(
 
 
 def guard_review(
-        description: str,
-        task_type: str = "generic",
-        complexity: TaskComplexity | str = TaskComplexity.STANDARD,
-        confidence: float = 1.0,
-        deps: GuardianDeps | None = None,
+    description: str,
+    task_type: str = "generic",
+    complexity: TaskComplexity | str = TaskComplexity.STANDARD,
+    confidence: float = 1.0,
+    deps: GuardianDeps | None = None,
 ) -> GuardianDecision:
     """Run the deterministic review gate (pure function).
 
@@ -311,8 +310,8 @@ _GUARDIAN_INSTRUCTIONS = (
 
 
 def build_guardian_agent(
-        model_id: str | None = None,
-        cfg: dict[str, Any] | None = None,
+    model_id: str | None = None,
+    cfg: dict[str, Any] | None = None,
 ) -> Agent[GuardianDeps, GuardianDecision]:
     """Build the Guardian Pydantic AI agent.
 
@@ -323,13 +322,13 @@ def build_guardian_agent(
     Args:
         model_id: Model id as declared under a provider
             ``models`` map. None selects the default.
-        cfg: Optional .berg_config override for resolution.
+        cfg: Optional configuration override for resolution.
 
     Returns:
         A Pydantic AI Agent named "guardian" with the
         risk-assessment tool and structured decisions.
     """
-    # Explicit model instance: construction reads .berg_config only,
+    # Explicit model instance: construction reads configuration only,
     # never the process environment, and makes no network calls.
     model = resolve_model_instance(model_id, cfg)
 
@@ -343,9 +342,9 @@ def build_guardian_agent(
 
     @agent.tool
     def assess_task_risk(
-            ctx: RunContext[GuardianDeps],
-            description: str,
-            task_type: str = "generic",
+        ctx: RunContext[GuardianDeps],
+        description: str,
+        task_type: str = "generic",
     ) -> str:
         """Assess a task's risk level deterministically.
 
@@ -365,8 +364,8 @@ def build_guardian_agent(
 
     @agent.tool
     def check_hitl_policy(
-            ctx: RunContext[GuardianDeps],
-            task_type: str,
+        ctx: RunContext[GuardianDeps],
+        task_type: str,
     ) -> str:
         """Report the HITL policy gate for a task type.
 
@@ -390,7 +389,7 @@ def build_guardian_agent(
 
 
 # Default agent instance for the harness.
-# Built at import: model string resolution is offline (.berg_config only, no network).
+# Built at import: model string resolution is offline (configuration only, no network).
 # Fallback keeps import safe when default model is not declared.
 try:
     guardian_agent: Agent[GuardianDeps, GuardianDecision] = (

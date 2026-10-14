@@ -5,7 +5,7 @@ becomes the ``provider:model`` string that Pydantic AI
 ``Agent`` constructors require. Pydantic AI rejects bare
 model ids, so every string built here always carries the
 ``provider:`` prefix taken from the ``providers`` block of
-``.berg_config/bergagents.jsonc`` (e.g. ``"ollama:qwen3.5:9b"``).
+``.berg-agents/bergagents.jsonc`` (e.g. ``"ollama:qwen3.5:9b"``).
 
 Resolution itself is delegated to
 :func:`berg_agents.providers.registry.resolve_model`, which
@@ -30,21 +30,20 @@ from __future__ import annotations
 
 from typing import Any
 
+from berg_agents.providers.registry import resolve_model
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
-
-from berg_agents.providers.registry import resolve_model
 
 __all__ = ["resolve_model_instance", "resolve_model_string"]
 
 
 def resolve_model_string(
-        model_id: str | None = None,
-        cfg: dict[str, Any] | None = None,
+    model_id: str | None = None,
+    cfg: dict[str, Any] | None = None,
 ) -> str:
     """Resolve a model id into a ``provider:model`` string.
 
-    The provider prefix comes from provider .berg_config (the
+    The provider prefix comes from provider configuration (the
     ``_provider`` key returned by ``resolve_model``), never
     from a global flag, so adding a new OpenAI-compatible
     endpoint needs zero code changes here.
@@ -118,10 +117,10 @@ def resolve_model_string(
 
 
 def resolve_model_instance(
-        model_id: str | None = None,
-        cfg: dict[str, Any] | None = None,
+    model_id: str | None = None,
+    cfg: dict[str, Any] | None = None,
 ) -> OpenAIChatModel:
-    """Build an explicit OpenAI-compatible model from .berg_config.
+    """Build an explicit OpenAI-compatible model from configuration files.
 
     Uses the same resolution as :func:`resolve_model_string`
     (provider ownership from the registry, first declared model
@@ -187,13 +186,14 @@ def resolve_model_instance(
     # keyless-local workaround ('api-key-not-set') when api_key is None.
     # An explicit "" skips both that workaround and the OPENAI_API_KEY
     # env fallback and is rejected by the openai SDK at construction.
-    # NOTE: Strip surrounding quotes/whitespace first — a .berg_config value
+    # NOTE: Strip surrounding quotes/whitespace first — a configuration value
     # like '' (empty-quoted, e.g. from a placeholder env var) is not a
     # credential; sending it as a bearer yields opaque 401s ("invalid
     # token payload") instead of clean keyless behavior.
     raw_key = resolved.get("api_key", "")
     api_key = (
-        raw_key.strip().strip("'\"").strip() if isinstance(raw_key, str)
+        raw_key.strip().strip("'\"").strip()
+        if isinstance(raw_key, str)
         else raw_key
     ) or None
 
@@ -208,7 +208,7 @@ def resolve_model_instance(
     # Provider API flavor (per provider block, e.g.
     # ``"api": "anthropic-messages"``). Default is OpenAI
     # Chat Completions. A Messages-style base URL on the
-    # default flavor is a .berg_config error, not something to
+    # default flavor is a configuration error, not something to
     # guess at: the OpenAI SDK would append
     # ``/chat/completions`` to it and produce a 404.
     api = str(resolved.get("api", "") or "").strip().lower()

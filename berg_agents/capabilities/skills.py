@@ -28,8 +28,8 @@ flood the context window.
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ def _parse_skill(path: Path) -> tuple[str, str, str] | None:
             name = value
         elif key == "description" and not description:
             description = value
-    body = text[match.end():].strip()
+    body = text[match.end() :].strip()
     if not name or not body:
         logger.warning("Skill file %s missing name or body, skipping", path)
         return None
@@ -126,9 +126,9 @@ def _collect_candidates(path: Path) -> list[Path]:
 
 
 def list_skills(
-        skill_paths: list[str | list[str]] | None,
-        *,
-        root_dir: str | Path = ".",
+    skill_paths: list[str | list[str]] | None,
+    *,
+    root_dir: str | Path = ".",
 ) -> list[dict[str, Any]]:
     """List available skills without building capabilities.
 
@@ -158,7 +158,7 @@ def list_skills(
             continue
         candidates = _collect_candidates(resolved)
         single = len(candidates) == 1 and (
-                resolved.is_file() or (resolved / "SKILL.md").is_file()
+            resolved.is_file() or (resolved / "SKILL.md").is_file()
         )
         for candidate in candidates:
             parsed = _parse_skill(candidate)
@@ -169,19 +169,17 @@ def list_skills(
             if skill_id in seen:
                 continue
             seen.add(skill_id)
-            found.append(
-                {
-                    "name": skill_id,
-                    "description": description or f"Skill: {label or name}",
-                    "source": str(candidate)}
-            )
+            found.append({
+                "name": skill_id,
+                "description": description or f"Skill: {label or name}",
+                "source": str(candidate)})
     return found
 
 
 def load_skill_capabilities(
-        skill_paths: list[str | list[str]] | None,
-        *,
-        root_dir: str | Path = ".",
+    skill_paths: list[str | list[str]] | None,
+    *,
+    root_dir: str | Path = ".",
 ) -> list[Any]:
     """Build one deferred capability per ``SKILL.md`` found.
 
@@ -214,7 +212,7 @@ def load_skill_capabilities(
         # keeps each skill's own frontmatter name - otherwise every
         # skill would collapse onto one id and dedup would eat them.
         single = len(candidates) == 1 and (
-                resolved.is_file() or (resolved / "SKILL.md").is_file()
+            resolved.is_file() or (resolved / "SKILL.md").is_file()
         )
         for candidate in candidates:
             parsed = _parse_skill(candidate)

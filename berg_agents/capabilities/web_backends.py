@@ -14,17 +14,17 @@ return ``str`` on success or ``None`` to pass to the next backend:
 Order comes from ``settings.web_search_backends``
 (``BERG_AGENT_WEB_SEARCH_BACKENDS``, default
 ``["ollama", "duckduckgo"]`` for search and the fetch-capable subset
-thereof for fetch). Add, remove, or reorder providers in .berg_config -
+thereof for fetch). Add, remove, or reorder providers in .berg-agents -
 the chain adapts without code changes. Unknown names are skipped
 with a warning.
 """
 
 from __future__ import annotations
 
-import logging
-import os
 from collections.abc import Callable
 from dataclasses import dataclass
+import logging
+import os
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -150,7 +150,7 @@ class WebBackend:
     fetch: Callable[[str], str | None] | None = None
 
 
-#: Registry - data, not branches. Add providers here; select via .berg_config.
+#: Registry - data, not branches. Add providers here; select via .berg-agents.
 BACKENDS: dict[str, WebBackend] = {
     "ollama": WebBackend(
         name="ollama",
@@ -173,7 +173,7 @@ DEFAULT_BACKEND_ORDER = ["ollama", "duckduckgo", "direct"]
 
 
 def _ordered_backends(
-        order: list[str] | None, *, kind: str
+    order: list[str] | None, *, kind: str
 ) -> list[WebBackend]:
     """Resolve configured names to backends supporting *kind*."""
     names = order or DEFAULT_BACKEND_ORDER
@@ -222,18 +222,18 @@ def make_web_search(order: list[str] | None = None) -> Callable[..., str]:
             if result:
                 return result
         return (
-                f"No web results for {query!r} "
-                f"(tried: {', '.join(attempted) or 'no backends'})."
-                + (
-                    ""
-                    if any(
-                        (BACKENDS[n].key_var or "")
-                        and _env(BACKENDS[n].key_var or "")
-                        for n in attempted
-                        if n in BACKENDS
-                    )
-                    else " Set OLLAMA_API_KEY to enable the Ollama index."
+            f"No web results for {query!r} "
+            f"(tried: {', '.join(attempted) or 'no backends'})."
+            + (
+                ""
+                if any(
+                    (BACKENDS[n].key_var or "")
+                    and _env(BACKENDS[n].key_var or "")
+                    for n in attempted
+                    if n in BACKENDS
                 )
+                else " Set OLLAMA_API_KEY to enable the Ollama index."
+            )
         )
 
     # Distinct __name__ keeps tool schemas readable per configuration.

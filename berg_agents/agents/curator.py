@@ -29,16 +29,14 @@ __all__ = [
 
 # Task types the curator handles with full confidence.
 # Mirrors the curation_types set of the old Curator class.
-CURATION_TASK_TYPES: frozenset[str] = frozenset(
-    {
-        "context_sync",
-        "curate",
-        "distill",
-        "document",
-        "memory_update",
-        "summarize",
-        "update_docs"}
-)
+CURATION_TASK_TYPES: frozenset[str] = frozenset({
+    "context_sync",
+    "curate",
+    "distill",
+    "document",
+    "memory_update",
+    "summarize",
+    "update_docs"})
 
 # Keywords matching documentation/memory work in a free-text
 # description; partial (0.7) confidence, as before.
@@ -65,7 +63,7 @@ KNOWLEDGE_TARGET = "context/technical-domain.md"
 
 
 def should_run_curator(
-        metadata: dict[str, Any] | None,
+    metadata: dict[str, Any] | None,
 ) -> bool:
     """Gate the curator step on ``files_changed`` metadata.
 
@@ -116,9 +114,9 @@ def curation_confidence(task: dict[str, Any]) -> float:
 
 
 def determine_actions(
-        task: dict[str, Any],
-        metadata: dict[str, Any],
-        complexity: str = "standard",
+    task: dict[str, Any],
+    metadata: dict[str, Any],
+    complexity: str = "standard",
 ) -> list[dict[str, Any]]:
     """Derive curation actions from task metadata.
 
@@ -142,52 +140,44 @@ def determine_actions(
     if isinstance(files_changed, list):
         for path in files_changed:
             if isinstance(path, str) and path.strip():
-                actions.append(
-                    {
-                        "action": "update_docs",
-                        "target": path,
-                        "type": "code_documentation"}
-                )
+                actions.append({
+                    "action": "update_docs",
+                    "target": path,
+                    "type": "code_documentation"})
 
     # One record action per distilled pattern.
     patterns = metadata.get("patterns", [])
     if isinstance(patterns, list):
         for pattern in patterns:
-            actions.append(
-                {
-                    "action": "record_pattern",
-                    "content": pattern,
-                    "target": PATTERN_TARGET,
-                    "type": "pattern"}
-            )
+            actions.append({
+                "action": "record_pattern",
+                "content": pattern,
+                "target": PATTERN_TARGET,
+                "type": "pattern"})
 
     # One append action per architecture decision.
     decisions = metadata.get("decisions", [])
     if isinstance(decisions, list):
         for decision in decisions:
-            actions.append(
-                {
-                    "action": "record_decision",
-                    "content": decision,
-                    "target": DECISION_TARGET,
-                    "type": "decision"}
-            )
+            actions.append({
+                "action": "record_decision",
+                "content": decision,
+                "target": DECISION_TARGET,
+                "type": "decision"})
 
     # Fallback: complex tasks with no concrete metadata still
     # refresh the technical-domain knowledge file.
     if not actions and complexity in COMPLEX_FALLBACK:
-        actions.append(
-            {
-                "action": "update_context",
-                "target": KNOWLEDGE_TARGET,
-                "type": "knowledge_update"}
-        )
+        actions.append({
+            "action": "update_context",
+            "target": KNOWLEDGE_TARGET,
+            "type": "knowledge_update"})
 
     return actions
 
 
 def build_update_plan(
-        actions: list[dict[str, Any]],
+    actions: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Order curation actions into numbered update steps.
 
@@ -205,13 +195,11 @@ def build_update_plan(
     def _add_step(action: str, target: str, description: str) -> None:
         """Append one numbered step to the plan."""
         # Step numbers are 1-based and follow insertion order.
-        plan.append(
-            {
-                "action": action,
-                "description": description,
-                "step": len(plan) + 1,
-                "target": target}
-        )
+        plan.append({
+            "action": action,
+            "description": description,
+            "step": len(plan) + 1,
+            "target": target})
 
     # Docs first: keep generated references in sync early.
     for item in actions:
@@ -254,8 +242,8 @@ def build_update_plan(
 
 
 def curate_task(
-        task: dict[str, Any],
-        metadata: dict[str, Any] | None,
+    task: dict[str, Any],
+    metadata: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Run the files_changed-gated curation step (harness entry).
 

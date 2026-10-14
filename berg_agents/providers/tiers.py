@@ -18,11 +18,11 @@ DEFAULT_COMPLEXITY = "standard"
 
 
 def model_for_complexity(
-        complexity: str, cfg: dict[str, Any] | None = None
+    complexity: str, cfg: dict[str, Any] | None = None
 ) -> str | None:
     """Return the first model id declared for a complexity level.
 
-    Reads ``model_routing.models`` from .berg_config; each level carries
+    Reads ``model_routing.models`` from config; each level carries
     its own ``models`` list plus ``max_tokens``.
 
     Args:
@@ -38,6 +38,6 @@ def model_for_complexity(
     if level not in COMPLEXITY_LEVELS:
         level = DEFAULT_COMPLEXITY
     models = (
-                     ((cfg.get("model_routing") or {}).get("models") or {}).get(level) or {}
-             ).get("models") or []
+        ((cfg.get("model_routing") or {}).get("models") or {}).get(level) or {}
+    ).get("models") or []
     return str(models[0]) if models else None

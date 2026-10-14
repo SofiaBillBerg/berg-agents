@@ -32,12 +32,12 @@ def _shell_allowed() -> bool:
 
 
 def build_chat_agent(
-        model_id: str | None = None,
-        *,
-        root_dir: str = ".",
-        plugin_tools: list[Any] | None = None,
-        disabled_mcp: frozenset[str] = frozenset(),
-        disabled_skills: frozenset[str] = frozenset(),
+    model_id: str | None = None,
+    *,
+    root_dir: str = ".",
+    plugin_tools: list[Any] | None = None,
+    disabled_mcp: frozenset[str] = frozenset(),
+    disabled_skills: frozenset[str] = frozenset(),
 ) -> Any:
     """Build a pydantic_ai ``Agent`` for the streaming chat endpoint.
 
@@ -49,7 +49,7 @@ def build_chat_agent(
     plugin tools (e.g. shared-todo) are attached as plain tools.
 
     System prompt, model, and temperature all come from configuration
-    (``.berg_config/bergagents.jsonc`` and ``.berg_config/profiles.yaml``) - never
+    (``.berg-agents/bergagents.jsonc`` and ``.berg-agents/profiles.yaml``) - never
     hardcoded.
 
     :param model_id: Model identifier to resolve; falls back to the session's
@@ -74,11 +74,11 @@ def build_chat_agent(
     from pydantic_ai.capabilities import WebFetch, WebSearch
     from pydantic_ai_harness import Planning
 
-    # Resolve the model from .berg_config - resolve_model_instance reads
+    # Resolve the model from .berg-agents - resolve_model_instance reads
     # bergagents.jsonc and returns a fully-configured OpenAIChatModel.
     model = resolve_model_instance(model_id or "")
 
-    # Build the system prompt from settings (.berg_config-driven, not hardcoded).
+    # Build the system prompt from settings (config-driven, not hardcoded).
     settings = get_settings()
     system_prompt = (
         settings.system_prompt.format(root_dir=root_dir)
