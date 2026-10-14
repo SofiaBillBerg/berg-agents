@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-
 import sys
 
 _THEME_DIR = Path(__file__).resolve().parent
@@ -42,17 +41,17 @@ def _build_custom_css() -> str:
         " */\n\n"
     )
     body = (
-            _read("tokens/colors.css")
-            + "\n"
-            + _read("tokens/typography.css")
-            + "\n"
-            + _read("tokens/spacing.css")
-            + "\n"
-            + _read("components/base.css")
-            + "\n"
-            + _read("components/banner.css")
-            + "\n"
-            + _read("presets/light.css")
+        _read("tokens/colors.css")
+        + "\n"
+        + _read("tokens/typography.css")
+        + "\n"
+        + _read("tokens/spacing.css")
+        + "\n"
+        + _read("components/base.css")
+        + "\n"
+        + _read("components/banner.css")
+        + "\n"
+        + _read("presets/light.css")
     )
     return header + body
 

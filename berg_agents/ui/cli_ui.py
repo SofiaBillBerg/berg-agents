@@ -15,12 +15,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from berg_agents.core.harness import Harness
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-
-from berg_agents.core.harness import Harness
 
 __all__ = [
     "SLASH_COMMANDS",
@@ -73,9 +72,9 @@ SLASH_COMMANDS: list[dict[str, str]] = [
         "name": "/context",
         "description": "Show current context",
         "category": "context"},
-    {"name": "/settings", "description": "Show settings", "category": ".berg_config"},
-    {"name": "/skills", "description": "List skills", "category": ".berg_config"},
-    {"name": "/mcps", "description": "MCP server status", "category": ".berg_config"},
+    {"name": "/settings", "description": "Show settings", "category": "config"},
+    {"name": "/skills", "description": "List skills", "category": "config"},
+    {"name": "/mcps", "description": "MCP server status", "category": "config"},
     {
         "name": "/harness",
         "description": "Run task through harness",
@@ -90,16 +89,14 @@ SLASH_COMMANDS: list[dict[str, str]] = [
 # /help for parity with the web UI but answered with a web-only notice:
 # they query server-side state (providers, models, MCP servers) that the
 # Harness API does not expose, and inventing answers would be fake.
-_TUI_HANDLED = frozenset(
-    {
-        "/help",
-        "/agents",
-        "/harness",
-        "/task",
-        "/stats",
-        "/history",
-        "/clear"}
-)
+_TUI_HANDLED = frozenset({
+    "/help",
+    "/agents",
+    "/harness",
+    "/task",
+    "/stats",
+    "/history",
+    "/clear"})
 
 _APPROVE_WORDS = frozenset({"y", "yes", "approve"})
 
@@ -128,7 +125,7 @@ def _outcome_total(record: Mapping[str, Any] | None) -> int:
 
 
 def render_agents(
-        agents: list[dict[str, Any]], console: Console | None = None
+    agents: list[dict[str, Any]], console: Console | None = None
 ) -> None:
     """Render the harness agent catalog as a rich table.
 
@@ -154,7 +151,7 @@ def render_agents(
 
 
 def render_result(
-        result: dict[str, Any], console: Console | None = None
+    result: dict[str, Any], console: Console | None = None
 ) -> None:
     """Render one harness task result as a rich panel.
 
@@ -193,7 +190,7 @@ def render_result(
     if status == "needs_human_review":
         reasons = result.get("review_reasons", [])
         body = (
-                "\n".join(f"* {reason}" for reason in reasons) or "review requested"
+            "\n".join(f"* {reason}" for reason in reasons) or "review requested"
         )
         console.print(
             Panel(
@@ -220,7 +217,7 @@ def render_result(
 
 
 def render_stats(
-        stats: dict[str, Any] | None, console: Console | None = None
+    stats: dict[str, Any] | None, console: Console | None = None
 ) -> None:
     """Render harness learning/outcome statistics as a rich table.
 
@@ -240,8 +237,8 @@ def render_stats(
     table.add_column("success rate", justify="right")
     table.add_column("outcomes", justify="right")
     for group, records in (
-            ("task type", (stats or {}).get("by_task_type", {})),
-            ("model", (stats or {}).get("by_model", {})),
+        ("task type", (stats or {}).get("by_task_type", {})),
+        ("model", (stats or {}).get("by_model", {})),
     ):
         for name, record in records.items():
             table.add_row(
@@ -271,7 +268,7 @@ def render_help(console: Console | None = None) -> None:
 
 
 def render_history(
-        entries: list[tuple[str, str]], console: Console | None = None
+    entries: list[tuple[str, str]], console: Console | None = None
 ) -> None:
     """Render the in-session task transcript as a rich table.
 
@@ -297,12 +294,12 @@ def render_history(
 
 
 def run_harness_task(
-        harness: Harness,
-        description: str,
-        task_type: str = "generic",
-        metadata: dict[str, Any] | None = None,
-        console: Console | None = None,
-        read_line: Callable[[str], str] | None = None,
+    harness: Harness,
+    description: str,
+    task_type: str = "generic",
+    metadata: dict[str, Any] | None = None,
+    console: Console | None = None,
+    read_line: Callable[[str], str] | None = None,
 ) -> dict[str, Any]:
     """Execute one task through the harness with a human-review gate.
 
@@ -325,12 +322,10 @@ def run_harness_task(
     base_metadata = dict(metadata or {})
     console.print(f"[dim]→ running '{description}' ...[/dim]")
     try:
-        result = harness.execute_task(
-            {
-                "description": description,
-                "task_type": task_type,
-                "metadata": base_metadata}
-        )
+        result = harness.execute_task({
+            "description": description,
+            "task_type": task_type,
+            "metadata": base_metadata})
     except Exception as exc:
         failed = {"status": "failed", "task_type": task_type, "error": str(exc)}
         render_result(failed, console)
@@ -357,12 +352,10 @@ def run_harness_task(
         render_result(failed, console)
         return failed
     try:
-        resumed = harness.execute_task(
-            {
-                "description": description,
-                "task_type": task_type,
-                "metadata": {**base_metadata, "hitl_decision": "approve"}}
-        )
+        resumed = harness.execute_task({
+            "description": description,
+            "task_type": task_type,
+            "metadata": {**base_metadata, "hitl_decision": "approve"}})
     except Exception as exc:
         failed = {"status": "failed", "task_type": task_type, "error": str(exc)}
         render_result(failed, console)
@@ -372,11 +365,11 @@ def run_harness_task(
 
 
 def _handle_slash_command(
-        harness: Harness,
-        raw: str,
-        history: list[tuple[str, str]],
-        console: Console,
-        read_line: Callable[[str], str],
+    harness: Harness,
+    raw: str,
+    history: list[tuple[str, str]],
+    console: Console,
+    read_line: Callable[[str], str],
 ) -> str:
     """Handle one slash-command line; return ``"quit"`` to end the session.
 
@@ -425,9 +418,9 @@ def _handle_slash_command(
 
 
 def run_cli_ui(
-        harness: Harness,
-        console: Console | None = None,
-        input_fn: Callable[[str], str] | None = None,
+    harness: Harness,
+    console: Console | None = None,
+    input_fn: Callable[[str], str] | None = None,
 ) -> None:
     """Run the interactive harness terminal session.
 
@@ -467,8 +460,8 @@ def run_cli_ui(
 
         if raw.startswith("/"):
             if (
-                    _handle_slash_command(harness, raw, history, console, read_line)
-                    == "quit"
+                _handle_slash_command(harness, raw, history, console, read_line)
+                == "quit"
             ):
                 return
             continue
@@ -481,7 +474,7 @@ def run_cli_ui(
 
 
 def run_tui() -> None:
-    """Start the interactive terminal session from application .berg_config.
+    """Start the interactive terminal session from application configuration.
 
     Zero-argument entry point used by ``python -m berg_agents --tui``: builds
     the application :class:`Harness` from configuration and runs the

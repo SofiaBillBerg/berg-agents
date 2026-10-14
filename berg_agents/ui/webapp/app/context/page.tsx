@@ -93,7 +93,7 @@ export default function ContextPage() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        // NOTE: /api/plugins is best-effort — the .berg_config-driven
+        // NOTE: /api/plugins is best-effort — the config-driven
         // catalog below still renders when the plugin system is down.
         const [ctxRes, statsRes, pluginsRes] = await Promise.all([
           fetch(`${API_BASE}/api/context`),
@@ -171,7 +171,7 @@ export default function ContextPage() {
             {plugins.length > 0 ? ` (${plugins.length} plugins)` : ""}
             .
           </p>
-          {/* NOTE: Runtime overlay — .berg_config lists what exists, the
+          {/* NOTE: Runtime overlay — config lists what exists, the
               plugin map adds live state (toggled off, approval flags). */}
           {(() => {
             const {mcp, skills, toolPlugins} = indexPlugins(plugins);
@@ -219,7 +219,7 @@ export default function ContextPage() {
               <Card.Content className="flex flex-wrap gap-1.5">
                 {data.mcp_servers.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    None configured in .berg_config/mcp.json.
+                    None configured in .berg-agents/mcp.json.
                   </p>
                 )}
                 {data.mcp_servers.map((s) => {

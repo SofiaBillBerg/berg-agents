@@ -22,11 +22,11 @@ class SessionManager:
     """
 
     def __init__(
-            self,
-            *,
-            active_provider: str = "ollama",
-            active_model: str = "",
-            root_dir: str = ".",
+        self,
+        *,
+        active_provider: str = "ollama",
+        active_model: str = "",
+        root_dir: str = ".",
     ) -> None:
         """Initialize session state.
 

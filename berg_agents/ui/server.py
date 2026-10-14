@@ -7,27 +7,52 @@ Builds the web application around one injected harness: routes in
 
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 from typing import Any
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from berg_agents.config.settings import get_settings
 from berg_agents.core.harness import Harness
 from berg_agents.ui.routes import create_router
 from berg_agents.ui.sessions import SessionManager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 logger = logging.getLogger(__name__)
 
 # Static export of the Next.js webapp: ``bun run next build`` writes
-# ``berg_agents/ui/webapp/dist/`` (see ``next..berg_config.mjs`` distDir).
+# ``berg_agents/ui/webapp/dist/`` (see ``next.config.mjs`` distDir).
 _WEB_DIST = Path(__file__).resolve().parent / "webapp" / "dist"
+
+# Plugin packages live at the checkout root: this file is
+# berg_agents/ui/server.py, so root is three parents up.
+_PLUGINS_DIR = Path(__file__).resolve().parents[2] / "berg_plugins"
+
+
+def _mount_plugin_assets(app: Any) -> None:
+    """Serve each plugin's built UI bundle at ``/berg-plugins/<dir>/``.
+
+    The bridge is config-driven: the manifest declares a built entry
+    (``ui.entry``), the browser loads it from this URL, and the host
+    never imports plugin source. Mounts the whole ``berg_plugins``
+    directory so installing a plugin needs no host change.
+    """
+    if not _PLUGINS_DIR.is_dir():
+        logger.warning(
+            "Plugin directory %s missing; no plugin UI assets served.",
+            _PLUGINS_DIR,
+        )
+        return
+    app.mount(
+        "/berg-plugins",
+        StaticFiles(directory=_PLUGINS_DIR),
+        name="berg-plugins",
+    )
+    logger.info("Plugin UI assets mounted at /berg-plugins")
 
 
 @asynccontextmanager
@@ -158,6 +183,12 @@ def create_app(
     async def health() -> dict[str, str]:
         """Liveness probe."""
         return {"status": "ok"}
+
+    # Plugin UI assets must be mounted BEFORE the "/" catch-all below:
+    # Starlette matches mounts in registration order, so a later "/"
+    # would swallow /berg-plugins/* and look for it inside the webapp
+    # dist (observed as a 404 for a bundle that exists on disk).
+    _mount_plugin_assets(app)
 
     if _WEB_DIST.joinpath("index.html").is_file():
         # Production UI on the same origin (single :8001).

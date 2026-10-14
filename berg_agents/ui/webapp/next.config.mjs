@@ -68,7 +68,7 @@ const nextConfig = {
         hostname: "localhost"}]},
 
   // ESLint configuration - moved to .eslintrc.json for Next.js 16 compatibility
-  // eslint .berg_config now in separate file
+  // eslint config now in separate file
 };
 
 export default withBundleAnalyzer(nextConfig);

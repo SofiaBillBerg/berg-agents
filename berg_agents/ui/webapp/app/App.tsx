@@ -26,7 +26,7 @@ import AgentPanel from "./components/AgentPanel.tsx";
 import LearningPanel from "./components/LearningPanel.tsx";
 import ChatTranscript, {
   CHAT_SCROLL_ID} from "./components/ChatTranscript.tsx";
-import { TODO_TOOL_NAMES, TodoPanel } from "./components/TodoPanel.tsx";
+import { PluginUISurface } from "./plugins/PluginUISurface.tsx";
 import { PluginCatalog } from "./components/PluginCatalog.tsx";
 import Navbar from "./components/Navbar.tsx";
 import {
@@ -313,35 +313,89 @@ function ChatContent() {
   const [showDetails, setShowDetails] = useState(false);
 
   // -------------------------------------------------------------------------
-  // Shared-todo plugin surface (side-panel + canvas views)
+  // Plugin surfaces (side-panel + canvas views), driven entirely by
+  // what the plugins declare in their manifests. The host holds no
+  // knowledge of any plugin's domain: it learns "this plugin has a
+  // surface, here is how to mount it" from GET /api/plugins.
   // -------------------------------------------------------------------------
-  /** Right-hand surface: todos, plugin catalog, or closed. */
-  const [sideSurface, setSideSurface] = useState<"todos" | "plugins" | null>(
-    null,
-  );
+  /** Plugin id whose surface is open, or the catalog. */
+  const [sidePluginId, setSidePluginId] = useState<string | null>(null);
+  /** Show the host's plugin catalog (enable/disable, no plugin UI). */
+  const [showCatalog, setShowCatalog] = useState(false);
   /** Panel (narrow) vs canvas (wide) presentation. */
-  const [todoView, setTodoView] = useState<"panel" | "canvas">("panel");
-  /** Bump to force the panel to refetch after agent todo calls. */
-  const [todoRefreshKey, setTodoRefreshKey] = useState(0);
-  /** Open-todo count reported by the panel (toggle badge). */
-  const [openTodoCount, setOpenTodoCount] = useState(0);
+  const [pluginView, setPluginView] = useState<"panel" | "canvas">("panel");
+  /** Bump to force the open surface to refetch after agent calls. */
+  const [pluginRefreshKey, setPluginRefreshKey] = useState(0);
+  /** Headline count reported by the open surface (badge). */
+  const [pluginCount, setPluginCount] = useState(0);
+  /** Registry entries for plugins that shipped a surface. */
+  const [pluginSurfaces, setPluginSurfaces] = useState<
+    Array<{
+      pluginId: string;
+      ui: Record<string, unknown> | null;
+      tools: string[];
+    }>
+  >([]);
 
-  // Completed todo tool calls anywhere in the transcript refresh the
-  // panel, so agent edits appear without manual reloads.
-  const todoActivity = messages.reduce(
+  // Discover which plugins have a registered surface.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const resp = await fetch(`${API_BASE}/api/plugins`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (cancelled || !Array.isArray(data.plugins)) return;
+        const found: Array<{
+          pluginId: string;
+          ui: Record<string, unknown> | null;
+          tools: string[];
+        }> = [];
+        for (const p of data.plugins) {
+          if (!p || typeof p.id !== "string" || !p.ui) continue;
+          // NOTE: the manifest is the only filter M-bM-^@M-^T any plugin that —
+          // declares a `ui:` block is offered. Whether its bundle loads
+          // is the bridge's problem, reported on the surface itself.
+          found.push({ pluginId: p.id, ui: p.ui, tools: p.tools ?? [] });
+        }
+        setPluginSurfaces(found);
+      } catch {
+        // Backend unreachable - no plugin surfaces offered.
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const activeSurface = pluginSurfaces.find((s) => s.pluginId === sidePluginId);
+  const activeDecl = activeSurface?.ui as
+    | { label?: unknown; width?: unknown; placement?: unknown }
+    | null
+    | undefined;
+  const activeLabel =
+    typeof activeDecl?.label === "string" ? activeDecl.label : "Plugin";
+  const activeWidth =
+    typeof activeDecl?.width === "number" ? activeDecl.width : 340;
+
+  // Completed tool calls anywhere in the transcript refresh the open
+  // surface, so agent edits appear without manual reloads.
+  const activeTools =
+    pluginSurfaces.find((s) => s.pluginId === sidePluginId)?.tools ?? [];
+  const pluginActivity = messages.reduce(
     (n, m) =>
       n +
-      (m.toolCalls?.filter((c) => TODO_TOOL_NAMES.includes(c.tool)).length ??
-        0),
+      (m.toolCalls?.filter((c) => activeTools.includes(c.tool)).length ?? 0),
     0,
   );
-  const seenTodoActivity = useRef(0);
+  const seenPluginActivity = useRef(0);
   useEffect(() => {
-    if (todoActivity > seenTodoActivity.current) {
-      seenTodoActivity.current = todoActivity;
-      setTodoRefreshKey((k) => k + 1);
+    if (pluginActivity > seenPluginActivity.current) {
+      seenPluginActivity.current = pluginActivity;
+      setPluginRefreshKey((k) => k + 1);
     }
-  }, [todoActivity]);
+  }, [pluginActivity]);
 
   /** Scroll the transcript (the page itself never scrolls). */
   const scrollChatTo = (where: "top" | "bottom") => {
@@ -721,25 +775,45 @@ function ChatContent() {
           >
             ↓ Bottom
           </Button>
+          {/*
+            One button per plugin that declared + shipped a surface.
+            Labels and widths come from the plugin's own manifest, so
+            a new plugin appears here without touching this file.
+          */}
+          {pluginSurfaces.map((surface) => {
+            const decl = surface.ui as { label?: unknown } | null;
+            const label =
+              typeof decl?.label === "string" ? decl.label : "Plugin";
+            const isOpen = sidePluginId === surface.pluginId;
+            return (
+              <Button
+                key={surface.pluginId}
+                aria-label={isOpen ? `Hide ${label}` : `Show ${label}`}
+                size="sm"
+                variant="secondary"
+                onPress={() => {
+                  setSidePluginId((prev) =>
+                    prev === surface.pluginId ? null : surface.pluginId,
+                  );
+                  if (!isOpen) {
+                    setPluginView("panel");
+                  }
+                }}
+              >
+                {label}
+                {isOpen && pluginCount > 0 ? ` (${pluginCount})` : ""}
+              </Button>
+            );
+          })}
           <Button
-            aria-label={sideSurface === "todos" ? "Hide todos" : "Show todos"}
+            aria-label={showCatalog ? "Hide plugins" : "Show plugins"}
             size="sm"
             variant="secondary"
-            onPress={() =>
-              setSideSurface((prev) => (prev === "todos" ? null : "todos"))
-            }
-          >
-            📋 Todos{openTodoCount > 0 ? ` (${openTodoCount})` : ""}
-          </Button>
-          <Button
-            aria-label={
-              sideSurface === "plugins" ? "Hide plugins" : "Show plugins"
-            }
-            size="sm"
-            variant="secondary"
-            onPress={() =>
-              setSideSurface((prev) => (prev === "plugins" ? null : "plugins"))
-            }
+            onPress={() => {
+              setShowCatalog((prev) => !prev);
+              // The catalog owns the right-hand side on its own.
+              setSidePluginId(null);
+            }}
           >
             🔌 Plugins
           </Button>
@@ -945,10 +1019,10 @@ function ChatContent() {
         )}
 
         {/* Chat transcript + plugin surface side by side when open:
-            todos (narrow side-panel by default, wide canvas on toggle)
-            or the plugin catalog. The transcript keeps its own flex
-            column so heights match. */}
-        {sideSurface !== null ? (
+            the plugin's own component (narrow side-panel by default,
+            wide canvas on toggle) or the host's plugin catalog. The
+            transcript keeps its own flex column so heights match. */}
+        {sidePluginId !== null || showCatalog ? (
           <div className="mb-2 flex min-h-0 flex-1 gap-2">
             <div className="flex min-w-0 flex-1 flex-col">
               <ChatTranscript
@@ -958,23 +1032,25 @@ function ChatContent() {
                 transcript={messages}
               />
             </div>
-            {sideSurface === "todos" ? (
-              <TodoPanel
-                className={
-                  todoView === "canvas" ? "flex-1" : "w-[340px] shrink-0"
-                }
-                onClose={() => setSideSurface(null)}
-                onCount={setOpenTodoCount}
+            {sidePluginId && activeSurface ? (
+              <PluginUISurface
+                className={pluginView === "canvas" ? "flex-1" : "shrink-0"}
+                key={sidePluginId}
+                onClose={() => setSidePluginId(null)}
+                onCount={setPluginCount}
                 onToggleView={() =>
-                  setTodoView((v) => (v === "panel" ? "canvas" : "panel"))
+                  setPluginView((v) => (v === "panel" ? "canvas" : "panel"))
                 }
-                refreshKey={todoRefreshKey}
-                view={todoView}
+                pluginId={sidePluginId}
+                refreshKey={pluginRefreshKey}
+                style={{ width: activeWidth }}
+                ui={activeSurface.ui}
+                view={pluginView}
               />
             ) : (
               <PluginCatalog
                 className="w-[340px] shrink-0"
-                onClose={() => setSideSurface(null)}
+                onClose={() => setShowCatalog(false)}
               />
             )}
           </div>

@@ -6,6 +6,7 @@ import {Suspense, useEffect, useState} from "react";
 
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import App from "./App.tsx";
+import {installBergRuntime} from "./runtime/berg-runtime.ts";
 
 /**
  * ClientOnly wrapper component.
@@ -23,6 +24,9 @@ export function ClientOnly() {
 
   useEffect(() => {
     setMounted(true);
+    // Plugin UI bundles resolve React/HeroUI against this runtime, so
+    // it must exist before any plugin surface is imported.
+    installBergRuntime();
     // Global uncaught error handler for frontend debugging
     const handleError = (event: ErrorEvent) => {
       console.error("Global UI error:", event.error);

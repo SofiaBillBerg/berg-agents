@@ -8,10 +8,22 @@ for native Vercel AI SSE protocol - no manual event-loop / SSE translation neede
 from __future__ import annotations
 
 import asyncio
-import logging
 from functools import cached_property
+import json
+import logging
 from typing import Any
 
+from berg_agents.core.harness import Harness
+from berg_agents.ui.schemas import (
+    ActiveProvider,
+    ProviderInfo,
+    ProviderListResponse,
+    SessionCreateRequest,
+    SessionRenameRequest,
+    ToolExecuteRequest,
+    ToolExecuteResponse,
+)
+from berg_agents.ui.sessions import SessionManager
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic_ai import DeferredToolRequests, DeferredToolResults
@@ -23,52 +35,78 @@ from pydantic_ai.ui.vercel_ai.request_types import (
     ToolApprovalRespondedPart,
 )
 
-from berg_agents.core.harness import Harness
-from berg_agents.ui.schemas import (
-    ActiveProvider,
-    ProviderInfo,
-    ProviderListResponse,
-    SessionCreateRequest,
-    SessionRenameRequest,
-    SubtaskCreateRequest,
-    SubtaskUpdateRequest,
-    TodoCreateRequest,
-    TodoUpdateRequest,
-    ToolExecuteRequest,
-    ToolExecuteResponse,
-)
-from berg_agents.ui.sessions import SessionManager
-
 logger = logging.getLogger(__name__)
 
 
-def _shared_todo_dir() -> str:
-    """Directory backing both the agent todo tools and the plugin UI.
+async def _run_plugin_tool(
+    plugin_id: str,
+    tool_name: str,
+    args: dict[str, Any],
+    root_dir: str,
+) -> Any:
+    """Run a loaded plugin's tool by name (no todo/shared-todo naming).
 
-    :return: Todo directory (same default the tools use, so the model
-        and the side-panel always read the same Markdown store).
+    The dispatch resolves the live plugin instance from the warmed
+    plugin manager, finds the named tool among the capabilities it
+    registered, and calls its underlying function. This is the single
+    path plugin UIs use — the host knows only tool names, never the
+    plugin's domain.
+
+    :param plugin_id: Plugin identifier.
+    :param tool_name: Tool name as declared by the plugin.
+    :param args: Keyword arguments for the tool.
+    :param root_dir: Project root (plugin config / storage base).
+    :return: The tool's return value (usually a string).
+    :raises KeyError: When the plugin or tool is unknown.
     """
-    return "./sharedtodos/"
+    from berg_agents.plugin_system.chat_integration import get_chat_plugin_tools
+    from berg_agents.plugin_system.lifecycle.lifecycle_states import PluginState
+
+    # Ensure the manager is warm (idempotent, cheap after first call).
+    await get_chat_plugin_tools()
+    from berg_agents.plugin_system.chat_integration import _CACHE
+
+    manager = _CACHE.get("manager")
+    if manager is None:
+        raise KeyError(f"Plugin system unavailable: {plugin_id}")
+    entry = manager.registry.get(plugin_id)
+    if entry is None or entry.state == PluginState.DISCOVERED:
+        raise KeyError(f"Unknown plugin: {plugin_id}")
+    if entry.state != PluginState.ENABLED:
+        raise KeyError(f"Plugin {plugin_id} is not enabled")
+    for cap in manager.registry.get_capabilities(
+        plugin_id=plugin_id, capability_type="tool"
+    ):
+        tool = getattr(cap, "tool", None)
+        if tool is None:
+            continue
+        # Names come from the Tool's `name`, but fall back to the
+        # wrapped function's __name__ so server-side helpers (which
+        # are not model-facing tools) stay callable too.
+        candidates = {
+            str(getattr(tool, "name", "") or ""),
+            str(getattr(getattr(tool, "function", None), "__name__", "") or "")}
+        if tool_name not in candidates:
+            continue
+        function = getattr(tool, "function", tool)
+        return function(**args)
+    raise KeyError(f"Unknown tool {tool_name} on plugin {plugin_id}")
 
 
-def _ensure_shared_todo_importable() -> None:
-    """Put the shared-todo pilot package on ``sys.path`` (idempotent).
+def _plugin_config_dir(root_dir: str) -> Any:
+    """Config dir base for plugin settings, via the shared resolver.
 
-    PluginManager does this too when it imports the plugin; the endpoint
-    must not depend on load ordering, so it ensures it as well.
+    Precedence: ``BERG_AGENTS_CONFIG_DIR``, project ``.berg-agents/``,
+    then global ``~/.berg-agents/``.
+
+    :param root_dir: Project root.
+    :return: Absolute path to the resolved config directory.
     """
-    import sys
     from pathlib import Path
 
-    # NOTE: routes.py lives at berg_agents/ui/, so the checkout root
-    # is two parents up.
-    plugin_dir = (
-        Path(__file__).resolve().parents[2] / "berg_plugins" / "shared-todo"
-    )
-    if plugin_dir.is_dir():
-        path_str = str(plugin_dir)
-        if path_str not in sys.path:
-            sys.path.insert(0, path_str)
+    from berg_agents.config.paths import resolve_config_dir
+
+    return resolve_config_dir(Path(root_dir).expanduser().resolve())
 
 
 class BergVercelAIAdapter(VercelAIAdapter):
@@ -237,7 +275,7 @@ def create_router(
         stay visible instead of vanishing inside one opaque call.
 
         The agent, model, and system prompt all come from configuration
-        (``.berg_config/bergagents.jsonc`` and ``.berg_config/profiles.yaml``) - never
+        (``.berg-agents/bergagents.jsonc`` and ``.berg-agents/profiles.yaml``) - never
         hardcoded. An optional ``?model=`` query param overrides the model.
 
         :param request: FastAPI request - VercelAIAdapter inspects the body
@@ -411,184 +449,65 @@ def create_router(
 
         :return: Dict with ``plugins`` descriptors.
         """
-        from berg_agents.plugin_system.chat_integration import (
-            list_chat_plugins,
-        )
+        from berg_agents.plugin_system.chat_integration import list_chat_plugins
 
         return {"plugins": await list_chat_plugins()}
 
-    @router.get("/api/plugins/todos")
-    async def list_todos_endpoint(
-        status: str | None = None,
+    @router.post("/api/plugins/{plugin_id}/tools/{tool_name}")
+    async def run_plugin_tool(
+        plugin_id: str,
+        tool_name: str,
+        body: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """List shared-todo items as structured data for the plugin UI.
+        """Run a loaded plugin's tool by name (generic, plugin-agnostic).
 
-        Reads the same Markdown store the agent's todo tools write,
-        so the side-panel/canvas and the model always see the same list.
+        Plugin UIs call this instead of any todo-specific endpoint: the
+        plugin's own callable runs with the project's `.berg-agents` in
+        scope, so the tool's `todo_path`-style defaults resolve to the
+        plugin's configured store.
 
-        :param status: Optional filter (todo, in_progress, done).
-        :return: Dict with ``todos`` items.
+        :param plugin_id: Plugin identifier.
+        :param tool_name: Tool name the plugin declares.
+        :param body: Keyword arguments for the tool.
+        :return: Dict with ``result`` (string) or ``error``.
+        :raises HTTPException: 404 for unknown plugin/tool, 502 when the
+            tool raises.
         """
-        from berg_agents.ui.schemas import TodoItem
+        args = {
+            k: v
+            for k, v in (body or {}).items()
+            if k not in {"sessionId", "tool", "args"}
+        }
+        root_dir = sessions._harness_root_dir()
+        # NOTE: run with the plugin config dir as cwd so relative
+        # defaults in the tool signature land inside the project.
+        import os
 
-        _ensure_shared_todo_importable()
-        from shared_todo.tools import list_todo_items
-
-        items = await asyncio.to_thread(
-            list_todo_items, status, _shared_todo_dir()
-        )
-        return {"todos": [TodoItem(**item).model_dump() for item in items]}
-
-    @router.post("/api/plugins/todos")
-    async def create_todo_endpoint(
-        request: TodoCreateRequest,
-    ) -> dict[str, Any]:
-        """Create a shared-todo item from the plugin UI.
-
-        :param request: Title plus optional description.
-        :return: Dict with the created item ``id``.
-        :raises HTTPException: 400 when the title is blank.
-        """
-        if not request.title.strip():
-            raise HTTPException(
-                status_code=400, detail="Title must not be blank."
+        had_cwd = os.getcwd()
+        os.chdir(root_dir)
+        try:
+            result = await _run_plugin_tool(
+                plugin_id, tool_name, args, root_dir
             )
-        _ensure_shared_todo_importable()
-        from shared_todo.tools import create_todo, list_todo_items
-
-        await asyncio.to_thread(
-            create_todo,
-            request.title.strip(),
-            request.description,
-            _shared_todo_dir(),
-        )
-        todo_id = (
-            # NOTE: Mirrors the tool's slugging algorithm so the
-            # response can echo the created item; keep in sync with
-            # shared_todo.tools.create_todo.
-            request.title
-            .strip()
-            .lower()
-            .replace(" ", "_")
-            .replace("/", "_")[:50]
-        )
-        created = await asyncio.to_thread(
-            list_todo_items, None, _shared_todo_dir()
-        )
-        match = next((item for item in created if item["id"] == todo_id), None)
-        return {"id": todo_id, "todo": match}
-
-    @router.patch("/api/plugins/todos/{todo_id}")
-    async def update_todo_endpoint(
-        todo_id: str, request: TodoUpdateRequest
-    ) -> dict[str, Any]:
-        """Update a shared-todo item from the plugin UI.
-
-        :param todo_id: Todo identifier.
-        :param request: Any subset of title/description/status.
-        :return: Dict with ``ok`` plus the tool output message.
-        :raises HTTPException: 404 when the todo does not exist.
-        """
-        _ensure_shared_todo_importable()
-        from shared_todo.tools import update_todo
-
-        output = await asyncio.to_thread(
-            update_todo,
-            todo_id,
-            request.title,
-            request.description,
-            request.status,
-            _shared_todo_dir(),
-        )
-        if output.startswith("Error:"):
-            raise HTTPException(status_code=404, detail=output)
-        return {"ok": True, "output": output}
-
-    @router.delete("/api/plugins/todos/{todo_id}")
-    async def delete_todo_endpoint(todo_id: str) -> dict[str, Any]:
-        """Delete a shared-todo item from the plugin UI.
-
-        :param todo_id: Todo identifier.
-        :return: Dict with ``ok`` plus the tool output message.
-        :raises HTTPException: 404 when the todo does not exist.
-        """
-        _ensure_shared_todo_importable()
-        from shared_todo.tools import delete_todo
-
-        output = await asyncio.to_thread(
-            delete_todo, todo_id, _shared_todo_dir()
-        )
-        if output.startswith("Error:"):
-            raise HTTPException(status_code=404, detail=output)
-        return {"ok": True, "output": output}
-
-    @router.post("/api/plugins/todos/{todo_id}/subtasks")
-    async def create_subtask_endpoint(
-        todo_id: str, request: SubtaskCreateRequest
-    ) -> dict[str, Any]:
-        """Append a subtask checklist item to a todo.
-
-        :param todo_id: Todo identifier.
-        :param request: Subtask text.
-        :return: Dict with ``ok`` plus the tool output message.
-        :raises HTTPException: 400 for blank text, 404 for unknown todos.
-        """
-        if not request.text.strip():
-            raise HTTPException(
-                status_code=400, detail="Subtask text must not be blank."
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.warning(
+                "Plugin tool %s/%s failed: %s", plugin_id, tool_name, exc
             )
-        _ensure_shared_todo_importable()
-        from shared_todo.tools import add_subtask
-
-        output = await asyncio.to_thread(
-            add_subtask, todo_id, request.text.strip(), _shared_todo_dir()
-        )
-        if output.startswith("Error:"):
-            raise HTTPException(status_code=404, detail=output)
-        return {"ok": True, "output": output}
-
-    @router.patch("/api/plugins/todos/{todo_id}/subtasks/{index}")
-    async def update_subtask_endpoint(
-        todo_id: str, index: int, request: SubtaskUpdateRequest
-    ) -> dict[str, Any]:
-        """Check or uncheck a subtask by index.
-
-        :param todo_id: Todo identifier.
-        :param index: Subtask index in file order (from 0).
-        :param request: Desired checked state.
-        :return: Dict with ``ok`` plus the tool output message.
-        :raises HTTPException: 404 for unknown todos or indices.
-        """
-        _ensure_shared_todo_importable()
-        from shared_todo.tools import set_subtask_done
-
-        output = await asyncio.to_thread(
-            set_subtask_done, todo_id, index, request.done, _shared_todo_dir()
-        )
-        if output.startswith("Error:"):
-            raise HTTPException(status_code=404, detail=output)
-        return {"ok": True, "output": output}
-
-    @router.delete("/api/plugins/todos/{todo_id}/subtasks/{index}")
-    async def delete_subtask_endpoint(
-        todo_id: str, index: int
-    ) -> dict[str, Any]:
-        """Delete a subtask by index (later items shift down).
-
-        :param todo_id: Todo identifier.
-        :param index: Subtask index in file order (from 0).
-        :return: Dict with ``ok`` plus the tool output message.
-        :raises HTTPException: 404 for unknown todos or indices.
-        """
-        _ensure_shared_todo_importable()
-        from shared_todo.tools import delete_subtask
-
-        output = await asyncio.to_thread(
-            delete_subtask, todo_id, index, _shared_todo_dir()
-        )
-        if output.startswith("Error:"):
-            raise HTTPException(status_code=404, detail=output)
-        return {"ok": True, "output": output}
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        finally:
+            os.chdir(had_cwd)
+        # Tools return human-readable strings for the model; a UI wants
+        # structured data, so non-string returns are passed through as
+        # JSON the caller can parse.
+        if isinstance(result, str):
+            return {"plugin": plugin_id, "tool": tool_name, "result": result}
+        try:
+            encoded = json.dumps(result, default=str)
+        except (TypeError, ValueError):
+            encoded = json.dumps({"value": str(result)})
+        return {"plugin": plugin_id, "tool": tool_name, "result": encoded}
 
     @router.post("/api/plugins/{plugin_id}/enable")
     async def enable_plugin_endpoint(plugin_id: str) -> dict[str, Any]:
@@ -736,9 +655,8 @@ def create_router(
         :return: Summary plus ``messages`` in Vercel AI UI shape.
         :raises HTTPException: 404 for unknown sessions.
         """
-        from pydantic_ai.ui.vercel_ai import VercelAIAdapter
-
         from berg_agents.ui import session_store
+        from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 
         store = session_store.get_store(sessions._harness_root_dir())
         try:
@@ -796,11 +714,10 @@ def create_router(
         :return: Dict with ``ok``.
         :raises HTTPException: 404 for unknown sessions, 409 when busy.
         """
+        from berg_agents.ui import session_store
         from pydantic_ai_harness.step_persistence.conversations import (
             ConversationConflict,
         )
-
-        from berg_agents.ui import session_store
 
         store = session_store.get_store(sessions._harness_root_dir())
         try:

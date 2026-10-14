@@ -1,9 +1,42 @@
-import {useState} from "react";
-import {Surface} from "@heroui/react";
+import { useEffect, useState } from "react";
+import { Surface } from "@heroui/react";
 
-import {MarkdownRenderer} from "./MarkdownRenderer.tsx";
-import {ToolCard} from "./ToolCard.tsx";
-import {TODO_TOOL_NAMES} from "./TodoPanel.tsx";
+import { API_BASE } from "@/envConfig";
+import { MarkdownRenderer } from "./MarkdownRenderer.tsx";
+import { ToolCard } from "./ToolCard.tsx";
+
+/** Plugin tool names, supplied by the backend (see usePluginSurfaceTools). */
+const PLUGIN_SURFACE_TOOLS = new Set<string>();
+
+/**
+ * Track which tool names belong to a plugin surface.
+ *
+ * The backend is the only place that knows which plugins are
+ * installed, so the host asks it rather than keeping its own list.
+ * Until it answers the marker stays neutral — never wrong.
+ */
+export function usePluginSurfaceTools(): void {
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`${API_BASE}/api/plugins`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data || !Array.isArray(data.plugins)) return;
+        PLUGIN_SURFACE_TOOLS.clear();
+        for (const p of data.plugins) {
+          if (p && Array.isArray(p.tools)) {
+            for (const t of p.tools) {
+              if (typeof t === "string") PLUGIN_SURFACE_TOOLS.add(t);
+            }
+          }
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+}
 
 export interface MessageToolCall {
   tool: string;
@@ -65,8 +98,7 @@ function ToolCallGroup({
   // activity reads as plugin work, not generic tool output. The full
   // interactive surface lives in the side-panel/canvas (TodoPanel).
   const isTodoGroup =
-    calls.length > 0 &&
-    calls.every((c) => TODO_TOOL_NAMES.includes(c.tool));
+    calls.length > 0 && calls.every((c) => PLUGIN_SURFACE_TOOLS.has(c.tool));
   return (
     <div className="mt-1.5 flex flex-col gap-1 rounded-md border border-border px-1.5 py-1">
       <button
@@ -114,6 +146,7 @@ function ToolCallGroup({
  * @returns JSX element rendering the messages list
  */
 export function MessageList({ history = [] }: MessageListProps) {
+  usePluginSurfaceTools();
   return (
     <div
       aria-label="Conversation transcript"

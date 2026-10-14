@@ -17,13 +17,13 @@
     "tsc": "tsc --noEmit --skipLibCheck"
   },
   "dependencies": {
-    "@ai-sdk/react": "^4.0.140",
+    "@ai-sdk/react": "^4.0.143",
     "@ai-sdk/tui": "^1.0.138",
     "@heroui/react": "^3.2.6",
     "@heroui/styles": "^3.2.6",
     "@next/env": "latest",
     "@tailwindcss/postcss": "^4.3.3",
-    "ai": "^7.0.137",
+    "ai": "^7.0.140",
     "ai-elements": "^1.9.0",
     "clsx": "2.1.1",
     "eslint-config-next": "^16.4.0",
@@ -40,7 +40,7 @@
     "remark-gfm": "^4.0.1",
     "tailwindcss": "^4.3.3",
     "workflow": "^4.8.13",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/compat": "1.2.8",

@@ -13,10 +13,10 @@ message as subtitle, and renames are explicit user titles.
 
 from __future__ import annotations
 
-import logging
-import re
 from datetime import datetime
+import logging
 from pathlib import Path
+import re
 from typing import Any
 from uuid import uuid4
 
@@ -37,13 +37,20 @@ _ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_:-]{0,63}")
 _stores: dict[str, Any] = {}
 
 
+def _config_dir(root_dir: str | Path) -> Path:
+    """Resolved config dir for a project (shared rule, see paths.py).
+
+    Precedence: ``BERG_AGENTS_CONFIG_DIR``, project ``.berg-agents/``,
+    then the global ``~/.berg-agents/``.
+    """
+    from berg_agents.config.paths import resolve_config_dir
+
+    return resolve_config_dir(Path(root_dir).expanduser().resolve())
+
+
 def _active_file(root_dir: str | Path) -> Path:
-    """Path of the active-session pointer for a project root."""
-    return (
-        Path(root_dir).expanduser().resolve()
-        / ".berg_agents"
-        / "active_session"
-    )
+    """Path of the active-session pointer inside the config dir."""
+    return _config_dir(root_dir) / "active_session"
 
 
 def get_active_session(root_dir: str | Path) -> str | None:
@@ -83,16 +90,17 @@ def available() -> bool:
 def get_store(root_dir: str | Path) -> Any:
     """Return the SQLite conversation store for a project root.
 
-    :param root_dir: Project root (database lives in ``.berg_agents/``).
+    :param root_dir: Project root (database lives in the resolved
+        config directory, e.g. ``.berg-agents/chat_sessions.db``).
     :return: Shared ``SqliteConversationStore`` for the root.
     :raises ImportError: When the harness store is unavailable.
     """
     if not available():
         raise ImportError("pydantic_ai_harness step_persistence unavailable")
-    key = str(Path(root_dir).expanduser().resolve())
+    key = str(_config_dir(root_dir))
     store = _stores.get(key)
     if store is None:
-        database = Path(key) / ".berg_agents" / "chat_sessions.db"
+        database = _config_dir(root_dir) / "chat_sessions.db"
         store = SqliteConversationStore(database=database)
         _stores[key] = store
     return store
