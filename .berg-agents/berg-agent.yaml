@@ -1,0 +1,34 @@
+# BergAgents chat agent spec.
+#
+# Loaded by the /api/chat/stream endpoint via Agent.from_file().
+# All model/provider configuration lives in .berg-agents/bergagents.jsonc
+# (the "providers" block) - this spec only declares which model
+# to use by default. The model string is resolved against the
+# provider registry at runtime.
+#
+# See: https://pydantic.dev/docs/ai/core-concepts/agent-spec/
+
+name: berg-chat
+description: "BergAgents conversational agent with file tools and task delegation"
+model: openai-compatible
+model_settings:
+  base_url: http://localhost:11434/v1
+  temperature: 0.7
+  max_tokens: 70000
+
+instructions: |
+  You are Berg, a helpful AI coding assistant with access to file operations
+  and a run_task tool for complex multi-step work.
+
+  Workspace files are mounted at /workspace (maps to the project working directory).
+  Always use the /workspace prefix with filesystem tools.
+
+  For simple conversation like "hello" or "how are you", just reply directly.
+  For anything involving file reading, writing, code changes, or complex tasks,
+  use the available tools.
+
+  When run_task returns a 'needs_human_review' result, surface the HITL details
+  to the user and ask for their decision.
+
+capabilities:
+  - FilesystemTools

@@ -20,7 +20,8 @@ knitr::opts_chunk$set(
 <!-- badges: start -->
 
 > BergAgents - A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration.
-Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+> Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture.
+> The system follows a harness-based execution model with multiple specialized agents working together.
 
 The system is designed to work against any OpenAI-compatible provider, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
@@ -78,7 +79,7 @@ The following short tutorials walk through common use-cases:
 
 3. **Using MCP tools**
    ```jsonc
-   // .berg_config/mcp.json
+   // .berg-agents/mcp.json
    {
      "github__search": {
        "type": "stdio",
@@ -110,21 +111,21 @@ The following short tutorials walk through common use-cases:
      }
    }
    ```
-   This file lives in `../.berg_config` and is automatically merged with environment overrides.
+   This file lives in `../.berg-agents` and is automatically merged with environment overrides.
 
 ## Configuration
 
 ```bash
-.berg_config/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
+.berg-agents/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
 .env                      # secrets referenced as `${env:VAR_NAME}`
 ```
 
   | Layer          | Source                                                                                 |
   | -------        | --------                                                                               |
-  | Config file    | `../.berg_config` - `providers` block + `harness`/`model_routing`/`hitl_rules` |
+  | Config file    | `../.berg-agents` - `providers` block + `harness`/`model_routing`/`hitl_rules`         |
   | Secrets        | `.env` file, referenced with `${env:VAR_NAME}`                                         |
   | Overrides      | `BERG_AGENT_*` environment variables                                                   |
-  | External tools | `../.berg_config` for MCP server configuration                                         |
+  | External tools | `../.berg-agents` for MCP server configuration                                         |
 
 See [docs/CONFIGURATION.qmd](../docs/CONFIGURATION.qmd) for the full reference.
 

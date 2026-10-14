@@ -1,33 +1,36 @@
 <!-- README.md is generated from README.qmd. Please edit that file -->
 
-```{r} #| include: false
+\`\`\`{r} \#\| include: false
 
-knitr::opts_chunk$set( collapse = TRUE, comment = “#\>” )
-```
-# berg_agents
+knitr::opts_chunk\$set( collapse = TRUE, comment = “\#\>” )
 
-<!-- badges: start -->
+    # berg_agents
 
-> BergAgents - a local, LLM-driven code assistant with a framework-agnostic core and provider-centric configuration.
+    <!-- badges: start -->
 
-<!-- badges: end -->
+    > BergAgents - A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration.
+    > Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture.
+    > The system follows a harness-based execution model with multiple specialized agents working together.
 
-![Berg-Agents Overview](docs/visualizations/png/packages_berg_agents.png "Berg Agents overview")
+    The system is designed to work against any OpenAI-compatible provider, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
-## Quick Start
+    <!-- badges: end -->
 
-```bash
-# Install dependencies (uv is recommended)
-  uv venv .venv
-  source .venv/bin/activate
-  uv pip install -e .
+    ![Berg-Agents Overview](docs/visualizations/png/packages_berg_agents.png "Berg Agents overview")
 
-# Interactive terminal UI
-  python -m berg_agents --tui
+    ## Quick Start
 
-# Web UI (default: http://127.0.0.1:8001)
-  python -m berg_agents --web
-```
+    ```bash
+    # Install dependencies (uv is recommended)
+    uv venv .venv
+    source .venv/bin/activate
+    uv pip install -e .
+
+    # Interactive terminal UI
+    python -m berg_agents --tui
+
+    # Web UI (default: http://127.0.0.1:8001)
+    python -m berg_agents --web
 
 ## What it is
 
@@ -81,7 +84,7 @@ The following short tutorials walk through common use-cases:
 3.  **Using MCP tools**
 
     ``` jsonc
-    // .berg_config/mcp.json
+    // .berg-agents/mcp.json
     {
       "github__search": {
         "type": "stdio",
@@ -96,7 +99,7 @@ The following short tutorials walk through common use-cases:
     python -m berg_agents --task "Search for repos about 'BergAgents' on GitHub"
     ```
 
-4. **Customizing the Harness via `bergagents.jsonc`**
+4.  **Customizing the Harness via `bergagents.jsonc`**
 
     ``` jsonc
     {
@@ -117,22 +120,22 @@ The following short tutorials walk through common use-cases:
     }
     ```
 
-    This file lives in `.berg_config` and is automatically
-   merged with environment overrides.
+    This file lives in `.berg-agents` and is automatically merged
+    with environment overrides.
 
 ## Configuration
 
 ``` bash
-.berg_config/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
+.berg-agents/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
 .env                      # secrets referenced as `${env:VAR_NAME}`
 ```
 
 | Layer | Source |
-|----------------------------------|--------------------------------------|
-| Config file | `.berg_config` - `providers` block + `harness`/`model_routing`/`hitl_rules` |
+|----|----|
+| Config file | `.berg-agents` - `providers` block + `harness`/`model_routing`/`hitl_rules` |
 | Secrets | `.env` file, referenced with `${env:VAR_NAME}` |
 | Overrides | `BERG_AGENT_*` environment variables |
-| External tools | `.berg_config` for MCP server configuration |
+| External tools | `.berg-agents` for MCP server configuration |
 
 See [docs/CONFIGURATION.qmd] for the full reference.
 
@@ -145,7 +148,7 @@ title="Berg Agents Config Modules" alt="Berg-Agents Config" />
 ## Documentation
 
 | Page | Description |
-|-----------------------|-------------------------------------------------|
+|----|----|
 | [QUICKSTART] | Installation and first run |
 | [USAGE][docs/USAGE.qmd] | TUI, Python API, and web workflows |
 | [API] | Module map for the codebase |
@@ -171,7 +174,7 @@ testing, and the submission process.
 
 ## License
 
-**Version**: 0.2.0 | **License**: AGPL-3.0-only
+**Version**: 0.2.0 \| **License**: GNU Affero General Public License
 
   [docs/USAGE.qmd]: docs/USAGE.qmd
   [docs/CONFIGURATION.qmd]: docs/CONFIGURATION.qmd
