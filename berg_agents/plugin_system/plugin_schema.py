@@ -140,7 +140,7 @@ class PluginManifest(BaseModel):
         | AgentCapability
         | ProviderCapability
         | BackendCapability
-        ] = []
+    ] = []
 
     # Settings
     settings_schema: dict[str, Any] | None = None

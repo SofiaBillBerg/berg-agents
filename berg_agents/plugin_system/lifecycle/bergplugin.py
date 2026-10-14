@@ -1,13 +1,11 @@
 """Base class for all berg_agents plugins."""
 
-import logging
 from abc import ABC, abstractmethod
-from typing import Any, TYPE_CHECKING
+import logging
+from typing import TYPE_CHECKING, Any
 
 from berg_agents.plugin_system.plugin_context import PluginContext
-from berg_agents.plugin_system.plugin_contract import (
-    PluginCapability,
-)
+from berg_agents.plugin_system.plugin_contract import PluginCapability
 
 if TYPE_CHECKING:
     from berg_agents.plugin_system.events.event_bus import EventBus
@@ -19,7 +17,7 @@ class BergPlugin(ABC):
     """Base class for all berg_agents plugins."""
 
     def __init__(self) -> None:
-        self._event_bus: "EventBus | None" = None
+        self._event_bus: EventBus | None = None
         self._plugin_id: str | None = None
 
     # === Lifecycle Hooks ===
@@ -37,13 +35,11 @@ class BergPlugin(ABC):
     async def on_unload(self, context: PluginContext) -> None:
         """Called when plugin is unloaded."""
 
-    async def on_error(
-            self, context: PluginContext, error: Exception
-    ) -> None:
+    async def on_error(self, context: PluginContext, error: Exception) -> None:
         """Called when plugin encounters an error."""
 
     async def on_config_change(
-            self, context: PluginContext, new_config: dict[str, Any]
+        self, context: PluginContext, new_config: dict[str, Any]
     ) -> None:
         """Called when plugin configuration changes."""
 
@@ -72,10 +68,10 @@ class BergPlugin(ABC):
     # === Event Helpers ===
 
     async def emit(
-            self,
-            event_type: str,
-            data: dict[str, Any] | None = None,
-            correlation_id: str | None = None,
+        self,
+        event_type: str,
+        data: dict[str, Any] | None = None,
+        correlation_id: str | None = None,
     ) -> None:
         """Emit an event from this plugin."""
         if self._event_bus and self._plugin_id:
@@ -87,10 +83,10 @@ class BergPlugin(ABC):
             )
 
     def subscribe(
-            self,
-            event_pattern: str,
-            handler: Any,
-            priority: int = 0,
+        self,
+        event_pattern: str,
+        handler: Any,
+        priority: int = 0,
     ) -> str:
         """Subscribe to events."""
         if self._event_bus:

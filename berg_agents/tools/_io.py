@@ -36,7 +36,7 @@ class FileObject:
 
 
 def _normalize_target(
-        target: str | Path, root: str | Path | None = None
+    target: str | Path, root: str | Path | None = None
 ) -> Path:
     """Rebase a write target so it stays safely inside the project root.
 
@@ -81,11 +81,11 @@ def _normalize_target(
 
 
 def _atomic_write(
-        target: Path | str,
-        content: str,
-        *,
-        mode: str = "w",
-        encoding: str = "utf-8",
+    target: Path | str,
+    content: str,
+    *,
+    mode: str = "w",
+    encoding: str = "utf-8",
 ) -> Path:
     """Write *content* to *target* atomically.
 
@@ -116,10 +116,10 @@ def _atomic_write(
 
 
 def create_from_template(
-        template_root_dir: Path,
-        dest_root_dir: Path,
-        *,
-        replace_vars: dict | None = None,
+    template_root_dir: Path,
+    dest_root_dir: Path,
+    *,
+    replace_vars: dict | None = None,
 ) -> Path:
     """Create *dest_path* by copying *template_path*.
 

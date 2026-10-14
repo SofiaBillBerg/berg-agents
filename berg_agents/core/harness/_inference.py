@@ -6,7 +6,7 @@ Pydantic AI agent modules into one deterministic flow:
 1. Guardian ``guard_review`` risk/HITL gate with early return.
 2. Planner ``build_plan`` decomposition for complex/critical work.
 3. Model selection via ``resolve_implementation_model`` (provider
-   prefix always comes from .berg_config, never a global flag).
+   prefix always comes from configuration, never a global flag).
 4. Agent selection from ``can_handle``/confidence scores, with
     implementation as the default executor.
 5. Synchronous implementation-agent inference whenever the
@@ -74,12 +74,12 @@ def _requested_model_id(metadata: dict[str, Any]) -> str | None:
 
 
 def _inference_prompt(
-        *,
-        description: str,
-        task_type: str,
-        complexity: TaskComplexity,
-        plan: dict[str, Any] | None,
-        steps: list[dict[str, Any]],
+    *,
+    description: str,
+    task_type: str,
+    complexity: TaskComplexity,
+    plan: dict[str, Any] | None,
+    steps: list[dict[str, Any]],
 ) -> str:
     """Render the task prompt for the implementation agent.
 
@@ -113,7 +113,7 @@ def _inference_prompt(
 
 
 async def _await_inference(
-        agent: Any, prompt: str, deps: ImplementationDeps
+    agent: Any, prompt: str, deps: ImplementationDeps
 ) -> Any:
     """Run one implementation-agent call under an explicit timeout.
 
@@ -192,9 +192,9 @@ def _files_changed_from_run(run_result: Any) -> list[str]:
             for key in _FILE_PATH_ARG_KEYS:
                 value = args.get(key)
                 if (
-                        isinstance(value, str)
-                        and value.strip()
-                        and value not in seen
+                    isinstance(value, str)
+                    and value.strip()
+                    and value not in seen
                 ):
                     seen.add(value)
                     touched.append(value)
@@ -256,7 +256,7 @@ def _files_changed_from_text(text: str) -> list[str]:
 
 
 def _merge_files_changed(
-        metadata: dict[str, Any], observed: list[str]
+    metadata: dict[str, Any], observed: list[str]
 ) -> dict[str, Any]:
     """Copy metadata with run-observed paths merged into files_changed.
 
@@ -408,5 +408,6 @@ def _finish_reason(run_result: Any) -> str:
     if isinstance(nested, str) and nested.strip():
         return nested.strip()
     return "unknown"
+
 
 # noinspection unresolved-references

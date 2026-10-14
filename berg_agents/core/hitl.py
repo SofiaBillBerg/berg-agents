@@ -161,7 +161,7 @@ def is_valid_decision(request: HitlRequest, decision: HitlDecision) -> bool:
 
 # noinspection unresolved-references
 def default_interrupt_on(
-        tools: Mapping[str, Any],
+    tools: Mapping[str, Any],
 ) -> dict[str, bool]:
     """Compute the default ``interrupt_on`` policy for a tool registry.
 
@@ -193,8 +193,8 @@ def default_interrupt_on(
 
 # noinspection unresolved-references
 def apply_decision(
-        request: HitlRequest,
-        decision: HitlDecision,
+    request: HitlRequest,
+    decision: HitlDecision,
 ) -> Mapping[str, Any] | None:
     """Resolve a paused request to the args the loop should use.
 

@@ -3,27 +3,70 @@
 # Configuration Manager
 import logging
 import os
-import re
 from pathlib import Path
+import re
 from typing import Any
-
-import yaml
-from jsonschema import ValidationError, validate
 
 from berg_agents.plugin_system.config.file_watcher import FileWatcher
 from berg_agents.plugin_system.exceptions import ConfigValidationError
-from berg_agents.plugin_system.lifecycle.lifecycle_hooks import (
-    PluginLifecycle,
-)
+from berg_agents.plugin_system.lifecycle.lifecycle_hooks import PluginLifecycle
+from jsonschema import ValidationError, validate
+import yaml
 
 logger = logging.getLogger(__name__)
+
+
+def _project_config_dir() -> Path:
+    """Project config directory, via the shared app resolver.
+
+    Precedence: ``BERG_AGENTS_CONFIG_DIR``, the project's
+    ``.berg-agents/``, then the global ``~/.berg-agents/``. See
+    :func:`berg_agents.config.paths.resolve_config_dir`.
+    """
+    from berg_agents.config.paths import resolve_config_dir
+
+    return resolve_config_dir()
+
+
+def plugin_slug(plugin_id: str) -> str:
+    """Short config name for a plugin id.
+
+    ``berg-plugin-shared-todo`` -> ``shared_todo``, matching the
+    directory convention under ``.berg-agents/``
+    (``.berg-agents/.shared_todo/config.yaml``).
+
+    :param plugin_id: Full plugin identifier.
+    :return: Slug with underscores.
+    """
+    name = plugin_id
+    name = name.removeprefix("berg-plugin-")
+    return name.replace("-", "_")
+
+
+def plugin_config_candidates(config_dir: Path, plugin_id: str) -> list[Path]:
+    """Config files searched for a plugin, first match wins.
+
+    Order: plugin-declared convention (``.<slug>/config.yaml``), then
+    the flat ``plugins/`` layouts. The project ``.berg-agents/`` is the
+    single source — no per-user home directory.
+
+    :param config_dir: Project config directory.
+    :param plugin_id: Plugin identifier.
+    :return: Candidate paths in priority order.
+    """
+    slug = plugin_slug(plugin_id)
+    return [
+        config_dir / f".{slug}" / "config.yaml",
+        config_dir / f".{slug}" / "config.yml",
+        config_dir / "plugins" / f"{plugin_id}.yaml",
+        config_dir / "plugins" / f"{slug}.yaml"]
 
 
 class PluginConfigManager:
     """Manage plugin configurations."""
 
     def __init__(self, config_dir: Path | None = None) -> None:
-        self.config_dir = config_dir or Path.home() / ".berg_agents"
+        self.config_dir = config_dir or _project_config_dir()
         self._cache: dict[str, dict[str, Any]] = {}
         self._env_pattern = re.compile(r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)}")
         self._initialized = False
@@ -33,7 +76,7 @@ class PluginConfigManager:
         if self._initialized:
             return
 
-        # Ensure .berg_config directory exists
+        # Ensure .berg-agents directory exists
         self.config_dir.mkdir(parents=True, exist_ok=True)
         (self.config_dir / "plugins").mkdir(exist_ok=True)
 
@@ -52,10 +95,10 @@ class PluginConfigManager:
         return self._cache.get(plugin_id, {})
 
     async def load_config(
-            self,
-            plugin_id: str,
-            schema: dict[str, Any] | None = None,
-            defaults: dict[str, Any] | None = None,
+        self,
+        plugin_id: str,
+        schema: dict[str, Any] | None = None,
+        defaults: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Load and validate plugin configuration.
 
@@ -70,7 +113,7 @@ class PluginConfigManager:
         # Start with defaults
         config = dict(defaults) if defaults else {}
 
-        # Load from user .berg_config file
+        # Load from user configuration file
         user_config = await self._load_user_config(plugin_id)
         if user_config:
             self._deep_merge(config, user_config)
@@ -98,19 +141,30 @@ class PluginConfigManager:
         return config
 
     async def _load_user_config(self, plugin_id: str) -> dict[str, Any] | None:
-        """Load user configuration file."""
-        config_file = self.config_dir / "plugins" / f"{plugin_id}.yaml"
+        """Load user configuration file.
 
-        if not config_file.exists():
-            return None
-
-        try:
-            with config_file.open() as f:
-                data = yaml.safe_load(f)
-                return data.get("settings", {}) if data else {}
-        except Exception as e:
-            logger.warning(f"Failed to load .berg_config for {plugin_id}: {e}")
-            return None
+        Searches the plugin's documented locations (see
+        :func:`plugin_config_candidates`) and accepts both shapes: a
+        ``settings:`` block (registry style) and a flat mapping (what
+        ``.berg-agents/.<slug>/config.yaml`` naturally holds).
+        """
+        for config_file in plugin_config_candidates(self.config_dir, plugin_id):
+            if not config_file.is_file():
+                continue
+            try:
+                with config_file.open(encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+            except (OSError, yaml.YAMLError) as e:
+                logger.warning(f"Failed to load config for {plugin_id}: {e}")
+                return None
+            if not isinstance(data, dict):
+                continue
+            settings = data.get("settings")
+            if isinstance(settings, dict):
+                return dict(settings)
+            # Flat file: every top-level key is a setting.
+            return {k: v for k, v in data.items() if k != "settings"}
+        return None
 
     def _load_env_config(self, plugin_id: str) -> dict[str, Any]:
         """Load configuration from environment variables.
@@ -126,7 +180,7 @@ class PluginConfigManager:
                 continue
 
             # Extract setting key
-            setting_key = key[len(prefix):].lower()
+            setting_key = key[len(prefix) :].lower()
 
             # Handle nested keys (FEATURES__ISSUES → features.issues)
             parts = setting_key.split("__")
@@ -189,9 +243,9 @@ class PluginConfigManager:
         """Deep merge override into base (mutates base)."""
         for key, value in override.items():
             if (
-                    key in base
-                    and isinstance(base[key], dict)
-                    and isinstance(value, dict)
+                key in base
+                and isinstance(base[key], dict)
+                and isinstance(value, dict)
             ):
                 self._deep_merge(base[key], value)
             else:
@@ -211,16 +265,16 @@ class PluginConfigManager:
         return await self.load_config(plugin_id)
 
     async def update(
-            self, plugin_id: str, updates: dict[str, Any], persist: bool = True
+        self, plugin_id: str, updates: dict[str, Any], persist: bool = True
     ) -> None:
         """Update plugin configuration.
 
         Args:
             plugin_id: Plugin ID
             updates: Configuration updates
-            persist: Write to .berg_config file
+            persist: Write to configuration file
         """
-        # Get current .berg_config
+        # Get current configuration
         current = self._cache.get(plugin_id, {})
 
         # Merge updates
@@ -234,9 +288,9 @@ class PluginConfigManager:
             await self._save_user_config(plugin_id, current)
 
     async def _save_user_config(
-            self, plugin_id: str, settings: dict[str, Any]
+        self, plugin_id: str, settings: dict[str, Any]
     ) -> None:
-        """Save configuration to user .berg_config file."""
+        """Save configuration to user configuration file."""
         config_file = self.config_dir / "plugins" / f"{plugin_id}.yaml"
 
         # Ensure directory exists
@@ -265,7 +319,7 @@ class PluginConfigWatcher:
     """Watch for configuration changes and reload."""
 
     def __init__(
-            self, config_manager: PluginConfigManager, lifecycle: PluginLifecycle
+        self, config_manager: PluginConfigManager, lifecycle: PluginLifecycle
     ) -> None:
         self.config_manager = config_manager
         self.lifecycle = lifecycle
@@ -276,7 +330,7 @@ class PluginConfigWatcher:
     async def watch(self, plugin_id: str) -> None:
         """Watch plugin configuration for changes."""
         config_file = (
-                self.config_manager.config_dir / "plugins" / f"{plugin_id}.yaml"
+            self.config_manager.config_dir / "plugins" / f"{plugin_id}.yaml"
         )
 
         if not config_file.exists():
@@ -292,7 +346,7 @@ class PluginConfigWatcher:
         logger.info(f"Configuration changed for {plugin_id}")
 
         try:
-            # Reload .berg_config
+            # Reload config
             new_config = await self.config_manager.reload(plugin_id)
 
             # Notify plugin
@@ -307,4 +361,4 @@ class PluginConfigWatcher:
                         f"Plugin {plugin_id} does not support live reconfiguration"
                     )
         except Exception as e:
-            logger.error(f"Failed to reload .berg_config for {plugin_id}: {e}")
+            logger.error(f"Failed to reload configuration for {plugin_id}: {e}")

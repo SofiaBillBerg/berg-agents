@@ -5,15 +5,14 @@ from berg_agents.plugin_system.discovery.compat_funcs import (
     create_mcp_toolset,
     parse_skill,
 )
+
 # Backward Compatibility
 from berg_agents.plugin_system.lifecycle.bergplugin import BergPlugin
 from berg_agents.plugin_system.plugin_context import PluginContext
-from berg_agents.plugin_system.plugin_contract import (
+from berg_agents.plugin_system.plugin_contract import (  # PluginContext,
     PluginCapability,
-    # PluginContext,
     ToolCapability,
 )
-
 
 # Skill Adapter
 
@@ -24,12 +23,12 @@ class CapabilityWrapper(PluginCapability):
     """Wrap skill content as a plugin capability PluginCapability."""
 
     def __init__(
-            self,
-            type: str,
-            id: str,
-            description: str,
-            content: str,
-            deferred: bool = True,
+        self,
+        type: str,
+        id: str,
+        description: str,
+        content: str,
+        deferred: bool = True,
     ) -> None:
         self.type = type
         self.id = id

@@ -2,16 +2,13 @@
 
 
 import asyncio
-import logging
 from importlib.metadata import entry_points
+import logging
 from pathlib import Path
 from typing import Any
 
+from berg_agents.plugin_system.discovery.plugin_metadata import PluginMetadata
 import yaml
-
-from berg_agents.plugin_system.discovery.plugin_metadata import (
-    PluginMetadata,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -90,11 +87,11 @@ class PluginDiscovery:
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         config = config or {}
-        self.plugin_dir = Path(config.get("plugin_dir", ".berg_config/plugins"))
+        self.plugin_dir = Path(config.get("plugin_dir", ".berg-agents/plugins"))
         self.cache_dir = Path(config.get("cache_dir", ".cache/plugins"))
 
     async def discover_all(
-            self, search_paths: list[Path] | None = None
+        self, search_paths: list[Path] | None = None
     ) -> list[PluginMetadata]:
         """Discover plugins from all sources.
 
@@ -226,6 +223,7 @@ class PluginDiscovery:
             repository=data.get("repository"),
             tags=data.get("tags", []),
             icon=data.get("icon"),
+            ui=data.get("ui"),
             dependencies=dependencies,
             permissions=data.get("permissions", []),
         )

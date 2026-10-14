@@ -1,4 +1,4 @@
-#  Berg Agents Plugin System - Permissions
+"""Berg Agents Plugin System - Permissions Module."""
 
 from berg_agents.plugin_system.permissions.hitl import (
     HITLManager,

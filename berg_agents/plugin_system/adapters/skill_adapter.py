@@ -13,8 +13,8 @@ adapter and the chat agent can never disagree about which skills exist.
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
+import re
 from typing import Any
 
 from berg_agents.plugin_system.discovery.plugin_metadata import PluginMetadata
@@ -75,7 +75,9 @@ class SkillPluginAdapter(BergPlugin):
         self._set_event_bus(context.event_bus, context.plugin_id)
         raw = (context.settings or {}).get("skill_file", "")
         if not raw:
-            logger.warning("Skill plugin %s has no skill_file setting", context.plugin_id)
+            logger.warning(
+                "Skill plugin %s has no skill_file setting", context.plugin_id
+            )
             return
         # NOTE: Reuses the chat skill parser so frontmatter rules stay
         # identical between the adapter and the chat agent.
@@ -169,10 +171,12 @@ async def register_skill_plugins(
         except PluginError as exc:
             logger.warning("Skill plugin registration skipped: %s", exc)
             continue
-        # NOTE: Unpersisted per-plugin settings — the skill path is
-        # environment-derived (settings), not user configuration.
+        # NOTE: persisted. The skill path must survive a restart: an
+        # in-memory cache dies with the process, so every adapter
+        # reloaded with empty settings (observed as "has no skill_file
+        # setting" spam at startup and inert skill plugins).
         await manager.config_manager.update(
-            metadata.id, {"skill_file": entry["source"]}, persist=False
+            metadata.id, {"skill_file": entry["source"]}, persist=True
         )
         registered.append(metadata.id)
         logger.info("Skill plugin registered: %s", metadata.id)

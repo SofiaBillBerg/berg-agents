@@ -1,0 +1,87 @@
+"""Configuration directory resolution — one rule for the whole app.
+
+Precedence (first match wins):
+
+1. ``BERG_AGENTS_CONFIG_DIR`` — explicit override, always wins.
+2. ``<project_root>/.berg-config`` — the project's current layout.
+3. ``<project_root>/.berg-agents`` — the scheme's canonical name.
+4. ``~/.berg-agents`` — the global fallback.
+
+Both project names are accepted because the tree historically used
+``.berg-agents`` (bergagents.jsonc, mcp.json, plugin configs) while new
+per-project state (session DBs) landed in ``.berg-agents``. Accepting
+either — rather than renaming live files — keeps existing setup working
+and lets the scheme be adopted gradually.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+#: Checkout root of the berg_agents package (this file is
+#: berg_agents/config/paths.py → up two).
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+#: Directory names, in precedence order, that may hold project config.
+_PROJECT_DIR_NAMES = (".berg-config", ".berg-agents")
+
+#: Name used when creating a fresh global directory.
+_GLOBAL_DIR_NAME = ".berg-agents"
+
+
+def project_root() -> Path:
+    """The checkout root (parent of the ``berg_agents`` package)."""
+    return _PROJECT_ROOT
+
+
+def resolve_config_dir(root: Path | None = None) -> Path:
+    """Resolve the config directory this process should read and write.
+
+    :param root: Project root; defaults to this checkout.
+    :return: The directory to use. Created by the caller when needed.
+    """
+    # 1) Explicit override always wins.
+    override = (os.environ.get("BERG_AGENTS_CONFIG_DIR") or "").strip()
+    if override:
+        return Path(override).expanduser()
+
+    base = Path(root) if root is not None else _PROJECT_ROOT
+
+    # 2-3) Existing project layout, in precedence order.
+    for name in _PROJECT_DIR_NAMES:
+        candidate = base / name
+        if candidate.is_dir():
+            return candidate
+
+    # 4) Global fallback.
+    return Path.home() / _GLOBAL_DIR_NAME
+
+
+def config_file(filename: str, root: Path | None = None) -> Path:
+    """Path of a named file inside the resolved config directory.
+
+    :param filename: File name (e.g. ``"bergagents.jsonc"``).
+    :param root: Project root; defaults to this checkout.
+    :return: Resolved absolute path.
+    """
+    return resolve_config_dir(root) / filename
+
+
+def plugin_config_dir(plugin_id: str, root: Path | None = None) -> Path:
+    """Config directory dedicated to one plugin.
+
+    Plugins own their config under ``<config-dir>/.<slug>/`` (e.g.
+    ``.berg-agents/.shared_todo/config.yaml``), keyed by the slug
+    derived from the plugin id.
+
+    :param plugin_id: Plugin identifier.
+        :param root: Project root; defaults to this checkout.
+    :return: The plugin's directory (may not exist yet).
+    """
+    from berg_agents.plugin_system.config.config_manager import plugin_slug
+
+    return resolve_config_dir(root) / f".{plugin_slug(plugin_id)}"

@@ -12,20 +12,17 @@ This class manages the complete plugin lifecycle:
 
 #  Berg Agents Plugin System - Plugin Manager
 
-
 import asyncio
 import importlib
 import logging
-import sys
 from pathlib import Path
+import sys
 from typing import Any
 
 # NOTE: app/harness are typed as Any to avoid a circular import
 # (berg_agents/__init__ -> app -> harness -> plugin_system -> app).
 # At runtime they are BergAgentsApp and Harness instances.
-from berg_agents.plugin_system.config.config_manager import (
-    PluginConfigManager,
-)
+from berg_agents.plugin_system.config.config_manager import PluginConfigManager
 from berg_agents.plugin_system.dependency.dependency_management import (
     DependencyResolver,
 )
@@ -33,12 +30,8 @@ from berg_agents.plugin_system.discovery.discovery_process import (
     PluginDiscovery,
 )
 from berg_agents.plugin_system.discovery.plugin_entry import PluginEntry
-from berg_agents.plugin_system.discovery.plugin_metadata import (
-    PluginMetadata,
-)
-from berg_agents.plugin_system.discovery.plugin_registry import (
-    PluginRegistry,
-)
+from berg_agents.plugin_system.discovery.plugin_metadata import PluginMetadata
+from berg_agents.plugin_system.discovery.plugin_registry import PluginRegistry
 from berg_agents.plugin_system.events.event_bus import EventBus
 from berg_agents.plugin_system.exceptions import (
     DependencyError,
@@ -46,12 +39,28 @@ from berg_agents.plugin_system.exceptions import (
     PluginStateError,
 )
 from berg_agents.plugin_system.lifecycle.bergplugin import BergPlugin
-from berg_agents.plugin_system.lifecycle.lifecycle_states import (
-    PluginState,
-)
+from berg_agents.plugin_system.lifecycle.lifecycle_states import PluginState
 from berg_agents.plugin_system.plugin_context import PluginContext
 
 logger = logging.getLogger(__name__)
+
+
+def _schema_defaults(schema: Any) -> dict[str, Any]:
+    """Pull ``default`` values out of a JSON-schema ``properties`` map.
+
+    :param schema: Plugin settings schema (JSON Schema object or None).
+    :return: Flat mapping of property name to declared default.
+    """
+    if not isinstance(schema, dict):
+        return {}
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return {}
+    return {
+        name: prop["default"]
+        for name, prop in properties.items()
+        if isinstance(prop, dict) and "default" in prop
+    }
 
 
 class PluginManager:
@@ -63,10 +72,10 @@ class PluginManager:
     """
 
     def __init__(
-            self,
-            app: Any,
-            harness: Any,
-            config: dict[str, Any] | None = None,
+        self,
+        app: Any,
+        harness: Any,
+        config: dict[str, Any] | None = None,
     ) -> None:
         """Initialize plugin manager.
 
@@ -99,7 +108,7 @@ class PluginManager:
     async def initialize(self) -> None:
         """Initialize the plugin system.
 
-        Sets up event bus, .berg_config manager, and prepares for plugin discovery.
+        Sets up event bus, configuration manager, and prepares for plugin discovery.
         Must be called before any other operations.
         """
         if self._initialized:
@@ -119,7 +128,7 @@ class PluginManager:
         logger.info("Plugin system initialized")
 
     async def discover_plugins(
-            self, search_paths: list[Path | str]
+        self, search_paths: list[Path | str]
     ) -> list[PluginMetadata]:
         """Discover plugins in the specified paths.
 
@@ -192,7 +201,7 @@ class PluginManager:
                 plugin_instance = await self._import_plugin(entry)
 
                 # Create plugin context
-                context = self._create_context(entry)
+                context = await self._create_context(entry)
 
                 # Call on_load hook
                 await plugin_instance.on_load(context)
@@ -338,7 +347,10 @@ class PluginManager:
                 try:
                     plugin_enabled = self._plugins.get(plugin_id)
                     context_enabled = self._contexts.get(plugin_id)
-                    if plugin_enabled is not None and context_enabled is not None:
+                    if (
+                        plugin_enabled is not None
+                        and context_enabled is not None
+                    ):
                         await plugin_enabled.on_disable(context_enabled)
                     await self._unregister_capabilities(plugin_id)
                     self.registry.update_state(plugin_id, PluginState.LOADED)
@@ -502,7 +514,7 @@ class PluginManager:
             "enabled": entry.state == PluginState.ENABLED}
 
     async def list_plugins(
-            self, state: PluginState | None = None
+        self, state: PluginState | None = None
     ) -> list[dict[str, Any]]:
         """List all plugins.
 
@@ -561,8 +573,8 @@ class PluginManager:
                 )
 
             if dep_entry.state not in (
-                    PluginState.LOADED,
-                    PluginState.ENABLED,
+                PluginState.LOADED,
+                PluginState.ENABLED,
             ):
                 # Try to load dependency first
                 await self.load_plugin(dep.id or "unknown")
@@ -611,7 +623,37 @@ class PluginManager:
             logger.error(f"Failed to import plugin {entry.plugin_id}: {e}")
             raise PluginError(f"Failed to import {entry.plugin_id}") from e
 
-    def _create_context(self, entry: PluginEntry) -> PluginContext:
+    async def _load_plugin_settings(self, entry: PluginEntry) -> dict[str, Any]:
+        """Resolve a plugin's settings from manifest + config + env.
+
+        Manifest ``settings_schema`` supplies defaults; project
+        ``.berg-agents`` is searched for the plugin's documented
+        locations; env vars override both. A schema violation is logged
+        and degrades to manifest defaults — a plugin with bad config
+        still loads, it just runs on defaults.
+
+        :param entry: Plugin entry whose settings are resolved.
+        :return: Validated settings mapping (possibly empty).
+        """
+        from berg_agents.plugin_system.exceptions import ConfigValidationError
+
+        plugin_id = entry.metadata.id or "unknown"
+        schema = entry.metadata.settings_schema
+        defaults = _schema_defaults(schema)
+
+        try:
+            return await self.config_manager.load_config(
+                plugin_id, schema=schema, defaults=defaults
+            )
+        except ConfigValidationError as exc:
+            logger.warning(
+                "Config for %s invalid (%s); using manifest defaults",
+                plugin_id,
+                exc,
+            )
+            return defaults
+
+    async def _create_context(self, entry: PluginEntry) -> PluginContext:
         """Create plugin context.
 
         Args:
@@ -620,10 +662,12 @@ class PluginManager:
         Returns:
             Plugin context
         """
-        # Get plugin settings from .berg_config
-        settings = self.config_manager.get_plugin_settings(
-            entry.metadata.id or "{}"
-        )
+        # Load settings for this plugin: manifest defaults + project
+        # .berg-agents + env overrides, validated against the
+        # settings_schema the plugin declared. This is the only call
+        # that populates the cache — without it context.settings was
+        # always empty and every plugin ran on hardcoded defaults.
+        settings = await self._load_plugin_settings(entry)
 
         # PluginContext requires all fields at construction time.
         context = PluginContext(
@@ -635,16 +679,14 @@ class PluginManager:
             config=self._config,
             plugin_manager=self,
             event_bus=self.event_bus,
-            logger=logging.getLogger(
-                f"plugin.{entry.metadata.id}"
-            ),
+            logger=logging.getLogger(f"plugin.{entry.metadata.id}"),
             settings=settings,
         )
 
         return context
 
     async def _register_capabilities(
-            self, plugin_id: str, plugin: BergPlugin
+        self, plugin_id: str, plugin: BergPlugin
     ) -> None:
         """Register plugin capabilities with berg_agents.
 

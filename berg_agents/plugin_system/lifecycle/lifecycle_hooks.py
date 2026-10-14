@@ -1,14 +1,12 @@
 """Plugin lifecycle management hooks."""
 
 import asyncio
-import logging
 from datetime import datetime
+import logging
 from typing import Any
 
 from berg_agents.plugin_system.discovery.plugin_entry import PluginEntry
-from berg_agents.plugin_system.discovery.plugin_registry import (
-    PluginRegistry,
-)
+from berg_agents.plugin_system.discovery.plugin_registry import PluginRegistry
 from berg_agents.plugin_system.events.event_bus import EventBus
 from berg_agents.plugin_system.exceptions import (
     PluginEnableError,
@@ -16,13 +14,9 @@ from berg_agents.plugin_system.exceptions import (
     PluginNotFoundError,
     PluginStateError,
 )
-from berg_agents.plugin_system.lifecycle.lifecycle_states import (
-    PluginState,
-)
+from berg_agents.plugin_system.lifecycle.lifecycle_states import PluginState
 from berg_agents.plugin_system.plugin_context import PluginContext
-from berg_agents.plugin_system.plugin_contract import (
-    PluginCapability,
-)
+from berg_agents.plugin_system.plugin_contract import PluginCapability
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +25,10 @@ class PluginLifecycle:
     """Manages plugin lifecycle transitions."""
 
     def __init__(
-            self,
-            registry: PluginRegistry,
-            event_bus: EventBus,
-            config: dict[str, Any],
+        self,
+        registry: PluginRegistry,
+        event_bus: EventBus,
+        config: dict[str, Any],
     ):
         self.registry = registry
         self.event_bus = event_bus
@@ -79,16 +73,23 @@ class PluginLifecycle:
             entry.loaded_at = datetime.now()
 
             # Emit event
-            await self.event_bus.emit("plugin.loaded", {
-                "plugin_id": plugin_id,
-                "version": entry.metadata.version})
+            await self.event_bus.emit(
+                "plugin.loaded",
+                {
+                    "plugin_id": plugin_id,
+                    "version": entry.metadata.version},
+            )
 
             logger.info(f"Loaded plugin: {plugin_id}")
 
-        except asyncio.TimeoutError:
-            await self._handle_error(entry, PluginLoadError(f"Load timeout: {plugin_id}"))
+        except TimeoutError:
+            await self._handle_error(
+                entry, PluginLoadError(f"Load timeout: {plugin_id}")
+            )
         except Exception as e:
-            await self._handle_error(entry, PluginLoadError(f"Load failed: {e}"))
+            await self._handle_error(
+                entry, PluginLoadError(f"Load failed: {e}")
+            )
 
     async def enable(self, plugin_id: str) -> None:
         """Enable a plugin."""
@@ -133,16 +134,23 @@ class PluginLifecycle:
             entry.metadata.enabled = True
 
             # Emit event
-            await self.event_bus.emit("plugin.enabled", {
-                "plugin_id": plugin_id,
-                "capabilities": len(capabilities)})
+            await self.event_bus.emit(
+                "plugin.enabled",
+                {
+                    "plugin_id": plugin_id,
+                    "capabilities": len(capabilities)},
+            )
 
             logger.info(f"Enabled plugin: {plugin_id}")
 
-        except asyncio.TimeoutError:
-            await self._handle_error(entry, PluginEnableError(f"Enable timeout: {plugin_id}"))
+        except TimeoutError:
+            await self._handle_error(
+                entry, PluginEnableError(f"Enable timeout: {plugin_id}")
+            )
         except Exception as e:
-            await self._handle_error(entry, PluginEnableError(f"Enable failed: {e}"))
+            await self._handle_error(
+                entry, PluginEnableError(f"Enable failed: {e}")
+            )
 
     async def disable(self, plugin_id: str) -> None:
         """Disable a plugin."""
@@ -177,13 +185,18 @@ class PluginLifecycle:
             entry.metadata.enabled = False
 
             # Emit event
-            await self.event_bus.emit("plugin.disabled", {
-                "plugin_id": plugin_id})
+            await self.event_bus.emit(
+                "plugin.disabled",
+                {
+                    "plugin_id": plugin_id},
+            )
 
             logger.info(f"Disabled plugin: {plugin_id}")
 
-        except asyncio.TimeoutError:
-            logger.error(f"Disable timeout for {plugin_id}, forcing state change")
+        except TimeoutError:
+            logger.error(
+                f"Disable timeout for {plugin_id}, forcing state change"
+            )
             await self._set_state(entry, PluginState.ERROR)
         except Exception as e:
             logger.error(f"Disable failed for {plugin_id}: {e}")
@@ -199,8 +212,14 @@ class PluginLifecycle:
         if entry.state == PluginState.ENABLED:
             await self.disable(plugin_id)
 
-        if entry.state not in (PluginState.LOADED, PluginState.DISABLED, PluginState.ERROR):
-            logger.debug(f"Plugin {plugin_id} cannot be unloaded from state {entry.state}")
+        if entry.state not in (
+            PluginState.LOADED,
+            PluginState.DISABLED,
+            PluginState.ERROR,
+        ):
+            logger.debug(
+                f"Plugin {plugin_id} cannot be unloaded from state {entry.state}"
+            )
             return
 
         # Transition to UNLOADING
@@ -220,12 +239,15 @@ class PluginLifecycle:
             await self.registry.unregister(plugin_id)
 
             # Emit event
-            await self.event_bus.emit("plugin.unloaded", {
-                "plugin_id": plugin_id})
+            await self.event_bus.emit(
+                "plugin.unloaded",
+                {
+                    "plugin_id": plugin_id},
+            )
 
             logger.info(f"Unloaded plugin: {plugin_id}")
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Unload timeout for {plugin_id}, forcing removal")
             await self.registry.unregister(plugin_id)
         except Exception as e:
@@ -251,9 +273,12 @@ class PluginLifecycle:
                 logger.error(f"on_error hook failed: {e}")
 
         # Emit event
-        await self.event_bus.emit("plugin.error", {
-            "plugin_id": entry.metadata.id,
-            "error": str(error)})
+        await self.event_bus.emit(
+            "plugin.error",
+            {
+                "plugin_id": entry.metadata.id,
+                "error": str(error)},
+        )
 
     async def _set_state(self, entry: PluginEntry, state: PluginState) -> None:
         """Set plugin state."""
@@ -265,6 +290,7 @@ class PluginLifecycle:
         """Import plugin class from entry point."""
         module_path, class_name = entry_point.rsplit(":", 1)
         import importlib
+
         module = importlib.import_module(module_path)
         return getattr(module, class_name)
 
@@ -286,14 +312,12 @@ class PluginLifecycle:
         )
 
     async def _register_capability_with_system(
-            self, entry: PluginEntry, capability: PluginCapability
+        self, entry: PluginEntry, capability: PluginCapability
     ) -> None:
         """Register capability with berg_agents system."""
         # This would integrate with berg_agents capability system
-        pass
 
     async def _unregister_capability_from_system(
-            self, entry: PluginEntry, capability: PluginCapability
+        self, entry: PluginEntry, capability: PluginCapability
     ) -> None:
         """Unregister capability from berg_agents system."""
-        pass

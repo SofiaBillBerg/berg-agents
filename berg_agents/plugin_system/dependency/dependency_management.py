@@ -1,18 +1,14 @@
 """Dependency management for the plugin system."""
 
-import logging
 from collections import defaultdict
+import logging
 
 from berg_agents.plugin_system.dependency.version_parsing import (
     Version,
     VersionConstraint,
 )
-from berg_agents.plugin_system.discovery.plugin_metadata import (
-    PluginMetadata,
-)
-from berg_agents.plugin_system.discovery.plugin_registry import (
-    PluginRegistry,
-)
+from berg_agents.plugin_system.discovery.plugin_metadata import PluginMetadata
+from berg_agents.plugin_system.discovery.plugin_registry import PluginRegistry
 from berg_agents.plugin_system.exceptions import (
     DependencyCycleError,
     DependencyError,
@@ -103,16 +99,21 @@ class DependencyGraph:
         # Check for cycles first
         cycle = self.has_cycle()
         if cycle:
-            raise DependencyCycleError(f"Circular dependency: {' -> '.join(cycle)}")
+            raise DependencyCycleError(
+                f"Circular dependency: {' -> '.join(cycle)}"
+            )
 
         # Kahn's algorithm
         from collections import deque
+
         in_degree = dict.fromkeys(self.nodes, 0)
         for node in self.nodes:
             for neighbor in self.edges.get(node, []):
                 in_degree[neighbor] += 1
 
-        queue = deque([node for node, degree in in_degree.items() if degree == 0])
+        queue = deque([
+            node for node, degree in in_degree.items() if degree == 0
+        ])
         result = []
 
         while queue:
@@ -134,8 +135,8 @@ class DependencyResolver:
         self.registry = registry
 
     async def resolve(
-            self,
-            plugins: list[PluginMetadata],
+        self,
+        plugins: list[PluginMetadata],
     ) -> tuple[list[str], list[str]]:
         """Resolve dependencies and return load order.
 
@@ -189,8 +190,8 @@ class ConflictResolver:
     """Resolve version conflicts."""
 
     def resolve_conflicts(
-            self,
-            plugins: list[PluginMetadata],
+        self,
+        plugins: list[PluginMetadata],
     ) -> list[PluginMetadata]:
         """Resolve version conflicts.
 
@@ -236,8 +237,8 @@ class ConflictResolver:
             for candidate in candidates:
                 version = Version.parse(candidate.version)
                 if all(
-                        VersionConstraint.parse(c).matches(version)
-                        for c in constraints
+                    VersionConstraint.parse(c).matches(version)
+                    for c in constraints
                 ):
                     resolved.append(candidate)
                     break

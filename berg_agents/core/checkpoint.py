@@ -31,14 +31,13 @@ Design goals
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping, Sequence
 import copy
 import json
+from pathlib import Path
 import re
 import threading
-from collections.abc import Iterator, Mapping, Sequence
-from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
-
 
 # ---------------------------------------------------------------------------
 # Public protocol
@@ -312,13 +311,13 @@ class FileCheckpointer:
 
 
 def make_snapshot(
-        *,
-        thread_id: str,
-        messages: Sequence[Mapping[str, Any]],
-        step: int,
-        tool_calls: int,
-        pending_hitl: Mapping[str, Any] | None = None,
-        metadata: Mapping[str, Any] | None = None,
+    *,
+    thread_id: str,
+    messages: Sequence[Mapping[str, Any]],
+    step: int,
+    tool_calls: int,
+    pending_hitl: Mapping[str, Any] | None = None,
+    metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a snapshot dict in the canonical shape the loop expects.
 
@@ -355,7 +354,7 @@ def make_snapshot(
 
 
 def iter_snapshots(
-        checkpointer: Checkpointer,
+    checkpointer: Checkpointer,
 ) -> Iterator[tuple[str, dict[str, Any]]]:
     """Yield ``(thread_id, snapshot)`` for every thread in *checkpointer*.
 

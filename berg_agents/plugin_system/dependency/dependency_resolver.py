@@ -1,6 +1,6 @@
-import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
+import logging
 
 from berg_agents.plugin_system.dependency.dependency_management import (
     DependencyGraph,
@@ -10,12 +10,8 @@ from berg_agents.plugin_system.dependency.version_parsing import (
     Version,
     VersionConstraint,
 )
-from berg_agents.plugin_system.discovery.plugin_metadata import (
-    PluginMetadata,
-)
-from berg_agents.plugin_system.discovery.plugin_registry import (
-    PluginRegistry,
-)
+from berg_agents.plugin_system.discovery.plugin_metadata import PluginMetadata
+from berg_agents.plugin_system.discovery.plugin_registry import PluginRegistry
 from berg_agents.plugin_system.exceptions import (
     DependencyNotEnabledError,
     DependencyNotFoundError,
@@ -23,9 +19,7 @@ from berg_agents.plugin_system.exceptions import (
     PluginNotFoundError,
     VersionConflictError,
 )
-from berg_agents.plugin_system.lifecycle.lifecycle_states import (
-    PluginState,
-)
+from berg_agents.plugin_system.lifecycle.lifecycle_states import PluginState
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +33,7 @@ class ConflictResolver:
     """Resolve version conflicts."""
 
     def resolve_conflicts(
-            self, plugins: list[PluginMetadata]
+        self, plugins: list[PluginMetadata]
     ) -> list[PluginMetadata]:
         """Resolve version conflicts.
 
@@ -85,8 +79,8 @@ class ConflictResolver:
             for candidate in candidates:
                 version = Version.parse(candidate.version)
                 if all(
-                        VersionConstraint.parse(c).matches(version)
-                        for c in constraints
+                    VersionConstraint.parse(c).matches(version)
+                    for c in constraints
                 ):
                     resolved.append(candidate)
                     break
@@ -109,9 +103,9 @@ class LoadOrderCalculator:
         self.resolver = resolver
 
     async def calculate(
-            self,
-            plugins: list[PluginMetadata],
-            priority_hints: dict[str, int] | None = None,
+        self,
+        plugins: list[PluginMetadata],
+        priority_hints: dict[str, int] | None = None,
     ) -> list[str]:
         """Calculate load order with optional priority hints.
 
@@ -136,7 +130,7 @@ class LoadOrderCalculator:
         return load_order
 
     def _apply_priorities(
-            self, load_order: list[str], priorities: dict[str, int]
+        self, load_order: list[str], priorities: dict[str, int]
     ) -> list[str]:
         """Apply priority hints while respecting dependencies.
 
@@ -254,7 +248,7 @@ PLUGIN_API_VERSIONS = [
 
 
 def check_api_compatibility(
-        plugin_api_version: str, current_version: str
+    plugin_api_version: str, current_version: str
 ) -> bool:
     """Check if plugin API version is compatible."""
     plugin_ver = Version.parse(plugin_api_version)

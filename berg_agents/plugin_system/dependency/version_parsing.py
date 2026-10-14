@@ -2,8 +2,8 @@
 
 # Version Parsing
 
-import re
 from dataclasses import dataclass
+import re
 
 
 @dataclass
@@ -110,7 +110,7 @@ class VersionConstraint:
         # Comparison operators
         for op in [">=", "<=", ">", "<", "="]:
             if constraint.startswith(op):
-                version = Version.parse(constraint[len(op):])
+                version = Version.parse(constraint[len(op) :])
                 if op == ">=":
                     return [lambda v: v >= version]
                 elif op == "<=":

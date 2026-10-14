@@ -34,25 +34,24 @@ Design notes
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 import contextlib
+from dataclasses import dataclass, field
 import json
 import logging
 import queue
 import re
 import subprocess
 import threading
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, field
+import time
 from typing import Any, Protocol
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
-import time
-
 from berg_agents.core.tool_spec import ToolParam, ToolSpec
 
 # ---------------------------------------------------------------------------
-# Naming convention (must match .berg_config/mcp.py byte-for-byte)
+# Naming convention (must match config/mcp.py byte-for-byte)
 # ---------------------------------------------------------------------------
 
 #: Prefix namespace for every MCP-sourced tool so names never collide with
@@ -98,16 +97,16 @@ def server_from_prefixed(tool_name: str) -> str | None:
 
 
 def is_sensitive_server(
-        server_name: str, enabled_servers: frozenset[str] | None = None
+    server_name: str, enabled_servers: frozenset[str] | None = None
 ) -> bool:
     """Return ``True`` if *server_name* is sensitive (approval-required).
 
-    When *enabled_servers* is provided (from loaded MCP server .berg_config),
+    When *enabled_servers* is provided (from loaded MCP server configuration),
     a server not in the enabled set is treated as not sensitive.
 
     :param server_name: MCP server key.
     :param enabled_servers: Optional set of server names that are configured
-        and enabled. When provided, classification respects .berg_config.
+        and enabled. When provided, classification respects configuration.
     :return: Whether every tool from this server must be approved by a human.
     """
     if enabled_servers is not None and server_name not in enabled_servers:
@@ -116,16 +115,16 @@ def is_sensitive_server(
 
 
 def is_readonly_server(
-        server_name: str, enabled_servers: frozenset[str] | None = None
+    server_name: str, enabled_servers: frozenset[str] | None = None
 ) -> bool:
     """Return ``True`` if *server_name* is read-only (autonomous).
 
-    When *enabled_servers* is provided (from loaded MCP server .berg_config),
+    When *enabled_servers* is provided (from loaded MCP server configuration file in .berg-agents directory),
     a server not in the enabled set is treated as not read-only.
 
     :param server_name: MCP server key.
     :param enabled_servers: Optional set of server names that are configured
-        and enabled. When provided, classification respects .berg_config.
+        and enabled. When provided, classification respects configuration file in .berg-agents directory.
     :return: Whether every tool from this server is safe to call without
         human approval.
     """
@@ -152,11 +151,11 @@ class McpError(RuntimeError):
     """
 
     def __init__(
-            self,
-            message: str,
-            *,
-            code: int | None = None,
-            data: Any = None,
+        self,
+        message: str,
+        *,
+        code: int | None = None,
+        data: Any = None,
     ) -> None:
         """Store *message* and the optional JSON-RPC ``code`` / ``data``."""
         super().__init__(message)
@@ -178,9 +177,9 @@ class McpTransport(Protocol):
     """
 
     def request(
-            self,
-            method: str,
-            params: Mapping[str, Any] | None,
+        self,
+        method: str,
+        params: Mapping[str, Any] | None,
     ) -> Mapping[str, Any]:
         """Send one JSON-RPC request and return the JSON-RPC response.
 
@@ -270,15 +269,13 @@ class StdioMcpTransport:
                 if not line:
                     continue
                 self.logger.warning("mcp stderr: %s", line)
-        except (
-                Exception
-        ) as exc:  # ruff: ignore[blind-except] - drainer never raises
+        except Exception as exc:  # ruff: ignore[blind-except] - drainer never raises
             self.logger.debug("mcp stderr drainer exited: %s", exc)
 
     def request(
-            self,
-            method: str,
-            params: Mapping[str, Any] | None,
+        self,
+        method: str,
+        params: Mapping[str, Any] | None,
     ) -> Mapping[str, Any]:
         """Send a JSON-RPC request and return the response.
 
@@ -286,9 +283,9 @@ class StdioMcpTransport:
             or the server returned a JSON-RPC ``error`` object.
         """
         if (
-                self._proc is None
-                or self._proc.stdin is None
-                or self._proc.stdout is None
+            self._proc is None
+            or self._proc.stdin is None
+            or self._proc.stdout is None
         ):
             raise McpError("stdio transport is not open")
         with self._lock:
@@ -437,9 +434,9 @@ class HttpMcpTransport:
             self._listen_thread.start()
 
     def request(
-            self,
-            method: str,
-            params: Mapping[str, Any] | None,
+        self,
+        method: str,
+        params: Mapping[str, Any] | None,
     ) -> Mapping[str, Any]:
         """Send a JSON-RPC request and return the response.
 
@@ -468,9 +465,7 @@ class HttpMcpTransport:
             method="POST",
         )
         try:
-            with urllib_request.urlopen(
-                    req, timeout=self.timeout_s
-            ) as resp:  # ruff: ignore[suspicious-url-open-usage]
+            with urllib_request.urlopen(req, timeout=self.timeout_s) as resp:  # ruff: ignore[suspicious-url-open-usage]
                 raw = resp.read()
         except urllib_error.URLError as exc:
             self._drop(request_id)
@@ -506,16 +501,15 @@ class HttpMcpTransport:
             method="GET",
         )
         try:  # ruff: ignore[too-many-statements-in-try-clause]
-            with urllib_request.urlopen(
-                    req, timeout=None
-            ) as resp:  # ruff: ignore[suspicious-url-open-usage]
+            with urllib_request.urlopen(req, timeout=None) as resp:  # ruff: ignore[suspicious-url-open-usage]
                 event_type = "message"
                 data_lines: list[str] = []
                 for raw in iter(resp.readline, b""):
                     if self._closed:
                         return
                     line = (
-                        raw.decode("utf-8", errors="replace")
+                        raw
+                        .decode("utf-8", errors="replace")
                         .rstrip("\n")
                         .rstrip("\r")
                     )
@@ -530,10 +524,10 @@ class HttpMcpTransport:
                     if line.startswith(":"):
                         continue  # SSE comment
                     if line.startswith("event:"):
-                        event_type = line[len("event:"):].strip()
+                        event_type = line[len("event:") :].strip()
                         continue
                     if line.startswith("data:"):
-                        data_lines.append(line[len("data:"):].lstrip())
+                        data_lines.append(line[len("data:") :].lstrip())
         except Exception as exc:  # ruff: ignore[blind-except]
             if not self._closed:
                 logging.getLogger("berg_agents.core.mcp.http").debug(
@@ -609,7 +603,7 @@ class HttpMcpTransport:
 
 
 # ---------------------------------------------------------------------------
-# Server .berg_config + client
+# Server config + client
 # ---------------------------------------------------------------------------
 
 
@@ -823,7 +817,7 @@ def _params_from_schema(schema: Mapping[str, Any]) -> tuple[ToolParam, ...]:
 
 
 def iter_servers_to_clients(
-        configs: Iterable[McpServerConfig],
+    configs: Iterable[McpServerConfig],
 ) -> Iterator[McpClient]:
     """Yield one :class:`McpClient` per :class:`McpServerConfig`.
 
@@ -848,28 +842,28 @@ def close_all(clients: Iterable[McpClient]) -> None:
     for client in clients:
         with contextlib.suppress(Exception):  # ruff: ignore[blind-except]
             client.close()
-        logger.debug("closed MCP client %s", getattr(client, ".berg_config", None))
+        logger.debug("closed MCP client %s", getattr(client, "config", None))
 
 
 # ---------------------------------------------------------------------------
-# Server .berg_config loading and client construction
+# Server configuration loading and client construction
 # ---------------------------------------------------------------------------
 
 
 def load_mcp_server_configs(
-        cfg: dict[str, Any] | None = None,
+    cfg: dict[str, Any] | None = None,
 ) -> list[McpServerConfig]:
     """Load MCP server configurations from settings into ``McpServerConfig`` list.
 
     Reads ``mcp_servers`` from *cfg* (or from application settings when
     *cfg* is ``None``). The value is either a JSON-encoded list of server
-    .berg_config dicts or a path to a JSON file containing that list. Each entry
+    configuration dicts or a path to a JSON file containing that list. Each entry
     is validated and converted to a :class:`McpServerConfig`. The ``enabled``
     flag (when present) populates the enabled set used by the ``enabled_servers``
     parameter of :func:`is_sensitive_server` and :func:`is_readonly_server`
     so MCP enabled flags participate in sensitive/read-only classification.
 
-    :param cfg: Optional .berg_config dict override.
+    :param cfg: Optional configuration dict override.
     :return: List of :class:`McpServerConfig`.
     """
     if cfg is None:

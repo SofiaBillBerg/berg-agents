@@ -2,17 +2,14 @@
 
 # Sandboxing
 import asyncio
+from enum import Enum
 import json
 import logging
 import os
-from enum import Enum
+import sys
 from typing import Any
 
-import sys
-
-from berg_agents.plugin_system.discovery.plugin_registry import (
-    PluginError,
-)
+from berg_agents.plugin_system.discovery.plugin_registry import PluginError
 from berg_agents.plugin_system.permissions.permissions import (
     Permission,
     PermissionCategory,

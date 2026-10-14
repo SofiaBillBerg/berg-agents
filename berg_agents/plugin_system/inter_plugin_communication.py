@@ -9,7 +9,6 @@ from berg_agents.plugin_system.events.event_bus import (
     EventHandler,
 )
 
-
 # [Request-Response Pattern](../08-plugin-event-system#Request-Response Pattern)
 
 
@@ -20,11 +19,11 @@ class RequestResponsePattern:
         self.event_bus = event_bus
 
     async def request(
-            self,
-            target_plugin: str,
-            request_type: str,
-            data: dict[str, Any],
-            timeout: float = 30.0,
+        self,
+        target_plugin: str,
+        request_type: str,
+        data: dict[str, Any],
+        timeout: float = 30.0,
     ) -> dict[str, Any]:
         """Send request and wait for response.
 
@@ -58,7 +57,7 @@ class RequestResponsePattern:
         return response_event.data
 
     async def respond(
-            self, request_event: Event, response_data: dict[str, Any]
+        self, request_event: Event, response_data: dict[str, Any]
     ) -> None:
         """Respond to a request.
 
@@ -101,7 +100,7 @@ class PubSubChannel:
         self.channel = channel
 
     async def publish(
-            self, topic: str, message: dict[str, Any], source: str
+        self, topic: str, message: dict[str, Any], source: str
     ) -> None:
         """Publish message to topic."""
         await self.event_bus.emit(
@@ -111,7 +110,7 @@ class PubSubChannel:
         )
 
     def subscribe(
-            self, topic: str, handler: EventHandler
+        self, topic: str, handler: EventHandler
     ) -> str:  # TODO: Implement EventHandler type or interface
         """Subscribe to topic."""
         pattern = f"channel.{self.channel}.{topic}"
@@ -144,7 +143,7 @@ class EventAggregator:
         self.event_bus = event_bus
 
     async def aggregate(
-            self, event_patterns: list[str], output_event: str, window: float = 5.0
+        self, event_patterns: list[str], output_event: str, window: float = 5.0
     ) -> None:
         """Aggregate events within time window.
 

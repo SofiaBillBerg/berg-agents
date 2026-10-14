@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+
 # Event Filtering & Transformation
 from typing import Any
 
@@ -68,16 +69,16 @@ class EventStore:
         # Implementation would use SQLite, PostgreSQL, etc.
 
     async def query(
-            self,
-            event_type: str | None = None,
-            source: str | None = None,
-            since: datetime | None = None,
-            limit: int = 100,
+        self,
+        event_type: str | None = None,
+        source: str | None = None,
+        since: datetime | None = None,
+        limit: int = 100,
     ) -> list[Event]:
         """Query stored events."""
 
     async def replay(
-            self, event_bus: EventBus, since: datetime | None = None
+        self, event_bus: EventBus, since: datetime | None = None
     ) -> None:
         """Replay events from storage."""
         events = await self.query(since=since)

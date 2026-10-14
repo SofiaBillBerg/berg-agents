@@ -3,8 +3,8 @@
 """File watching utilities for configuration hot-reloading."""
 
 import asyncio
-import logging
 from collections.abc import Awaitable, Callable
+import logging
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ class FileSystemWatcher:
         self.watchers: dict[str, FileWatcher] = {}
 
     async def watch_file(
-            self, filepath: Path, callback: Callable[[], Awaitable[None]]
+        self, filepath: Path, callback: Callable[[], Awaitable[None]]
     ) -> None:
         """Watch a file for changes."""
         key = str(filepath)

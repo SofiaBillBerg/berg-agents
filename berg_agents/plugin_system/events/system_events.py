@@ -16,7 +16,7 @@ class SystemEvents:
     PLUGIN_DISABLED = "plugin.disabled"
     PLUGIN_UNLOADED = "plugin.unloaded"
     PLUGIN_ERROR = "plugin.error"
-    PLUGIN_CONFIG_CHANGED = "plugin..berg_config.changed"
+    PLUGIN_CONFIG_CHANGED = "plugin.config.changed"
 
     # Agent lifecycle
     AGENT_TASK_STARTED = "agent.task.started"

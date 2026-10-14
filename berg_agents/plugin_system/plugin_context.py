@@ -29,17 +29,17 @@ class PluginContext:
     settings: dict[str, Any]  # Plugin-specific settings
 
     def __init__(
-            self,
-            plugin_id: str,
-            plugin_version: str,
-            plugin_dir: Path,
-            app: BergAgentsApp,
-            harness: Harness,
-            config: dict[str, Any],
-            plugin_manager: Any,
-            event_bus: EventBus,
-            logger: Any,
-            settings: dict[str, Any],
+        self,
+        plugin_id: str,
+        plugin_version: str,
+        plugin_dir: Path,
+        app: BergAgentsApp,
+        harness: Harness,
+        config: dict[str, Any],
+        plugin_manager: Any,
+        event_bus: EventBus,
+        logger: Any,
+        settings: dict[str, Any],
     ) -> None:
         self.plugin_id = plugin_id
         self.plugin_version = plugin_version

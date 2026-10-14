@@ -2,24 +2,23 @@
 
 # Security Wrappers
 import asyncio
-import json
-import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum
+import json
+import logging
 from pathlib import Path
 from typing import Any, Literal
 
-import httpx
-
 from berg_agents.capabilities.base import RISK_HIGH, RiskClass
 from berg_agents.plugin_system.exceptions import PermissionDeniedError
-from berg_agents.plugin_system.permissions import HITLRequest, HITLManager
+from berg_agents.plugin_system.permissions import HITLManager, HITLRequest
 from berg_agents.plugin_system.permissions.permissions import (
     PermissionCategory,
     PermissionChecker,
 )
 from berg_agents.plugin_system.permissions.sandbox import SandboxLevel
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ class SecureFilesystem:
     async def read_file(self, path: str) -> str:
         """Read file with permission check."""
         if not await self.checker.check(
-                self.plugin_id, PermissionCategory.FILESYSTEM_READ, target=path
+            self.plugin_id, PermissionCategory.FILESYSTEM_READ, target=path
         ):
             raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied read access to {path}"
@@ -52,7 +51,7 @@ class SecureFilesystem:
     async def write_file(self, path: str, content: str) -> None:
         """Write file with permission check."""
         if not await self.checker.check(
-                self.plugin_id, PermissionCategory.FILESYSTEM_WRITE, target=path
+            self.plugin_id, PermissionCategory.FILESYSTEM_WRITE, target=path
         ):
             raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied write access to {path}"
@@ -82,7 +81,7 @@ class SecureNetwork:
     async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
         """HTTP request with permission check."""
         if not await self.checker.check(
-                self.plugin_id, PermissionCategory.NETWORK_OUTBOUND, target=url
+            self.plugin_id, PermissionCategory.NETWORK_OUTBOUND, target=url
         ):
             raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied network access to {url}"
@@ -129,11 +128,11 @@ class AuditLogger:
                 f.write(json.dumps(asdict(entry), default=str) + "\n")
 
     async def query(
-            self,
-            plugin_id: str | None = None,
-            operation: str | None = None,
-            since: datetime | None = None,
-            limit: int = 100,
+        self,
+        plugin_id: str | None = None,
+        operation: str | None = None,
+        since: datetime | None = None,
+        limit: int = 100,
     ) -> list[AuditEntry]:
         """Query audit log."""
         entries = []
@@ -166,16 +165,16 @@ class PluginHITL:
     """Human-in-the-loop approval for plugins."""
 
     def __init__(
-            self, hitl_manager: HITLManager
+        self, hitl_manager: HITLManager
     ) -> None:  # TODO: Define HITLRequest class
         self.hitl_manager = hitl_manager
 
     async def request_approval(
-            self,
-            plugin_id: str,
-            operation: str,
-            details: dict[str, Any],
-            risk_level: RiskClass = RISK_HIGH,
+        self,
+        plugin_id: str,
+        operation: str,
+        details: dict[str, Any],
+        risk_level: RiskClass = RISK_HIGH,
     ) -> bool:
         """Request user approval for operation.
 

@@ -113,10 +113,10 @@ class AbstractAgent(ABC):
 
     @abstractmethod
     def execute(
-            self,
-            task: dict[str, Any],
-            context: TaskContext,
-            model: Any = None,
+        self,
+        task: dict[str, Any],
+        context: TaskContext,
+        model: Any = None,
     ) -> AgentResult:
         """Execute the task.
 

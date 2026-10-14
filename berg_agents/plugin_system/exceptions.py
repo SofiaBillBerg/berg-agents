@@ -62,7 +62,7 @@ class PermissionDeniedError(Exception):
     """Raised when a plugin attempts an unauthorized operation."""
 
     def __init__(
-            self, message: str, plugin_id: str = "", resource: str = ""
+        self, message: str, plugin_id: str = "", resource: str = ""
     ) -> None:
         super().__init__(message)
         self.message = message

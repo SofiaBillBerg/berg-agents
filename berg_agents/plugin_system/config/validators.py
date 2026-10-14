@@ -1,11 +1,10 @@
 """Configuration validators for the plugin system."""
 
-import re
 # Configuration Validation
 from collections.abc import Callable
 from pathlib import Path
+import re
 from typing import Any
-
 
 # Custom Validators
 
@@ -21,7 +20,7 @@ class ConfigValidator:
         self.validators[name] = validator
 
     def validate(
-            self, value: Any, validator_name: str, **kwargs
+        self, value: Any, validator_name: str, **kwargs
     ) -> tuple[bool, str | None]:
         """Validate value with custom validator.
 

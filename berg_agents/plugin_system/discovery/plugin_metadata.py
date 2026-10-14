@@ -8,9 +8,7 @@ from typing import Any
 from berg_agents.plugin_system.dependency.plugin_dependency import (
     PluginDependency,
 )
-from berg_agents.plugin_system.discovery.plugin_sources import (
-    PluginSource,
-)
+from berg_agents.plugin_system.discovery.plugin_sources import PluginSource
 
 
 @dataclass
@@ -44,6 +42,10 @@ class PluginMetadata:
     # Configuration
     settings_schema: dict[str, Any] | None = None
     permissions: list[str] = field(default_factory=list)
+
+    # UI surface (optional): declared by the plugin's manifest, so a
+    # plugin ships its own component and the host only renders it.
+    ui: dict[str, Any] | None = None
 
     # Behavior
     deferred: bool = True  # Enable deferred loading

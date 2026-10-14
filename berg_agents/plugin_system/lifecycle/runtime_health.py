@@ -3,12 +3,8 @@
 import asyncio
 import logging
 
-from berg_agents.plugin_system.lifecycle.lifecycle_hooks import (
-    PluginLifecycle,
-)
-from berg_agents.plugin_system.lifecycle.lifecycle_states import (
-    PluginState,
-)
+from berg_agents.plugin_system.lifecycle.lifecycle_hooks import PluginLifecycle
+from berg_agents.plugin_system.lifecycle.lifecycle_states import PluginState
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +13,7 @@ class HealthMonitor:
     """Monitor plugin health."""
 
     def __init__(
-            self, lifecycle: PluginLifecycle, interval: float = 60.0
+        self, lifecycle: PluginLifecycle, interval: float = 60.0
     ) -> None:
         self.lifecycle = lifecycle
         self.interval = interval

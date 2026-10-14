@@ -1,13 +1,11 @@
-import logging
 # Permission Categories
 # Permission System
 from dataclasses import dataclass
 from enum import Enum
+import logging
 from typing import Any
 
-from berg_agents.plugin_system.discovery.plugin_registry import (
-    PluginRegistry,
-)
+from berg_agents.plugin_system.discovery.plugin_registry import PluginRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -111,11 +109,11 @@ class PermissionChecker:
         self.granted: dict[str, set[Permission]] = {}
 
     async def check(
-            self,
-            plugin_id: str,
-            permission: PermissionCategory,
-            target: str | None = None,
-            context: dict[str, Any] | None = None,
+        self,
+        plugin_id: str,
+        permission: PermissionCategory,
+        target: str | None = None,
+        context: dict[str, Any] | None = None,
     ) -> bool:
         """Check if plugin has permission.
 
@@ -166,11 +164,11 @@ class PermissionChecker:
         return False
 
     async def _request_permission(
-            self,
-            plugin_id: str,
-            permission: PermissionCategory,
-            target: str | None,
-            context: dict[str, Any] | None,
+        self,
+        plugin_id: str,
+        permission: PermissionCategory,
+        target: str | None,
+        context: dict[str, Any] | None,
     ) -> bool:
         """Request permission from user (HITL)."""
         # Build prompt

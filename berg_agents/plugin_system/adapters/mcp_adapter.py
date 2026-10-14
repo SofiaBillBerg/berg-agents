@@ -1,7 +1,7 @@
-"""Front one MCP server (.berg_config /mcp.json entry) as a plugin.
+"""Front one MCP server (.berg-agents /mcp.json entry) as a plugin.
 
 Migration-guide Phase 1: MCP servers keep working exactly as before —
-no .berg_config moves and no rewrites. Each server becomes one
+no configuration file moves and no rewrites. Each server becomes one
 ``MCPPluginAdapter`` exposing an ``MCPCapability`` descriptor, so
 servers gain plugin lifecycle, events, and UI visibility while the
 chat agent keeps attaching their toolsets through the existing
@@ -23,15 +23,13 @@ logger = logging.getLogger(__name__)
 
 #: Entry point shared by every MCP plugin (the server key travels via
 #: per-plugin settings, see register_mcp_plugins).
-ENTRY_POINT = (
-    "berg_agents.plugin_system.adapters.mcp_adapter:MCPPluginAdapter"
-)
+ENTRY_POINT = "berg_agents.plugin_system.adapters.mcp_adapter:MCPPluginAdapter"
 
 
 def mcp_plugin_id(server_name: str) -> str:
     """Plugin id for an MCP server (``berg-plugin-mcp-<name>``).
 
-    :param server_name: MCP server key from .berg_config /mcp.json.
+    :param server_name: MCP server key from .berg-agents /mcp.json.
     :return: Namespaced plugin identifier.
     """
     return f"berg-plugin-mcp-{server_name}"
@@ -56,7 +54,7 @@ class MCPPluginAdapter(BergPlugin):
         self.sensitive = False
 
     async def on_load(self, context: PluginContext) -> None:
-        """Read the server entry from .berg_config /mcp.json.
+        """Read the server entry from .berg-agents /mcp.json.
 
         :param context: Plugin context carrying ``server_name`` settings.
         """
@@ -67,14 +65,16 @@ class MCPPluginAdapter(BergPlugin):
                 "MCP plugin %s has no server_name setting", context.plugin_id
             )
             return
-        # NOTE: Reuses the chat MCP .berg_config reader so transport rules
+        # NOTE: Reuses the chat MCP config reader so transport rules
         # stay identical between the adapter and the chat agent.
         from berg_agents.capabilities.mcp_toolsets import _load_config
         from berg_agents.core.mcp import is_sensitive_server
 
         entry = _load_config().get(server_name)
         if not isinstance(entry, dict):
-            logger.warning("MCP server %r not in .berg_config, skipping", server_name)
+            logger.warning(
+                "MCP server %r not in .berg-agents, skipping", server_name
+            )
             return
         self.server_name = server_name
         self.server_type = str(entry.get("type", "")).strip().lower()
@@ -104,7 +104,7 @@ class MCPPluginAdapter(BergPlugin):
     def get_capabilities(self) -> list[MCPCapability]:
         """Return the MCP server descriptor (empty when unloaded).
 
-        :return: One ``MCPCapability`` once on_load read the .berg_config.
+        :return: One ``MCPCapability`` once on_load read the configuration file in .berg-agents directory.
         """
         if not self.server_name:
             return []
@@ -119,10 +119,12 @@ class MCPPluginAdapter(BergPlugin):
         ]
 
 
-def build_mcp_metadata(server_name: str, server_type: str = "") -> PluginMetadata:
+def build_mcp_metadata(
+    server_name: str, server_type: str = ""
+) -> PluginMetadata:
     """Build registry metadata for one MCP server.
 
-    :param server_name: MCP server key from .berg_config /mcp.json.
+    :param server_name: MCP server key from .berg-agents /mcp.json.
     :param server_type: Transport kind (``remote``/``local``/``""``).
     :return: Plugin metadata pointing at the shared adapter entry point.
     """
@@ -135,19 +137,19 @@ def build_mcp_metadata(server_name: str, server_type: str = "") -> PluginMetadat
             "Tools attach to the chat agent via its toolset."
         ),
         source="local",
-        path=Path(__file__).resolve().parents[3] / ".berg_config",
+        path=Path(__file__).resolve().parents[3] / ".berg-agents",
         entry_point=ENTRY_POINT,
         tags=["mcp"],
     )
 
 
 def describe_mcp_server(server_name: str) -> dict[str, Any] | None:
-    """Describe an MCP server from .berg_config without a running plugin.
+    """Describe an MCP server from configuration without a running plugin.
 
     Used for descriptors of disabled plugins (whose capabilities are
     unregistered): same reader as the adapter and the chat toolsets.
 
-    :param server_name: MCP server key from .berg_config /mcp.json.
+    :param server_name: MCP server key from .berg-agents /mcp.json.
     :return: Capability-style descriptor, or None when unconfigured.
     """
     from berg_agents.capabilities.mcp_toolsets import _load_config
@@ -175,7 +177,7 @@ async def register_mcp_plugins(manager: Any) -> list[str]:
     :param manager: Initialized ``PluginManager``.
     :return: Registered plugin ids.
     """
-    # NOTE: Same .berg_config reader as the chat toolsets — adapter and chat
+    # NOTE: Same config reader as the chat toolsets — adapter and chat
     # can never disagree about which servers exist.
     from berg_agents.capabilities.mcp_toolsets import _load_config
     from berg_agents.plugin_system.exceptions import PluginError
@@ -194,10 +196,12 @@ async def register_mcp_plugins(manager: Any) -> list[str]:
         except PluginError as exc:
             logger.warning("MCP plugin registration skipped: %s", exc)
             continue
-        # NOTE: Unpersisted per-plugin settings — the server key is
-        # .berg_config-derived, not user configuration.
+        # NOTE: persisted. The server key must survive a restart: an
+        # in-memory cache dies with the process, so every adapter
+        # reloaded with empty settings (observed as "has no server_name
+        # setting" spam at startup and inert MCP plugins).
         await manager.config_manager.update(
-            metadata.id, {"server_name": server_name}, persist=False
+            metadata.id, {"server_name": server_name}, persist=True
         )
         registered.append(metadata.id)
         logger.info("MCP plugin registered: %s", metadata.id)
@@ -205,10 +209,10 @@ async def register_mcp_plugins(manager: Any) -> list[str]:
 
 
 async def sync_mcp_config_states(manager: Any) -> None:
-    """Align plugin states with ``enabled: false`` .berg_config entries.
+    """Align plugin states with ``enabled: false`` configuration entries.
 
-    Runs once after enable_all at warmup: .berg_config-off servers move to
-    disabled state so the .berg_config kill-switch works through the same
+    Runs once after enable_all at warmup: config-off servers move to
+    disabled state so the config kill-switch works through the same
     mechanism as the UI toggles (and the chat exclusion sets pick
     them up). Never enables anything — user toggles are one-way here.
 
@@ -223,10 +227,14 @@ async def sync_mcp_config_states(manager: Any) -> None:
             continue
         server_name = plugin_id.removeprefix("berg-plugin-mcp-")
         cfg = config.get(server_name)
-        config_off = not isinstance(cfg, dict) or cfg.get("enabled", True) is False
+        config_off = (
+            not isinstance(cfg, dict) or cfg.get("enabled", True) is False
+        )
         if config_off:
             try:
                 await manager.disable_plugin(plugin_id)
-                logger.info("MCP plugin disabled by .berg_config: %s", server_name)
+                logger.info(
+                    "MCP plugin disabled by configuration: %s", server_name
+                )
             except Exception as exc:
-                logger.warning("MCP .berg_config sync failed: %s", exc)
+                logger.warning("MCP configuration sync failed: %s", exc)

@@ -1,14 +1,13 @@
 """Plugin contract for the plugin system."""
 
-import logging
 from dataclasses import dataclass
+import logging
 from typing import Any
-
-from pydantic_ai.agent.abstract import AbstractAgent
-from pydantic_ai.tools import Tool
 
 from berg_agents.capabilities.base import RiskClass
 from berg_agents.core.interface import TaskComplexity
+from pydantic_ai.agent.abstract import AbstractAgent
+from pydantic_ai.tools import Tool
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +90,7 @@ class MCPCapability(PluginCapability):
     """
 
     type: str = "mcp"
-    id: str = ""  # MCP server key from .berg_config /mcp.json
+    id: str = ""  # MCP server key from .berg-agents /mcp.json
     server_type: str = ""  # "remote" or "local"
     enabled: bool = True
     sensitive: bool = False  # every tool requires human approval

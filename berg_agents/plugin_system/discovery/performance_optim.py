@@ -6,15 +6,13 @@ import json
 from pathlib import Path
 
 from attrs import asdict
-
 from berg_agents.plugin_system.discovery.discovery_process import (
     discover_local_plugins,
     discover_package_plugins,
 )
+
 # Lazy Import
-from berg_agents.plugin_system.discovery.plugin_metadata import (
-    PluginMetadata,
-)
+from berg_agents.plugin_system.discovery.plugin_metadata import PluginMetadata
 from berg_agents.plugin_system.lifecycle.bergplugin import BergPlugin
 
 
@@ -41,7 +39,7 @@ def discover_packages() -> list[PluginMetadata]:
 
 def discover_local() -> list[PluginMetadata]:
     """Discover local plugins."""
-    return discover_local_plugins(plugin_dir=Path("./.berg_config/plugins"))
+    return discover_local_plugins(plugin_dir=Path("./.berg-agents/plugins"))
 
 
 async def discover_all_parallel() -> list[PluginMetadata]:

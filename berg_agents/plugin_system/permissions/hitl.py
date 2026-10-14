@@ -4,10 +4,10 @@ Integrates with berg_agents approval system when available.
 """
 
 import asyncio
-import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -53,13 +53,13 @@ class HITLManager:
         self._counter = 0
 
     async def request_approval(
-            self,
-            plugin_id: str,
-            action: str,
-            description: str,
-            risk_level: str = "medium",
-            context: dict[str, Any] | None = None,
-            timeout: float = 300.0,
+        self,
+        plugin_id: str,
+        action: str,
+        description: str,
+        risk_level: str = "medium",
+        context: dict[str, Any] | None = None,
+        timeout: float = 300.0,
     ) -> bool:
         """Request approval for a plugin action.
 
@@ -143,7 +143,7 @@ class HITLManager:
             await asyncio.sleep(0.1)
 
     def approve(
-            self, request_id: str, approver: str = "user", reason: str = ""
+        self, request_id: str, approver: str = "user", reason: str = ""
     ) -> bool:
         """Approve a pending request."""
         request = self.requests.get(request_id)
@@ -157,7 +157,7 @@ class HITLManager:
         return True
 
     def deny(
-            self, request_id: str, approver: str = "user", reason: str = ""
+        self, request_id: str, approver: str = "user", reason: str = ""
     ) -> bool:
         """Deny a pending request."""
         request = self.requests.get(request_id)

@@ -16,15 +16,14 @@ schema or be persisted to MemPalace.
 
 from __future__ import annotations
 
-import fnmatch
-import inspect
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+import fnmatch
+import inspect
 from typing import Any, get_args, get_origin
 
-from pydantic import BaseModel, Field, create_model
-
 from berg_agents.capabilities.base import RiskClass  # canonical risk vocabulary
+from pydantic import BaseModel, Field, create_model
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -268,10 +267,10 @@ def _python_type_to_json(annotation: Any) -> str:
 
 
 def _resolve_annotation(
-        annotation: Any,
-        *,
-        func: Callable[..., Any] | None = None,
-        name: str | None = None,
+    annotation: Any,
+    *,
+    func: Callable[..., Any] | None = None,
+    name: str | None = None,
 ) -> Any:
     """Resolve a string annotation to its real type when possible.
 
@@ -301,12 +300,12 @@ def _resolve_annotation(
 
 
 def _param_from_signature(
-        name: str,
-        annotation: Any,
-        default: Any,
-        docstring_param_desc: str,
-        *,
-        func: Callable[..., Any] | None = None,
+    name: str,
+    annotation: Any,
+    default: Any,
+    docstring_param_desc: str,
+    *,
+    func: Callable[..., Any] | None = None,
 ) -> ToolParam:
     """Build a :class:`ToolParam` from a function-signature entry.
 
@@ -349,7 +348,7 @@ def _parse_param_descriptions(docstring: str | None) -> dict[str, str]:
         stripped = line.strip()
         # reST-style: ":param name: description"
         if stripped.startswith(":param"):
-            rest = stripped[len(":param"):].strip()
+            rest = stripped[len(":param") :].strip()
             if ":" in rest:
                 pname, pdesc = rest.split(":", 1)
                 descriptions[pname.strip()] = pdesc.strip()
@@ -367,12 +366,12 @@ def _parse_param_descriptions(docstring: str | None) -> dict[str, str]:
 
 
 def make_tool_spec(
-        func: Callable[..., Any],
-        *,
-        name: str | None = None,
-        description: str | None = None,
-        tags: Iterable[str] = (),
-        risk_class: RiskClass | None = None,
+    func: Callable[..., Any],
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    tags: Iterable[str] = (),
+    risk_class: RiskClass | None = None,
 ) -> ToolSpec:
     """Build a :class:`ToolSpec` from a plain function.
 
@@ -562,8 +561,8 @@ def effective_risk_class(tool: ToolSpec) -> RiskClass:
 
 
 def filter_specs_by_model(
-        tools: Iterable[ToolSpec],
-        model_id: str,
+    tools: Iterable[ToolSpec],
+    model_id: str,
 ) -> list[ToolSpec]:
     """Filter specs by the model's ``excluded_tools`` patterns.
 

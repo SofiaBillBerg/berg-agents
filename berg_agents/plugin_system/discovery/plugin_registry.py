@@ -9,9 +9,7 @@ from berg_agents.plugin_system.discovery.plugin_metadata import (
     PluginSource,
 )
 from berg_agents.plugin_system.exceptions import PluginError
-from berg_agents.plugin_system.lifecycle.lifecycle_states import (
-    PluginState,
-)
+from berg_agents.plugin_system.lifecycle.lifecycle_states import PluginState
 from berg_agents.plugin_system.plugin_contract import PluginCapability
 
 logger = logging.getLogger(__name__)
@@ -54,10 +52,10 @@ class PluginRegistry:
         return self._plugins.get(plugin_id)
 
     def list_plugins(
-            self,
-            state: PluginState | None = None,
-            source: PluginSource | None = None,
-            tag: str | None = None,
+        self,
+        state: PluginState | None = None,
+        source: PluginSource | None = None,
+        tag: str | None = None,
     ) -> list[PluginEntry]:
         """List plugins with optional filters."""
         plugins = list(self._plugins.values())
@@ -72,7 +70,7 @@ class PluginRegistry:
         return plugins
 
     async def register_capability(
-            self, plugin_id: str, capability: PluginCapability
+        self, plugin_id: str, capability: PluginCapability
     ) -> None:
         """Register a plugin capability."""
         async with self._lock:
@@ -81,7 +79,7 @@ class PluginRegistry:
             self._capabilities[plugin_id].append(capability)
 
     def get_capabilities(
-            self, plugin_id: str | None = None, capability_type: str | None = None
+        self, plugin_id: str | None = None, capability_type: str | None = None
     ) -> list[PluginCapability]:
         """Get capabilities with optional filters."""
         if plugin_id:
