@@ -5,8 +5,8 @@ project:
     - docs/docs_web/search-index.json
     - docs/docs_web/docs/404.html
   type: website
- # favicon: berg_agents/ui/webapp/public/favicon/favicon.ico
- # image: berg_agents/ui/webapp/public/favicon/favicon.svg
+  # favicon: berg_agents/ui/webapp/public/favicon/favicon.ico
+  # image: berg_agents/ui/webapp/public/favicon/favicon.svg
   output-dir: docs/docs_web
   pre-render:
     - "project_utils/run_apidocs.sh"
@@ -29,7 +29,7 @@ website:
   llms-txt: true
   page-navigation: true
   search:
-    keyboard-shortcut: ["?", "H"]
+    keyboard-shortcut: [ "?", "H" ]
     copy-button: true
     type: textbox
 
@@ -123,8 +123,9 @@ format:
     fig-cap-location: bottom
     fig-format: svg
     tbl-cap-location: top
-    subtitle: "Documentation for The berg_agents - an interactive, locally maintained LLM-powered assistant"
-    description: "The berg_agents is a local, LLM-driven code assistant that can scaffold projects, edit files, generate tests, and produce documentation. It is built on top of LangChain and uses a local Ollama instance as the LLM backend."
+    subtitle: "Documentation for The Berg-Agents - A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration.
+"
+    description: "Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture."
     fig-env: figure
     cache: true
     includesource: true
@@ -143,7 +144,7 @@ filters:
   - lua-env
 extensions:
   badge:
-    - key: BergAgentsrenv::snap
+    - key: BergAgents
       colour: orchid
       icon: chat-right-quote-fill
     - key: experimental

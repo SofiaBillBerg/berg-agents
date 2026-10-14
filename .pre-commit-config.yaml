@@ -7,14 +7,14 @@ repos:
         name: run-autofix
         entry: project_utils/run_autofix.sh
         language: script
-        stages: [pre-commit, manual]
+        stages: [ pre-commit, manual ]
 
       - id: quarto-render
         name: quarto-render
         entry: quarto render
         language: unsupported
         pass_filenames: false
-        stages: [pre-push, manual]
+        stages: [ pre-push, manual ]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -41,7 +41,7 @@ repos:
     rev: v3.21.2
     hooks:
       - id: pyupgrade
-        args: [--py312-plus]
+        args: [ --py312-plus ]
   - repo: https://github.com/posit-dev/air-pre-commit
     # Air version
     rev: 0.12.0

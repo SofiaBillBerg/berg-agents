@@ -3,14 +3,14 @@
 Simple test of plugin discovery and shared_todo functionality.
 """
 
-
-
 import asyncio
 import logging
-from pathlib import Path
 import sys
 
+from pathlib import Path
+
 import pytest
+
 
 # Configure logging
 logging.basicConfig(
@@ -87,19 +87,25 @@ async def test_shared_todo_standalone():
 
         # List todos
         logger.info("\nListing todos...")
-        todos = list_todos(todo_path="../berg_plugins/shared_todo/example/test_standalone_todos/")
+        todos = list_todos(
+            todo_path="../berg_plugins/shared_todo/example/test_standalone_todos/"
+        )
         logger.info(f"\n{todos}")
 
         # Complete the todo
         logger.info("\nCompleting todo...")
         result = complete_todo(
-            "test_standalone_tools", todo_path="../berg_plugins/shared_todo/example/test_standalone_todos/"
+            "test_standalone_tools",
+            todo_path="../berg_plugins/shared_todo/example/test_standalone_todos/",
         )
         logger.info(f"Result: {result}")
 
         # List completed todos
         logger.info("\nListing completed todos...")
-        todos = list_todos(status="done", todo_path="../berg_plugins/shared_todo/example/test_standalone_todos/")
+        todos = list_todos(
+            status="done",
+            todo_path="../berg_plugins/shared_todo/example/test_standalone_todos/",
+        )
         logger.info(f"\n{todos}")
 
         logger.info("\n✓ SharedToDo tools work correctly!")

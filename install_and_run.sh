@@ -28,7 +28,7 @@ set -o pipefail
 # Check if user specified --auto or -a flag
 AUTO_MODE=false
 if [[ "$1" == "--auto" || "$1" == "-a" ]]; then
-	AUTO_MODE=true
+  AUTO_MODE=true
 fi
 
 # 1. Find the project root directory and change to it
@@ -42,21 +42,21 @@ echo "=========================================="
 # 2. OS detection and virtual environment activation
 echo "▶ Activating virtual environment..."
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]]; then
-	source .venv/Scripts/activate 2>/dev/null || {
-		echo "❌ Failed to activate .venv on Windows"
-		exit 1
-	}
+  source .venv/Scripts/activate 2>/dev/null || {
+    echo "❌ Failed to activate .venv on Windows"
+    exit 1
+  }
 else
-	source .venv/bin/activate 2>/dev/null || {
-		echo "❌ Failed to activate .venv on Unix"
-		exit 1
-	}
+  source .venv/bin/activate 2>/dev/null || {
+    echo "❌ Failed to activate .venv on Unix"
+    exit 1
+  }
 fi
 
 # 3. Find a free port
 find_free_port() {
-	local start_port=$1
-	python3 -c "
+  local start_port=$1
+  python3 -c "
 import socket
 port = $start_port
 while True:
@@ -74,55 +74,55 @@ while True:
 TARGET_PORT=8001
 
 check_and_select_port() {
-	local port=$1
-	if lsof -i :$port >/dev/null 2>&1; then
-		# If the port is busy, get the process info
-		local proc_info
-		proc_info=$(lsof -i :$port -sTCP:LISTEN -t | xargs ps -o pid,comm= -p 2>/dev/null | awk '{print "PID: " $1 " (" $2 ")"}')
-		[ -z "$proc_info" ] && proc_info="Unknown process"
+  local port=$1
+  if lsof -i :$port >/dev/null 2>&1; then
+    # If the port is busy, get the process info
+    local proc_info
+    proc_info=$(lsof -i :$port -sTCP:LISTEN -t | xargs ps -o pid,comm= -p 2>/dev/null | awk '{print "PID: " $1 " (" $2 ")"}')
+    [ -z "$proc_info" ] && proc_info="Unknown process"
 
-		if [ "$AUTO_MODE" = true ]; then
-			echo "⚠️ Port $port is BUSY by: $proc_info"
-			echo "▶ [--auto mode] Searching for a free port automatically..."
-			TARGET_PORT=$(find_free_port 8001)
-			echo "✅ Found a free port: $TARGET_PORT"
-			return
-		fi
+    if [ "$AUTO_MODE" = true ]; then
+      echo "⚠️ Port $port is BUSY by: $proc_info"
+      echo "▶ [--auto mode] Searching for a free port automatically..."
+      TARGET_PORT=$(find_free_port 8001)
+      echo "✅ Found a free port: $TARGET_PORT"
+      return
+    fi
 
-		echo "⚠️ Port $port is BUSY by: $proc_info"
-		echo "What would you like to do?"
-		echo "1) Kill that process and use port $port"
-		echo "2) Automatically find the next available free port"
-		echo "3) Enter a custom port manually"
-		echo "4) Abort everything"
+    echo "⚠️ Port $port is BUSY by: $proc_info"
+    echo "What would you like to do?"
+    echo "1) Kill that process and use port $port"
+    echo "2) Automatically find the next available free port"
+    echo "3) Enter a custom port manually"
+    echo "4) Abort everything"
 
-		read -r -p "Select an option [1-4]: " choice
+    read -r -p "Select an option [1-4]: " choice
 
-		case $choice in
-		1)
-			echo "▶ Killing process on port $port..."
-			kill -9 $(lsof -t -i :$port) 2>/dev/null || true
-			TARGET_PORT=$port
-			;;
-		2)
-			echo "▶ Searching for a free port..."
-			TARGET_PORT=$(find_free_port 8001)
-			echo "✅ Found a free port: $TARGET_PORT"
-			;;
-		3)
-			read -r -p "Enter your custom port: " custom_port
-			TARGET_PORT=$custom_port
-			check_and_select_port $custom_port
-			;;
-		*)
-			echo "❌ Operation aborted by user."
-			exit 1
-			;;
-		esac
-	else
-		echo "✅ Port $port is FREE!"
-		TARGET_PORT=$port
-	fi
+    case $choice in
+    1)
+      echo "▶ Killing process on port $port..."
+      kill -9 $(lsof -t -i :$port) 2>/dev/null || true
+      TARGET_PORT=$port
+      ;;
+    2)
+      echo "▶ Searching for a free port..."
+      TARGET_PORT=$(find_free_port 8001)
+      echo "✅ Found a free port: $TARGET_PORT"
+      ;;
+    3)
+      read -r -p "Enter your custom port: " custom_port
+      TARGET_PORT=$custom_port
+      check_and_select_port $custom_port
+      ;;
+    *)
+      echo "❌ Operation aborted by user."
+      exit 1
+      ;;
+    esac
+  else
+    echo "✅ Port $port is FREE!"
+    TARGET_PORT=$port
+  fi
 }
 
 echo "▶ Checking available ports..."
@@ -132,27 +132,27 @@ export bergport=$TARGET_PORT
 # 4. Install and build frontend (Next.js)
 UI_DIR="$PROJECT_ROOT/berg_agents/ui/webapp"
 if [ -d "$UI_DIR" ]; then
-	echo "▶ Building frontend in $UI_DIR..."
-	cd "$UI_DIR"
-	bun install || {
-		echo "❌ 'bun install' failed"
-		exit 1
-	}
-	bun run next build || {
-		echo "❌ 'bun run next build' failed"
-		exit 1
-	}
-	cd "$PROJECT_ROOT"
+  echo "▶ Building frontend in $UI_DIR..."
+  cd "$UI_DIR"
+  bun install || {
+    echo "❌ 'bun install' failed"
+    exit 1
+  }
+  bun run next build || {
+    echo "❌ 'bun run next build' failed"
+    exit 1
+  }
+  cd "$PROJECT_ROOT"
 else
-	echo "❌ Frontend directory not found at $UI_DIR"
-	exit 1
+  echo "❌ Frontend directory not found at $UI_DIR"
+  exit 1
 fi
 
 # 5. Install Python dependencies in editable mode
 echo "▶ Syncing Python packages..."
 uv pip install -e . || {
-	echo "❌ Python package installation failed"
-	exit 1
+  echo "❌ Python package installation failed"
+  exit 1
 }
 
 # 6. Start the application

@@ -727,6 +727,7 @@ dependencies = [
     { name = "jsonschema" },
     { name = "pydantic-ai-harness", extra = ["code-mode"] },
     { name = "pydantic-ai-slim", extra = ["duckduckgo", "web-fetch"] },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
 ]
 

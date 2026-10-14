@@ -1,5 +1,3 @@
-
-
 # Vulture whitelist - false positives and intentionally-public APIs
 
 # Dataclass field annotations (pydantic/vulture can't distinguish from variables)
@@ -9,7 +7,7 @@ ignore_names = [
     "contents",
     # module-level logger
     "log",
-    # config fields (runtime-used via env/config files, not Python imports)
+    # .berg-agents fields (runtime-used via env/.berg-agents files, not Python imports)
     "toolsets",
     "presets",
     "capabilities",

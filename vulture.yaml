@@ -9,7 +9,7 @@ ignore_names:
   - "file_secret_settings"
   - "_validate_checkpoint_dir"
 
-  # --- pydantic .berg_config fields (runtime-used via env/.berg_config files) ---
+  # --- pydantic config fields (runtime-used via env/.berg-agents files) ---
   - "backend"
   - "max_tokens"
   - "stream"
