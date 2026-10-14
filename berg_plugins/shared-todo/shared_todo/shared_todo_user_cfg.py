@@ -25,15 +25,20 @@ except ValueError as e:
     print("❌ Error:", e)
     raise SystemExit(str(e))
 """
+
 import os
-import yaml
+
 from pathlib import Path
+
+import yaml
+
 
 # ----------------------------------------------------------------------
 # Load environment variables from .env (if python-dotenv is installed)
 # ----------------------------------------------------------------------
 try:
     from dotenv import load_dotenv
+
     # Load .env from the current working directory (usually the project root)
     load_dotenv()
 except ImportError:
@@ -44,7 +49,11 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # Allow overriding the config file location via env var
 CONFIG_PATH_ENV = os.getenv("SH_TODO_CONFIG_PATH")
-DEFAULT_CONFIG_PATH = Path(CONFIG_PATH_ENV) if CONFIG_PATH_ENV else PROJECT_ROOT / ".berg_config" / ".shared_todo" / "config.yaml"
+DEFAULT_CONFIG_PATH = (
+    Path(CONFIG_PATH_ENV)
+    if CONFIG_PATH_ENV
+    else PROJECT_ROOT / ".berg-agents" / ".shared_todo" / "config.yaml"
+)
 REQUIRED_ENV = {
     "SH_TODO_ENABLED": bool,
     "SH_TODO_LOG_LEVEL": str}
@@ -54,20 +63,32 @@ def load_user_config() -> dict:
     cfg_path = DEFAULT_CONFIG_PATH
     if cfg_path.is_file():
         with open(cfg_path) as f:
-            import yaml, re, os
+            import os
+            import re
+
+            import yaml
+
             def expand_env_vars(obj):
                 if isinstance(obj, str):
                     # Replace ${env:VAR} or ${VAR} with os.environ value or empty string if not set
                     def replace_match(match):
-                        var_name = match.group(1) if match.group(1) else match.group(2)
-                        return os.getenv(var_name, '')
-                    return re.sub(r'\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}|\\$([A-Za-z_][A-Za-z0-9_]*)', replace_match, obj)
+                        var_name = (
+                            match.group(1) if match.group(1) else match.group(2)
+                        )
+                        return os.getenv(var_name, "")
+
+                    return re.sub(
+                        r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}|\\$([A-Za-z_][A-Za-z0-9_]*)",
+                        replace_match,
+                        obj,
+                    )
                 elif isinstance(obj, dict):
                     return {k: expand_env_vars(v) for k, v in obj.items()}
                 elif isinstance(obj, list):
                     return [expand_env_vars(item) for item in obj]
                 else:
                     return obj
+
             raw_cfg = yaml.safe_load(f) or {}
             return expand_env_vars(raw_cfg)
     return {}
@@ -86,12 +107,14 @@ def validate_user_config() -> dict:
     merged = {**cfg, **env_cfg}
 
     # Set defaults for optional keys before validation
-    merged.setdefault("SH_TODO_ENABLED", True)   # default to True if not provided
+    merged.setdefault(
+        "SH_TODO_ENABLED", True
+    )  # default to True if not provided
     merged.setdefault("SH_TODO_LOG_LEVEL", "INFO")  # default log level
 
     # Validate required keys (now guaranteed to exist because of setdefault)
     for key, expected_type in REQUIRED_ENV.items():
-        value = merged[key]   # value is guaranteed to exist
+        value = merged[key]  # value is guaranteed to exist
         # ---- BOOL‑SPECIFIC HANDLING ----
         if expected_type is bool:
             # Accept common truthy strings and native bool values
@@ -104,10 +127,14 @@ def validate_user_config() -> dict:
         else:
             # For non‑bool types keep the original check
             if not isinstance(value, expected_type):
-                raise ValueError(f"Configuration '{key}' must be a {expected_type.__name__}")
+                raise ValueError(
+                    f"Configuration '{key}' must be a {expected_type.__name__}"
+                )
 
     # Optional: coerce types (adjusted)
-    merged["SH_TODO_LOG_LEVEL"] = str(merged.get("SH_TODO_LOG_LEVEL", "INFO")).upper()
+    merged["SH_TODO_LOG_LEVEL"] = str(
+        merged.get("SH_TODO_LOG_LEVEL", "INFO")
+    ).upper()
     return merged
 
 

@@ -6,6 +6,8 @@ authors = [
     {name = "Berg Agents Team", email = "team@berg-agents.dev"}
 ]
 license = "AGPL-3.0-only"
+license-files = ["LICENSE", "agpl-3.0.txt"]
+
 readme = "README.md"
 requires-python = ">=3.12"
 

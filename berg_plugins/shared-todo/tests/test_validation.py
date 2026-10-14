@@ -1,11 +1,18 @@
-""" Quick sanity‑check script."""
-from shared_todo import validate_shared_todo_config, is_plugin_installable, is_integrated_into_berg_agents, \
-    validate_user_config
+"""Quick sanity‑check script."""
+
+from shared_todo import (
+    is_integrated_into_berg_agents,
+    is_plugin_installable,
+    validate_shared_todo_config,
+    validate_user_config,
+)
+
 
 # 1️ Validate a minimal config
-cfg = validate_shared_todo_config(
-    {"plugin_id": "shared_todo", "enabled": True, "log_level": "INFO"}
-)
+cfg = validate_shared_todo_config({
+    "plugin_id": "shared_todo",
+    "enabled": True,
+    "log_level": "INFO"})
 print("✅ Config model ok:", cfg)
 
 # 2️ Detect distribution mode (will just log – no raise)

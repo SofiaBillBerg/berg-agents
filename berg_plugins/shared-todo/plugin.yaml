@@ -17,7 +17,7 @@ author:
   email: "you@example.com"
   url: "https://example.com"
 
-license: "AGPL"
+license: "AGPL-3.0-only"
 
 homepage: "https://github.com/org/berg-plugin-shared-todo"
 repository: "https://github.com/org/berg-plugin-shared-todo"
@@ -55,6 +55,7 @@ capabilities:
       - "delete_todo"
       - "add_subtask"
       - "set_subtask_done"
+      - "rename_subtask"
       - "delete_subtask"
     risk_level: "low"
 
@@ -73,6 +74,24 @@ settings_schema:
 permissions:
   - filesystem:read
   - filesystem:write
+
+# === UI Surface (Optional) ===
+# Declares that this plugin ships its own UI component. The host
+# renders whatever the manifest names, and never knows the plugin's
+# domain (see berg_plugins/shared-todo/ui/).
+ui:
+  # Built JS bundle (relative to the manifest), served by the host at
+  # /berg-plugins/<plugin-dir>/ui/dist/todo-surface.js. The browser
+  # runtime-imports this — the host never imports plugin source.
+  entry: "ui/dist/todo-surface.js"
+  # Named export the host mounts from that bundle.
+  export: "TodoSurface"
+  # Where the host offers it: "side-panel" (docked) or "canvas".
+  placement: "side-panel"
+  # Chrome in the host tool bar.
+  label: "📋 Todos"
+  # Panel width in the docked view.
+  width: 340
 
 # === Lifecycle (Optional) ===
 lifecycle:

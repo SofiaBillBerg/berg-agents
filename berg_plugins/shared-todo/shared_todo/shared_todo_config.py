@@ -24,9 +24,13 @@ from pydantic import BaseModel, Field
 
 
 class SharedTodoConfig(BaseModel):
-    plugin_id: str = Field(..., description="Unique identifier for the shared todo plugin")
+    plugin_id: str = Field(
+        ..., description="Unique identifier for the shared todo plugin"
+    )
     enabled: bool = Field(..., description="Whether the plugin is active")
-    log_level: str = Field("INFO", description="Logging verbosity (e.g., DEBUG, INFO, WARN, ERROR)")
+    log_level: str = Field(
+        "INFO", description="Logging verbosity (e.g., DEBUG, INFO, WARN, ERROR)"
+    )
     # Add any additional fields required by your plugin here
 
 
@@ -36,5 +40,3 @@ def validate_shared_todo_config(raw_config: dict) -> SharedTodoConfig:
     Returns a validated model instance or raises a ValidationError.
     """
     return SharedTodoConfig(**raw_config)
-
-

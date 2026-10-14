@@ -29,6 +29,7 @@ elif is_integrated_into_berg_agents():
                 break
 
 """
+
 import importlib.util
 
 
@@ -58,4 +59,3 @@ elif is_integrated_into_berg_agents():
     print("📦 Shared todo is integrated directly into berg_agents.")
 else:
     print("⚠️  Unable to determine distribution mode.")
-

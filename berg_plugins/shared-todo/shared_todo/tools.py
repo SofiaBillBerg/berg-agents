@@ -21,10 +21,12 @@ Tool functions for Shared ToDo plugin.
 These functions are exposed to the AI agent for todo list management.
 """
 
-from datetime import datetime
 import logging
+
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
+
 
 logger = logging.getLogger(__name__)
 
@@ -612,3 +614,41 @@ def delete_subtask(
         return f"Error: Could not write todo '{todo_id}': {e}"
     logger.info(f"Deleted subtask #{index} from {todo_id}")
     return f"Deleted subtask #{index} '{removed['text']}' from '{todo_id}'."
+
+
+def rename_subtask(
+    todo_id: Annotated[str, "ID of the todo"],
+    index: Annotated[int, "Subtask index (file order, from 0)"],
+    text: Annotated[str, "New subtask text"],
+    todo_path: str = "./sharedtodos/",
+) -> str:
+    """Rename a subtask's text (user or agent may correct wording).
+
+    Args:
+        todo_id: ID of the todo
+        index: Subtask index in file order (from 0)
+        text: Replacement text (must not be blank)
+        todo_path: Path to todo directory
+
+    Returns:
+        Success message
+    """
+    if not text.strip():
+        return "Error: Subtask text must not be blank."
+    loaded = _load_subtasks(todo_id, todo_path)
+    if isinstance(loaded, str):
+        return loaded
+    todo_file, lines, subtasks = loaded
+    if index < 0 or index >= len(subtasks):
+        return f"Error: Subtask #{index} not found in '{todo_id}'."
+    previous = subtasks[index]["text"]
+    subtasks[index]["text"] = text.strip()
+    try:
+        _write_subtasks(todo_file, lines, subtasks)
+    except OSError as e:
+        return f"Error: Could not write todo '{todo_id}': {e}"
+    logger.info(f"Renamed subtask #{index} on {todo_id}")
+    return (
+        f"Renamed subtask #{index} on '{todo_id}' "
+        f"from '{previous}' to '{text.strip()}'."
+    )

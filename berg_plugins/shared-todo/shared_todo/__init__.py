@@ -7,9 +7,22 @@ from shared_todo.shared_todo import SharedToDoPlugin
 # ----------------------------------------------------------------------
 # Validation imports
 # ----------------------------------------------------------------------
-from shared_todo.shared_todo_config import validate_shared_todo_config, SharedTodoConfig
-from shared_todo.shared_todo_distribution import is_plugin_installable, is_integrated_into_berg_agents
+from shared_todo.shared_todo_config import (
+    SharedTodoConfig,
+    validate_shared_todo_config,
+)
+from shared_todo.shared_todo_distribution import (
+    is_integrated_into_berg_agents,
+    is_plugin_installable,
+)
 from shared_todo.shared_todo_user_cfg import validate_user_config
 
+
 # ----------------------------------------------------------------------
-__all__ = ["SharedToDoPlugin", "validate_shared_todo_config", "SharedTodoConfig", "is_plugin_installable", "is_integrated_into_berg_agents", "validate_user_config"]
+__all__ = [
+    "SharedToDoPlugin",
+    "SharedTodoConfig",
+    "is_integrated_into_berg_agents",
+    "is_plugin_installable",
+    "validate_shared_todo_config",
+    "validate_user_config"]

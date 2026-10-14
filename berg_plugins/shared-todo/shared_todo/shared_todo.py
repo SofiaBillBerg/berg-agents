@@ -34,8 +34,16 @@ In the function on_load(), the plugin performs several validation checks to ensu
 """
 
 import logging
+
 from pathlib import Path
 from typing import Any
+
+from pydantic import BaseModel, ValidationError
+from shared_todo.shared_todo_distribution import (
+    is_integrated_into_berg_agents,
+    is_plugin_installable,
+)
+from shared_todo.shared_todo_user_cfg import validate_user_config
 
 # NOTE: Use the real plugin base classes so PluginManager's
 # isinstance(plugin, BergPlugin) check passes. The previous local
@@ -43,10 +51,7 @@ from typing import Any
 from berg_agents.plugin_system.lifecycle.bergplugin import BergPlugin
 from berg_agents.plugin_system.plugin_context import PluginContext
 from berg_agents.plugin_system.plugin_contract import ToolCapability
-from pydantic import BaseModel, ValidationError
 
-from shared_todo.shared_todo_distribution import is_plugin_installable, is_integrated_into_berg_agents
-from shared_todo.shared_todo_user_cfg import validate_user_config
 
 logger = logging.getLogger(__name__)
 
@@ -112,10 +117,14 @@ class SharedToDoPlugin(BergPlugin):
         # Validate the *configuration* that may be supplied by the user
         # --------------------------------------------------------------
         try:
-            user_cfg = validate_user_config()  # reads env + ~/.shared_todo/config.yaml
+            user_cfg = (
+                validate_user_config()
+            )  # reads env + ~/.shared_todo/config.yaml
             logger.info(f"User configuration validated: {user_cfg}")
         except ValueError as cfg_err:
-            raise RuntimeError(f"User config error – aborting plugin load: {cfg_err}") from cfg_err
+            raise RuntimeError(
+                f"User config error – aborting plugin load: {cfg_err}"
+            ) from cfg_err
 
         # --------------------------------------------------------------
         # Detect distribution mode (stand‑alone plugin vs. integrated)
@@ -125,7 +134,9 @@ class SharedToDoPlugin(BergPlugin):
         elif is_integrated_into_berg_agents():
             logger.info("⚡ Running **integrated** inside berg‑agents.")
         else:
-            logger.warning("⚠️  Could not determine distribution mode – proceeding anyway.")
+            logger.warning(
+                "⚠️  Could not determine distribution mode – proceeding anyway."
+            )
 
         # --------------------------------------------------------------
         # 4️⃣ Validate that all required configuration fields are present
@@ -136,8 +147,6 @@ class SharedToDoPlugin(BergPlugin):
         # Any ValidationError will be raised automatically.
 
         logger.info("✅ Shared ToDo plugin loaded successfully")
-
-
 
         # Initialize todo directory
         self.todo_dir = Path(self.settings.todo_path)
@@ -190,14 +199,15 @@ class SharedToDoPlugin(BergPlugin):
         # NOTE: Absolute package import works when the plugin dir is
         # on sys.path (see PluginManager._import_plugin).
         from pydantic_ai.tools import Tool
-
         from shared_todo.tools import (
             add_subtask,
             complete_todo,
             create_todo,
             delete_subtask,
             delete_todo,
+            list_todo_items,
             list_todos,
+            rename_subtask,
             set_subtask_done,
             update_todo,
         )
@@ -205,11 +215,13 @@ class SharedToDoPlugin(BergPlugin):
         return [
             ToolCapability(tool=Tool(create_todo), risk_level="low"),
             ToolCapability(tool=Tool(list_todos), risk_level="low"),
+            ToolCapability(tool=Tool(list_todo_items), risk_level="low"),
             ToolCapability(tool=Tool(update_todo), risk_level="low"),
             ToolCapability(tool=Tool(complete_todo), risk_level="low"),
             ToolCapability(tool=Tool(delete_todo), risk_level="low"),
             ToolCapability(tool=Tool(add_subtask), risk_level="low"),
             ToolCapability(tool=Tool(set_subtask_done), risk_level="low"),
+            ToolCapability(tool=Tool(rename_subtask), risk_level="low"),
             ToolCapability(tool=Tool(delete_subtask), risk_level="low")]
 
     def get_settings_schema(self) -> dict[str, Any] | None:
