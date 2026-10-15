@@ -2,25 +2,20 @@ language:
   search-text-placeholder: Search
 project:
   resources:
-    - docs/docs_web/search-index.json
-    - docs/docs_web/docs/404.html
+    - _site/search-index.json
+    - _site/docs/404.html
   type: website
-  # favicon: berg_agents/ui/webapp/public/favicon/favicon.ico
-  # image: berg_agents/ui/webapp/public/favicon/favicon.svg
-  output-dir: docs/docs_web
+
+  output-dir: _site
   pre-render:
     - "project_utils/run_apidocs.sh"
     - "project_utils/run_diagrams.sh"
   render:
-    - "docs/*.qmd"
-    - "docs/README.qmd"
-    - "!docs/docs_web/**/*.*"
+    - "docs/**/*.qmd"
     - "!pdf_docs/*.qmd"
     - "!.*/*.*"
     - "!notes/*.*"
     - "!apidocs/**/*.*"
-    - "decisions/decisions-log.md"
-    # - "CHANGELOG.qmd"
   post-render:
     - "project_utils/render_readme.sh"
 website:
@@ -32,8 +27,15 @@ website:
     keyboard-shortcut: [ "?", "H" ]
     copy-button: true
     type: textbox
+  favicon: docs/styles/logo/favicon.png
+  image: docs/styles/logo/favicon.png
+  margin-header: |
+    ![Berg Agents Logo](docs/styles/logo/favicon.png)
 
   navbar:
+    logo: docs/styles/logo/favicon.png
+    logo-alt: "Berg Agents Logo"
+    logo-href: docs/README.qmd
     left:
       - text: "Home"
         href: docs/README.qmd
@@ -53,18 +55,19 @@ website:
       contents:
         - text: "Quick Start"
           href: docs/QUICKSTART.qmd
+        - text: "Cheat Sheet"
+          href: docs/CHEATSHEET.qmd
     - title: "Guides"
       contents:
         - text: "Example Usage"
           href: docs/USAGE.qmd
+        - text: "Plugin UI"
+          href: docs/plugins/PLUGIN-UI.qmd
         - text: "Tools"
           href: docs/TOOLS.qmd
         - text: "Configuration"
           href: docs/CONFIGURATION.qmd
-        - text: "Best Practices"
-          href: docs/best_practices.qmd
-        - text: "Cheat Sheet"
-          href: docs/cheatsheet.qmd
+
     - title: "Reference"
       contents:
         - text: "API Reference Overview"
@@ -79,20 +82,24 @@ website:
           href: docs/CHANGELOG.qmd
         - text: "FAQ & Troubleshooting"
           href: docs/FAQ.qmd
-    - title: "Tutorials"
-      contents:
-        - text: "Tutorials Overview"
-          href: docs/TUTORIALS.qmd
-        - text: "Quickstart Agents"
-          href: docs/tutorials/quickstart_agents.qmd
-        - text: "MCP Integration"
-          href: docs/tutorials/mcp_integration.qmd
-        - text: "Human-in-the-loop"
-          href: docs/tutorials/hilt_lifecycle.qmd
-        - text: "Harness Workflow"
-          href: docs/tutorials/harness_workflow.qmd
-        - text: "Advanced Tools"
-          href: docs/tutorials/advanced_tools.qmd
+  #    - title: "Tutorials"
+  #      contents:
+  #        - text: "Tutorials Overview"
+  #          href: docs/TUTORIALS.qmd
+  #        - text: "Quickstart Agents"
+  #          href: docs/tutorials/quickstart_agents.qmd
+  #        - text: "MCP Integration"
+  #          href: docs/tutorials/mcp_integration.qmd
+  #        - text: "Human-in-the-loop"
+  #          href: docs/tutorials/hilt_lifecycle.qmd
+  #        - text: "Harness Workflow"
+  #          href: docs/tutorials/harness_workflow.qmd
+  #        - text: "Advanced Tools"
+  #          href: docs/tutorials/advanced_tools.qmd
+  page-footer:
+    right:
+      - text: "License"
+        href: agpl-3.0.md
 
 format:
   html:
@@ -101,47 +108,50 @@ format:
     css:
       - docs/styles/quartz-contrast.css
       - docs/styles/dt-wrap.css
-    highlight-style: pygments
-    toc: true
-    toc-depth: 3
-    code-fold: true
-    code-tools: true
-    code-overflow: wrap
+    author: "Sofia Billger Bergström"
+    cache: true
+    citations-hover: true
     code-annotations: select
     code-copy: true
-    toc-title: "On this page"
-    lightbox: true
-    citations-hover: true
-    # self-contained: true
-    code-summary: "Show/Hide Code"
-    date: "2025-11-02"
-    date-format: "iso"
+    code-fold: true
     code-links: true
-    author: "Sofia Billger Bergström"
+    code-overflow: wrap
+    code-summary: "Show/Hide Code"
+    code-tools: true
+    date-format: "iso"
     date-modified: last-modified
+    date: "2025-11-02"
+    description: "Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture."
     embed-resources: true
     fig-cap-location: bottom
-    fig-format: svg
-    tbl-cap-location: top
-    subtitle: "Documentation for The Berg-Agents - A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration.
-"
-    description: "Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture."
     fig-env: figure
-    cache: true
-    includesource: true
-    wrap: auto
-    touch: true
-    search: true
+    fig-format: svg
     fig-responsive: true
+    highlight-style: pygments
+    includesource: true
+    lightbox: true
+    search: true
+    # self-contained: true
+    subtitle: "Documentation for The Berg-Agents - A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration."
+    tbl-cap-location: top
+    toc-depth: 3
+    toc-title: "On this page"
+    toc: true
+    touch: true
+    wrap: auto
     resource-path:
       - LICENSE
-      - docs/visualizations/png/
+      - docs/styles/logo/favicon.png
+      - docs/visualizations/
 #  - apidocs/09
 
 filters:
   - include-code-files
   - inline-svg
   - lua-env
+  - linkrot
+  - preview-colour
+
 extensions:
   badge:
     - key: BergAgents
@@ -158,3 +168,17 @@ extensions:
       href: docs/README.qmd
       icon: icon
       target: _self
+  linkrot:
+    fail-on-error: false      # Set to true to fail the build if broken links are found
+    timeout: 10               # Timeout in seconds for each URL check
+    user-agent: "Quarto-Linkrot/1.0"  # User agent string for requests
+    cache-results: true       # Cache results to avoid checking the same URL multiple times
+    debug: true              # Enable debug logging
+    output-file: "linkrot-report.txt"         # Write results to a file (e.g., "linkrot-report.txt")
+    skip-patterns: # List of regex patterns to skip
+      - "example\\.com"
+      - "localhost"
+      - "0.0.0.0"
+  preview-colour:
+    code: true
+    text: true

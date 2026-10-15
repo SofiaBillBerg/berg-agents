@@ -22,12 +22,11 @@ knitr::opts_chunk$set(
 > BergAgents - A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration.
 > Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture.
 > The system follows a harness-based execution model with multiple specialized agents working together.
-
-The system is designed to work against any OpenAI-compatible provider, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
+> The system is designed to work against any OpenAI-compatible provider, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
 <!-- badges: end -->
 
-![Berg-Agents Overview](../docs/visualizations/png/packages_berg_agents.png "Berg Agents overview")
+![Berg-Agents Overview](visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
 
 ## Quick Start
 
@@ -46,53 +45,10 @@ python -m berg_agents --web
 
 ## What it is
 
-A task engine (**Harness**) drives specialized subagents - Guardian, Planner, Implementation, Curator, Learning - against any OpenAI-compatible provider:
+See [docs/USAGE.qmd](USAGE.qmd) for TUI, Python API, and web examples.
 
-- **Harness engine**: guardian → planner → implementation → curator, with a learning gate that records task → model → outcome and adapts routing
-- **Human-AI balance**: Guardian decides when to ask (risk × complexity × confidence); mutating tools pause for approve / reject / edit
-- **Provider-centric config**: each model belongs to a provider; baseURL/apiKey resolve FROM the model id - never from a global flag
-- **MCP integration**: external MCP servers (stdio or HTTP); tools prefixed `mcp_<server>__<tool>`
-- **TUI + web, same surface**: interactive terminal (`berg_agents/ui/cli_ui.py`) and Next.js + FastAPI web UI list identical slash commands (`/harness`, `/task`, ...) and stream the same Harness task lifecycle
 
-See [docs/USAGE.qmd](../docs/USAGE.qmd) for TUI, Python API, and web examples.
-
-## Tutorials
-
-The following short tutorials walk through common use-cases:
-
-1. **Simple code-review agent**
-   ```bash
-   # Create a guardian-only task to review a Python file
-   python -m berg_agents --task "Review src/utils.py for PEP-8 violations"
-   ```
-   The response is streamed back in the terminal and stored in the learning gate.
-
-2. **Building a multi-step workflow**
-   ```bash
-   # Plan → Implement → Curate workflow
-   python -m berg_agents --task "Refactor the authentication module" \
-       --plan "Identify security gaps" \
-       --implement "Add rate limiting" \
-       --curate "Write unit tests"
-   ```
-   The harness automatically routes each step to the appropriate subagent.
-
-3. **Using MCP tools**
-   ```jsonc
-   // .berg-agents/mcp.json
-   {
-     "github__search": {
-       "type": "stdio",
-       "command": "gh"
-     }
-   }
-   ```
-   Then call the tool from the UI or CLI:
-   ```bash
-   python -m berg_agents --task "Search for repos about 'BergAgents' on GitHub"
-   ```
-
-4. **Customizing the Harness via `bergagents.jsonc`**
+1. **Customizing the Harness via `bergagents.jsonc`**
    ```jsonc
    {
      "providers": {
@@ -127,36 +83,36 @@ The following short tutorials walk through common use-cases:
   | Overrides      | `BERG_AGENT_*` environment variables                                                   |
   | External tools | `../.berg-agents` for MCP server configuration                                         |
 
-See [docs/CONFIGURATION.qmd](../docs/CONFIGURATION.qmd) for the full reference.
+See [docs/CONFIGURATION.qmd](CONFIGURATION.qmd) for the full reference.
 
-![Berg-Agents Config](../docs/visualizations/png/packages_berg_agents.png "Berg Agents Config Modules")
+![Berg-Agents Config](visualizations/svg/packages_berg_agents.svg "Berg Agents Config Modules")
 
 ## Documentation
 
   | Page                                       | Description                                   |
   | ------                                     | -------------                                 |
-  | [QUICKSTART](../docs/QUICKSTART.qmd)       | Installation and first run                    |
-  | [USAGE](../docs/USAGE.qmd)                 | TUI, Python API, and web workflows            |
-  | [API](../docs/API.qmd)                     | Module map for the codebase                   |
-  | [TOOLS](../docs/TOOLS.qmd)                 | Built-in tools, capabilities, and MCP         |
-  | [CONFIGURATION](../docs/CONFIGURATION.qmd) | Provider-centric config, `.env`, and env vars |
-  | [CONTRIBUTING](../docs/CONTRIBUTING.qmd)   | Guidelines for contributing                   |
-  | [FAQ](../docs/FAQ.qmd)                     | Common questions and troubleshooting          |
+  | [QUICKSTART](QUICKSTART.qmd)       | Installation and first run                    |
+  | [USAGE](USAGE.qmd)                 | TUI, Python API, and web workflows            |
+  | [API](API.qmd)                     | Module map for the codebase                   |
+  | [TOOLS](TOOLS.qmd)                 | Built-in tools, capabilities, and MCP         |
+  | [CONFIGURATION](CONFIGURATION.qmd) | Provider-centric config, `.env`, and env vars |
+  | [CONTRIBUTING](CONTRIBUTING.qmd)   | Guidelines for contributing                   |
+  | [FAQ](FAQ.qmd)                     | Common questions and troubleshooting          |
   | **TUTORIALS** (this page)                  | Step-by-step examples for common tasks        |
 
 ## Getting Help
 
-- Read the [QUICKSTART guide](../docs/QUICKSTART.qmd) for installation
-- Check [USAGE examples](../docs/USAGE.qmd) for common workflows
-- See [TOOLS documentation](../docs/TOOLS.qmd) to understand agent capabilities
-- Review [FAQ](../docs/FAQ.qmd) for troubleshooting tips
-- API reference is in [API](../docs/API.qmd)
+- Read the [QUICKSTART guide](QUICKSTART.qmd) for installation
+- Check [USAGE examples](USAGE.qmd) for common workflows
+- See [TOOLS documentation](TOOLS.qmd) to understand agent capabilities
+- Review [FAQ](FAQ.qmd) for troubleshooting tips
+- API reference is in [API](API.qmd)
 - Explore the [TUTORIALS] section above for ready-to-run snippets
 
 ## Contributing
 
-Please read our [CONTRIBUTING](../docs/CONTRIBUTING.qmd) guide for details on coding standards, testing, and the submission process.
+Please read our [CONTRIBUTING](CONTRIBUTING.qmd) guide for details on coding standards, testing, and the submission process.
 
 ## License
 
-**Version**: 0.2.0 \| **License**: GNU Affero General Public License
+**Version**: 0.2.0 | **License**: GNU Affero General Public License

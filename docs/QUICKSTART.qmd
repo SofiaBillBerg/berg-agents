@@ -11,7 +11,7 @@ This guide gets BergAgents installed and running on your local machine.
 
 - **`uv`** (recommended) or `pip`
 
-- **An OpenAI-compatible provider** - e.g. Ollama running locally with a pulled model:
+- **An OpenAI- or Anthropic-compatible provider** - e.g. Ollama running locally with a pulled model:
 
   ```bash
   ollama pull qwen3.5:9b
@@ -77,11 +77,6 @@ python -m berg_agents --web --port 8001
 Python API:
 
 ```python
-from berg_agents.app import BergAgentsApp
-
-app = BergAgentsApp.create()
-result = app.execute("Add retry logic to the sync worker", task_type="standard")
-print(result["status"])  # completed | needs_human_review | failed
 ```
 
 ## Next Steps

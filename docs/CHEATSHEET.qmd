@@ -59,24 +59,6 @@ A quick reference for everyday BergAgents usage.
   | `OPENAI_API_KEY`         | API key for OpenAI models (`${env:OPENAI_API_KEY}` in config). |
   | `ANTHROPIC_API_KEY`      | API key for Anthropic.                                         |
   | `BERG_AGENT_MCP_SERVERS` | Path to MCP JSONC config file.                                 |
-  | `BERG_AGENT_CONFIG`      | Optional alternate config file overrides.                      |
-  | `ALLOW_MODEL_REQUESTS`   | Set to `true` to enable live model calls (CI disables it).     |
-
-## 🛠️ Handy CLI Flags
-
-  | Flag             | Example                               | Effect                                      |
-  | ------           | ---------                             | --------                                    |
-  | `--tui`          | `python -m berg_agents --tui`         | Launch the Rich terminal UI.                |
-  | `--web`          | `python -m berg_agents --web`         | Start the FastAPI server.                   |
-  | `--port`         | `--port 8001`                         | Choose port for web UI (default 8001).      |
-  | `--host`         | `--host 0.0.0.0`                      | Bind to all interfaces.                     |
-  | `--task`         | `--task "Summarize README"`           | Provide the task description.               |
-  | `--agent`        | `--agent custom_reviewer`             | Specify a custom agent to run.              |
-  | `--tool`         | `--tool fs__read`                     | Use a built-in tool.                        |
-  | `--tool-args`    | `--tool-args '{"path":"src/app.py"}'` | Arguments for the tool.                     |
-  | `--set-variable` | `--set-variable my_var="{{result}}"`  | Store previous tool output.                 |
-  | `--complexity`   | `--complexity high`                   | Hint to Guardian about expected difficulty. |
-  | `--hitl-pause`   | `--hitl-pause true`                   | Force a HITL pause regardless of risk.      |
 
 ## ✅ Quick Checklist Before Committing
 

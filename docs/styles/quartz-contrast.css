@@ -1,78 +1,81 @@
 /*
- * <one line to give the program's name and a brief idea of what it does.>
+ * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
  *
- * Copyright (c) 2026.
- *         Copyright (C) <year>  <name of author>
+ * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
- *         This program is free software: you can redistribute it and/or modify
- *         it under the terms of the GNU Affero General Public License as
- *         published by the Free Software Foundation, either version 3 of the
- *         License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
  *
- *         This program is distributed in the hope that it will be useful,
- *         but WITHOUT ANY WARRANTY; without even the implied warranty of
- *         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *         GNU Affero General Public License for more details.
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *         You should have received a copy of the GNU Affero General Public License
- *         along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
+
 
 /*-- scss:rules --*/
 
 /* Logic for DT::datatable */
 @defaults;
+
 .dataTable td {
-  line-height: 1.4;
-  max-width: 700px;
-  white-space: pre-wrap !important;
-  word-break: break-word !important;
+    line-height: 1.4;
+    max-width: 700px;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
 }
 
 /* Extra CSS for better quartz-contrast */
+
 /* Increase the contrast for TOC and button */
 .tocify,
 .tocify-header,
 .tocify-subheader,
 .quarto-code-tools,
 .quarto-code-tools .btn {
-  background: #f8edf8 !important;
-  border-radius: 4px;
-  color: #222 !important;
-  font-size: 1em !important;
-  font-weight: 600;
+    background: #f8edf8 !important;
+    border-radius: 4px;
+    color: #222 !important;
+    font-size: 1em !important;
+    font-weight: 600;
 }
 
 /* background and text color */
-/*-- scss:defaults --*/
+
+/* -- scss:defaults -- */
 pre,
 code,
 .code,
 .quarto-code-cell {
-  background: rgba(248, 237, 248, 0.76) !important;
-  color: #191970 !important;
-  font-size: 1em;
+    background: rgb(248 237 248 / 76%) !important;
+    color: #191970 !important;
+    font-size: 1em;
 }
 
 /* For better visibility on dark background */
 .quarto-code-tools .btn {
-  background: #eee !important;
-  border: 1px solid #fcf1f8;
-  color: #222 !important;
+    background: #eee !important;
+    border: 1px solid #fcf1f8;
+    color: #222 !important;
 }
 
 /* Improved contrast for plots and tables */
 table,
 th,
 td {
-  background: #fff !important;
-  color: #222 !important;
+    background: #fff !important;
+    color: #222 !important;
 }
 
 /* Improved contrast for plotly and DT widgets */
 .js-plotly-plot,
 .dataTable {
-  background: #fff !important;
-  color: #222 !important;
+    background: #fff !important;
+    color: #222 !important;
 }

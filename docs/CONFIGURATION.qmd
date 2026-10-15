@@ -17,7 +17,7 @@ Layers (increasing precedence):
 3. **Environment variables**: `BERG_AGENT_*` override config and `.env`
 4. **MCP config**: `../.berg-agents` (via `BERG_AGENT_MCP_SERVERS`) for MCP servers
 
-![Berg-Agents Config](visualizations/png/packages_berg_agents.png "Berg Agents Config Modules")
+![Berg-Agents Config](visualizations/svg/packages_berg_agents.svg "Berg Agents Config Modules")
 
 ## Providers
 
@@ -46,7 +46,7 @@ Resolution (`berg_agents/providers/registry.py`):
 3. `api_key` defaults to `""`; `{env:VAR}` placeholders expand at load time
 4. With no id, the first declared model is the default; unknown ids raise `KeyError` listing known models
 
-![Berg-Agents Providers](visualizations/png/packages_berg_agents.providers.png "Berg Agents Providers Modules")
+![Berg-Agents Providers](visualizations/svg/packages_berg_agents.providers.svg "Berg Agents Providers Modules")
 
 ## Harness
 
@@ -87,8 +87,8 @@ Resolution (`berg_agents/providers/registry.py`):
 }
 ```
 
-Loaded via `BergAgentsApp.create()` → `Settings` → `Harness`.
-Subagents: Guardian (risk gate), Planner (breakdown), Implementation (edits), Curator (review), Learning (outcome stats).
+Loaded via
+Subagents:
 
 ## `.env` File
 
@@ -99,7 +99,7 @@ GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
 
 ## MCP Configuration
 
-External MCP servers live in the file pointed at by `BERG_AGENT_MCP_SERVERS` (default `../.berg-agents`):
+External MCP servers live in the file pointed at by `BERG_AGENT_MCP_SERVERS` (default `../.berg-agents/mcp.json`):
 
 ```json
 [
@@ -119,7 +119,7 @@ Sensitive servers (`github`, `memory`) pause for approval; read-only servers (`c
 
 ## Profiles
 
-`../.berg-agents` tunes prompt suffixes and tool visibility per provider or per `provider:model`:
+`../.berg-agents/profiles.yaml` tunes prompt suffixes and tool visibility per provider or per `provider:model`:
 
 ```yaml
 "ollama":
@@ -127,7 +127,7 @@ Sensitive servers (`github`, `memory`) pause for approval; read-only servers (`c
   excluded_tools: []
 ```
 
-![Berg-Agents Profiles](visualizations/png/packages_berg_agents.profiles.png "Berg Agents Profiles Modules")
+![Berg-Agents Profiles](visualizations/svg/packages_berg_agents.profiles.svg "Berg Agents Profiles Modules")
 
 ## Precedence Example
 

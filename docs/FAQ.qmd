@@ -8,8 +8,6 @@ format: html
 
 ## How does the agent remember conversations?
 
-Two layers: short-term thread state (checkpoints persist messages, step, and pending HITL per thread) and long-term learnings (the Learning gate records task → model → outcome and adapts routing).
-Inspect via `/stats` in the TUI or `GET /api/learning-stats`.
 
 ## Can I use a cloud LLM instead of Ollama?
 
@@ -30,27 +28,17 @@ See [Configuration](CONFIGURATION.qmd).
 
 ## What happens if the LLM server is not running?
 
-The adapter call raises, the loop captures it as a `RunError` event, and the surface renders the failure inline - TUI panel, web error state, or `{"status": "failed", "error": ...}` from the API.
-Check the provider is reachable at its `baseURL`, then retry.
 
 ## Is it safe to let the agent edit my files?
 
-Guardian assesses risk × complexity × confidence against `hitl_rules` (`auto_execute` / `notify_after` / `ask_before` / `human_leads`).
-Mutating tools (`write_file`, `edit_file`, `delete`, `execute`) pause for your approval by default, and file tools are jailed to the workspace root (`/workspace/`, escapes blocked).
 
 ## How do I add a new tool or subagent?
 
-Wrap a function with `make_tool_spec` and register it in the `ToolRegistry` (capabilities flow through `tool_to_capability`).
-New subagents implement `AbstractAgent` and register via `app.register_agent(name, agent)`.
-
 ## The TUI shows `(no text response)` - what does that mean?
-
-The model finished without text (e.g. it only called tools, or returned empty content).
-It is the honest placeholder, not an error - the tool results are still shown.
 
 ## How do I configure MCP servers?
 
-Point `BERG_AGENT_MCP_SERVERS` at a JSON file (default `../.berg-agents`) and reference secrets with `${env:VAR}`.
+Point `BERG_AGENT_MCP_SERVERS` at a JSON file (default `../.berg-agents/mcp.json`) and reference secrets with `${env:VAR}`.
 See [Configuration](CONFIGURATION.qmd).
 
 ## What Python version do I need?
@@ -58,13 +46,5 @@ See [Configuration](CONFIGURATION.qmd).
 Python 3.12+.
 Dependencies via `uv` (`uv pip install -e .`).
 
-## Any special dependencies?
-
-No.
-The core is stdlib + Pydantic.
 
 ## How does model routing work?
-
-Complexity is estimated from task description × task type against `complexity_rules` → `trivial` / `standard` / `complex` / `critical` → small / medium / large tier from `model_routing`.
-The Learning gate then shifts tiers by observed success rates.
-Check via `/stats` or `GET /api/learning-stats`.

@@ -1,0 +1,306 @@
+---
+title: "Plugin UI"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+## Overview
+
+A berg-agents plugin ships **its own user interface**. The host does not
+know what any plugin does; it only knows how to *mount* one.
+
+This page documents that contract end to end:
+
+1. Declare the UI in `plugin.yaml` (a `ui:` block).
+2. Build it into a self-contained JS bundle.
+3. The host serves that bundle at a stable URL.
+4. The host loads it at runtime and mounts the named export.
+5. Your bundle talks to the backend through `BergRuntime`.
+
+The one rule behind all of it: **the host never imports plugin source.**
+Everything crosses the boundary as a built artifact, so installing a
+plugin never requires touching `berg-agents` and never requires a host
+rebuild.
+
+## The `ui:` block
+
+Add this to `plugin.yaml`:
+
+```yaml
+ui:
+  # Built JS bundle, relative to the package root.
+  entry: "ui/dist/my-surface.js"
+  # Named export the host mounts from that bundle.
+  export: "MySurface"
+  # Where the host offers it: "side-panel" (docked) or "canvas".
+  placement: "side-panel"
+  # Chrome in the host tool bar.
+  label: "🧩 My Plugin"
+  # Initial docked width, in pixels.
+  width: 340
+```
+
+All five keys are read by the host. `entry` and `export` are required
+for the surface to load; the rest are presentation.
+
+The host exposes the resolved descriptor at `GET /api/plugins`:
+
+```json
+{
+  "id": "berg-plugin-my-plugin",
+  "ui": {
+    "entry": "ui/dist/my-surface.js",
+    "export": "MySurface",
+    "placement": "side-panel",
+    "label": "🧩 My Plugin",
+    "width": 340,
+    "entry_url": "/berg-plugins/my-plugin/ui/dist/my-surface.js",
+    "entry_built": true
+  }
+}
+```
+
+`entry_url` is where the bundle is actually served from — construct it
+yourself from `<plugin-dir>/<entry>` if you need it before startup.
+`entry_built` is `false` when the bundle has not been built yet, so the
+host can say *why* instead of showing an empty panel.
+
+## Building the bundle
+
+Your bundle is loaded by the browser at runtime, so it must be a real
+ES module and must be built. The reference plugin uses esbuild (`build-ui.mjs`) and a `build:ui` script:
+
+```json
+{
+  "scripts": {
+    "build:ui": "node build-ui.mjs"
+  }
+}
+```
+
+### React must not be bundled
+
+This is the part that trips people up. Plugin bundles treat
+`react`, `react-dom`, the JSX runtimes, and your component library as **externals**, resolved against the host's own
+copies. If your bundle
+ships its own React, you get two React instances and hooks break the
+moment the host renders your component.
+
+The reference plugin maps those specifiers to a namespace whose
+contents read from the host runtime:
+
+```js
+// build-ui.mjs (excerpt)
+const runtimeGlobals = {
+  name: "berg-runtime-globals",
+  setup(build) {
+    build.onResolve({filter: /^react$/}, () => ({
+      path: "react",
+      namespace: "berg-runtime"}));
+    build.onResolve({filter: /^react\/jsx-runtime$/}, () => ({
+      path: "react/jsx-runtime",
+      namespace: "berg-runtime"}));
+    // ... react-dom, react-dom/client, jsx-dev-runtime ...
+
+    // Everything else bare → host runtime too.
+    build.onResolve({filter: /.*/}, (args) => {
+      if (args.kind === "entry-point") return null;
+      if (!args.path.startsWith(".") && !path.isAbsolute(args.path)) {
+        return {path: args.path, namespace: "berg-runtime"};
+      }
+      return null;
+    });
+
+    build.onLoad({filter: /.*/, namespace: "berg-runtime"}, (args) => ({
+      contents: `module.exports = window.BergRuntime.require(${JSON.stringify(args.path)});`,
+      loader: "js"}));
+  }};
+
+await esbuild.build({
+  entryPoints: [path.join(pkgRoot, "ui", "TodoSurface.tsx")],
+  outfile: path.join(pkgRoot, "ui", "dist", "todo-surface.js"),
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  target: ["es2020"],
+  jsx: "automatic",
+  plugins: [runtimeGlobals],
+  minify: true,
+  sourcemap: true});
+```
+
+Keep the catch-all resolving bare specifiers to the runtime — that is
+what makes `@heroui/react` (and anything else) come from the host
+instead of inflating your bundle.
+
+### Where the entry file lives
+
+The bundle is written to the package directory named in `ui.entry`
+(`berg_plugins/<your-plugin>/ui/dist/my-surface.js`). Build it before
+you start the server, or `entry_built` will be `false`.
+
+## The host runtime
+
+The host installs `window.BergRuntime` on mount (see
+`berg_agents/ui/webapp/app/runtime/berg-runtime.ts`), before any plugin
+surface is imported:
+
+```js
+window.BergRuntime = {
+  React,
+  HeroUI,
+  apiBase,             // the host's own API base, "" when same-origin
+  require(specifier),  // resolves to the host's own module
+};
+```
+
+| Member               | Purpose                                                                                                                          |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| `React`, `HeroUI`    | The host's own instances. Use `require`, not a static import.                                                                    |
+| `apiBase`            | The backend origin the host is using. `""` means same-origin.                                                                    |
+| `require(specifier)` | Returns the host's module object for a bare specifier. Throws with a helpful message if the host does not expose that specifier. |
+
+So do **not** `import React from "react"` in a plugin surface — that is
+the import esbuild rewrites to `BergRuntime.require("react")`, and it
+only works because you marked it external. Importing something the host
+does not expose is an error with a clear message telling you to add it
+to `RUNTIME_MODULES`.
+
+### Talking to the backend
+
+Read the API base from the runtime rather than baking it in at build
+time. The reference plugin keeps a small helper:
+
+```ts
+// berg_plugins/shared-todo/ui/runtime.ts
+export function apiBase(): string {
+  return String(window.BergRuntime?.apiBase ?? "");
+}
+
+export function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${apiBase()}${path}`, init);
+}
+```
+
+That means your surface follows the host's backend wherever the host is
+served from. Baking `process.env.NEXT_PUBLIC_API_BASE_URL` into the
+bundle instead would freeze it at build time and break under
+`next build` (the value is also not defined in a raw esbuild bundle).
+
+## How the host mounts your component
+
+1. **`GET /api/plugins`** — the backend walks discovered plugins and
+   turns each manifest `ui:` block into a descriptor by appending
+   `entry_url` and `entry_built`.
+2. **The host builds its toolbar from that list.** One button per
+   plugin that declares a UI, using your `label`. No plugin name
+   appears in host code.
+3. **On click** the host calls `loadPluginSurface(pluginId, ui)`, which
+   runtime-imports `entry_url` exactly once (cached by URL) and reads
+   the named export.
+4. **It renders your component** with a fixed props contract:
+
+```ts
+interface PluginSurfaceProps {
+  view: "panel" | "canvas";   // docked vs wide
+  refreshKey: number;         // bump → refetch
+  onClose?: () => void;
+  onToggleView?: () => void;
+  onCount?: (n: number) => void;  // report a headline count
+  className?: string;
+  style?: React.CSSProperties;
+}
+```
+
+`refreshKey` is bumped when a tool call belonging to your plugin
+completes in the chat transcript, so the surface reflects what the
+agent just did without polling. `onCount` feeds the badge on the host's
+toolbar button.
+
+If the bundle is missing, the export name is wrong, or the import
+throws, the host renders an explicit "Plugin UI unavailable" message
+with the reason — never a blank panel.
+
+### Served with `no-cache`
+
+The host serves `/berg-plugins/*` with `Cache-Control: no-cache` (via
+etag revalidation, not `no-store`). This matters: your bundle URL never
+changes, so a cached copy would silently hide every rebuild. Keep the
+URL stable and rebuild freely.
+
+## A complete example
+
+Place this in your plugin package as `ui/TodoSurface.tsx`:
+
+```tsx
+"use client";
+
+import {useEffect, useState} from "react";
+import {Button, Card} from "@heroui/react";
+import {apiFetch} from "./runtime";
+
+export interface TodoSurfaceProps {
+  view: "panel" | "canvas";
+  refreshKey: number;
+  onClose?: () => void;
+}
+
+export function TodoSurface({view, refreshKey, onClose}: TodoSurfaceProps) {
+  const [todos, setTodos] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Reach the host's backend through the runtime-provided base.
+    void apiFetch("/api/plugins/berg-plugin-shared-todo/tools/list_todo_items")
+      .then((r) => r.json())
+      .then((d) => setTodos((d.todos ?? []).map((t: {title: string}) => t.title)))
+      .catch(() => undefined);
+  }, [refreshKey]);
+
+  return (
+    <Card>
+      <Card.Title>My Plugin</Card.Title>
+      <Card.Content>
+        {todos.map((t) => <p key={t}>{t}</p>)}
+        {view === "panel" ? null : <p>wider view here</p>}
+        {onClose ? <Button onPress={onClose}>Close</Button> : null}
+      </Card.Content>
+    </Card>
+  );
+}
+
+export default TodoSurface;
+```
+
+Then in `plugin.yaml`:
+
+```yaml
+ui:
+  entry: "ui/dist/todo-surface.js"
+  export: "TodoSurface"
+  placement: "side-panel"
+  label: "📋 My Plugin"
+  width: 340
+```
+
+Run `bun run build:ui`, restart the server, and your plugin's button
+appears in the toolbar.
+
+## Checklist
+
+- [ ] `plugin.yaml` has a `ui:` block with `entry` and `export`
+- [ ] The bundle builds (`bun run build:ui`) and exists at `ui.entry`
+- [ ] React / ReactDOM / component library are esbuild externals
+- [ ] Backend calls go through `window.BergRuntime.apiBase`
+- [ ] Your component exports the name named in `ui.export`
+- [ ] You accept `PluginSurfaceProps` and honor `refreshKey`
+
+## Known gaps
+
+- **Static import only.** The host maps plugin ids to components in
+  `app/plugins/registry.tsx`, so a new plugin needs one entry there to
+  be *listed*. Everything after that is runtime — but that one line is
+  host code, and making it fully data-driven is not done yet.
+- **Standalone dev mode.** Running a plugin's `next dev` in isolation
+  is possible but has no documented workflow yet.
+- **`FallbackCompaction`** and `WarnNearLimits` are part of the harness
+  compaction menu but are not wired into the host.

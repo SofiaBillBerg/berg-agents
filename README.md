@@ -11,12 +11,11 @@ knitr::opts_chunk\$set( collapse = TRUE, comment = “\#\>” )
     > BergAgents - A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration.
     > Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture.
     > The system follows a harness-based execution model with multiple specialized agents working together.
-
-    The system is designed to work against any OpenAI-compatible provider, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
+    > The system is designed to work against any OpenAI-compatible provider, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
     <!-- badges: end -->
 
-    ![Berg-Agents Overview](docs/visualizations/png/packages_berg_agents.png "Berg Agents overview")
+    ![Berg-Agents Overview](docs/visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
 
     ## Quick Start
 
@@ -34,72 +33,9 @@ knitr::opts_chunk\$set( collapse = TRUE, comment = “\#\>” )
 
 ## What it is
 
-A task engine (**Harness**) drives specialized subagents - Guardian,
-Planner, Implementation, Curator, Learning - against any
-OpenAI-compatible provider:
-
-- **Harness engine**: guardian → planner → implementation → curator,
-  with a learning gate that records task → model → outcome and adapts
-  routing
-- **Human-AI balance**: Guardian decides when to ask (risk × complexity
-  × confidence); mutating tools pause for approve / reject / edit
-- **Provider-centric config**: each model belongs to a provider;
-  baseURL/apiKey resolve FROM the model id - never from a global flag
-- **MCP integration**: external MCP servers (stdio or HTTP); tools
-  prefixed `mcp_<server>__<tool>`
-- **TUI + web, same surface**: interactive terminal
-  (`berg_agents/ui/cli_ui.py`) and Next.js + FastAPI web UI list
-  identical slash commands (`/harness`, `/task`, …) and stream the same
-  Harness task lifecycle
-
 See [docs/USAGE.qmd] for TUI, Python API, and web examples.
 
-## Tutorials
-
-The following short tutorials walk through common use-cases:
-
-1.  **Simple code-review agent**
-
-    ``` bash
-    # Create a guardian-only task to review a Python file
-    python -m berg_agents --task "Review src/utils.py for PEP-8 violations"
-    ```
-
-    The response is streamed back in the terminal and stored in the
-    learning gate.
-
-2.  **Building a multi-step workflow**
-
-    ``` bash
-    # Plan → Implement → Curate workflow
-    python -m berg_agents --task "Refactor the authentication module" \
-        --plan "Identify security gaps" \
-        --implement "Add rate limiting" \
-        --curate "Write unit tests"
-    ```
-
-    The harness automatically routes each step to the appropriate
-    subagent.
-
-3.  **Using MCP tools**
-
-    ``` jsonc
-    // .berg-agents/mcp.json
-    {
-      "github__search": {
-        "type": "stdio",
-        "command": "gh"
-      }
-    }
-    ```
-
-    Then call the tool from the UI or CLI:
-
-    ``` bash
-    python -m berg_agents --task "Search for repos about 'BergAgents' on GitHub"
-    ```
-
-4.  **Customizing the Harness via `bergagents.jsonc`**
+1.  **Customizing the Harness via `bergagents.jsonc`**
 
     ``` jsonc
     {
@@ -140,7 +76,7 @@ The following short tutorials walk through common use-cases:
 See [docs/CONFIGURATION.qmd] for the full reference.
 
 <figure>
-<img src="docs/visualizations/png/packages_berg_agents.png"
+<img src="docs/visualizations/svg/packages_berg_agents.svg"
 title="Berg Agents Config Modules" alt="Berg-Agents Config" />
 <figcaption aria-hidden="true">Berg-Agents Config</figcaption>
 </figure>
@@ -165,7 +101,7 @@ title="Berg Agents Config Modules" alt="Berg-Agents Config" />
 - See [TOOLS documentation][TOOLS] to understand agent capabilities
 - Review [FAQ] for troubleshooting tips
 - API reference is in [API]
-- Explore the [TUTORIALS] section above for ready-to-run snippets
+- Explore the \[TUTORIALS\] section above for ready-to-run snippets
 
 ## Contributing
 
@@ -183,4 +119,3 @@ testing, and the submission process.
   [TOOLS]: docs/TOOLS.qmd
   [CONTRIBUTING]: docs/CONTRIBUTING.qmd
   [FAQ]: docs/FAQ.qmd
-  [TUTORIALS]: #tutorials

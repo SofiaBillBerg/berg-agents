@@ -6,12 +6,9 @@ format: html
 
 # Tools
 
-Tools are framework-free `ToolSpec` values (`berg_agents/core/tool_spec.py`): name, description, JSON-Schema params inferred from the function signature, and an `execute` callable.
-They serialize to OpenAI function-calling or Anthropic tool-use shape, validate args through generated Pydantic models, and carry a risk class (`low` / `medium` / `high`).
 
 ## Built-in tools
 
-`berg_agents/agents/factory.py:create_tools()` wires the file tools bound to a workspace root:
 
   | Tool         | Risk   | Purpose                                                           |
   | ------       | ------ | ---------                                                         |
@@ -23,19 +20,6 @@ The workspace root mounts at `/workspace/`; path normalization blocks escapes (`
 
 ## Capabilities
 
-`berg_agents/capabilities/tool_adapter.py:tool_to_capability()` wraps a `ToolSpec` as a `Capability` (kebab-case id, intent from description, input model from params) so tools dispatch through the standard audited envelope flow.
-Risk is inferred - sensitive MCP servers and explicit `risk_class` win, read-only name hints (`read`, `search`, `lookup`, `list`, `get`, ...) map to low, everything else is medium.
-
-Custom subagents implement `AbstractAgent` and register via `app.register_agent(name, agent)`.
-
 ## MCP tools
 
-External MCP servers (stdio subprocess or HTTP) contribute tools prefixed `mcp_<server>__<tool>`, so names never collide.
-Sensitive servers (`github`, `memory`) pause for approval; read-only servers (`context7`, `docs`, `reference`) run without interruption.
-See [Configuration](CONFIGURATION.qmd) for the `mcp.json` format.
-
-## Human-in-the-Loop
-
-Mutating tools pause the run by default (`write_file`, `edit_file`, `delete`, `execute`).
-The caller resumes with approve (tool runs, cycle continues), reject (an error is fed back to the model, tool never runs), or edit (args rewritten before dispatch).
-TUI approves inline; the web HITL surface offers Approve / Reject / Edit with raw interrupt data for debugging.
+See [Configuration](CONFIGURATION) for MCP server setup and `BERG_AGENT_MCP_SERVERS` environment variable.

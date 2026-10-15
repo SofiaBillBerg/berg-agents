@@ -13,8 +13,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - New `tutorials/` section with quick-start, harness workflow, MCP integration, HITL lifecycle, and advanced tool usage.
-- `best_practices.qmd` describing project structure, config hygiene, testing, and migration checklist.
-- `cheatsheet.qmd` with command reference, API shortcuts, and CI checklist.
+- `BEST-PRACTICES.qmd` describing project structure, config hygiene, testing, and migration checklist.
+- `CHEATSHEET.qmd` with command reference, API shortcuts, and CI checklist.
 - Expanded `FAQ.qmd` with 8 new Q&A items covering testing, CI, and common errors.
 - `CHANGELOG.qmd` for versioned change tracking.
 - Updated `CONTRIBUTING.qmd` with detailed PR checklist and CI workflow.

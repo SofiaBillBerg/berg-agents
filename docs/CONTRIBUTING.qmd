@@ -19,13 +19,8 @@ source .venv/bin/activate
 uv pip install -e .
 ```
 
-## Architecture Principles (NEVER DRIFT)
+## Architecture Principles
 
-- `berg_agents/core/` is framework-free - no LangChain, no LangGraph, no web imports.
-  Adapters live in `backends/`.
-- All tasks route through `Harness`, never directly to agents.
-- No shims, wrappers, redirects, or backcompat layers.
-  Delete dead code; don't bridge it.
 - New agents implement `AbstractAgent`; new tools are `ToolSpec` values in the `ToolRegistry`.
 
 ## Code Style & Linting
