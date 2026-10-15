@@ -159,7 +159,16 @@ def create_app(
         response = await call_next(request)
         if not request.url.path.startswith("/api"):
             content_type = response.headers.get("content-type", "")
-            if "text/html" in content_type:
+            # HTML entry points revalidate every load (they reference
+            # hashed JS/CSS). Plugin UI bundles get the same treatment
+            # for a different reason: their URL never changes, but the
+            # plugin can rebuild the bundle at any time, so a cached
+            # copy silently hides plugin work (observed: stale
+            # subtask UI served after a rebuild). revalidate, not
+            # no-store - the etag still makes this cheap.
+            if "text/html" in content_type or request.url.path.startswith(
+                "/berg-plugins/"
+            ):
                 response.headers["Cache-Control"] = "no-cache"
         return response
 

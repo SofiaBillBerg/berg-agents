@@ -371,6 +371,12 @@ function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
           if (typeof part.type !== "string") return [];
           const isTool =
             part.type === "dynamic-tool" || part.type.startsWith("tool-");
+          // Non-restore: the client never owns the system prompt
+          // (the backend builds it), so replayed system parts from a
+          // restored session are what triggers its strip warning.
+          if (!preserveLatest && (m as { role?: unknown }).role === "system") {
+            return [];
+          }
           if (
             isTool &&
             part.state === "approval-responded" &&

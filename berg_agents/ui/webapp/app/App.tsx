@@ -324,6 +324,14 @@ function ChatContent() {
   const [showCatalog, setShowCatalog] = useState(false);
   /** Panel (narrow) vs canvas (wide) presentation. */
   const [pluginView, setPluginView] = useState<"panel" | "canvas">("panel");
+  /**
+   * Width (px) of the docked side surface. Draggable via the handle
+   * between the transcript and the surface — the fixed 340px clipped
+   * the MCP/skill descriptions so toggles were unreadable.
+   */
+  const [sideWidth, setSideWidth] = useState(340);
+  /** True while the divider is being dragged (drives the cursor). */
+  const [sideDragging, setSideDragging] = useState(false);
   /** Bump to force the open surface to refetch after agent calls. */
   const [pluginRefreshKey, setPluginRefreshKey] = useState(0);
   /** Headline count reported by the open surface (badge). */
@@ -371,13 +379,11 @@ function ChatContent() {
 
   const activeSurface = pluginSurfaces.find((s) => s.pluginId === sidePluginId);
   const activeDecl = activeSurface?.ui as
-    | { label?: unknown; width?: unknown; placement?: unknown }
-    | null
-    | undefined;
+    { label?: unknown; placement?: unknown } | null | undefined;
   const activeLabel =
     typeof activeDecl?.label === "string" ? activeDecl.label : "Plugin";
-  const activeWidth =
-    typeof activeDecl?.width === "number" ? activeDecl.width : 340;
+  // NOTE: `width` used to come from the manifest; the docked surface is
+  // now user-resizable (sideWidth), so the manifest value is ignored.
 
   // Completed tool calls anywhere in the transcript refresh the open
   // surface, so agent edits appear without manual reloads.
@@ -396,6 +402,43 @@ function ChatContent() {
       setPluginRefreshKey((k) => k + 1);
     }
   }, [pluginActivity]);
+
+  // -------------------------------------------------------------------------
+  // Side-surface resize: pointer-capture divider between the transcript
+  // and the docked surface. Width is clamped so the transcript always
+  // keeps a usable column, and reset when the surface closes.
+  // -------------------------------------------------------------------------
+  const sideDragStart = useRef<{ x: number; w: number } | null>(null);
+
+  const onSideDragMove = useCallback((e: PointerEvent) => {
+    const start = sideDragStart.current;
+    if (!start) return;
+    // Dragging left grows the surface (it sits to the right of the
+    // divider), so the delta is inverted.
+    const next = start.w - (e.clientX - start.x);
+    const max = Math.max(320, window.innerWidth - 420);
+    setSideWidth(Math.min(max, Math.max(280, next)));
+  }, []);
+
+  const onSideDragEnd = useCallback(() => {
+    sideDragStart.current = null;
+    setSideDragging(false);
+  }, []);
+
+  useEffect(() => {
+    if (!sideDragging) return;
+    window.addEventListener("pointermove", onSideDragMove);
+    window.addEventListener("pointerup", onSideDragEnd);
+    return () => {
+      window.removeEventListener("pointermove", onSideDragMove);
+      window.removeEventListener("pointerup", onSideDragEnd);
+    };
+  }, [sideDragging, onSideDragMove, onSideDragEnd]);
+
+  const startSideDrag = (e: React.PointerEvent) => {
+    sideDragStart.current = { x: e.clientX, w: sideWidth };
+    setSideDragging(true);
+  };
 
   /** Scroll the transcript (the page itself never scrolls). */
   const scrollChatTo = (where: "top" | "bottom") => {
@@ -1023,7 +1066,7 @@ function ChatContent() {
             wide canvas on toggle) or the host's plugin catalog. The
             transcript keeps its own flex column so heights match. */}
         {sidePluginId !== null || showCatalog ? (
-          <div className="mb-2 flex min-h-0 flex-1 gap-2">
+          <div className="mb-2 flex min-h-0 flex-1 gap-0">
             <div className="flex min-w-0 flex-1 flex-col">
               <ChatTranscript
                 hitlRequest={undefined}
@@ -1032,6 +1075,30 @@ function ChatContent() {
                 transcript={messages}
               />
             </div>
+            {/*
+              Drag divider. role=separator + keyboard support so it is
+              reachable without a mouse; aria-valuenow reports the width.
+            */}
+            <div
+              aria-orientation="vertical"
+              aria-valuemax={Math.max(320, 1200)}
+              aria-valuemin={280}
+              aria-valuenow={sideWidth}
+              className={`w-1 shrink-0 cursor-col-resize rounded bg-border transition-colors hover:bg-primary ${
+                sideDragging ? "bg-primary" : ""
+              }`}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft")
+                  setSideWidth((w) =>
+                    Math.min(Math.max(320, window.innerWidth - 420), w + 24),
+                  );
+                if (e.key === "ArrowRight")
+                  setSideWidth((w) => Math.max(280, w - 24));
+              }}
+              onPointerDown={startSideDrag}
+              role="separator"
+              tabIndex={0}
+            />
             {sidePluginId && activeSurface ? (
               <PluginUISurface
                 className={pluginView === "canvas" ? "flex-1" : "shrink-0"}
@@ -1043,14 +1110,17 @@ function ChatContent() {
                 }
                 pluginId={sidePluginId}
                 refreshKey={pluginRefreshKey}
-                style={{ width: activeWidth }}
+                style={
+                  pluginView === "canvas" ? undefined : { width: sideWidth }
+                }
                 ui={activeSurface.ui}
                 view={pluginView}
               />
             ) : (
               <PluginCatalog
-                className="w-[340px] shrink-0"
+                className="shrink-0"
                 onClose={() => setShowCatalog(false)}
+                style={{ width: sideWidth }}
               />
             )}
           </div>

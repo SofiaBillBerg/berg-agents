@@ -1,9 +1,9 @@
 "use client";
 
-import {useCallback, useEffect, useState} from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import {Button, Card, Chip} from "@heroui/react";
-import {API_BASE} from "@/envConfig";
+import { Button, Card, Chip } from "@heroui/react";
+import { API_BASE } from "@/envConfig";
 
 export interface PluginCapabilityInfo {
   type: string;
@@ -29,6 +29,8 @@ export interface PluginCatalogProps {
   onClose?: () => void;
   /** Extra layout classes from the parent (width). */
   className?: string;
+  /** Inline style from the host (e.g. draggable width). */
+  style?: React.CSSProperties;
 }
 
 /**
@@ -56,7 +58,10 @@ const SECTION_TITLE: Record<string, string> = {
  * entry, MCP servers their transport plus the approval flag — the same
  * data the model side uses, now visible to the user.
  */
-export function PluginCatalog({onClose, className}: PluginCatalogProps) {
+export function PluginCatalog({
+  onClose,
+  className,
+  style}: PluginCatalogProps) {
   const [plugins, setPlugins] = useState<PluginInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,7 +93,7 @@ export function PluginCatalog({onClose, className}: PluginCatalogProps) {
     try {
       const resp = await fetch(
         `${API_BASE}/api/plugins/${encodeURIComponent(plugin.id)}/${enabled ? "disable" : "enable"}`,
-        {method: "POST"},
+        { method: "POST" },
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       await fetchPlugins();
@@ -108,6 +113,7 @@ export function PluginCatalog({onClose, className}: PluginCatalogProps) {
   return (
     <Card
       className={`mb-2 flex min-h-0 flex-col ${className ?? ""}`}
+      style={style}
       variant="default"
     >
       <Card.Header>
