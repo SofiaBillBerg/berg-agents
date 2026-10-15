@@ -297,6 +297,7 @@ def create_router(
         # transcript is saved on completion. All failure-isolated:
         # sessions must never break chat.
         session_id: str | None = None
+        conversation: Any = None
         try:
             from berg_agents.ui import session_store
 
@@ -317,9 +318,14 @@ def create_router(
                 model=model_id or sessions.active_model,
             )
             session_store.set_active_session(root_dir, session_id)
+            # Carry the stored Conversation so usage (and the
+            # conversation_id) survive across turns. Without it every
+            # turn's UsageLimits budget restarts from zero.
+            conversation = session_store.load_conversation(session_id)
         except Exception as exc:
             logger.warning("Session tracking skipped: %s", exc)
             session_id = None
+            conversation = None
         # NOTE: Plugin state is per-turn and failure-isolated: a broken
         # plugin dir only logs, chat still gets its agent. Disabled
         # plugins are withheld from tools, MCP toolsets, and skills.
@@ -357,17 +363,31 @@ def create_router(
             logger.info("chat run cancelled: %s", run_cancelled)
 
         async def _save_turn(result: Any) -> None:
-            # on_complete receives the AgentRunResult: persist the
-            # authoritative transcript so any browser can resume it.
+            # on_complete receives the AgentRunResult: persist both the
+            # display transcript (any browser can resume it) and the
+            # Conversation (usage + id carry into the next turn).
             if not session_id:
                 return
             try:
+                from pydantic_ai import ConversationTypeAdapter
+
                 from berg_agents.ui import session_store
 
-                store = session_store.get_store(sessions._harness_root_dir())
+                root = sessions._harness_root_dir()
+                store = session_store.get_store(root)
                 await session_store.record_turn(
                     store, session_id, result.all_messages()
                 )
+                conversation_obj = getattr(result, "conversation", None)
+                if conversation_obj is not None:
+                    payload = ConversationTypeAdapter.dump_json(
+                        conversation_obj
+                    )
+                    await asyncio.to_thread(
+                        session_store.save_conversation,
+                        session_id,
+                        payload.decode("utf-8"),
+                    )
             except Exception as exc:
                 logger.warning("Session save skipped: %s", exc)
 
@@ -386,7 +406,14 @@ def create_router(
                         agent=agent,
                         sdk_version=6,
                         output_type=[str, DeferredToolRequests],
-                        conversation_id=session_id,
+                        # Decomposed from the stored Conversation: the
+                        # UI adapter takes history/id/usage separately
+                        # rather than the Conversation object itself.
+                        conversation_id=(
+                            session_id
+                            or getattr(conversation, "conversation_id", None)
+                        ),
+                        usage=getattr(conversation, "usage", None),
                         on_complete=_save_turn,
                         on_cancel=_log_run_cancelled,
                     )

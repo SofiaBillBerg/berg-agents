@@ -70,6 +70,9 @@ def build_chat_agent(
     )
     from berg_agents.config.settings import get_settings
     from berg_agents.providers.models import resolve_model_instance
+    from berg_agents.plugin_system.context_capabilities import (
+        build_context_capabilities,
+    )
     from pydantic_ai import Agent
     from pydantic_ai.capabilities import WebFetch, WebSearch
     from pydantic_ai_harness import Planning
@@ -122,6 +125,14 @@ def build_chat_agent(
             # work shows its todos/plan in the transcript instead of
             # happening invisibly. Eager — planning is core behavior.
             Planning(),
+            # Context, memory, and recall: tiered compaction (keeps the
+            # history inside the context window), a persistent Markdown
+            # notebook, and step persistence + conversation search so
+            # the model can recall what compaction or an earlier run
+            # dropped. Compaction is registered before Memory because
+            # compaction rewrites history persistently while Memory's
+            # injected block is request-only.
+            *build_context_capabilities(root_dir),
             # Repo skills (SKILL.md manuals) as deferred capabilities:
             # one-line catalog entries until the model loads one.
             # Point BERG_AGENT_SKILLS at e.g. ".agents/skills".

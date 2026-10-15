@@ -13,7 +13,8 @@ message as subtitle, and renames are explicit user titles.
 
 from __future__ import annotations
 
-from datetime import datetime
+from contextlib import contextmanager
+from datetime import UTC, datetime
 import logging
 from pathlib import Path
 import re
@@ -85,6 +86,89 @@ def set_active_session(root_dir: str | Path, session_id: str) -> None:
 def available() -> bool:
     """Whether the harness conversation store imports cleanly."""
     return SqliteConversationStore is not None
+
+
+# ---------------------------------------------------------------------------
+# Conversation persistence (pydantic side, converted at the edge)
+#
+# The harness store above carries the *messages*, which is enough to
+# display and search a session but not to continue one: a Conversation
+# also carries the running usage and the conversation_id. Continuing
+# from messages alone makes every turn's UsageLimits budget start over
+# from zero, so the authoritative record is kept here as JSON and fed
+# back through dispatch_request(usage=..., conversation_id=...).
+# ---------------------------------------------------------------------------
+
+@contextmanager
+def _conversation_connection(root_dir: str | Path) -> Any:
+    """Short-lived SQLite connection for conversation JSON (WAL enabled).
+
+    Deliberately NOT cached: these run under ``asyncio.to_thread``,
+    whose pool picks an arbitrary worker per call, and a sqlite3
+    connection defaults to ``check_same_thread=True``. A cached
+    connection therefore failed with "SQLite objects created in a
+    thread can only be used in that same thread" on whichever call
+    landed on a different worker than the one that created it.
+    Opening per operation matches how the harness's own conversation
+    store works and removes the thread affinity entirely.
+
+    :param root_dir: Project root selecting the database.
+    :return: Context manager yielding an open connection.
+    """
+    import sqlite3
+
+    database = _config_dir(root_dir) / "conversations.db"
+    database.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(database, timeout=10)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS conversations ("
+            "id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at TEXT NOT NULL)"
+        )
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def save_conversation(session_id: str, conversation_json: str) -> None:
+    """Store a session's Conversation JSON (upsert, best-effort).
+
+    :param session_id: Session identifier.
+    :param conversation_json: Output of ConversationTypeAdapter.dump_json.
+    """
+    try:
+        with _conversation_connection(session_id) as conn:
+            conn.execute(
+                "INSERT INTO conversations (id, json, updated_at) "
+                "VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
+                "json=excluded.json, updated_at=excluded.updated_at",
+                (session_id, conversation_json, datetime.now(UTC).isoformat()),
+            )
+    except Exception as exc:
+        logger.warning("Conversation save skipped: %s", exc)
+
+
+def load_conversation(session_id: str) -> Any:
+    """Load a session's Conversation, or None when absent/unreadable.
+
+    :param session_id: Session identifier.
+    :return: A ``Conversation`` instance, or None.
+    """
+    try:
+        from pydantic_ai import ConversationTypeAdapter
+
+        with _conversation_connection(session_id) as conn:
+            row = conn.execute(
+                "SELECT json FROM conversations WHERE id=?", (session_id,)
+            ).fetchone()
+        if not row:
+            return None
+        return ConversationTypeAdapter.validate_json(row[0])
+    except Exception as exc:
+        logger.debug("Conversation load skipped: %s", exc)
+        return None
 
 
 def get_store(root_dir: str | Path) -> Any:
