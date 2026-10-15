@@ -6,7 +6,7 @@
  * Next.js module can — the value would be frozen when the plugin was
  * built and `process` does not even exist once bundled.
  *
- * Instead the host publishes its own resolved API base on
+ * Instead, the host publishes its own resolved API base on
  * `window.BergRuntime.apiBase` (see the host's app/runtime), and this
  * module reads it. That means the plugin always talks to the same
  * backend the host itself is talking to, including when the host is

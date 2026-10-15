@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import {
   Button,
   Card,
-  Checkbox,
   Chip,
   Fieldset,
   FieldsetLegend} from "@heroui/react";
@@ -65,13 +64,10 @@ async function callTool(
   tool: string,
   args: Record<string, unknown> = {},
 ): Promise<string> {
-  const resp = await apiFetch(
-    `/api/plugins/${PLUGIN_ID}/tools/${tool}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(args)},
-  );
+  const resp = await apiFetch(`/api/plugins/${PLUGIN_ID}/tools/${tool}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(args)});
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) {
     throw new Error(
@@ -190,7 +186,7 @@ export function TodoSurface({
     if (todo.status === status || busyId) return;
     setBusyId(todo.id);
     try {
-      await callTool("update_todo", {todo_id: todo.id, status});
+      await callTool("update_todo", { todo_id: todo.id, status });
       await fetchTodos();
     } catch (e) {
       setError(String(e));
@@ -203,7 +199,7 @@ export function TodoSurface({
     if (busyId) return;
     setBusyId(todo.id);
     try {
-      await callTool("delete_todo", {todo_id: todo.id});
+      await callTool("delete_todo", { todo_id: todo.id });
       await fetchTodos();
     } catch (e) {
       setError(String(e));
@@ -277,7 +273,7 @@ export function TodoSurface({
     if (!text || busyId) return;
     setBusyId(`${todo.id}:add`);
     try {
-      await callTool("add_subtask", {todo_id: todo.id, text});
+      await callTool("add_subtask", { todo_id: todo.id, text });
       setSubDrafts((prev) => ({ ...prev, [todo.id]: "" }));
       await fetchTodos();
     } catch (e) {
@@ -291,7 +287,7 @@ export function TodoSurface({
     if (busyId) return;
     setBusyId(`${todo.id}:sub${index}`);
     try {
-      await callTool("delete_subtask", {todo_id: todo.id, index});
+      await callTool("delete_subtask", { todo_id: todo.id, index });
       await fetchTodos();
     } catch (e) {
       setError(String(e));
@@ -458,35 +454,44 @@ export function TodoSurface({
                   </p>
                 )}
                 {/*
-                  NOTE: one Checkbox per subtask, each driving its own
-                  item. The earlier CheckboxGroup diff silently dropped
-                  un-check clicks (the user could not undo a subtask the
-                  model had marked done), so the group is gone: direct
-                  control, both directions, no set arithmetic.
+                  NOTE: plain buttons, not HeroUI Checkbox/CheckboxGroup.
+                  HeroUI v3's Checkbox wraps React Aria's CheckboxField -
+                  a standalone field - which cannot participate in
+                  CheckboxGroup state and renders permanently disabled
+                  with no onChange. Verified in the browser: the fibre
+                  shows no isSelected/onChange ever reaching React Aria.
+                  A button with aria-pressed is accessible, toggles in
+                  BOTH directions, and looks identical.
                 */}
                 {(todo.subtasks ?? []).map((sub) => {
                   const rowBusy = busyId === `${todo.id}:sub${sub.index}`;
                   return (
-                    <div key={sub.index} className="flex flex-col gap-1 py-0.5">
+                    <div
+                      key={sub.index}
+                      className="flex flex-col gap-1 py-0.5"
+                    >
                       <div className="flex items-center gap-1.5">
-                        <Checkbox
+                        <button
                           aria-label={`Subtask ${sub.text}`}
-                          isDisabled={rowBusy}
-                          isSelected={sub.done}
-                          onChange={(isSelected) =>
-                            void setSubtask(
-                              todo,
-                              sub.index,
-                              Boolean(isSelected),
-                            )
+                          aria-pressed={sub.done}
+                          className={`flex flex-1 items-center gap-1.5 rounded-md px-1 py-0.5 text-left ${
+                            rowBusy
+                              ? "cursor-not-allowed opacity-60"
+                              : "cursor-pointer hover:bg-surface-soft"
+                          }`}
+                          disabled={rowBusy}
+                          onClick={() =>
+                            void setSubtask(todo, sub.index, !sub.done)
                           }
+                          type="button"
                         >
+                          <span aria-hidden>{sub.done ? "☑" : "☐"}</span>
                           <span
                             className={`flex-1 text-xs whitespace-pre-wrap ${sub.done ? "line-through text-muted-foreground" : ""}`}
                           >
                             {sub.text}
                           </span>
-                        </Checkbox>
+                        </button>
                         <Button
                           aria-label={
                             renamingSub === `${todo.id}:${sub.index}`
@@ -521,7 +526,9 @@ export function TodoSurface({
                           <input
                             aria-label="Subtask text"
                             className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs"
-                            onChange={(e) => setSubRenameText(e.target.value)}
+                            onChange={(e) =>
+                              setSubRenameText(e.target.value)
+                            }
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 void renameSubtask(todo, sub.index);
@@ -534,7 +541,9 @@ export function TodoSurface({
                             aria-label="Save subtask text"
                             size="sm"
                             variant="primary"
-                            onPress={() => void renameSubtask(todo, sub.index)}
+                            onPress={() =>
+                              void renameSubtask(todo, sub.index)
+                            }
                           >
                             Save
                           </Button>
