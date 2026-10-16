@@ -6,45 +6,356 @@ format: html
 
 # FAQ & Troubleshooting
 
-## How does the agent remember conversations?
+## Memory and context
 
+### Does the agent remember conversations?
 
-## Can I use a cloud LLM instead of Ollama?
+**Conversations**, as in tasks during a chat, are persisted in
+`{config}/chat_sessions.db` (one entry per session, full
+`Conversation` JSON).
+Restoring re-loads it, and the `active_session`
+pointer keeps tabs converging rather than minting duplicates.
+Older
+conversation turns that leave the visible window can still be recalled
+via `ConversationSearch` (powered by `StepPersistence`).
 
-Yes - add any OpenAI-compatible endpoint under `providers` in `../.berg-agents`:
+**Memory** is separate and explicit: the model writes to `MEMORY.md`
+and topic files (`{config}/memory`) through its memory tools.
+A bounded
+snapshot of `MEMORY.md` is injected on **every** request, so a fact
+saved in one turn is visible in the next; a topic file is only loaded
+on demand.
+Compaction does not wipe what is filed in memory --- only the
+conversation window.
 
-```jsonc
-"providers": {
-  "openai": {
-    "options": { "baseURL": "https://api.openai.com/v1", "apiKey": "${env:OPENAI_API_KEY}" },
-    "models": { "gpt-4o": {} }
-  }
-}
+### Why did the agent call `read_memory` to fetch something I see on screen?
+
+Earlier guidance said \"read a listed file with read_memory\" and didn't
+state that `MEMORY.md` is already in context.
+That has now been fixed
+(`guidance` override in
+`berg_agents/plugin_system/context_capabilities.py`): `MEMORY.md`
+content is present and refreshed right after a write.
+If your older
+snapshot still uses the stale guidance, rebuild / restart the app.
+
+### My memory path is wrong (nested `.berg-agents/berg-agents`)
+
+This was caused by `Memory(namespace=<config>.name, agent_name=\"berg-agents\")`
+composing `scope/filename` twice.
+That has been replaced with
+`namespace=\"\"`, `agent_name=\"memory\"`, and FileStore rooted at the
+config directory, so the notebook lands at
+`{config}/memory/MEMORY.md`.
+If the old nesting left a file in your
+workspace, move its contents yourself --- the app deliberately does not
+delete it.
+
+### Is compaction going to delete the injected memory block?
+
+No.
+The block is request-only (added at load time), while compaction
+edits history persistently.
+Compaction is registered **before** `Memory`
+in the capability list specifically so the order is correct.
+Do not
+reorder those entries.
+
+### What is the compaction threshold and how do I change it?
+
+Default triggers (any, OR): 80% of window, 80k tokens, 100 messages.
+Retention after compaction keeps 20 messages.
+Match `BERG_AGENT_SUMMARIZATION_TRIGGER`
+and `BERG_AGENT_SUMMARIZATION_KEEP` against
+`CONFIGURATION.qmd` examples.
+
+## Models, providers and errors
+
+### Can I use a cloud model instead of Ollama?
+
+Yes.
+Any entry in `providers` with a valid `options.baseURL` and
+`apiKey` (including `${env:VAR}`) works.
+The provider is **derived from
+the requested model id**, not from a global flag.
+
+### The model says a 401 or empty-token error
+
+If `UNSLOTH_STUDIO_AUTH_TOKEN` was referenced but unset, earlier builds
+sent an empty bearer string.
+The config now uses `UNSLOTH_API_KEY`
+with missing-env degradation (unset → default, never empty bearer).
+Inspect by adding `UNSLOTH_API_KEY` to `.env` or dropping the key
+entirely.
+
+### The model refuses my system messages ("must be at beginning")
+
+Earlier Unsloth/Ollama templates threw when a system message appeared
+mid-request history.
+The agent's system message now comes from
+`{config}/profiles.yaml` and the `MEMORY.md` snapshot is not a system
+role message --- it is a user-role block just ahead of each request.
+If
+you still see it, check `{config}/mcp.json` or custom wiring that may
+inject an assistant/system role.
+
+### How do I model-route by task complexity?
+
+`model_routing.models` holds one list per level (`trivial`, `standard`,
+`complex`, `critical`) with `max_tokens` budgets.
+The harness picks
+from the best available model given `handle_complexity` and the model's
+registered provider.
+Use `defaultModel` to select the startup model.
+
+### Where does the context gauge (Tokens In/Out) come from?
+
+`ReportContextUsage` emits `ContextUsageEvent` (`used`, `window`,
+`fraction`) **after** compaction, so the gauge reflects the real
+post-rewrite history.
+
+## Configuration, paths and data
+
+### Which config directory is actually used?
+
+The single resolver `berg_agents/config/paths.py::resolve_config_dir`:
+
+1. `BERG_AGENTS_CONFIG_DIR` (explicit, always wins)
+2. Existing `{project-root}/.berg-config`
+3. Existing `{project-root}/.berg-agents`
+4. `~/.berg-agents`
+
+Inspect by checking which directory contains both `bergagents.jsonc` and
+`chat_sessions.db` for the project you are working from.
+
+### What file formats are configuration files?
+
+- Settings: `bergagents.jsonc` (default), `.json`, `.yml`, `.yaml`
+- MCP: JSON (`.json`)
+- Profiles: YAML (`profiles.yaml`)
+- Plugins: YAML/YML under plugin package or `{config}/plugins/{id}.yaml`
+
+JSONC allows trailing commas and comments, resolves `${env:..}`, and
+replaces an unset placeholder with nothing (then default applies).
+
+### I need the config outside my checkout (portable install)
+
+```bash
+export BERG_AGENTS_CONFIG_DIR=$HOME/.berg-agents
+python -m berg_agents --web
 ```
 
-The provider is derived **from the model id** - there is no global provider flag.
-Switch at runtime via the web model selector.
-See [Configuration](CONFIGURATION.qmd).
+### Shared-ToDo data access and safety
 
-## What happens if the LLM server is not running?
+- The user-data folder `sharedtodos/` (device-level, at project root)
+  is there by design.
+  It is never deleted, rewritten, or re-indexed by
+  install scripts.
+  Manual removal and add tasks at the Markdown level are
+  allowed; saving a model's rewrite without explicit intent is wrong.
+- Legacy memory files from the nested-path bug are also left untouched.
 
+### The TUI or web UI says nothing when a command doesn't exist
 
-## Is it safe to let the agent edit my files?
+Unknown commands emit a warning and return control to the prompt;
+they never crash the session.
+The list is shared across both surfaces
+and lives in the slash-command definitions.
 
+## Build and deploy
 
-## How do I add a new tool or subagent?
+### Web UI not rendering assets
 
-## The TUI shows `(no text response)` - what does that mean?
+Run `cd berg_agents/ui/webapp && npm install && npm run build`.
+The
+FastAPI server looks for the **static export output** produced by the
+build in its installed asset path.
+Dev mode (`npm run dev`) served via
+the cross-origin loop instead needs `NEXT_PUBLIC_API_BASE_URL`.
 
-## How do I configure MCP servers?
+### Plugin button not appearing
 
-Point `BERG_AGENT_MCP_SERVERS` at a JSON file (default `../.berg-agents/mcp.json`) and reference secrets with `${env:VAR}`.
-See [Configuration](CONFIGURATION.qmd).
+1. Check `GET /api/plugins` --- plugin & `ui` block present and
+   `entry_built: true`.
+2. Bundle exists at the bundle path named by the manifest.
+3. There is no `registry.tsx` line required --- the loader is runtime
+   driven (known gap: the list itself still needs an entry).
+4. After rebuilding, do a full reload --- but note `/berg-plugins/*` is
+   served with `no-cache`, so rebuilds surface naturally.
 
-## What Python version do I need?
+### Web plugin clipboard/copy button not working
 
-Python 3.12+.
-Dependencies via `uv` (`uv pip install -e .`).
+Port the sandbox's constraints: the embedded render/runtime cannot access
+the network.
+Functions requiring network calls inside web render are
+not supported.
 
+### Next.js hydration errors / 404s on `_next`
 
-## How does model routing work?
+Run the full production build (`npm run build`), then the gated
+`npm run tsc` separately.
+Production deploy serves both the API and
+static assets from one origin --- expect no `/api/*` 404s after
+`BERG_AGENT` mode.
+
+### The frontend dev server upstream badge is \"offline\"
+
+Ensure both ports (backend + dev, 3000--3001) and CORS defaults match;
+backend blocks mismatched ports within the 3000/3001 range by design.
+
+## Safety, approvals and sandboxing
+
+### Why do high-risk tools pause for approval?
+
+`risk_class=high` tools (`bash`, `edit_file`, `patch_file`, `write_file`,
+`implement_task`) surface a HITL consult --- TUI (`A]`) vs web
+(Approve/Reject/Edit).
+Low-risk (`list_files`, `read_file`, `search_code`,
+`plan_task`) run immediately.
+
+Read-only deployments register mutating tools **out-of-band** and deny
+the whole mutation set when `read_only=True` or `allow_shell=False` ---
+stronger than asking the model not to run them.
+
+### Are path escapes possible from `read_file`?
+
+No --- normalize happens in `_io.py`; `..`/`~`/outside-root are rejected.
+Same enforcement every subprocess tool (`bash`, workspace JP entirely).
+
+### Is `bash` sandboxed in any way?
+
+The working directory is set to the workspace root, and timeout bounded
+(30s default).
+There is no container separation in this OSS build ---
+grant shell only to trusted models/users, or run with `allow_shell=False`.
+
+### Do risky secrets ever enter git?
+
+Never: keys come from environment variables / `.env` / config
+placeholders and the grace of gitignore.
+`api_key` defaults to \"\".
+
+## Sessions and continuity
+
+### How do sessions stay synced across tabs?
+
+The server owns `active_session` (per project); new windows adopt it.
+Each page reloads storage events after tools.
+`Cache-Control: no-cache`
+on HTML stops old page shells from latching on.
+Storage mutation clears
+only per-tab keys.
+
+### A session restore failed after an interrupted run
+
+`chat_sessions` (SQLite, `{config}/`) stores rollbacks; a transaction
+failure mid-write can leave orphaned IDs; re-running the turn or
+opening a new session is safe - stale approval ids in restored
+conversations are quarantined.
+If schema errors persist (different
+version) see the troubleshooting for roles.
+
+### Duplicate `message` keys in a restored conversation
+
+Fixed by the role-namespaced `_unique_ui_message_id` for Model + User
+parts.
+If keys still duplicate, strip approval ids from dead approval
+runs --- `restoreMessages` now auto-suffixes residual collisions.
+
+### Poisoned saved state after a quota-overflow
+
+The serializer is bounded (2k per part, 700k total) and stores settled
+turns only.
+Restoring now drops approval ids from prior runs, marks
+expired approvals, and self-heals.
+Open a fresh incognito tab if you
+suspect stale UI state.
+
+### Failed sends rejecting orphaned approvals
+
+Auto-rejected; shows dismissible Alert with a retry-friendly reason;
+clears on the next normal send success.
+
+## Plugin lifecycle
+
+### Plugins always show in `GET /api/plugins` with some tools, but chat
+
+state isn't always instant
+
+Plugin `enabled` is live plugin state; toggles apply on the *next* chat
+turn.
+If you turned a plugin off and it's still visible to the agent,
+the conversation was started against the old flag or context has not
+renewed itself; scroll to the latest turn or start a new session.
+
+### Sensitive MCP servers in the UI show as locked
+
+A sensitive server (e.g. `github`, `memory`) requires approval each
+run and displays a 🔒 badge.
+`disable` via config or UI permanently
+disables it.
+Read-only (`context7`, `docs`, `reference`) runs without
+pulses and cannot be denied mid-run even when toggled off.
+
+### Toggling key MCPs seem to `disable` twice but not reflect in pills?
+
+Config `enabled` is only the startup default; runtime state is the
+authoritative source for the UI pills.
+In-context pills must read from
+runtime (`/api/plugins`), else a delete/reload bug is in play.
+
+## Development and test notes
+
+### Debugging config/data without running the server
+
+1. `python -m berg_agents` runs a desktop app; for REST-only verified tests,
+   expose only `list_web_plugins` or `list_chat_plugins` to skip servers.
+2. `GET /api/plugins` (FastAPI allows local calls without auth).
+3. `GET /api/sessions/current` lets you inspect pointers without opening
+   `/history`.
+4. `GET /api/context` lists runtime + config sources resolved.
+
+### Tests need the provider/mcp processes alive
+
+Tests in this repo must not launch MCP stdio servers or call real
+providers - tests are mocked; huge model requests route via `allow_mock`.
+Use
+offline mocks and pre-seeded JSON.
+Never set `ALLOW_MODEL_REQUESTS=True`
+in `conftest.py` (project policy).
+
+### SQLite thread/coroutines
+
+Open per-operation connections inside `asyncio.to_thread`; cached
+connections fail on thread switching with class-of-X SQLite errors.
+The
+conversation DB already does this.
+Follow that exact pattern in all new stores.
+
+### CRLF/on-disk end-of-line safety
+
+File tools preserve line endings (LF/CRLF), with edit fallbacks for
+whitespace/quote/dash variants.
+Do not hand-edit files with mixed
+endings.
+
+## Quarto and documentation
+
+### Why does Quarto render warn about re-render?
+
+Docs are Quarto-owned; each `.qmd` ships as a module.
+`docs/README.md` is
+a generated artifact sourced from `README.qmd` --- never edit it by hand.
+Keep filenames and case consistent with `quarto.yml` links.
+
+### The Unsloth auth key in my older environment is named differently
+
+`UNSLOTH_API_KEY` is the supported one
+(`UNSLOTH_STUDIO_AUTH_TOKEN` was retired).
+Retire config entries with it.
+
+--------------------------------------------------------------------------------
+
+Still an issue?
+Check the live logs first (backend prints full errors),
+then file a bug report with the key entries above plus reproducible steps.

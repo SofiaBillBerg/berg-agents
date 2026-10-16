@@ -1,0 +1,143 @@
+---
+title: "Shared-ToDo Pilot Plugin"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+# Shared-ToDo Pilot Plugin
+
+`shared-todo` (`berg-plugin-shared-todo`) is the real, end-to-end pilot
+plugin: it installs and runs without touching `berg-agents` source.
+It
+exists to validate discovery, config, tools, generic tool dispatch, UI
+mounting, and cross-tab synchronization before any other plugin follows
+the pattern.
+If a plugin works end to end as `shared-todo` does, it is
+conformant.
+
+## Identity
+
+  | Key           | Value                                          |
+  | ------------- | ---------------------------------------------- |
+  | Package Path  | `berg_plugins/shared-todo/`                    |
+  | Plugin ID     | `berg-plugin-shared-todo`                      |
+  | Manifest      | `berg_plugins/shared-todo/plugin.yaml`         |
+  | Entry         | `shared_todo.shared_todo:SharedToDoPlugin`     |
+  | Python dist   | `pyproject.toml` -> `berg-plugins` entry point |
+  | Frontend dist | `ui/dist/todo-surface.js` (built, not source)  |
+
+## Manifest `ui:` block
+
+Shared-ToDo was the first plugin to own its own UI.
+See
+`docs/plugins/PLUGIN-UI.qmd` for the full contract.
+Its manifest
+declares:
+
+```yaml
+ui:
+  entry:  \"ui/dist/todo-surface.js\"
+  export: \"TodoSurface\"
+  placement: \"side-panel\"
+  label: \"📋 Todos\"
+  width: 340
+```
+
+## Tools (10)
+
+Tools are ordinary Python functions exposed to the model as agent-facing
+tools, plus a `list_todo_items` helper registered as a UI capability.
+All communication between the plugin UI and the backend now goes only
+through the generic dispatch path.
+
+### Todos
+
+- `create_todo(title, description?, subtasks?)`
+- `list_todos()` --- model-ready Markdown summary
+- `list_todo_items()` --- structured snapshot used by the UI
+- `update_todo(id, title, description?, status?)`
+- `complete_todo(id)`
+- `delete_todo(id)`
+
+### Subtasks
+
+Subtasks are stored inside each todo's Markdown as a `## Subtasks`
+checklist (`- [ ]` / `- [x]`) so hand edits stay safe.
+
+- `add_subtask(todo_id, text)`
+- `set_subtask_done(todo_id, subtask_index, done)`
+- `rename_subtask(todo_id, subtask_index, text)`
+- `delete_subtask(todo_id, subtask_index)`
+
+`update_todo` preserves existing subtasks and any notes across rewrites;
+the separate toggle tools do not.
+
+## Generic dispatch
+
+The host exposes one call shape:
+
+`POST /api/plugins/{plugin_id}/tools/{tool}` --- backend:
+
+1. validates plugin exists and is enabled,
+2. resolves the actual tool (by plug-in tool name *or* function
+   `__name__`, so non-model-facing helpers remain callable),
+3. runs it with the project as the working directory,
+4. returns non-string results as JSON.
+
+The shared-todo UI uses only `apiFetch` against that endpoint.
+Nothing
+todo-specific remains in `berg_agents/ui/routes.py` or `schemas.py`.
+
+## Config
+
+Shared-ToDo config is read from `.berg-agents/.shared_todo/config.yaml`
+(single config resolver --- see `CONFIGURATION.qmd`).
+The plugin also
+records a separate `sharedtodos/` user-data directory (three existing
+Markdown todos in this repo).
+Those files and their contents are user
+data; never delete or overwrite them as part of an installation/update.
+
+If your config is empty/invalid, the plugin degrades to its schema
+defaults; discovery and capability registration still succeed.
+
+## Capabilities registration
+
+Plugin tools are registered as `ToolCapability` entries and discovered by
+`PluginManager` inside each chat turn, plus `list_chat_plugins` for the
+UI/status badges.
+Turning the plugin OFF (through the Plugins panel)
+removes its tools from the next turn.
+New todo items created or updated
+by the plugin surface are visible to the agent on the next turn without
+a restart; the sidebar surface refreshes on `refreshKey` bumps.
+
+## UI notes
+
+- UI runs as a built bundle; the host mounts it with one React instance.
+- Side panel defaults to `width: 340`, but a drag divider lets the user
+  resize it (280px -- viewport minus 420px).
+  Manifest `width` is now a
+  historical hint, not a hard lock.
+- Subtask toggles must be plain accessible buttons in this HeroUI
+  version --- `Checkbox`/`CheckboxField` does not move inside a
+  `CheckboxGroup`; the pilot verified toggling both directions.
+- Cache `no-cache` applies to ` /berg-plugins/*`, so rebuilds appear on
+  the next navigation without a hard reload.
+
+## Install / change / verify
+
+1. `cd berg_plugins/shared-todo && bun run build:ui`
+2. Confirm output lands at `ui/dist/todo-surface.js` (git-ignored?
+   **Not** ignored --- the built file is tracked as the shippable artifact).
+3. Start / restart the server.
+4. `GET /api/plugins` --- expect `berg-plugin-shared-todo`, 10 tools,
+   `ui.entry_built: true`.
+5. In the web UI, click **📋 Todos** --- side panel renders; toggle
+   survives both directions.
+
+Quick backend verification (non-interactive, cheap):
+
+```sh
+python -m berg_agents.plugin_system.chat_integration list  # prints plugins + capabilities
+```

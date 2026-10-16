@@ -1,76 +1,64 @@
 ---
 title: "Tutorial - Multi-step Harness Workflow"
-author: "Your Name"
+author: "Sofia Billger Bergström"
 format: html
 ---
 
 # Tutorial - Multi-step Harness Workflow
 
-> An end‑to‑end example that walks through the four core sub‑agents (Guardian → Planner → Implementation → Curator) and shows how to drive them from the CLI or the Python API.
+An end-to-end example that runs one task through the harness (Guardian → Planner → Implementation → Curator) from the TUI and from Python. There are no per-stage CLI flags — staging happens through the `plan_task` / `implement_task` tools and the `task_type` argument.
 
-## 1️⃣ Scenario
+## 1. Scenario
 
-We want to **refactor the authentication module** so that it:
+Refactor the authentication module: add rate limiting to the login endpoint, cover it, and update the docs.
 
-1. Adds rate‑limiting to the API endpoint.  
-2. Writes unit tests for the new logic.  
-3. Updates documentation with usage examples.
-
-## 2️⃣ Create a task description
+## 2. Run it from the TUI
 
 ```bash
-TASK="Refactor auth module to add rate limiting and tests"
+python -m berg_agents --tui
 ```
 
-## 3️⃣ Run the workflow from the CLI
-
-```bash
-python -m berg_agents \
-    --task "$TASK" \
-    --plan "Identify rate‑limit strategy" \
-    --implement "Add decorator to /login endpoint" \
-    --curate "Write unit tests + update docs"
+```
+harness> /harness Refactor auth module to add rate limiting and tests
 ```
 
-### What the flags do
+Bare text works too (it runs as a `generic` task). `/agents` lists the registered subagents; `/stats` shows learning metrics afterwards.
 
-| Flag          | Meaning |
-|---------------|---------|
-| `--plan`      | Sends a planning prompt to the **Planner** sub‑agent. |
-| `--implement` | Sends an implementation prompt to the **Implementation** sub‑agent. |
-| `--curate`    | Sends a curation prompt to the **Curator** sub‑agent. |
-| `--task`      | The overall description that the **Guardian** uses to assess risk/complexity. |
+## 3. Stage it explicitly with plan / implement
 
-You can omit any flag; the harness will simply skip that step.
+For multi-step work, ask for a plan first, review it, then approve implementation:
 
-## 4️⃣ Run the same workflow from Python
+```
+harness> plan the rate-limit refactor as numbered steps, don't implement yet
+# read the plan, then:
+harness> implement the approved plan
+```
+
+Under the hood these are the `plan_task` (low-risk, runs unattended) and `implement_task` (high-risk, pauses for HITL approval) workspace tools. `implement_task` only runs against a plan you have seen — approve it in the HITL prompt (TUI) or the Approve / Reject / Edit surface (web).
+
+## 4. Run the same workflow from Python
 
 ```python
 from berg_agents.app import BergAgentsApp
 
 app = BergAgentsApp.create()
-
 result = app.execute(
     "Refactor auth module to add rate limiting and tests",
-    task_type="standard"
+    task_type="standard",
 )
 print(result)
 ```
 
-The returned dictionary contains a `selected_agent`, the model used, and any HITL decision if a pause occurred.
+The returned dict contains the selected agent, the model used, and any HITL decision if a pause occurred. `app.get_learning_stats()` returns success rates and model-tier stats.
 
-## 5️⃣ Inspect the result
+## 5. Inspect the result
 
-* **CLI** – after the command finishes, you can type `/stats` to see learning metrics.  
-* **Web UI** – open `http://127.0.0.1:8001` and look at the **Task History** panel.  
-* **Python** – `app.get_learning_stats()` returns a dict with success rates, model tiers, etc.
+- **TUI** — `/history` shows the task transcript; `/stats` shows learning metrics.
+- **Web UI** — `http://127.0.0.1:8001` shows the same lifecycle panels; session search and restore live at `/history`.
+- **API** — `GET /api/learning-stats` aggregates outcomes; per-thread SSE streams carry the typed loop events.
 
-## 6️⃣ Tweaking the workflow
+## 6. Tweaking the workflow
 
-* **Change complexity** – add `--complexity high` (or `low`, `medium`) to influence the Guardian’s risk calculation.  
-* **Force a HITL pause** – set an environment variable that triggers a pause (e.g., `RISK=high` before running).  
-* **Custom sub‑agents** – register your own agent (see the *Custom Agent* tutorial) and reference it with `--agent my_custom_agent`.
-
----------------------------------------------------------------------
-
-**That's it!** You now have a reproducible, multi‑step pipeline that you can embed in scripts, CI jobs, or UI explorations. 🎉
+- **Complexity routing** — `task_type` plus the `model_routing` block in `bergagents.jsonc` picks the model tier; per-agent preferences live under the `agents` key.
+- **Approval posture** — `hitl_rules` in config names which tool families auto-run, notify, or ask first; `read_only` / `allow_shell` deployment flags withhold mutating tools entirely.
+- **Custom subagents** — register your own agent (see the *Adding a Custom Agent* tutorial); the harness routes to it by `can_handle` confidence.

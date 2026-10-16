@@ -1,86 +1,226 @@
 ---
 title: "Quick Start"
+author: "Sofia Billger Bergström"
 format: html
 ---
 
-This guide gets BergAgents installed and running on your local machine.
+# Quick Start
+
+This guide gets BergAgents installed and running against a local model,
+the web UI, and the Shared-ToDo plugin, while naming every path and flag
+that is actually supported by the current code.
 
 ## 1. Prerequisites
 
-- **Python 3.12+**
+- Python 3.12+ and `uv` (pip fallback supported)
+- A model runtime, ideally locally:
+  - **Ollama** --- `ollama pull qwen3.5:9b`
+  - Optional: a cloud/OpenAI-compatible provider (any entry under `providers`)
+- A set-up project (already cloned); default config dir resolved at
+  first-run as described below.
+- Node/Bun only if you want the web UI front-end or plugin bundle builds.
 
-- **`uv`** (recommended) or `pip`
-
-- **An OpenAI- or Anthropic-compatible provider** - e.g. Ollama running locally with a pulled model:
-
-  ```bash
-  ollama pull qwen3.5:9b
-  ```
-
-## 2. Installation
+## 2. Install the Python package
 
 ```bash
-git clone https://github.com/your-username/berg-agents.git
-cd berg-agents
-
+cd /path/to/berg-agents
 uv venv
 source .venv/bin/activate
 uv pip install -e .
 ```
 
-## 3. Configuration
+The editable install layers into the project path, so changing `berg_agents/` code is visible without
+reinstalling.
 
-Copy the example config and point it at your provider:
+## 3. Configure provider + config directory
 
-```bash
-cp .berg-agents/bergagents.jsonc .berg-agents/bergagents.local.jsonc
-```
+The config dir is resolved in this order (
+`berg_agents/config/paths.py::resolve_config_dir`):
 
-Minimal `providers` block (Ollama):
+1. `BERG_AGENTS_CONFIG_DIR` (explicit override, always wins)
+2. An existing `{project-root}/.berg-config` directory
+3. An existing `{project-root}/.berg-agents` directory
+4. `~/.berg-agents`
+
+On this checkout the directory is already `.berg-agents`; that matches
+`step-3`.
+Set the env var if you want to run elsewhere or to keep data
+out of the source tree.
+
+### 3.1 Minimal provider (Ollama)
+
+Edit `{config}/bergagents.jsonc` (JSONC - comments and trailing commas
+allowed):
 
 ```jsonc
 {
-  "providers": {
-    "ollama": {
-      "options": { "baseURL": "http://localhost:11434/v1", "apiKey": "" },
-      "models": { "qwen3.5:9b": {} }
+  \"BERG_AGENT_PROVIDER\": \"ollama\",
+  \"BERG_AGENT_OLLAMA_BASE_URL\": \"http://localhost:11434\",
+  \"providers\": {
+    \"ollama\": {
+      \"options\": { \"baseURL\": \"http://localhost:11434/v1\", \"apiKey\": \"\" },
+      \"models\": { \"qwen3.5:9b\": {} }
     }
-  }
+  },
+  \"defaultModel\": \"qwen3.5:9b\",
+  \"harness\": { \"enable_learning\": true, \"enable_hitl\": true },
+  \"BERG_AGENT_SKILLS\": \"[\\\"./.agents/skills/\\\"]\",
+   \"BERG_AGENT_PLUGINS\": \"[\\\"./.shared_todo/\\\"]\"
 }
 ```
 
-Secrets go in `.env` and are referenced as `${env:VAR_NAME}`:
+### 3.2 Secrets (always via `.env`)
+
+Place a `.env` at the project root and reference values with
+`${env:VAR_NAME}` / `${VAR}` - never inline a key.
 
 ```dotenv
-OPENAI_API_KEY=sk-...
+OLLAMA_API_KEY=
+BERG_AGENT_OPENAI_API_KEY=
+UNSLOTH_API_KEY=
+COHERE_API_KEY=
+CONTEXT7_API_KEY=
+BERG_AGENT_OMNIROUTE_API_KEY=
 ```
 
-Full reference: [Configuration](CONFIGURATION.qmd).
+Rule: config values may be whole-string placeholders (`\"${env:KEY}\"`); an
+unset one then falls back to default instead of persisting empty.
 
-## 4. Run it
+Paths and plugins live under `{config}/` (`bergagents.jsonc`,
+`mcp.json`, `profiles.yaml`, `plugins/`, `active_session`, session and
+memory databases).
 
-Interactive terminal UI:
+### 3.3 MCP (optional)
+
+Point `BERG_AGENT_MCP_SERVERS` at a JSON file (default
+`{config}/mcp.json`).
+Each entry is `http` or `stdio`, with
+`${env:...}` for secrets.
+Use `enabled: false` as the startup kill-switch
+for a server; the UI toggle becomes authoritative after startup.
+
+See [CONFIGURATION](CONFIGURATION.qmd) for the full reference.
+
+## 4. Build the web UI (once, then on UI change)
+
+```bash
+cd berg_agents/ui/webapp
+npm install   # or: bun install
+npm run build # static export into the path FastAPI serves
+```
+
+Production plus dev modes (cross-origin dev loop):
+
+```bash
+cd berg_agents/ui/webapp
+npx next dev -p 3000
+# or with a backend different from same-origin:
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8001 npx next dev -p 3000
+```
+
+Port precedence is usually 3001 if 3000 is taken.
+FastAPI enables CORS
+from `localhost`/`127.0.0.1` on ports 3000-3001.
+
+## 5. Optional shared-todo bundle build
+
+The shared-todo is the reference/pilot plugin (see
+[Shared-ToDo pilot](plugins/SHARED-TODO.qmd)).
+
+```bash
+cd berg_plugins/shared-todo
+npm install   # or: bun install
+npm run build:ui
+cd ../..
+# Output should land at berg_plugins/shared-todo/ui/dist/todo-surface.js
+```
+
+The host reads that file over ` /berg-plugins/shared-todo/...` and treats
+React/ReactDOM/`@heroui/react` as externals resolved at runtime against
+`window.BergRuntime` - do not add a second React instance in the bundle.
+
+## 6. Run BergAgents
+
+### Terminal UI (text-based)
 
 ```bash
 python -m berg_agents --tui
-# harness> /help
-# harness> /harness refactor the login flow to use sessions
 ```
 
-Web UI (FastAPI serves API + static UI on one origin):
+First commands at the prompt:
+`/harness <task>`, `/agents`, `/tools`, `/memory`, `/plugins`, `/help`.
+
+### Web UI (single origin, served by FastAPI)
 
 ```bash
 python -m berg_agents --web --port 8001
-# → http://127.0.0.1:8001
+# default also: --host 0.0.0.0
+# http://127.0.0.1:8001
 ```
 
-Python API:
+Run it another day without re-running any build; FastAPI serves the static
+web export from the same origin as the API, so no proxy issues.
+
+### Python API
 
 ```python
+from berg_agents.app import BergAgentsApp
+
+app = BergAgentsApp.create()
+# app attributes: agent loop, workspace toolset, harness, settings
 ```
 
-## Next Steps
+There is no separate HTTP server spawned by `BergAgentsApp.create()` - you
+get direct objects plus the container API; call `.serve(host, port)` on
+the created app for background use.
 
-- [**Usage**](USAGE.qmd) - TUI commands, Python API, and web workflows
-- [**Tools**](TOOLS.qmd) - what the agent can touch and how approval works
-- [**Configuration**](CONFIGURATION.qmd) - providers, routing, HITL rules
+## 7. Verify the first run
+
+- `http://localhost:8001/` loads the UI without hydration failures.
+- `http://localhost:8001/api/tools` (and web `/api/tools`) returns both
+  low/high-risk tools as registered.
+- `GET http://localhost:8001/api/plugins` (in UI or curl) lists
+  `berg-plugin-shared-todo`, 10 tools, and `ui.entry_built: true`.
+- The `📋 Todos` button appears in the tool bar; clicking toggles both
+  directions.
+- `GET http://localhost:8001/_next/...` 404s only mean the production
+  UI was never built; run `npm run build` again.
+
+## 8. Common environment variables
+
+  | Variable                         | What it does                                                   |
+  | ---                              | ---                                                            |
+  | `BERG_AGENTS_CONFIG_DIR`         | Override config directory (highest precedence)                 |
+  | `BERG_AGENT_*`                   | / Overrides for any typed setting (provider, MCP path, skills) |
+  | `BERG_AGENT_WEB_SEARCH_BACKENDS` | Which web backends are used (list, JSON)                       |
+  | `BERG_AGENT_SKILLS`              | JSON array of skill directories                                |
+  | `BERG_AGENT_PLUGINS`             | JSON array of plugin directory paths                           |
+  | `BERG_AGENT_MCP_SERVERS`         | Path to the MCP JSON file                                      |
+  | `OLLAMA_API_KEY`                 | Ollama search backend key (zero if public)                     |
+  | `UNSLOTH_API_KEY`                | Unsloth provider (not `UNSLOTH_STUDIO_AUTH_TOKEN`)             |
+  | `COHERE_API_KEY`                 | Higher-level search capability                                 |
+  | `CONTEXT7_API_KEY`               | Documentation probing MCP server                               |
+
+## 9. Path gotchas (observed)
+
+- `.berg-agents/` (or `.berg-config`) must be considered user data;
+  never wipe it.
+  Destructive deletes inside `.berg-agents/memory/` or
+  `sharedtodos/` only ever manual.
+- Plugin bundles are served with `Cache-Control: no-cache`, but a hard
+  reload clears any rare stale copy after a rebuild.
+- Only one config directory wins; keep `.berg-config` and `.berg-agents`
+  from silently splitting config/state data across locations.
+- If you started from a detached plugin path, the config lives wherever
+  `{project-root}/ `.berg-agents/\` resolves.
+
+## 10. Next steps
+
+- [Usage Examples](USAGE.qmd) \u2014 commands, API, web dev loop, HITL
+- [Configuration](CONFIGURATION.qmd) \u2014 provider-centric blocks & env vars
+- [Tools](TOOLS.qmd) \u2014 what the agent can touch and approval gates
+- [Memory & Compaction](MEMORY.qmd) \u2014 how MEMORY.md injection works
+- [Shared-ToDo pilot](plugins/SHARED-TODO.qmd) and
+  [Plugin UI](plugins/PLUGIN-UI.qmd) \u2014 conformance reference
+
+See [CONTRIBUTING](CONTRIBUTING.qmd) for coding + testing rules.

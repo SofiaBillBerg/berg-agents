@@ -1,0 +1,149 @@
+---
+title: "Memory, Compaction and Persistence"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+# Memory, Compaction and Persistence
+
+This page describes how berg-agents remembers things across turns and
+sessions, how it keeps the context window within budget, and where that
+state lives on disk.
+
+All of it is wired automatically through `build_chat_agent` in
+`berg_agents/plugin_system/context_capabilities.py` --- no extra setup is
+required.
+The four capabilities are registered in a specific order; see
+**Registration order**.
+
+## What is in context every request
+
+A bounded snapshot of `MEMORY.md` is injected beside the latest user
+prompt, inside `<memory>...</memory>` tags, followed by a
+`<memory_instructions>` block.
+This snapshot is **refreshed on every
+request** --- including immediately after a write or external edit --- so a
+model that just saved a fact does not need to re-read the file to see it.
+
+Only the main notebook is injected that way: other memory files appear
+by name only, referenced through it.
+
+<|message|> File on disk | Purpose |
+|---|---|
+| `{config}/memory/MEMORY.md` | The auto-injected notebook. Plain Markdown. |
+| `{config}/memory/<topic>.md` | Append-on-topic files. Read only on request. |
+| `{config}/memory.db` | SQLite fallback store when file-backed mode is unavailable. |
+| `{config}/runs.db` | Paired with `StepPersistence` (see below). |
+
+Where `{config}` is the resolved config directory (`.berg-agents`/
+`.berg-config` etc.; see `CONFIGURATION.qmd`).
+
+## Memory tools
+
+The model can call the standard memory toolset:
+
+- `write_memory` --- append a new durable fact (pass `old_text` to amend or
+  remove one; de-duplicate instead of duplicating).
+- `read_memory` --- for **topic files only**.
+  Never for `MEMORY.md` itself;
+  it is already in context and does not live inside the workspace.
+- `search_memory` --- keyword lookup across memory files.
+- `delete_memory` --- remove a memory entry.
+
+The companion guidance (in `context_capabilities._MEMORY_GUIDANCE`) states
+plainly that `MEMORY.md` is already present in context, which prevents the
+observed failure mode of the model using `read_file`/`read_memory` to
+re-fetch it and hitting \"file not found\".
+
+## Writing and editing memory by hand
+
+Because the canonical store is `FileStore`, `MEMORY.md` is ordinary
+Markdown --- read it, edit it, grep it, or version-control the folder.
+Changes show up on the next request (see next section for the context-body
+limit that applies).
+
+A previous nested-path bug left an earlier file at
+`{config}/memory/.berg-agents/berg-agents/MEMORY.md`.
+It was not deleted
+automatically --- move or merge that content into the flat
+`{config}/memory/MEMORY.md` if you want it.
+
+## When memory stops being fully automatic (limits)
+
+The `Memory` capability only injects a *bounded* snapshot.
+Content past
+the configured `max_tokens`/`max_lines` is truncated, with the tail
+available through `read_memory` and `search_memory`.
+So automatic injection
+is the rule for the small, durable facts; pull-on-demand covers the rest.
+
+## Compaction
+
+Context compaction rewrites history in place so the request stays within
+budget.
+Berg-agents uses `TieredCompaction`: cheap zero-LLM tiers first,
+summarisation last.
+
+1. **DeduplicateFileReads** --- blanks every read that was later superseded
+   by a newer read of the same file.
+2. **ClearToolResults** --- blanks the oldest tool results, keeping the
+   newest sets (`keep_pairs=3`).
+3. **ClampOversizedMessages** --- head/tail-truncates a single oversized
+   part (e.g. a runaway generation).
+4. **SummarisingCompaction** --- one model call, reached only when tiers 1--3
+   cannot reclaim enough (`max_messages=1`, `keep_messages=20`,
+   `receipts=True`).
+
+Tierd strategies report what they dropped as a receipt, so compaction is
+legible rather than looking like silent amnesia.
+`ReportContextUsage`
+emits used/window/fraction events after compaction, feeding the live
+context gauge in the web UI.
+
+`FallbackCompaction` and `WarnNearLimits` are available in the harness but
+are **not** wired into the berg-agents chat path (they would risk
+compacting twice).
+
+**Threshold**: 80% of the model's context window (unknown local GGUF
+endpoints fall back to 32K so compacting starts early).
+Budget parameters
+are configured through `BERG_AGENT_SUMMARIZATION_*` keys; see
+`CONFIGURATION.qmd`.
+
+### Registration order (load-bearing)
+
+Compaction is registered **before** `Memory`: compaction edits history
+persistently while the memory block is request-only, so a memory block
+added before the rewrite would be discarded.
+Do not reorder these when
+extending the capability list.
+
+## Persistence and recall of prior turns
+
+- `StepPersistence(store=SqliteStepStore, agent_name=\"chat\")` snapshots
+  every settled step into `{config}/runs.db`.
+- `ConversationSearch(SnapshotHistorySource(store), scope=\"conversation\")`
+  gives the model keyword recall across those snapshots, including turns
+  that compaction has dropped.
+
+Together these give the model a useful \"what did we do earlier?\" path
+that does not depend on the raw context window.
+
+## Conversation (chat session) persistence
+
+Separately from memory, chat sessions are stored by
+`berg_agents/ui/session_store.py` in SQLite (`{config}/chat_sessions.db`)
+holding the **full `Conversation` JSON**, not raw message lists.
+That is
+what made restores reliable: the system-prompt warning is stripped from
+restored conversations and each dumped message gets a namespaced id.
+
+## Known gaps
+
+- `LearningGate` / harness integration are not yet routed into the chat
+  path (deferred by the maintainer).
+- Skills/MCP exposed as adapter plugins are working but their status as
+  \"plugins\" versus first-class configuration systems is still open.
+- SQLite connections in the session store must be per-operation (not
+  cached) to satisfy thread affinity under `asyncio.to_thread`; the doc's
+  troubleshooting entry covers symptoms.

@@ -1,155 +1,58 @@
 ---
 title: "Tutorial - Human-in-the-Loop (HITL) Lifecycle"
-author: "Your Name"
+author: "Sofia Billger Bergström"
 format: html
 ---
 
 # Tutorial - Human-in-the-Loop (HITL) Lifecycle
 
-> BergAgents pauses automatically when a task is deemed risky, awaiting explicit human approval before proceeding.
-> This tutorial shows how the pause works, how to configure it, and how to respond from the TUI or the web UI.
+BergAgents pauses before running anything risky. This tutorial shows when a pause happens, how to answer it in both surfaces, and how to tune it. Code: `berg_agents/core/hitl.py` (`HitlRequest`, `HitlDecision`), tool risk classes in `berg_agents/agents/factory.py`.
 
-## 1️⃣ When does a HITL pause happen?
+## 1. When does a pause happen?
 
-The **Guardian** evaluates a task against a risk matrix that uses values from the `harness` section of `config/bergagents.jsonc`:
+Each tool carries a `risk_class`. **Low-risk** tools (`list_files`, `read_file`, `search_code`, `plan_task`) run unattended. **High-risk** tools (`bash`, `edit_file`, `patch_file`, `write_file`, `implement_task`, sensitive MCP tools) pause for approval.
+
+`hitl_rules` in `bergagents.jsonc` names which families fall where:
 
 ```jsonc
 {
-  "harness": {
-    "auto_execute": false,          // false = Guardian will pause when risk is high
-    "notify_after": 0.7,            // when confidence crosses 70 % a notification is sent
-    "ask_before": 0.8,              // when confidence crosses 80 % the Guardian asks for approval
-    "human_leads": true             // forces a HITL pause for every decision
+  "hitl_rules": {
+    "auto_execute": ["read_file", "list_files", "search_code"],
+    "notify_after": ["edit_file", "new_file", "generate_test"],
+    "ask_before":   ["delete_file", "execute_command", "refactor"],
+    "human_leads":  ["security_change", "production_deploy", "data_migration"]
   }
 }
 ```
 
-The **risk** is calculated as:
+Read-only (`read_only=True`) or shell-disabled (`allow_shell=False`) deployments withhold mutating tools at registration — there is nothing to approve because the tools are absent from the schema.
+
+## 2. Answering a pause (TUI)
 
 ```
-risk = base_risk × complexity_factor × (1 - confidence)
+Approve and resume? [y/N]:
 ```
 
-If the computed `risk` exceeds the configured threshold (by default the `auto_execute` flag must be `false`), the Guardian:
+Approval re-executes with `hitl_decision: approve` in metadata; anything else fails the task as rejected.
 
-1. **Stops** the execution flow.  
-2. Emits a `HitlRequest` event that the TUI or web UI candisplay.
+## 3. Answering a pause (web UI)
 
-## 2️⃣ Responding to a HITL request (CLI)
+The HITL surface shows the tool name plus its arguments with three actions:
 
-When a pause occurs the TUI shows a prompt similar to:
+| Action | Effect |
+|---|---|
+| Approve | Runs with the given arguments. |
+| Reject | Cancels the task. |
+| Edit | Rewrites the arguments inline before the tool runs. |
 
-```
-[HITL] Task needs review. Approve, Reject, or Edit? [y/N/e]:
-```
+## 4. Recovery behavior
 
-* Type **`y`** → resumes execution with `hitl_decision: approve`.  
-* Type **`N`** or just **Enter** → resumes with `hitl_decision: reject` and marks the task as failed.  
-* Type **`e`** → opens an editor so you can modify the tool‑call arguments before they are re‑executed.
+- Failed sends auto-reject orphaned approvals with a retry-friendly reason plus a dismissible alert.
+- Restoring a session strips approval ids from dead runs (marked expired, never replayed); your explicit rejects are retained.
+- History of pauses is visible in `/history` (TUI), the transcript (web), and the per-thread SSE event stream.
 
-You can also bypass the UI programmatically:
+## 5. Tuning checklist
 
-```python
-result = app.execute(
-    "Add retry logic to the sync worker",
-    task_type="standard",
-    hitl_decision="approve"   # automatically resumes without UI
-)
-```
-
-## 3️⃣ Responding to a HITL request (Web UI)
-
-The web interface shows a **HITL modal** that lists:
-
-| Field | Description |
-|-------|-------------|
-| **Tool** | Name of the tool that is about to run. |
-| **Arguments** | JSON payload that will be fed to the tool. |
-| **Approve** | Resumes execution with the given arguments. |
-| **Reject** | Cancels the task. |
-| **Edit** | Opens a JSON editor; you can modify the payload inline. |
-
-After you make a decision the Harness records a `HitlDecision` event for later audit.
-
-## 4️⃣ Tuning HITL Rules for Your Project
-
-Edit `config/bergagents.jsonc` and add a `hitl_rules` fragment (or modify the existing one):
-
-```jsonc
-{
-  "harness": {
-    "hitl_rules": {
-      "auto_execute": false,
-      "notify_after": 0.75,
-      "ask_before": 0.85,
-      "human_leads": true,
-      "risk_thresholds": {
-        "critical": 0.9,
-        "high": 0.75,
-        "medium": 0.6,
-        "low": 0.4
-      }
-    }
-  }
-}
-```
-
-* **`notify_after`** – probability at which the Guardian *notifies* the human (does **not** stop automatically).  
-* **`ask_before`** – probability at which the Guardian *asks* before proceeding.  
-* **`risk_thresholds`** – map custom risk levels to thresholds if you want finer‑grained control.
-
-> **Rule of thumb:** start with the defaults, observe the number of pauses via `/stats` or the UI, then tighten/loosen as appropriate for your domain (e.g., finance‑critical tasks may need `human_leads: true` and lower thresholds).
-
-## 5️⃣ Inspecting HITL History
-
-* **CLI** – `/history` shows every pause event with timestamp, decision, and tool arguments.  
-* **Web UI** – the **HITL Log** panel lists each request; click to view the full payload and result.  
-* **API** – `GET /api/harness/{thread_id}/events` streams SSE events that include `hitl` messages.
-
-## 6️⃣ Advanced: Custom HITL Decision Logic (Python)
-
-If you need domain‑specific policies (e.g., auto‑approve read‑only file ops but require human approval for `delete` or `exec`), implement a custom **InterruptPolicy**:
-
-```python
-from berg_agents.hitl import InterruptPolicy
-
-
-class MyPolicy(InterruptPolicy):
-    async def should_pause(self, event: LoopEvents) -> bool:
-        # Auto‑approve read‑only file reads
-        if event.tool_name == "read_file" and not event.is_mutating:
-            return False
-        # Fall back to the default logic otherwise
-        return await super().should_pause(event)
-
-    async def post_pause(self, event: LoopEvents) -> None:
-        # Optional custom UI prompt
-        print("[CUSTOM] Approve? (y/N) ")
-        # …handle input…
-```
-
-Register the policy when building the Harness:
-
-```python
-harness = Harness(
-    enable_learning=True,
-    interrupt_policy=MyPolicy(),
-)
-app = BergAgentsApp(harness=harness, enable_learning=True)
-```
-
----------------------------------------------------------------------
-
-### Quick Reference Cheat‑Sheet
-
-| Action | CLI | Web UI | API |
-|--------|-----|--------|-----|
-| **Pause** | Guardian evaluates risk automatically | Same logic | Automatic |
-| **Approve** | `y` or `--hitl-approve` | **Approve** button | `hitl_decision=approve` |
-| **Reject** | `N` or `--hitl-reject` | **Reject** button | `hitl_decision=reject` |
-| **Edit** | `e` → editor | **Edit** button → JSON editor | `hitl_decision=edit` (opens editor) |
-| **View History** | `/history` | **HITL Log** panel | `GET /api/harness/{id}/events` |
-
----------------------------------------------------------------------
-
-**That's everything you need to understand, tune, and react to HITL pauses in BergAgents!** Add this page to the sidebar for quick access. 🎯
+- Start with the default `hitl_rules`; watch pause frequency via `/stats`.
+- Tighten `ask_before` / `human_leads` for destructive domains; loosen nothing without reason.
+- Prefer deployment flags over prompting for untrusted setups: `read_only` and `allow_shell` cannot be talked around by the model.

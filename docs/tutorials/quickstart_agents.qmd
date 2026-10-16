@@ -1,96 +1,71 @@
 ---
-title: "Tutorial - Building a Custom Agent"
-author: "Your Name"
+title: "Tutorial - Adding a Custom Agent"
+author: "Sofia Billger Bergström"
 format: html
 ---
 
-# Tutorial - Building a Custom Agent
+# Tutorial - Adding a Custom Agent
 
-> This tutorial shows how to create a brand‑new agent, register it with BergAgents, and run a task that uses it from the TUI or the CLI.
+This tutorial adds a real subagent to the harness: subclass `AbstractAgent`, register it on the app, and run a task through it. Code: `berg_agents/core/interface.py` (`AbstractAgent`), `berg_agents/app.py` (`register_agent`, `execute`).
 
-## 1️⃣ Write the agent class
+## 1. Write the agent class
 
-Create a file in your project, for example `my_package/agents/custom_reviewer.py`:
+Every subagent implements two methods: `can_handle(task)` returning a 0–1 confidence, and `execute(task, context, model)` returning an `AgentResult`.
 
 ```python
 # my_package/agents/custom_reviewer.py
-from berg_agents.agents.base import BaseAgent
-from berg_agents.core.loop import LoopEvents
+from typing import Any
+
+from berg_agents.core.interface import AbstractAgent, AgentResult, TaskContext
 
 
-class CustomReviewer(BaseAgent):
-    """Echo back the first 100 characters of a file."""
+class CustomReviewer(AbstractAgent):
+    """Echoes back the first 100 characters of the task description."""
 
-    async def run(self, event: LoopEvents) -> None:
-        # `event.payload` contains the input string passed from the harness
-        snippet = event.payload[:100] + (
-            "..." if len(event.payload) > 100 else ""
-        )
-        # Emit a `review` event that the harness will capture
-        await self.emit("review", {"snippet": snippet})
+    name = "custom_reviewer"
+    description = "Echo back the first 100 characters of a task"
+    preferred_complexity = "trivial"
+    capabilities = ["review"]
+
+    def can_handle(self, task: dict[str, Any]) -> float:
+        if "review" in task.get("description", "").lower():
+            return 0.9
+        return 0.1
+
+    def execute(
+        self,
+        task: dict[str, Any],
+        context: TaskContext,
+        model: Any = None,
+    ) -> AgentResult:
+        snippet = task.get("description", "")[:100]
+        return AgentResult(success=True, output=f"Review snippet: {snippet}")
 ```
 
-## 2️⃣ Register the agent
+Check `AgentResult`'s fields in `berg_agents/core/interface.py` before constructing it — the contract is `success`, `output`, `error`, `needs_human_review`, `review_reasons`, `model_used`, `tokens_used`, `metadata`.
 
-You can register the agent **statically** (via a `config/agents.toml` file) **or** **dynamically** in Python.
-
-### Static registration (TOML)
-
-Add (or edit) `config/agents.toml`:
-
-```toml
-[agents.custom_reviewer]
-module = "my_package.agents.custom_reviewer"
-class = "CustomReviewer"
-```
-
-### Dynamic registration (Python)
-
-In your startup script or `__init__.py`:
+## 2. Register it on the app
 
 ```python
-from berg_agents.agents.factory import register_agent
+from berg_agents.app import BergAgentsApp
 from my_package.agents.custom_reviewer import CustomReviewer
 
-register_agent("custom_reviewer", CustomReviewer)
+app = BergAgentsApp.create()
+app.register_agent("custom_reviewer", CustomReviewer())
 ```
 
-## 3️⃣ Run a task that uses the agent
+Registered agents appear in `/agents` (TUI) and `GET /api/agents` (web).
 
-### From the CLI
+## 3. Run a task through it
 
-```bash
-python -m berg_agents \
-    --task "Read README.qmd and give me a short 2‑sentence summary" \
-    --agent "custom_reviewer"
+```python
+result = app.execute("Review the login flow for obvious issues", task_type="generic")
+print(result)
 ```
 
-The harness will instantiate `CustomReviewer`, execute its `run` method, and stream the `review` event back to you. You should see output similar to:
+`execute(description, task_type)` returns the harness result dict, including the selected agent, the model used, and any HITL decision if a pause occurred. Learning stats: `app.get_learning_stats()`.
 
-```
-[review] {'snippet': '## Quick-Start\nBergAgents ...'}
-```
+## Notes
 
-### From the TUI
-
-1. Start the TUI: `python -m berg_agents --tui`  
-2. Type `/task` (or `/harness`, they are aliases) and enter the same description.  
-3. The TUI will display the result streamed from the agent.
-
-## 4️⃣ What just happened?
-
-1. The **Harness** located the registered agent named `custom_reviewer`.  
-2. It passed the task description to the agent’s `run` coroutine.  
-3. The agent emitted a `review` event, which the Harness captured and returned as the final result.
-
-Replace the logic inside `run` with whatever behaviour you need—file writes, API calls, database queries—just make sure to `await` any asynchronous work and `emit` events that the Harness can capture.
-
----------------------------------------------------------------------
-
-### Next Steps
-
-* Add unit tests for your agent using `pytest`.  
-* Experiment with HITL rules (see `docs/tutorials/hilt_lifecycle.qmd`).  
-* Publish the agent as a pip‑installable package so other projects can reuse it.
-
-Happy hacking! 🚀
+- `preferred_complexity` should match a level in your `model_routing` config (`trivial`, `standard`, `complex`, `critical`); per-agent tuning also lives under the `agents` key in `bergagents.jsonc`.
+- Keep the change to one logical piece: new file, registration, test, docs. See [CONTRIBUTING](../CONTRIBUTING.qmd).

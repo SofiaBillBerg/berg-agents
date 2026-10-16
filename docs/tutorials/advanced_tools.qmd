@@ -1,105 +1,56 @@
 ---
-title: "Tutorial - Advanced Tool Usage"
-author: "Your Name"
+title: "Tutorial - Calling Tools Directly"
+author: "Sofia Billger Bergström"
 format: html
 ---
 
-# Tutorial - Advanced Tool Usage
+# Tutorial - Calling Tools Directly
 
-> This guide shows how to combine multiple built‑in tools in a single task, share context between tools, and create richer workflows using BergAgents.
+Every tool the agent can call is also callable by you: synchronously through `POST /api/tool/execute`, by slash-command in the chat box, or from Python through the app. Plugin tools go through the generic dispatch endpoint instead.
 
-## 1️⃣ Invoking built‑in tools from the CLI
-
-Each built‑in tool is exposed as an **MCP‑style** endpoint that can be called directly from the command line.
+## 1. Synchronous tool execution (REST)
 
 ```bash
-# Read a file (built‑in file tool)
-python -m berg_agents \
-    --task "Read src/utils.py" \
-    --tool "fs__read" \
-    --tool-args '{"path":"src/utils.py"}'
+curl -X POST http://127.0.0.1:8001/api/tool/execute \
+  -H 'Content-Type: application/json' \
+  -d '{ "tool": "read_file", "args": { "file_path": "README.md" } }'
 ```
 
-* `--tool` names the tool (e.g., `fs__read`, `fs__write`, `mcp_github__search`).  
-* `--tool-args` supplies a JSON object with the arguments the tool expects.  
-* The tool’s output becomes available as `{{result}}` in subsequent steps of the same command chain.
+- `args` may be an object or a bare string (a string is treated as `file_path`).
+- The response carries tool name, string output, and status. Failures arrive as `status: "error"` output — never tracebacks.
+- `run_task` is special-cased: it launches a full harness task instead of a workspace tool.
+- Tool names and risk classes: `GET /api/tools`.
 
-You can chain tools by separating them with `--tool`/`--tool-args` pairs in a single invocation, or by using the `--set-variable` flag to store one result and retrieve it later with `{{variable}}`.
+## 2. Slash-commands in chat
 
-## 2️⃣ Sharing context between tools
+Typing `/read_file README.md` in the TUI or web chat calls the same endpoint. `/tools` lists what is available; `/stats` aggregates outcomes afterwards (`GET /api/learning-stats` is the same data over HTTP).
 
-The Harness provides a temporary **key‑value store** that lives for the duration of a thread (session). Use the `--set-variable` flag to save a value and `{{variable}}` to insert it into later tool arguments.
+## 3. Plugin tools (generic dispatch)
 
 ```bash
-# Store the result of a GitHub search in a variable called search_results
-python -m berg_agents \
-    --task "Search GitHub for 'BergAgents'" \
-    --tool "mcp_github__search" \
-    --tool-args '{"query":"BergAgents"}' \
-    --set-variable search_results="{{result}}"
+curl -X POST http://127.0.0.1:8001/api/plugins/berg-plugin-shared-todo/tools/list_todo_items \
+  -H 'Content-Type: application/json' -d '{}'
 ```
 
-Later, in the same command (or in a later command that re‑uses the same session), retrieve the stored value:
+The backend validates the plugin exists and is enabled, matches the tool by advertised name or function `__name__`, runs it with the project as cwd, and JSON-encodes non-string returns. Unknown plugin or tool returns 404.
 
-```bash
-# Summarize the stored search results
-python -m berg_agents \
-    --task "Summarize the GitHub search results" \
-    --tool "summarize_text" \
-    --tool-args '{"text":"{{search_results}}"}' \
-    --set-variable summary="{{result}}"
+## 4. From Python
+
+```python
+from berg_agents.app import BergAgentsApp
+
+app = BergAgentsApp.create()
+result = app.execute("Summarize README.md", task_type="generic")
+print(result)
 ```
 
-`{{result}}` is automatically replaced with the **output of the previous tool** in the same chain.
+`execute` runs the full harness loop (Guardian → Planner → Implementation → Curator) including tool calls and HITL pauses. For single synchronous tool runs outside chat, use the REST endpoint above.
 
-## 3️⃣ Embedding a mini‑pipeline with `execute_subtask`
+## 5. Checklist for multi-tool work
 
-If you need more orchestration than a simple linear chain, you can embed a **sub‑task** that runs a full Harness loop inside the larger task.
-
-```bash
-python -m berg_agents \
-    --task "Refactor authentication code" \
-    --tool "execute_subtask" \
-    --tool-args '{
-        "subtask_description": "Add rate‑limit decorator",
-        "task_type": "implementation",
-        "preferred_complexity": "medium",
-        "agent_override": {"name": "implementation_agent", "preferred_complexity": 1}
-    }'
-```
-
-* `execute_subtask` creates a **nested thread** that goes through the complete Guardian → Planner → Implementation → Curator cycle.  
-* The parent task can capture the sub‑task’s output via `--set_variable` or pause it with a HITL interaction. This pattern is useful for reusable mini‑pipelines that you want to invoke from multiple top‑level tasks.
-
-## 4️⃣ Example: End‑to‑End “Documentation Generator”
-
-The following one‑liner shows how to read a Python module, generate Markdown documentation from the source, and write the generated file back to disk—all in a single CLI invocation.
-
-```bash
-python -m berg_agents \
-    --task "Generate docs for new function `process_data`" \
-    --tool "fs__read" \
-    --tool-args '{"path":"src/process_data.py"}' \
-    --set_variable source_code="{{result}}" \
-    --tool "generate_markdown" \
-    --tool-args '{"template":"doc_template.md","variables":{"CODE":"{{source_code}}"}}' \
-    --tool "fs__write" \
-    --tool-args '{"path":"docs/generated/${NOW}.md","content":"{{result}}"}' \
-    --set_variable generated_path="{{result}}"
-```
-
-* `generate_markdown` is a placeholder for any custom tool you implement that transforms code into Markdown.  
-* `${NOW}` is a macro that the runtime expands to a timestamp, ensuring a unique filename.  
-* The final `{{result}}` after `fs__write` contains the file path of the newly created document.
-
-## 5️⃣ Best‑practice checklist for multi‑tool workflows
-
-| Checklist item | Why it matters |
-|----------------|----------------|
-| **Emit a unique event name** (e.g., `review_done`, `summary_generated`) | Prevents name collisions when several agents emit events simultaneously. |
-| **Validate input before calling mutating tools** | The Guardian will pause if the risk assessment flags the operation as high‑risk. |
-| **Limit nested subprocess depth** (Harness enforces `max_steps`) | Avoid runaway loops or DoS inside the sandbox. |
-| **Check output length** – very long results may be truncated; write to a temporary file first if you need the complete text. | Guarantees you receive the full result. |
-| **Use `--set_variable` for debugging** – you can later inspect all stored variables via the `/debug-vars` TUI command. | Makes intermediate state visible and easy to troubleshoot. |
-
-With these patterns you can build sophisticated pipelines that span file I/O, code generation, external APIs, and human approvals—all inside the safe, audited sandbox that BergAgents provides. Happy chaining! 🎛️
+| Practice | Why |
+|---|---|
+| Plan before implementing (`plan_task`, then `implement_task`) | Keeps multi-step work reviewable; implementation is approval-gated. |
+| Validate before mutating | High-risk tools pause — have the arguments right before approving. |
+| Watch output length | Session persistence is budgeted (bounded parts, newest survives); write long results to a file instead of the transcript. |
+| Read-only first | Explore with `list_files` / `read_file` / `search_code` before touching anything. |

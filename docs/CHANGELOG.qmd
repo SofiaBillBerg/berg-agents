@@ -1,36 +1,162 @@
 ---
 title: "Changelog"
-author: "Your Name"
+author: "Sofia Billger Bergström"
 format: html
 ---
 
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are documented here.
+Versions
+reflect a release; ongoing in-tree work appears under **Unreleased**.
+Each entry is based on the active build path in `main`, plus internal
+plan notes; versions are repository-wide, not subsystem-specific.
+
+## [Unreleased] --- 2026-10-16
+
+### Plan status
+
+- Plugin system has reached a stable pilot state; Shared-ToDo is the
+  reference plugin.
+  UI bridge, schema removals, generic dispatch, session
+  convergence, memory/compaction, and todo subtasks were all landed and
+  verified in the browser.
+
+### Added
+
+- **Plugin system** (`berg_agents/plugin_system/`) with discovery,
+  config-driven settings, capabilities registry, chat integration,
+  adapter bridging for skills (19) and MCP servers (7), and generic
+  tool dispatch.
+- **Real plugin pilot**: `berg-plugin-shared-todo` with 10 tools and its
+  own UI bundle (full manifest reference in
+  `docs/plugins/SHARED-TODO.qmd`).
+- **Plugin UI bridge**: manifests declare a `ui:` block; the backend
+  resolves it to a `entry_url`/`entry_built` pair and the host mounts the
+  plugin's built React component through `window.BergRuntime` (React,
+  HeroUI, `apiBase`, `require(specifier)`).
+  Cached by URL, `no-cache`
+  on `/berg-plugins/*`, and reports load failures honestly.
+- **Generic dispatch** --- `POST /api/plugins/{id}/tools/{tool}` runs the
+  plugin tool and JSON-encodes non-string results; all shared-todo UI
+  traffic is now through this single path.
+  Todo-specific routes and
+  schemas were removed from the host.
+- **Skill/MCP adapter plugins** exposing settings/meta primarily through
+  `/api/plugins`, so the UI 🧩 Plugins browser reflects them; persistence
+  corrected to disk.
+- **Enable/disable per plugin** through the web UI; state applies on the
+  next chat turn, and config kill-switches still seed the default.
+- **Session convergence**: server-side `active_session` pointer; tabs
+  adopt it instead of minting new ones;
+  `GET/POST /api/sessions/current`, set on create/send/restore.
+- **Session history page** (`/history`) with full-text search, restore
+  (parks current first), and rename.
+- **Cross-tab staleness fixes**: `storage` events, single snapshot
+  hydration, and `Cache-Control: no-cache` on HTML documents.
+- **Memory** capability: `FileStore` rooted at the config dir and a
+  bounded `MEMORY.md` injected every request; `write_memory`,
+  `read_memory`, `search_memory`, `delete_memory` with the revised
+  guidance block; path landed at `{config}/memory/MEMORY.md`.
+- **Compaction**: `TieredCompaction` (dedup reads → clear tool results →
+  clamp oversized → summarize last), plus `ReportContextUsage`; no
+  `FallbackCompaction` (would double-compact).
+- **Step persistence + conversation search**: every settled step snapshot
+  into SQLite; keyword recall across turns dropped by compaction.
+- **Conversation persistence upgrade**: stores full `Conversation` JSON
+  rather than raw `uiMessages`; system-prompt warning stripped on restore;
+  dumped message ids namespaced by role; SQLite connections are now
+  per-operation for thread affinity.
+- **Shared-todo UI**: `/berg-plugins/...` integration, resizable docked
+  surface (divider, 280--viewport-420), `onCount` badge, auto-refresh on
+  `refreshKey`, subtask checkboxes as plain accessible buttons,
+  add/delete/rename inline editing, filters, descriptions, `delete_todo`.
+- **Plugin user config**: `.berg-config` and `.berg-agents` remain
+  neighbours; `.berg-agents/.shared_todo/config.yaml` supplies manifest
+  settings (fixed from always-empty).
+- **Docs**: MEMORY, SHARED-TODO pilot, PLUGIN-UI contract; CONFIGURATION
+  path resolver notes, TOOLS, QUICKSTART, USAGE, FAQ, CHEATSHEET,
+  CONTRIBUTING rebuild.
+
+### Changed
+
+- Config directory rule consolidated in `berg_agents/config/paths.py`:
+  `BERG_AGENTS_CONFIG_DIR` → existing `.berg-config` → `.berg-agents` →
+  `~/.berg-agents`.
+- Memory store changed from a nested multi-path namespace to a flat
+  `FileStore` path inside the config directory, so reads land exactly in
+  `{config}/memory/MEMORY.md`.
+- Skill/MCP adapter settings moved to `persist=True` so they are found
+  via the normal config load and the reported 26-line startup warnings
+  are gone.
+- Runtime state is authoritative for MCP/skill profiles; config's
+  `enabled` is only the startup kill-switch default.
+- `context/tab` uses plugin state (including `🔒 sensitive`) rather than
+  the MCP JSON `enabled` flag.
+- `.berg_config` and `.berg-agents` are accepted project names in the
+  resolver compatibility window.
+
+### Fixed
+
+- Plugin manager race between enable/disable/disable→enable doubled
+  capability registration via `clear_capabilities` + descriptor
+  fallbacks.
+- 404 on plugin bundle due to mount ordering: `/berg-plugins` now mounted
+  before the catch-all static webapp mount, so resolves the bundle.
+- Subtask toggles: HeroUI `Checkbox` does not participate in
+  `CheckboxGroup`, so plain accessible buttons were used (both
+  directions verified).
+- Cacheable plugin bundles masked hot re-builds; added `no-cache` on
+  ` /berg-plugins/*`.
+- OAuth/Jabber Unsloth: the config referenced a non-existing env key
+  (`UNSLOTH_STUDIO_AUTH_TOKEN`), now resolved as `UNSLOTH_API_KEY` with
+  quote-stripping.
+- **SQLite objects created in a thread**: `_conversation_connection`
+  cached a connection and failed under `asyncio.to_thread`; now one per
+  operation.
+- Conversation restore duplicate message keys after dump: role-namespaced
+  ids (`_unique_ui_message_id`) plus residual collision suffix.
+- Poisoned saved state: slimmed serializer with budget (2k/part,
+  700k total, newest safe) and restore-state strips approval ids from
+  dead runs.
+- Failed sends now auto-reject orphaned approvals with a retry-friendly
+  system reason + a dismissible Alert.
+
+### Not yet done
+
+- `LearningGate` and harness gating for the chat path (deferred by the
+  maintainer).
+- Whether skills and MCP belong in the plugin registry at all vs.
+  first-class (open architecture question).
 
 ## [0.2.0] - 2025-11-02
 
 ### Added
 
-- New `tutorials/` section with quick-start, harness workflow, MCP integration, HITL lifecycle, and advanced tool usage.
-- `BEST-PRACTICES.qmd` describing project structure, config hygiene, testing, and migration checklist.
-- `CHEATSHEET.qmd` with command reference, API shortcuts, and CI checklist.
-- Expanded `FAQ.qmd` with 8 new Q&A items covering testing, CI, and common errors.
+- `tutorials/` section (quick-start, harness, MCP integration, HITL
+  lifecycle, advanced tool usage).
+- `BEST-PRACTICES.qmd` (project structure, config hygiene, testing,
+  migration checklist).
+- `CHEATSHEET.qmd` (commands, API shortcuts, CI checklist).
+- Expanded `FAQ.qmd` (8 new Q&A items: testing, CI, common errors).
 - `CHANGELOG.qmd` for versioned change tracking.
-- Updated `CONTRIBUTING.qmd` with detailed PR checklist and CI workflow.
+- `CONTRIBUTING.qmd` detailed PR + CI checklist.
 
 ### Fixed
 
-- Minor navigation issues in `API.qmd` (added missing module signatures).
-- Corrected typo in `README.qmd` "BergAgents - a local, LLM-driven code assistant...".
+- Missing module signatures in `API.qmd`.
+- Typo in `README.qmd`.
 
 ## [0.1.0] - 2025-09-15
 
 ### Initial release
 
-- Core Harness, agents framework, FastAPI UI, and CLI.
-- Basic documentation: README, QUICKSTART, USAGE, API, CONFIGURATION, CONTRIBUTING, FAQ.
+- Core Harness (`guardian` → `planner` → `implementation` → `curator`),
+  agents framework, FastAPI web UI, TUI CLI.
+- Basic documentation: README, QUICKSTART, USAGE, API, CONFIGURATION,
+  CONTRIBUTING, FAQ.
 
 --------------------------------------------------------------------------------
 
-*Generated automatically by the documentation pipeline.*
+*Generated by the documentation pipeline; release versions are reflected only
+in `pyproject.toml`.*

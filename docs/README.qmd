@@ -19,10 +19,9 @@ knitr::opts_chunk$set(
 
 <!-- badges: start -->
 
-> BergAgents - A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration.
-> Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture.
-> The system follows a harness-based execution model with multiple specialized agents working together.
-> The system is designed to work against any OpenAI-compatible provider, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
+> BergAgents --- a local, LLM-driven coding assistant with a **framework-agnostic core** and provider-centric configuration.
+> A multi-agent system built on Pydantic AI: Guardian, Planner, Implementation, Curator and Learning agents run a harness-based execution model with human-in-the-loop approval gates.
+> Any OpenAI-compatible provider works with zero code changes, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
 <!-- badges: end -->
 
@@ -43,62 +42,73 @@ python -m berg_agents --tui
 python -m berg_agents --web
 ```
 
+Full walkthrough: [QUICKSTART](QUICKSTART.qmd).
+
 ## What it is
 
-See [docs/USAGE.qmd](USAGE.qmd) for TUI, Python API, and web examples.
+- **Harness engine** --- Guardian (risk gate) → Planner (breakdown) → Implementation (edits) → Curator (review), plus Learning stats.
+  See [USAGE](USAGE.qmd).
+- **Provider-centric config** --- each model carries its own provider, `baseURL` and `apiKey`.
+  No global provider flag.
+  See [CONFIGURATION](CONFIGURATION.qmd).
+- **Real plugin system** --- discovery, capabilities, generic tool dispatch, and plugin-owned UI bundles.
+  Pilot: shared-todo.
+  See [Shared-ToDo](plugins/SHARED-TODO.qmd) and [Plugin UI](plugins/PLUGIN-UI.qmd).
+- **Memory that persists** --- a `MEMORY.md` notebook injected every request, tiered compaction, step persistence with keyword recall.
+  See [MEMORY](MEMORY.qmd).
 
+```jsonc
+// {config}/bergagents.jsonc — providers, harness, routing, plugins
+{
+  "providers": {
+    "ollama": {
+      "options": { "baseURL": "http://localhost:11434/v1", "apiKey": "" },
+      "models": { "qwen3.5:9b": {} }
+    }
+  },
+  "harness": { "enable_learning": true, "enable_hitl": true },
+  "defaultModel": "qwen3.5:9b"
+}
+```
 
-1. **Customizing the Harness via `bergagents.jsonc`**
-   ```jsonc
-   {
-     "providers": {
-       "openai": {
-         "baseURL": "https://api.openai.com",
-         "apiKey": "${env:OPENAI_API_KEY}"
-       }
-     },
-     "harness": {
-       "enable_learning": true,
-       "enable_inference": true
-     },
-     "model_routing": {
-       "gpt-4o": { "provider": "openai", "complexity": 2 },
-       "claude-3-sonnet": { "provider": "anthropic", "complexity": 1 }
-     }
-   }
-   ```
-   This file lives in `../.berg-agents` and is automatically merged with environment overrides.
+Secrets live in `.env` as `${env:VAR_NAME}` references --- never inline.
+The config directory resolves via `BERG_AGENTS_CONFIG_DIR` → `.berg-config` → `.berg-agents` → `~/.berg-agents`.
 
 ## Configuration
 
 ```bash
-.berg-agents/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
-.env                      # secrets referenced as `${env:VAR_NAME}`
+{config}/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
+.env                        # secrets referenced as `${env:VAR_NAME}`
 ```
 
-  | Layer          | Source                                                                                 |
-  | -------        | --------                                                                               |
-  | Config file    | `../.berg-agents` - `providers` block + `harness`/`model_routing`/`hitl_rules`         |
-  | Secrets        | `.env` file, referenced with `${env:VAR_NAME}`                                         |
-  | Overrides      | `BERG_AGENT_*` environment variables                                                   |
-  | External tools | `../.berg-agents` for MCP server configuration                                         |
+  | Layer          | Source                                                                                                                 |
+  | ---            | ---                                                                                                                    |
+  | Config file    | `{config}/bergagents.jsonc` — `providers` block plus `harness` / `model_routing` / `hitl_rules` / `plugins` / `agents` |
+  | Secrets        | `.env` file, referenced with `${env:VAR_NAME}`                                                                         |
+  | Overrides      | `BERG_AGENT_*` environment variables                                                                                   |
+  | External tools | `{config}/mcp.json` for MCP server configuration                                                                       |
 
-See [docs/CONFIGURATION.qmd](CONFIGURATION.qmd) for the full reference.
+See [CONFIGURATION](CONFIGURATION.qmd) for the full reference.
 
 ![Berg-Agents Config](visualizations/svg/packages_berg_agents.svg "Berg Agents Config Modules")
 
 ## Documentation
 
-  | Page                                       | Description                                   |
-  | ------                                     | -------------                                 |
-  | [QUICKSTART](QUICKSTART.qmd)       | Installation and first run                    |
-  | [USAGE](USAGE.qmd)                 | TUI, Python API, and web workflows            |
-  | [API](API.qmd)                     | Module map for the codebase                   |
-  | [TOOLS](TOOLS.qmd)                 | Built-in tools, capabilities, and MCP         |
-  | [CONFIGURATION](CONFIGURATION.qmd) | Provider-centric config, `.env`, and env vars |
-  | [CONTRIBUTING](CONTRIBUTING.qmd)   | Guidelines for contributing                   |
-  | [FAQ](FAQ.qmd)                     | Common questions and troubleshooting          |
-  | **TUTORIALS** (this page)                  | Step-by-step examples for common tasks        |
+  | Page                                   | Description                                   |
+  | ---                                    | ---                                           |
+  | [QUICKSTART](QUICKSTART.qmd)           | Installation and first run                    |
+  | [USAGE](USAGE.qmd)                     | TUI, Python API, and web workflows            |
+  | [API](API.qmd)                         | Module map for the codebase                   |
+  | [TOOLS](TOOLS.qmd)                     | Tool catalog with signatures and risk classes |
+  | [CONFIGURATION](CONFIGURATION.qmd)     | Provider-centric config, `.env`, and env vars |
+  | [MEMORY](MEMORY.qmd)                   | Memory, compaction, and persistence           |
+  | [PLUGIN-UI](plugins/PLUGIN-UI.qmd)     | Runtime plugin UI bridge                      |
+  | [SHARED-TODO](plugins/SHARED-TODO.qmd) | Plugin pilot walkthrough                      |
+  | [MANIFEST](plugins/MANIFEST.qmd)       | Plugin manifest reference                     |
+  | [CHEATSHEET](CHEATSHEET.qmd)           | Commands, endpoints, and env keys             |
+  | [CONTRIBUTING](CONTRIBUTING.qmd)       | Guidelines for contributing                   |
+  | [FAQ](FAQ.qmd)                         | Common questions and troubleshooting          |
+  | [CHANGELOG](CHANGELOG.qmd)             | Versioned change tracking                     |
 
 ## Getting Help
 
@@ -107,12 +117,12 @@ See [docs/CONFIGURATION.qmd](CONFIGURATION.qmd) for the full reference.
 - See [TOOLS documentation](TOOLS.qmd) to understand agent capabilities
 - Review [FAQ](FAQ.qmd) for troubleshooting tips
 - API reference is in [API](API.qmd)
-- Explore the [TUTORIALS] section above for ready-to-run snippets
 
 ## Contributing
 
-Please read our [CONTRIBUTING](CONTRIBUTING.qmd) guide for details on coding standards, testing, and the submission process.
+Please read our [CONTRIBUTING](CONTRIBUTING.qmd) guide for architecture rules, coding standards, testing, and the submission process.
+Note: git remote operations always need explicit approval.
 
 ## License
 
-**Version**: 0.2.0 | **License**: GNU Affero General Public License
+**Version**: 0.2.0 \| **License**: GNU Affero General Public License v3 (AGPL-3.0-only)

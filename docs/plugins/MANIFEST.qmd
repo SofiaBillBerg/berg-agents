@@ -1,0 +1,194 @@
+---
+title: "Plugin Manifest Reference"
+author: "Sofia Billger Bergström"
+format: html
+---
+
+# Plugin Manifest Reference
+
+Every plugin is a directory containing a `plugin.yaml` manifest, an importable Python entry point, and optionally a built UI bundle.
+This page documents each manifest section, the validation rules enforced by `berg_agents/plugin_system/plugin_schema.py` (`PluginManifest`), and how the host turns the manifest into runtime behavior.
+Shared-todo (`berg_plugins/shared-todo/plugin.yaml`) is the conformance example throughout.
+
+## Minimal manifest
+
+```yaml
+id: "berg-plugin-my-plugin"          # required, lowercase slug
+version: "0.0.1"                     # required, semver x.y.z
+name: "My Plugin"                    # required, human label
+description: "What it does."         # required
+entry_point: "my_pkg.my_mod:MyPlugin"  # required, importable
+```
+
+## 1. Identity (required)
+
+  | Key             | Rule                                                                                                                                             |
+  | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `id`            | Must match `^[a-z0-9][a-z0-9-]*$` — lowercase, hyphens only. This is the id used in `/api/plugins`, dispatch URLs, and per-plugin config dirs.   |
+  | `version`       | Must match `^\d+\.\d+\.\d+$` — strict three-part semver.                                                                                         |
+  | `name`          | Human-readable label.                                                                                                                            |
+  | `description`   | Free text; shown in the Plugins browser.                                                                                                         |
+
+The plugin *directory* name and the *Python package* name are unrelated to `id` except by convention.
+The entry point module must be importable, so it cannot contain hyphens (shared-todo's package is `shared_todo`, its directory is `shared-todo`).
+
+## 2. Metadata (optional)
+
+```yaml
+author:
+  name: "Sofia Billger Bergström"
+  email: "you@example.com"
+  url: "https://example.com"
+license: "AGPL-3.0-only"
+homepage: "https://github.com/org/berg-plugin-my-plugin"
+repository: "https://github.com/org/berg-plugin-my-plugin"
+tags: ["planning", "productivity"]
+icon: "📋"
+```
+
+All informational.
+`tags` and `icon` surface in the Plugins browser; nothing here affects loading.
+
+## 3. Entry point (required)
+
+```yaml
+entry_point: "shared_todo.shared_todo:SharedToDoPlugin"
+```
+
+`module.path:ClassName`.
+The class must be a real `BergPlugin` subclass imported from `berg_agents.plugin_system` --- local stubs fail validation at load.
+The module is imported from the plugin's own package (installed via the `berg-plugins` entry-point group in its `pyproject.toml`, or found on the plugin search path), never from host code.
+
+## 4. Requirements and dependencies (optional)
+
+```yaml
+requirements:
+  python: ">=3.10"
+  berg_agents: ">=0.0.1 <1.0.0"
+dependencies: []
+```
+
+`requirements` declares interpreter and host compatibility; `dependencies` lists other plugin ids that must load first.
+Version conflicts and cycles raise at discovery with the offending chain named.
+
+## 5. Capabilities (optional)
+
+```yaml
+capabilities:
+  - type: tool
+    id: "shared-todo"
+    name: "Shared ToDo"
+    description: "Manage shared todo lists"
+    tools:
+      - "create_todo"
+      - "list_todos"
+      - "update_todo"
+      - "complete_todo"
+      - "delete_todo"
+      - "add_subtask"
+      - "set_subtask_done"
+      - "rename_subtask"
+      - "delete_subtask"
+    risk_level: "low"
+```
+
+- `type: tool` registers each named function as a `ToolCapability`.
+  Names must match the plugin's tool functions; dispatch additionally accepts each function's `__name__`, so non-model-facing helpers (like shared-todo's `list_todo_items`, registered as a UI capability rather than listed here) stay callable through the generic endpoint.
+- `risk_level` seeds the HITL default for the capability's tools.
+- Skill and MCP adapters produce `SkillCapability` and `MCPCapability` descriptors instead; they are created by the host adapters, not hand-written.
+
+Capabilities only attach while the plugin is enabled.
+Toggling off withholds them from the next chat turn; toggling on re-registers (a past double-registration bug on enable→disable→enable is fixed via `clear_capabilities`).
+
+## 6. Settings schema (optional)
+
+```yaml
+settings_schema:
+  type: object
+  properties:
+    todo_path:
+      type: string
+      description: "Path to directory to use for todo-lists"
+      default: "./sharedtodos/"
+      secret: false
+      required: false
+```
+
+A JSON-schema subset.
+At load, `PluginManager._load_plugin_settings` runs `load_config` with these defaults, so `context.settings` is populated --- user config is never inert.
+Resolution order per key: `{config}/.{slug}/config.yaml` (flat or under `settings:`), then `plugins/<id|slug>.yaml`.
+Invalid config degrades to schema defaults; it never fails the load.
+
+Rules for authors:
+
+- Every setting the entry point reads must be declared here with a working `default`.
+- Mark credentials `secret: true` so they resolve from `${env:VAR}` and are never written to disk.
+- Adapter plugins must persist identity fields (`skill_file`, `server_name`) with `persist=True`, or every fresh process loads them with empty settings and zero capabilities.
+
+## 7. Permissions (optional)
+
+```yaml
+permissions:
+  - filesystem:read
+  - filesystem:write
+```
+
+Declared intent, surfaced in the Plugins browser.
+Enforcement for sandbox levels lives in `permissions/`; declare what you use so reviewers and future sandboxing agree with the code.
+
+## 8. UI block (optional)
+
+```yaml
+ui:
+  entry: "ui/dist/todo-surface.js"   # built bundle, relative to package root
+  export: "TodoSurface"              # named export the host mounts
+  placement: "side-panel"            # "side-panel" (docked) or "canvas"
+  label: "📋 Todos"                  # toolbar button chrome
+  width: 340                         # historical docked-width hint
+```
+
+- `entry` and `export` are required for the surface to load.
+  The backend resolves `entry` to `ui.entry_url` (`/berg-plugins/<plugin-dir>/…`) plus `ui.entry_built`, exposed in `GET /api/plugins`.
+- The bundle must exist before the server starts, or `entry_built` is `false` and the host says why instead of showing an empty panel.
+- React, ReactDOM, and the component library must be esbuild externals resolved against `window.BergRuntime` --- exactly one React instance.
+  Backend calls go through `BergRuntime.apiBase`, never a baked-in env var.
+- The component receives `PluginSurfaceProps` (`view`, `refreshKey`, `onClose`, `onToggleView`, `onCount`, ...).
+  Honor `refreshKey`; report a headline count via `onCount` for the toolbar badge.
+
+Full contract: [Plugin UI](PLUGIN-UI.qmd).
+
+## 9. Lifecycle (optional)
+
+```yaml
+lifecycle:
+  auto_enable: false
+  deferred: true
+  priority: 100
+```
+
+- `auto_enable: false` means the plugin loads but starts disabled until the user enables it.
+- `deferred: true` keeps heavy initialization off the startup path.
+- `priority` orders load when plugins depend on each other.
+
+## Discovery, validation, and runtime
+
+1. **Discovery** (`discovery/`) scans plugin paths (for example `BERG_AGENT_PLUGINS`) for `plugin.yaml` files and validates each against `PluginManifest`.
+   Schema violations fail the plugin with the field named --- the host keeps running.
+2. **Settings** load per section 6 before the plugin context is built.
+3. **Registration** (`PluginManager.load_all` + `enable_all`) instantiates the entry point and stores capabilities in the registry.
+4. **Chat path** (`chat_integration.py`) collects tools per turn and filters on live enabled state: `get_chat_plugin_tools`, `get_chat_plugin_state`, `set_plugin_enabled`, `list_chat_plugins` (the cheap offline check --- use it instead of booting a server in scripts).
+5. **Generic dispatch** --- `POST /api/plugins/{id}/tools/{tool}` resolves the live instance, matches by tool name or function `__name__`, runs with the project as cwd, JSON-encodes non-string returns, 404s unknown plugins/tools.
+6. **UI** --- `_resolve_ui_declaration` turns the `ui:` block into the browser-loadable descriptor; the host serves the bundle under `/berg-plugins/*` (`Cache-Control: no-cache`) and mounts it via `loadPluginSurface`.
+
+## Author checklist
+
+- [ ] `id` matches `^[a-z0-9][a-z0-9-]*$`, `version` is strict semver
+- [ ] `entry_point` is `importable.module:ClassName` (no hyphens), subclassing the real `BergPlugin`
+- [ ] Every tool the plugin offers is listed under a `tool` capability (or deliberately UI-only and reachable by `__name__`)
+- [ ] Every setting read in code is declared in `settings_schema` with a working default; secrets marked `secret: true`
+- [ ] Adapter identity fields use `persist=True`
+- [ ] If `ui:` is declared: bundle built at `ui.entry`, React as externals, `apiBase` helper used, export name matches, `PluginSurfaceProps` accepted
+- [ ] `lifecycle` reflects the right startup posture (`auto_enable`, `deferred`, `priority`)
+
+Known gap: the host's plugin list still needs one `pluginId` entry in `app/plugins/registry.tsx` per plugin to be *listed*; everything after that is runtime-driven.
+Making that mapping fully data-driven is open work --- do not treat the line as architecture.

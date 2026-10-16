@@ -6,7 +6,8 @@ format: html
 
 ## Overview
 
-A berg-agents plugin ships **its own user interface**. The host does not
+A berg-agents plugin ships **its own user interface**.
+The host does not
 know what any plugin does; it only knows how to *mount* one.
 
 This page documents that contract end to end:
@@ -40,7 +41,8 @@ ui:
   width: 340
 ```
 
-All five keys are read by the host. `entry` and `export` are required
+All five keys are read by the host.
+`entry` and `export` are required
 for the surface to load; the rest are presentation.
 
 The host exposes the resolved descriptor at `GET /api/plugins`:
@@ -60,7 +62,7 @@ The host exposes the resolved descriptor at `GET /api/plugins`:
 }
 ```
 
-`entry_url` is where the bundle is actually served from — construct it
+`entry_url` is where the bundle is actually served from --- construct it
 yourself from `<plugin-dir>/<entry>` if you need it before startup.
 `entry_built` is `false` when the bundle has not been built yet, so the
 host can say *why* instead of showing an empty panel.
@@ -68,7 +70,8 @@ host can say *why* instead of showing an empty panel.
 ## Building the bundle
 
 Your bundle is loaded by the browser at runtime, so it must be a real
-ES module and must be built. The reference plugin uses esbuild (`build-ui.mjs`) and a `build:ui` script:
+ES module and must be built.
+The reference plugin uses esbuild (`build-ui.mjs`) and a `build:ui` script:
 
 ```json
 {
@@ -80,9 +83,11 @@ ES module and must be built. The reference plugin uses esbuild (`build-ui.mjs`) 
 
 ### React must not be bundled
 
-This is the part that trips people up. Plugin bundles treat
+This is the part that trips people up.
+Plugin bundles treat
 `react`, `react-dom`, the JSX runtimes, and your component library as **externals**, resolved against the host's own
-copies. If your bundle
+copies.
+If your bundle
 ships its own React, you get two React instances and hooks break the
 moment the host renders your component.
 
@@ -129,14 +134,15 @@ await esbuild.build({
   sourcemap: true});
 ```
 
-Keep the catch-all resolving bare specifiers to the runtime — that is
+Keep the catch-all resolving bare specifiers to the runtime --- that is
 what makes `@heroui/react` (and anything else) come from the host
 instead of inflating your bundle.
 
 ### Where the entry file lives
 
 The bundle is written to the package directory named in `ui.entry`
-(`berg_plugins/<your-plugin>/ui/dist/my-surface.js`). Build it before
+(`berg_plugins/<your-plugin>/ui/dist/my-surface.js`).
+Build it before
 you start the server, or `entry_built` will be `false`.
 
 ## The host runtime
@@ -154,22 +160,24 @@ window.BergRuntime = {
 };
 ```
 
-| Member               | Purpose                                                                                                                          |
-|----------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| `React`, `HeroUI`    | The host's own instances. Use `require`, not a static import.                                                                    |
-| `apiBase`            | The backend origin the host is using. `""` means same-origin.                                                                    |
-| `require(specifier)` | Returns the host's module object for a bare specifier. Throws with a helpful message if the host does not expose that specifier. |
+  | Member                 | Purpose                                                                                                                            |
+  | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+  | `React`, `HeroUI`      | The host's own instances. Use `require`, not a static import.                                                                      |
+  | `apiBase`              | The backend origin the host is using. `""` means same-origin.                                                                      |
+  | `require(specifier)`   | Returns the host's module object for a bare specifier. Throws with a helpful message if the host does not expose that specifier.   |
 
-So do **not** `import React from "react"` in a plugin surface — that is
+So do **not** `import React from "react"` in a plugin surface --- that is
 the import esbuild rewrites to `BergRuntime.require("react")`, and it
-only works because you marked it external. Importing something the host
+only works because you marked it external.
+Importing something the host
 does not expose is an error with a clear message telling you to add it
 to `RUNTIME_MODULES`.
 
 ### Talking to the backend
 
 Read the API base from the runtime rather than baking it in at build
-time. The reference plugin keeps a small helper:
+time.
+The reference plugin keeps a small helper:
 
 ```ts
 // berg_plugins/shared-todo/ui/runtime.ts
@@ -183,17 +191,19 @@ export function apiFetch(path: string, init: RequestInit = {}): Promise<Response
 ```
 
 That means your surface follows the host's backend wherever the host is
-served from. Baking `process.env.NEXT_PUBLIC_API_BASE_URL` into the
+served from.
+Baking `process.env.NEXT_PUBLIC_API_BASE_URL` into the
 bundle instead would freeze it at build time and break under
 `next build` (the value is also not defined in a raw esbuild bundle).
 
 ## How the host mounts your component
 
-1. **`GET /api/plugins`** — the backend walks discovered plugins and
+1. **`GET /api/plugins`** --- the backend walks discovered plugins and
    turns each manifest `ui:` block into a descriptor by appending
    `entry_url` and `entry_built`.
 2. **The host builds its toolbar from that list.** One button per
-   plugin that declares a UI, using your `label`. No plugin name
+   plugin that declares a UI, using your `label`.
+   No plugin name
    appears in host code.
 3. **On click** the host calls `loadPluginSurface(pluginId, ui)`, which
    runtime-imports `entry_url` exactly once (cached by URL) and reads
@@ -214,18 +224,21 @@ interface PluginSurfaceProps {
 
 `refreshKey` is bumped when a tool call belonging to your plugin
 completes in the chat transcript, so the surface reflects what the
-agent just did without polling. `onCount` feeds the badge on the host's
+agent just did without polling.
+`onCount` feeds the badge on the host's
 toolbar button.
 
 If the bundle is missing, the export name is wrong, or the import
 throws, the host renders an explicit "Plugin UI unavailable" message
-with the reason — never a blank panel.
+with the reason --- never a blank panel.
 
 ### Served with `no-cache`
 
 The host serves `/berg-plugins/*` with `Cache-Control: no-cache` (via
-etag revalidation, not `no-store`). This matters: your bundle URL never
-changes, so a cached copy would silently hide every rebuild. Keep the
+etag revalidation, not `no-store`).
+This matters: your bundle URL never
+changes, so a cached copy would silently hide every rebuild.
+Keep the
 URL stable and rebuild freely.
 
 ## A complete example
@@ -298,7 +311,8 @@ appears in the toolbar.
 
 - **Static import only.** The host maps plugin ids to components in
   `app/plugins/registry.tsx`, so a new plugin needs one entry there to
-  be *listed*. Everything after that is runtime — but that one line is
+  be *listed*.
+  Everything after that is runtime --- but that one line is
   host code, and making it fully data-driven is not done yet.
 - **Standalone dev mode.** Running a plugin's `next dev` in isolation
   is possible but has no documented workflow yet.

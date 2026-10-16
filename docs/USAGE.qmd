@@ -6,15 +6,16 @@ format: html
 
 # Usage Examples
 
-BergAgents has three surfaces over the same Harness engine: the TUI, the Python API, and the web UI.
+One harness engine, three surfaces: the terminal UI, the Python API, and the web UI.
+Same tools, same slash vocabulary, same task lifecycle.
 
-## TUI
+## 1. Terminal UI
 
 ```bash
 python -m berg_agents --tui
 ```
 
-Bare text runs a `generic` task; `/harness` (alias `/task`) runs it with explicit `harness` task type:
+Bare text runs a `generic` task; `/harness` (alias `/task`) runs it with an explicit harness task type:
 
 ```
 harness> refactor the login flow to use sessions
@@ -24,82 +25,126 @@ harness> /stats
 harness> /help
 ```
 
-Slash commands (identical list and order in the web picker):
+### Slash commands (identical list and order in the web picker)
 
-| Command     | What it does                   |
-  |-------------|--------------------------------|
-| `/help`     | Show all slash commands        |
-| `/agents`   | List registered agents         |
-| `/models`   | Show available models (web UI) |
-| `/stats`    | Learning statistics            |
-| `/tools`    | List available tools (web UI)  |
-| `/health`   | System health check (web UI)   |
-| `/history`  | Show session task transcript   |
-| `/memory`   | Memory information (web UI)    |
-| `/context`  | Show current context (web UI)  |
-| `/settings` | Show settings (web UI)         |
-| `/plugins`  | List plugins (web UI)          |
-| `/skills`   | List skills (web UI)           |
-| `/mcps`     | MCP server status (web UI)     |
-| `/harness`  | Run a task through the harness |
-| `/task`     | Same as `/harness`             |
-| `/clear`    | Clear the session              |
+  | Command             | What it does                   |
+  | ------------------- | ------------------------------ |
+  | `/help`             | Show all slash commands        |
+  | `/agents`           | List registered agents         |
+  | `/models`           | Show available models (web UI) |
+  | `/stats`            | Learning statistics            |
+  | `/tools`            | List available tools (web UI)  |
+  | `/health`           | System health check (web UI)   |
+  | `/history`          | Show session task transcript   |
+  | `/memory`           | Memory information (web UI)    |
+  | `/context`          | Show current context (web UI)  |
+  | `/settings`         | Show settings (web UI)         |
+  | `/plugins`          | List plugins (web UI)          |
+  | `/skills`           | List skills (web UI)           |
+  | `/mcps`             | MCP server status (web UI)     |
+  | `/harness`, `/task` | Run a task through the harness |
+  | `/clear`            | Clear the session              |
 
 Commands marked "web UI" are listed in the TUI for parity but answered there with a web-only notice.
-Unknown commands warn and continue.
+Unknown commands warn and continue --- they never kill the session.
 
-## Python API
+## 2. Python API
 
 ```python
+from berg_agents.app import BergAgentsApp
+
+app = BergAgentsApp.create()
+# app.harness, app.agent, app.workspace, app.loop
+# app.serve(host="0.0.0.0", port=8001)  # serve explicitly
 ```
 
+`create()` assembles objects from the resolved config; it starts no server.
+Call `.serve(...)` to expose the API.
+Entry flags live in `berg_agents/__main__.py`: `--tui` / `--cli` for the terminal, otherwise web with `--host` / `--port` (defaults `0.0.0.0:8001`).
 
-## Web UI
+## 3. Web UI
 
 ```bash
+# Build the static UI once (FastAPI serves the export on the same origin)
+cd berg_agents/ui/webapp && npm install && npm run build
+
 python -m berg_agents --web --port 8001
 # → http://127.0.0.1:8001
 ```
 
-Type `/` to open the slash-command picker (same 16 commands as the TUI).
-Agent, HITL, and learning panels update from the same task lifecycle the TUI renders.
+Type `/` for the slash-command picker (same commands as the TUI).
+Agent, HITL, and learning panels follow the same task lifecycle the TUI renders.
+Session search and restore live at `/history`.
 
-### Frontend development
-
-For UI work, run the backend and the Next.js dev server separately.
-The dev server is cross-origin, so it needs the backend URL at startup (inlined by Next.js) - without it all `/api/*`
-calls 404 against
-Next.js itself.
-The backend allows CORS from `localhost`/`127.0.0.1`
-ports 3000-3001.
+### Frontend development loop
 
 ```bash
 python -m berg_agents --web --port 8001   # backend API
 cd berg_agents/ui/webapp && NEXT_PUBLIC_API_BASE_URL=http://localhost:8001 npm run dev
-# → http://localhost:3001 (3000 if free)
+# → http://localhost:3000 (3001 if taken)
 ```
 
-Production needs none of this: `python -m berg_agents --web` serves the
-API and the static Next.js build from one origin.
+The dev server is cross-origin, so it needs the backend URL at startup (inlined by Next.js) --- without it all `/api/*` calls 404 against Next.js itself.
+The backend allows CORS from `localhost` / `127.0.0.1` on ports 3000--3001 only.
+Production needs none of this: one origin serves API plus static build.
 
-### API endpoints
+### Plugin surfaces
 
-| Method   | Path                                                               | Purpose                                                  |
-  |----------|--------------------------------------------------------------------|----------------------------------------------------------|
+Toolbar buttons are generated from `GET /api/plugins` --- one per plugin declaring a `ui:` block, using its `label`.
+The host runtime-imports the plugin's built bundle once (cached by URL) and mounts the named export with `PluginSurfaceProps` (`view`, `refreshKey`, `onClose`, `onToggleView`, `onCount`, ...).
+`refreshKey` bumps when that plugin's tool completes in the transcript, so the panel reflects what the agent just did without polling.
+Bundles are served with `Cache-Control: no-cache`, so rebuilds appear on next navigation.
+Failures render an explicit reason --- never a blank panel.
+Full contract: [Plugin UI](plugins/PLUGIN-UI.qmd); pilot: [Shared-ToDo](plugins/SHARED-TODO.qmd).
 
-## Human-in-the-Loop
+## 4. Calling tools directly
 
-When a task needs review, the Harness returns `needs_human_review`:
+Synchronous single-tool execution (what a slash-typed `/read_file x` calls):
 
-- **TUI**: the result panel shows the review reasons, then `Approve and resume? [y/N]:` - approval re-executes with
-  `hitl_decision: approve` in metadata, anything else fails the task as rejected.
-- **Web**: the HITL surface shows tool name + arguments with Approve / Reject / Edit (edit rewrites the args before the
-  tool runs).
+```bash
+curl -X POST http://127.0.0.1:8001/api/tool/execute \
+  -H 'Content-Type: application/json' \
+  -d '{ "tool": "read_file", "args": { "file_path": "README.md" } }'
+```
 
-See [Tools](TOOLS.qmd) for which tools pause by default.
+`args` may also be a bare string (treated as `file_path`).
+`run_task` is special-cased to run the full harness pipeline.
+Failures return `status: "error"` output --- never tracebacks.
+Tool names and risk classes: `GET /api/tools`.
 
-## See Also
+Plugin tools go through one generic shape:
 
-- [Configuration](CONFIGURATION.qmd) - providers, routing, HITL rules
-- [Tools](TOOLS.qmd) - built-in tools, capabilities, MCP
-- [Quick Start](QUICKSTART.qmd) - installation and first run
+```bash
+curl -X POST http://127.0.0.1:8001/api/plugins/berg-plugin-shared-todo/tools/list_todo_items \
+  -H 'Content-Type: application/json' -d '{}'
+```
+
+Unknown plugin or tool returns 404.
+Nothing todo-specific remains in host routes.
+
+## 5. Human-in-the-loop
+
+Tool risk classes (`berg_agents/agents/factory.py`) decide the pause: `low` (`list_files`, `read_file`, `search_code`, `plan_task`) runs unattended; `high` (`bash`, `edit_file`, `patch_file`, `write_file`, `implement_task`, sensitive MCP) pauses.
+
+- **TUI**: the result panel shows review reasons, then `Approve and resume? [y/N]:` --- approval re-executes with `hitl_decision: approve` in metadata, anything else fails the task as rejected.
+- **Web**: the HITL surface shows tool name plus arguments with Approve / Reject / Edit (edit rewrites the args before the tool runs).
+- **Read-only / no-shell deployments** withhold mutating tools at registration --- stronger than asking the model not to use them.
+- Failed sends auto-reject orphaned approvals with a retry-friendly reason plus a dismissible alert; orphaned approval ids from dead runs are stripped on restore and marked expired, never replayed.
+
+## 6. Sessions, memory, compaction in daily use
+
+- Sessions persist as full `Conversation` JSON in `{config}/chat_sessions.db` (`GET` / `POST` / `PATCH` / `DELETE /api/sessions…`); a server-side `active_session` pointer (`GET` / `POST /api/sessions/current`, set on create/send/restore) keeps fresh tabs converging instead of minting duplicates.
+- Memory: `write_memory` files durable facts to `{config}/memory/MEMORY.md`; a bounded snapshot is injected beside every user message, refreshed each request.
+  `read_memory` / `search_memory` are for topic files only --- never re-read `MEMORY.md` itself.
+  Details: [Memory & Compaction](MEMORY.qmd).
+- Compaction (`TieredCompaction`: dedupe reads, then clear old tool results, then clamp oversized parts, then summarize once, receipts on) runs before the memory block is attached; `ReportContextUsage` feeds the live context gauge.
+  `StepPersistence` plus `ConversationSearch` keep compacted-away turns recallable by keyword.
+- Plugin enable/disable (`POST /api/plugins/{id}/enable|disable`) applies on the next chat turn.
+  Config `enabled: false` is the startup kill-switch default; runtime state is authoritative after that.
+
+## See also
+
+- [Configuration](CONFIGURATION.qmd) --- providers, routing, HITL rules, MCP, paths.
+- [Tools](TOOLS.qmd) --- full tool catalog with signatures and risk classes.
+- [Quick Start](QUICKSTART.qmd) --- installation and first run.
+- [Memory & Compaction](MEMORY.qmd), [Shared-ToDo pilot](plugins/SHARED-TODO.qmd), [Plugin UI](plugins/PLUGIN-UI.qmd).

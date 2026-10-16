@@ -1,75 +1,213 @@
 ---
 title: "Cheat Sheet"
-author: "Your Name"
+author: "Sofia Billger Bergström"
 format: html
 ---
 
-# Cheat Sheet
+# BergAgents Cheat Sheet
 
-A quick reference for everyday BergAgents usage.
+A reference page for the most-used commands, endpoints, environment keys,
+plugin identity, and data locations.
+Pairs with
+[Configuration](CONFIGURATION.qmd), [Tools](TOOLS.qmd),
+[Memory & Compaction](MEMORY.qmd), and the
+[Plugin UI](plugins/PLUGIN-UI.qmd) contract.
 
-## 📋 Common Slash Commands (TUI / Web)
+## Slash commands (shared by TUI / web)
 
-  | Command               | Description                        |
-  | --------------------- | ---------------------------------- |
-  | `/help`               | List all available commands        |
-  | `/agents`             | Show registered agents             |
-  | `/models`             | Show loaded models (web UI only)   |
-  | `/stats`              | Show learning statistics           |
-  | `/tools`              | List available tools               |
-  | `/health`             | System health check                |
-  | `/history`            | Show task transcript               |
-  | `/memory`             | Memory stats                       |
-  | `/context`            | Current context                    |
-  | `/settings`           | Show current settings              |
-  | `/plugins`            | List loaded plugins                |
-  | `/skills`             | List registered skills             |
-  | `/mcps`               | MCP server status                  |
-  | `/harness` or `/task` | Execute a task through the Harness |
-  | `/clear`              | Clear session state                |
+| Command | What it does |
+|---|---|
+| `/help` | List all commands |
+| `/agents` | Names/ids of registered agents plus per-agent settings |
+| `/models` | Loaded models and current selection |
+| `/tools` | Available tool names (risk banners) |
+| `/stats` | Learning/tool usage stats |
+| `/health` | System health check (web only; listed in TUI parity) |
+| `/history` | Task transcript (web/KTUI) |
+| `/memory` | Memory information (web version) |
+| `/context` | Current context dump (web version) |
+| `/plugins` | Loaded plugin inventory (web) |
+| `/skills` | Skill inventory (web) |
+| `/mcps` | MCP server status (web) |
+| `/settings` | Settings snapshot (web) |
+| `/harness <task>` or `/task <task>` | Run a task through the harness |
+<|end|> `/clear` | Clear the session's end context |
 
-## 📡 API Endpoints (REST)
+TUI-only commands accept free text; anything non-slash becomes a
+generic task.
+Web supports the same list via the slash picker.
 
-  | Method   | Path                               | Purpose                                   |
-  | -------- | ------                             | ---------                                 |
-  | POST     | `/api/harness`                     | Run a task; returns result dict           |
-  | POST     | `/api/harness/{thread_id}/stream`  | Start a streaming worker                  |
-  | GET      | `/api/harness/{thread_id}/events`  | SSE stream of task events                 |
-  | POST     | `/api/harness/{thread_id}/respond` | Answer a HITL pause (approve/reject/edit) |
-  | GET      | `/api/learning-stats`              | Get learning/outcome statistics           |
-  | GET/POST | `/api/providers`                   | List or modify provider registry          |
-  | GET      | `/api/providers/active`            | Show active provider                      |
-  | GET      | `/api/agents`                      | List all agents                           |
-  | GET      | `/api/agents/{name}`               | Get detailed agent info                   |
-  | POST/GET | `/api/threads`                     | Manage conversation threads               |
-  | POST     | `/api/threads/{id}/cancel`         | Cancel a running thread                   |
-  | POST     | `/api/threads/{id}/export`         | Export thread transcript                  |
+## CLI entry points
 
-## ⚙️ Configuration Layers (order of precedence)
+```bash
+python -m berg_agents --tui               # interactive TUI
+python -m berg_agents --web               # default host 0.0.0.0, port 8001
+python -m berg_agents --web --port 8123   # pick a port
+python -m berg_agents --web --host 127.0.0.1 --port 8001
+```
 
-1. **Explicit dict** passed to `BergAgentsApp.create()` (highest).
-2. **Environment variables** (`BERG_AGENT_*`).
-3. **`.env`** file (plain key-value pairs).
-4. **`../.berg-agents`** (default config).
+There are no additional flags wired to those settings (e.g.
+`--verbose`).
+Exit the TUI with Ctrl-D or `/clear` plus empty run,
+both standard.
 
-## 🗝️ Common Environment Variables
+## REST API endpoints
 
-  | Variable                 | Meaning                                                        |
-  | ----------               | ---------                                                      |
-  | `OPENAI_API_KEY`         | API key for OpenAI models (`${env:OPENAI_API_KEY}` in config). |
-  | `ANTHROPIC_API_KEY`      | API key for Anthropic.                                         |
-  | `BERG_AGENT_MCP_SERVERS` | Path to MCP JSONC config file.                                 |
+You can reach all endpoints from a `curl`/browser at the same origin as
+the web UI.
 
-## ✅ Quick Checklist Before Committing
+### Providers and agents
 
-- [ ] Code passes `ruff check` and `ruff format --check`.
-- [ ] Unit tests exist and run (`pytest`).
-- [ ] Documentation pages updated (new API, tutorials, or changes).
-- [ ] Version bump in `pyproject.toml` and `../.berg-agents`.
-- [ ] Changelog entry added.
-- [ ] All new concepts documented in the appropriate tutorial or best-practice page.
+- `GET  /api/providers` --- provider configs
+- `GET  /api/providers/active` --- active model selection
+- `POST /api/providers/active` --- set active model
+- `GET  /api/agents` --- agent inventory
+- `GET  /api/agents/{name}` --- agent detail
 
---------------------------------------------------------------------------------
+### Harness / chat loops
 
-Keep this page bookmarked; it's the fastest way to recall the most used commands and patterns.
-🎯
+- `POST /api/tool/execute` --- synchronous tool execution
+- `POST /api/chat/stream` --- start a streamed chat run
+- `GET  /api/harness` should not be used from docs check `/threads` path
+  of current API
+- `GET  /api/learning-stats` --- learning outcome stats
+- `GET  /api/threads` --- list threads
+- `POST /api/threads` --- create thread
+- `POST /api/threads/{id}/cancel` --- cancel running
+- `POST /api/threads/{id}/export` --- export transcript
+- `POST /api/harness/{thread_id}/stream` --- agent stream
+- `GET  /api/harness/{thread_id}/events` --- JSON events stream
+- `POST /api/harness/{thread_id}/respond` --- HITL response
+
+### Plugins and sessions
+
+- `GET  /api/plugins` --- plugin inventory + capabilities + UI
+- `POST /api/plugins/{plugin_id}/tools/{tool_name}` --- generic dispatch (request body JSON or string args mapped to file_path)
+- `POST /api/plugins/{plugin_id}/enable`
+- `POST /api/plugins/{plugin_id}/disable`
+- `GET  /api/sessions`
+- `GET  /api/sessions/current`
+- `POST /api/sessions/current`
+- `POST /api/sessions` --- create session
+- `GET  /api/sessions/{id}` --- retrieve
+- `PATCH /api/sessions/{id}` --- rename/update
+- `DELETE /api/sessions/{id}`
+
+### General
+
+- `GET  /api/tools` --- tool names and risk classes
+- `GET  /api/context` --- resolved context sources + config dir
+- `GET  /api/history` (History page serves it) --- page by page search
+- `GET  /api/plugins/{id}/...` mostly metadata
+- `GET  /berg-plugins/<plugin>/ui/dist/<surface>.js` --- plugin bundle
+- `GET  /history` --- search/restore history UI
+
+For authoritative, generated docs: open the served FastAPI open API at
+`/docs` once the server is running.
+
+## Environment and config keys
+
+### Config-level (JSONC)
+
+- `BERG_AGENT_PROVIDER`: `ollama`, `openai`, `unsloth`, etc.
+- `BERG_AGENT_BASE_URL`: optional
+- `BERG_AGENT_MODEL`: optional override
+- `BERG_AGENT_TEMPERATURE`
+- `BERG_AGENT_STREAM` (`true`)
+- `BERG_AGENT_VERBOSE` / `BERG_AGENT_LOG_LEVEL`
+- `BERG_AGENT_ROOT_DIR`: explicit workspace path
+- `BERG_AGENT_MCP_SERVERS`: MCP JSON file path
+- `BERG_AGENT_SKILLS`: JSON array of skill directories (`[[path, label]]`)
+- `BERG_AGENT_PLUGINS`: JSON array of plugin dirs (`./.shared_todo/`)
+- `BERG_AGENT_WEB_SEARCH_BACKENDS`: list of backends (`ollama`, `duckduckgo`, `direct`)
+- `BERG_AGENT_MEMORY`: JSON array of always-loaded AGENTS memory files
+- `BERG_AGENT_TODOS_ENABLED`: enable model's write-todos tool
+- `BERG_AGENT_SUMMARIZATION_TRIGGER`
+- `BERG_AGENT_SUMMARIZATION_KEEP`
+- `providers`, `defaultModel`, `harness`, `model_routing`, `hitl_rules`,
+  `agents`: provider + routing config (preferred modern form)
+- `CONTEXT7_API_KEY`
+- `GITHUB_PERSONAL_ACCESS_TOKEN` (if you wire github mcp)
+
+### Environment variables
+
+- `BERG_AGENTS_CONFIG_DIR`: highest config path precedence
+- `BERG_AGENT_*`: forward each setting directly via environment
+- `BERG_AGENT_OMNIROUTE_API_KEY`/`BERG_AGENT_OMNIROUTE_BASE_URL`
+- `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `COHERE_API_KEY`,
+  `UNSLOTH_API_KEY`, `OLLAMA_API_KEY`, `CONTEXT7_API_KEY`
+- `BERG_AGENT_OLLAMA_HOST`, `_PORT`, `_SCHEME`
+
+Prefix alignment: JSONC keys using dots/sections are mirrored by
+`BERG_AGENT_*` family env keys; use env values with `${env:...}` or direct.
+
+### Plugin per-plugin settings
+
+Plugin config lives at `{config}/.{slug}/config.yaml` (e.g.
+`{config}/.shared_todo/config.yaml`) and uses:
+
+- `{slug}` derived from plugin id (always lowercase, stripped `--todo`)
+- `load_config(manifest, defaults)` with schema defaults
+- Writes persist when adapters record identity (`persist=True`)
+
+## Plugin identities
+
+  | Plugin id                 | Package                    | Install                        | Tools                     | UI                  |
+  | ---                       | ---                        | ---                            | ---                       | ---                 |
+  | `berg-plugin-shared-todo` | `berg_plugins/shared-todo` | `build:ui`                     | 10 (incl. helper)         | side panel `        |
+  | label \"📋 Todos\"`       |                            |                                |                           |                     |
+  | `berg-plugin-skill-*`     | skills via config paths    | pre-built (no personal bundle) | deferred                  | none                |
+  | `berg-plugin-mcp-*`       | config servers (fronted)   | none                           | contributed by mcp server | none (status badge) |
+
+- Tools require a tools chain (registry: can disable via backend)
+- Plugin `ui.entry` URL is served at
+  `/berg-plugins/<plugin-dir>/...` with no cache.
+
+## File/data layout (do not move lightly)
+
+```
+.berg-agents/                     # technology solution root
+  bergagents.jsonc                 # typed settings + providers
+  profiles.yaml                    # prompt suffix/tool tuning per model
+  mcp.json                        # external servers
+  active_session                  # tracked pointer for new windows
+  chat_sessions.db                 # sessions + full conversation JSON
+  runs.db                         # step persistence + search
+  plugins/                        # per-plugin config (persisted)
+  .shared_todo/                    # shared-todo identity/config
+  memory/                         # memory runtime
+      MEMORY.md                    # auto-injected notebook
+      (topic files)               # per-feature memory
+  (legacy nested memories)        # leave untouched unless you know them
+sharedtodos/                      # user todo (Markdown-level)
+berg_plugins/<plugin>/            # plugin sources + bundles
+```
+
+Do NOT exit or rename any of these without considering consequences:
+- Debug rollbacks require the db not page-level deletion.
+Clean
+up only from code that understands each schema.
+- Uninstalling plugins does not touch their `{config}/.{plugin}` folder;
+manual archive/restore it yourself.
+
+## Build/dev quick keys
+
+- `npm run build` (web app) writes static export FastAPI serves.
+- `npm run build:ui` (plugin package) writes `ui/dist/<surface>.js`.
+- `tsc --noEmit --skipLibCheck` for TypeScript checks.
+- `ruff check .`, `ruff format --check .`
+- `pytest -q` for offline tests only (no provider).
+  Slow test suite by
+  marker opt-in.
+
+## One-line verification
+
+```bash
+# plugin visibility
+curl -s http://localhost:8001/api/plugins | head
+curl -s http://localhost:8001/berg-plugins/shared-todo/ui/dist/todo-surface.js | head
+curl -s http://localhost:8001/api/tools
+```
+
+All generated via local codebase + notes; if something changes,
+consult `notes/recovery_plugin_plan.md` for contract details.

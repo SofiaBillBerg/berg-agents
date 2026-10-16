@@ -1,31 +1,84 @@
 ---
 title: "Configuration"
+author: "Sofia Billger Bergström"
 format: html
 ---
 
 # Configuration
 
-BergAgents uses a **provider-centric configuration** pattern.
-Each model
-belongs to a provider; provider/baseURL/apiKey resolve FROM the model id -
-never from a global provider flag.
+BergAgents is **provider-centric**: every model id belongs to a provider block, and the provider block carries its own `baseURL`, `apiKey`, timeout and transport flags.
+There is no global provider switch.
+Selecting `qwen3.5:9b` resolves the `ollama` block; selecting `gpt-4o` resolves the `openai` block.
+Code: `berg_agents/providers/registry.py` (`resolve_model`, `load_providers`).
 
-Layers (increasing precedence):
+All state --- settings, plugin settings, sessions, runs, memory --- lives under one directory resolved by one function.
+Code: `berg_agents/config/paths.py::resolve_config_dir`.
 
-1. **Config file**: `../.berg-agents` - `providers` + `harness`/`model_routing`/`hitl_rules`/`plugins`/`agents`
-2. **`.env` file**: values referenced from config with `${env:VAR_NAME}` or `{env:VAR}`
-3. **Environment variables**: `BERG_AGENT_*` override config and `.env`
-4. **MCP config**: `../.berg-agents` (via `BERG_AGENT_MCP_SERVERS`) for MCP servers
+## 1. Config directory resolution
 
-![Berg-Agents Config](visualizations/svg/packages_berg_agents.svg "Berg Agents Config Modules")
+First match wins:
 
-## Providers
+1. `BERG_AGENTS_CONFIG_DIR` --- explicit override, always wins.
+2. `{project-root}/.berg-config` --- preferred when present.
+3. `{project-root}/.berg-agents` --- accepted for compatibility.
+4. `~/.berg-agents` --- global fallback.
+
+Helpers: `config_file(name)` gives `{config}/{name}`; `plugin_config_dir(plugin_id)` gives `{config}/.{slug}` (for example `{config}/.shared_todo/config.yaml`).
+
+What lives there on this checkout (`.berg-agents/`): `bergagents.jsonc`, `profiles.yaml`, `mcp.json`, `active_session`, `chat_sessions.db`, `runs.db`, `plugins/`, `.shared_todo/`, `memory/` (`MEMORY.md` plus topic files).
+
+Rules: never hardcode a config dir name elsewhere --- call the resolver.
+Never split state across two dir names.
+
+## 2. Layer precedence
+
+`berg_agents/config/settings.py` (`Settings`, pydantic-settings, `BERG_AGENT_` prefix).
+Sources are consulted in order, first match wins:
+
+1. Init values passed to `Settings(...)` in code (rarely needed).
+2. Environment variables (`BERG_AGENT_*`).
+3. `.env` at the project root.
+4. `bergagents.jsonc` (JSONC: comments and trailing commas allowed; `.json` / `.yaml` / `.yml` variants also read).
+
+Environment beats `.env`, which beats the config file.
+
+### `${env:VAR}` substitution
+
+Config strings may embed `${env:VAR_NAME}` or `${VAR}`.
+They expand against the merged `.env` plus process environment (process wins).
+A value that is exactly one placeholder for an unset variable is dropped so the field default applies --- it never persists as an empty string.
+Never write a secret inline; write the placeholder and put the value in `.env` (git-ignored).
+
+## 3. Typed settings fields
+
+Defaults live on the model so the app boots with zero config.
+The main fields (environment name in brackets):
+
+- `backend` [`BERG_AGENT_BACKEND`], default `"berg"` --- the framework-free `BergLoop`.
+- `provider` [`BERG_AGENT_PROVIDER`], default `"ollama"`.
+- `max_tokens` (6000), `stream` (true), `temperature` (0.7).
+- `auth_token`, `log_level` (`INFO`), `max_execution_time` (5000), `max_iterations` (50).
+- `root_dir` (`.`) --- the workspace root file tools are bound to.
+- `system_prompt` --- default coding-agent prompt; `profiles.yaml` appends per-model suffixes.
+- `verbose` (true), `checkpoint_dir` (`~/.berg_agents/checkpoints/`), `stream_enabled` (true --- false makes the stream endpoint return 501).
+- `mcp_servers` [`BERG_AGENT_MCP_SERVERS`] --- path to the MCP JSON file.
+- `ollama_*` / `openai_*` --- legacy flat connection keys; the `providers` block below is preferred.
+- JSON-encoded arrays: `BERG_AGENT_SKILLS`, `BERG_AGENT_PLUGINS`, `BERG_AGENT_WEB_SEARCH_BACKENDS`, `BERG_AGENT_MEMORY`, `BERG_AGENT_TODOS_ENABLED`, `BERG_AGENT_SUMMARIZATION_TRIGGER`, `BERG_AGENT_SUMMARIZATION_KEEP`.
+
+Unknown `BERG_AGENT_*` keys are ignored, never fatal.
+
+## 4. The `providers` block (preferred)
 
 ```jsonc
 {
   "providers": {
     "ollama": {
-      "options": { "baseURL": "http://localhost:11434/v1", "apiKey": "" },
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://localhost:11434/v1",
+        "apiKey": "",
+        "timeout": 120000
+      },
       "models": { "qwen3.5:9b": {}, "gpt-oss:20b": {} }
     },
     "openai": {
@@ -35,71 +88,74 @@ Layers (increasing precedence):
       },
       "models": { "gpt-4o": {}, "gpt-4o-mini": {} }
     }
-  }
+  },
+  "defaultModel": "qwen3.5:9b"
 }
 ```
 
-Resolution (`berg_agents/providers/registry.py`):
+Resolution rules (`registry.py`):
 
-1. `resolve_model("qwen3.5:9b")` finds the model under its provider block
-2. Provider `options` map onto constructor kwargs (`baseURL` → `base_url`, `apiKey` → `api_key`); per-model `options` override them
-3. `api_key` defaults to `""`; `{env:VAR}` placeholders expand at load time
-4. With no id, the first declared model is the default; unknown ids raise `KeyError` listing known models
+- `options` map onto constructor kwargs: `baseURL` becomes `base_url`, `apiKey` becomes `api_key` (`api_key` defaults to `""`).
+- Per-model `options` override the provider-level ones.
+- With no id, the first declared model is the default; `defaultModel` pins startup explicitly.
+- Unknown ids raise `KeyError` listing the known models.
+- `npm` is informational (which JS SDK package speaks to the endpoint).
+  `"api": "anthropic-messages"` switches a block to native Anthropic wire format instead of appending `/chat/completions`.
 
-![Berg-Agents Providers](visualizations/svg/packages_berg_agents.providers.svg "Berg Agents Providers Modules")
+Any OpenAI-compatible endpoint (Unsloth, OmniRoute, a local GGUF server) is added the same way: a new block, zero code changes.
 
-## Harness
+## 5. Harness, routing, HITL, agents
 
 ```jsonc
 {
-  // Harness engine (framework-agnostic core)
   "harness": { "enable_learning": true, "enable_hitl": true },
-
-  // Model routing - one model list per complexity level (single axis)
   "model_routing": {
     "models": {
-      "trivial":  { "models": ["qwen3.5:9b"], "max_tokens": 4096 },
-      "standard": { "models": ["gpt-oss:20b"], "max_tokens": 8192 },
-      "complex":  { "models": ["gpt-oss:20b"], "max_tokens": 8192 },
-      "critical": { "models": ["gpt-4o"], "max_tokens": 128000 }
+      "trivial":   { "models": ["qwen3.5:9b"], "max_tokens": 6000 },
+      "standard":  { "models": ["gpt-oss:20b"], "max_tokens": 8192 },
+      "complex":   { "models": ["gpt-oss:20b"], "max_tokens": 8192 },
+      "critical":  { "models": ["gpt-4o"],     "max_tokens": 128000 }
     }
   },
-
-  // HITL rules - Guardian decides when to ask
   "hitl_rules": {
     "auto_execute": ["read_file", "list_files", "search_code"],
     "notify_after": ["edit_file", "new_file", "generate_test"],
-    "ask_before": ["delete_file", "execute_command", "refactor"],
-    "human_leads": ["security_change", "production_deploy", "data_migration"]
+    "ask_before":   ["delete_file", "execute_command", "refactor"],
+    "human_leads":  ["security_change", "production_deploy", "data_migration"]
   },
-
-  // Plugins - optional plugin paths (BergAgents works without them)
-  "plugins": [".opencode"],
-
-  // Per-agent tuning - preferred complexity per subagent
+  "plugins": ["./.shared_todo/"],
   "agents": {
-    "guardian":      { "preferred_complexity": "standard" },
-    "planner":       { "preferred_complexity": "complex" },
-    "implementation":{ "preferred_complexity": "standard" },
-    "curator":       { "preferred_complexity": "trivial" },
-    "learning":      { "preferred_complexity": "standard" }
+    "guardian":       { "preferred_complexity": "standard" },
+    "planner":        { "preferred_complexity": "complex" },
+    "implementation": { "preferred_complexity": "standard" },
+    "curator":        { "preferred_complexity": "trivial" },
+    "learning":       { "preferred_complexity": "standard" }
   }
 }
 ```
 
-Loaded via
-Subagents:
+One model list per complexity level (single axis).
+Each tool's `risk_class` (`low`/`high` in `factory.py`) decides whether it pauses for approval; `hitl_rules` names which families fall where.
 
-## `.env` File
+## 6. Profiles (`profiles.yaml`)
 
-```dotenv
-OPENAI_API_KEY=sk-...
-GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
+Per-provider or per-`provider:model` prompt suffixes and tool visibility.
+Code: `berg_agents/profiles/router.py`.
+
+```yaml
+"ollama":
+  system_prompt_suffix: "Be concise and prefer minimal, focused diffs."
+  excluded_tools: []
 ```
 
-## MCP Configuration
+- Keys match the bare provider (`ollama`), exact pairs (`ollama:qwen3.5:9b`), and wire aliases (`openai`, `openai:<model>`).
+- `excluded_tools` supports globs: `mcp_*` hides every MCP tool for that provider, `mcp_memory__*` hides one server.
+- A missing or broken profiles file degrades to `{}` --- nothing hidden, never fatal.
 
-External MCP servers live in the file pointed at by `BERG_AGENT_MCP_SERVERS` (default `../.berg-agents/mcp.json`):
+## 7. MCP servers (`mcp.json`)
+
+Path from `BERG_AGENT_MCP_SERVERS` (default `{config}/mcp.json`).
+A JSON list; each entry is `http` or `stdio`:
 
 ```json
 [
@@ -114,23 +170,39 @@ External MCP servers live in the file pointed at by `BERG_AGENT_MCP_SERVERS` (de
 ]
 ```
 
-Secrets are never stored in the MCP file - only `${env:VAR}` references.
-Sensitive servers (`github`, `memory`) pause for approval; read-only servers (`context7`, `docs`, `reference`) run without interruption.
+- Secrets only as `${env:VAR}` --- never inline.
+- Sensitive servers (`github`, `memory` by convention) pause for approval; read-only ones (`context7`, `docs`, `reference`) run without interruption.
+- `"enabled": false` is the startup kill-switch.
+  After startup, runtime state (Plugins tab toggles, applied per turn) is authoritative.
+- Servers appear as `berg-plugin-mcp-*` in `GET /api/plugins` with transport and approval flags, so the UI and the chat path agree.
 
-## Profiles
+## 8. Web search backends
 
-`../.berg-agents/profiles.yaml` tunes prompt suffixes and tool visibility per provider or per `provider:model`:
+`BERG_AGENT_WEB_SEARCH_BACKENDS` (default `["ollama", "duckduckgo", "direct"]`).
+Code: `berg_agents/capabilities/web_backends.py`.
 
-```yaml
-"ollama":
-  system_prompt_suffix: "Be concise and prefer minimal, focused diffs."
-  excluded_tools: []
-```
+  | Backend      | Key              | Search | Fetch |
+  | ------------ | ---------------- | ------ | ----- |
+  | `ollama`     | `OLLAMA_API_KEY` | yes    | yes   |
+  | `duckduckgo` | none             | yes    | no    |
+  | `direct`     | none             | no     | yes   |
 
-![Berg-Agents Profiles](visualizations/svg/packages_berg_agents.profiles.svg "Berg Agents Profiles Modules")
+Backends are tried in order; unknown names warn and are skipped.
+Without `OLLAMA_API_KEY` the Ollama index is skipped and search falls through --- the web stack never fails hard because one backend is missing.
 
-## Precedence Example
+## 9. Skills and plugins
 
-Config file: `BERG_AGENT_TEMPERATURE = 0.7` .
-`.env`: `BERG_AGENT_TEMPERATURE=0.9` .
-environment: `BERG_AGENT_TEMPERATURE=0.5` → effective value is `0.5` (environment wins).
+- `BERG_AGENT_SKILLS` --- JSON array of `SKILL.md` directories (or `[path, label]` pairs).
+  Skills load as deferred toolsets and surface as `berg-plugin-skill-*`.
+- `BERG_AGENT_PLUGINS` --- JSON array of plugin package paths (for example `["./.shared_todo/"]`).
+- Per-plugin settings resolve to `{config}/.{slug}/config.yaml` (shared-todo: `{config}/.shared_todo/config.yaml`), loaded with manifest schema defaults; invalid config degrades to defaults and never fails discovery.
+  Adapter identity fields persist with `persist=True` so they survive restarts.
+
+## 10. Verify
+
+1. Start the server: `python -m berg_agents --web --port 8001`.
+2. `GET /api/tools` --- workspace plus memory tools with risk classes.
+3. `GET /api/plugins` --- the default set (pilot plus skill and MCP adapters); shared-todo reports its tools and `ui.entry_built: true`.
+4. `GET /api/context` --- the resolved config dir, providers, and profiles as the app sees them.
+
+Keep `.env` beside `bergagents.jsonc`, out of version control.

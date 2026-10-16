@@ -6,48 +6,228 @@ format: html
 
 # Contributing
 
-Bug fixes, features, and docs improvements are all welcome.
-The rules below keep the architecture coherent - please follow them.
+Bug fixes, features, plugin work, and documentation improvements are all
+welcome.
+The rules below keep the architecture coherent - every
+contribution should make the system **more** self-consistent, not less.
 
-## Development Setup
+## 1. Core principles
+
+- **One logical piece at a time.** Do not bundle an unrelated refactor,
+  a dependency upgrade, and a bug fix into one change - it is impossible to
+  review or roll back safely.
+- **Permission default = ASK.** Never push, open a PR, merge, rebase, or
+  ev en commit to `origin` without explicit approval from Sofia.
+  Local git
+  actions are also off-limits without approval; the maintainers handle
+  git directly.
+- **Never edit code you have not read in the current session.** If a file
+  has drifted, re-read it first.
+- **Plan before big changes.** Non-trivial work lives in `.opencode/plans/`
+  - keep `tasklog.md` per-task and `projectlog.md` per-project current.
+- **No live-model or live-provider tests.** `ALLOW_MODEL_REQUESTS=False`
+  in `tests/conftest.py` is never bypassed - tests use mocks only.
+  Real
+  providers are exercised manually in the browser or TUI.
+
+## 2. Development setup
+
+### Workspace
+
+1. The working tree is everything - `.berg-agents/` (config, sessions,
+   memory), `sharedtodos/` (user tasks), and `.opencode/` (plans, notes)
+   are git-ignored but shared for continuity.
+   Do not delete them.
+2. Node and Bun are not always on `PATH` (shell is non-interactive).
+   Use absolute binaries (e.g. `~/.bun/bin/bun`,
+   `~/.nvm/versions/node/v24.21.0/bin/node`).
+3. Use `uv` for all Python environment and dependency work.
+
+### First-time install
 
 ```bash
-git clone https://github.com/your-username/berg_agents.git
-cd berg_agents
 uv venv
+cd .venv  # implied by project root
 source .venv/bin/activate
 uv pip install -e .
 ```
 
-## Architecture Principles
-
-- New agents implement `AbstractAgent`; new tools are `ToolSpec` values in the `ToolRegistry`.
-
-## Code Style & Linting
-
-`ruff` for lint and format.
-Before pushing:
+### Front-end (once, then on change)
 
 ```bash
-ruff check --select F .
+cd berg_agents/ui/webapp
+npm install   # or: bun install
+npm run build # static export served by FastAPI on one origin
+```
+
+### Plugin bundles (shared-todo and any others)
+
+```bash
+cd berg_plugins/<plugin>
+npm install
+npm run build:ui     # writes ui/dist/<surface>.js if the manifest declares an entry
+```
+
+### Configuration
+
+- Copy/adapt `.berg-agents/bergagents.jsonc` and put secrets in `.env`
+  under `${env:VAR_NAME}` references - never in source.
+- Verify the active config dir with `BERG_AGENTS_CONFIG_DIR` before you
+  assume a data location.
+
+## 3. Where code lives
+
+  | Area           | Location                           | Notes                                                                 |
+  | ---            | ---                                | ---                                                                   |
+  | Harness/agents | `berg_agents/agents/`              | `AbstractAgent`, Guardian, Planner, Implementation, Curator, Learning |
+  | Tools (specs)  | `berg_agents/agents/factory.py`    | `ToolSpec` values, risk classes, native + MCP tools                   |
+  | Web + TUI      | `berg_agents/ui/`                  | `server.py`, `routes.py`, `session_store.py`, FastAPI helpers         |
+  | Web front-end  | `berg_agents/ui/webapp/app/`       | Next.js, HeroUI, plugins, runtime (`BergRuntime`)                     |
+  | Plugin system  | `berg_agents/plugin_system/`       | discovery, capabilities, memory, compaction, sessions                 |
+  | Providers      | `berg_agents/providers/`           | provider-centric resolution - never add a global provider flag        |
+  | Config         | `berg_agents/config/`              | single resolver in `paths.py`; settings, config manager               |
+  | Plugins        | `berg_plugins/<plugin-id>/`        | one home per plugin (manifest, code, UI bundle)                       |
+  | Docs           | `docs/*.qmd`, `docs/plugins/*.qmd` | Quarto source; `README.md` generated from `README.qmd`                |
+
+## 4. Architecture rules you must respect
+
+1. **Config single source of truth.** All config files resolve through
+   `berg_agents/config/paths.resolve_config_dir` - mirror one logic means
+   no hard-coded `.berg-agents`/`.berg-config` strings elsewhere.
+2. **Provider-centric config.** A model carries its own provider,
+   `baseURL`, and `apiKey`.
+   No global provider flag, EVER.
+3. **Plugin installing must not require a host edit.** Plugins ship a built
+   JS bundle; the host imports the plugin source in no place - it only
+   mounts manifest-declared UI at runtime.
+   Adding a plugin line to
+   `registry.tsx` is a known gap to fix, not acceptable architecture.
+4. **User data is inviolable.** `sharedtodos/` is her data - never
+   auto-delete, rewrite cache, or reformat it as a \"clean-up\" step.
+   Older
+   nested memory files were explicitly left in place for manual merge.
+5. **Memory path is flat.** `FileStore` rooted at the config directory,
+   namespace empty, `agent_name=\"memory\"` so `MEMORY.md` lands at
+   `{config}/memory/MEMORY.md`.
+   Double-nesting is a known regression.
+6. **Compaction ordering is load-bearing.** Compaction (mutable history)
+   is registered **before** `Memory` (request-only injection) - otherwise
+   a memory block is dropped by the rewrite.
+   Do not re-order.
+7. **Session store is per-operation connections.** sqlite3 thread affinity;
+   do not cache connections across asyncio tasks.
+8. **Permission default = ask** for tools surfaced in chat (high-risk /
+   HITL) and for any agent that runs unsafe steps.
+9. **Comments must stay** - source comments are clarity, not \"AI slop\".
+
+## 5. Adding a tool
+
+1. Implement the function in `berg_agents/agents/` (or as a `ToolCapability`
+   in a plugin).
+2. Wrap it as `make_tool_spec(... name=..., risk_class=low|high ...)` so it
+   inherits atomic writes, timeouts, path normalization.
+3. Add it to `create_tools()` (or the plugin capability registrations).
+4. Declare its HITL class implicitly by `risk_class`: high-risk auto-gates.
+5. Write tests under `tests/` using mocks only; do not forward to live
+   providers.
+6. Document it in `docs/TOOLS.qmd` and (if user-facing) `FAQ.qmd`.
+
+## 6. Writing a plugin
+
+Follow `berg_plugins/shared-todo/` as the conformance baseline:
+
+1. `plugin.yaml` with `metadata`, `entry`, `capabilities`, and - if the
+   plugin has UI - a `ui:` block (`entry`, `export`, `placement`, `label`,
+   `width`).
+2. Real `BergPlugin` subclass imported from `berg_agents.plugin_system`
+   (no local stubs).
+3. `PluginContext` is populated via `load_config` with schema defaults so
+   config is alive - never read env/config manually in the entry point.
+4. Capabilities are stored persistently: use `persist=True` for
+   per-plugin identity fields (skill path / MCP server name etc.).
+5. Ship a built bundle produced by esbuild (`build-ui.mjs`); treat
+   React/ReactDOM/component libraries as **externals** against
+   `window.BergRuntime` so there is exactly one React instance.
+6. Use `apiBase()` from the runtime helper - never bake `process.env`
+   into the bundle.
+   SetCache-Control is handled by the host, but keep the
+   URL stable and rebuild freely.
+7. Give the plugin UI the `PluginSurfaceProps` contract (`view`,
+   `refreshKey`, etc.).
+   Tries on `refreshKey` is how it stays in sync.
+
+See `docs/plugins/PLUGIN-UI.qmd` and `docs/plugins/SHARED-TODO.qmd` for
+the full contract.
+
+## 7. Documentation discipline
+
+- Source is always **`.qmd`** in `docs/`.
+  `README.md` is generated from
+  `docs/README.qmd` (`project_utils/render_readme.sh`); never hand-edit
+  `README.md`.
+- `quarto render` runs `run_apidocs.sh`, `run_diagrams.sh`, and (for
+  `render_readme.sh`) the exported docs output.
+  Check `_site/` (not
+  `docs/docs_web/`) is the publishable build when used as a website.
+- Update the page's front-matter (`title`, `author`) - author = you,
+  Sofia Billger Bergström.
+- Keep internal links relative and verify them after moving files - e.g.
+  `docs/plugins/...qmd` capitalization must match `_quarto.yml`.
+- Add new capabilities to `TOOLS.qmd`; architecture decisions to
+  `docs/…` and notes/
+- Every plan page update is a real deliverable; do not ship \"TODO\" pages.
+
+## 8. Testing
+
+```bash
+source .venv/bin/activate
+ruff check .
 ruff format --check .
+ pytest -q
 ```
 
-Public functions, classes, and methods get docstrings.
-PEP 8 naming.
+- Suite is offline; mock HITL, tools, MCP.
+  Never live models.
+- Use markers (`slow`, etc.) when adding expensive tests - slow tests must
+  not run by default in CI.
+- Common entry points for plugins: instead of `TestClient(create_app())`
+  (which can hang waiting for stdio MCP processes), use cheap helpers
+  like `chat_integration.list_chat_plugins()`.
+- Sub-second feedback: use `py_compile` + `ruff` on touched files before
+  waiting for a full run.
+- `sqlite` tests must be per-operation; never share a `Connection` across
+  threads.
 
-## Testing
+## 9. Toolchain gotchas (observed)
 
-```bash
-pytest   # full suite, offline: mocks only, never live models
+- `keep_alive` MCP keep-stdio servers can block `pytest`; bound the run
+  or avoid killing server processes inside tests.
+- `agent-browser --enable react-devtools` is required for React component
+  tracing during UI work.
+- `git` remote operations (push, gh pr, merge) happen only on explicit
+  user approval.
+- Do not run `sudo`; ask Sofia.
+
+## 10. Open a pull request
+
+1. Keep it scoped - one logical piece.
+2. Branch from `main`; no history rewriting shared.
+3. Describe **what** changed and **why**; include test evidence and manual
+   checks you performed.
+4. Update docs if any public surface changed (new tool, env key, file path,
+   mutation pattern).
+5. Move plan files in `.opencode/plans/` if one tracks this work.
+6. Wait for explicit approval before any push.
+
+```markdown
+## 11. Bootstrap checklist for a fresh checkout
+
+- [ ] Python 3.12+, uv, `.venv` activated
+- [ ] `uv pip install -e .`
+- [ ] Web UI built (`npm run build`)
+- [ ] Any plugin bundles built (`npm run build:ui`)
+- [ ] Config directory resolves to the right project path
+- [ ] `ruff check . && ruff format --check .` clean
+- [ ] `pytest -q` passes
+- [ ] Agent and docs updated
 ```
-
-Rules: no live-model tests (`ALLOW_MODEL_REQUESTS=False` in `conftest.py` is never bypassed); strengthen assertions in lockstep with behavior changes, never weaken them to fit.
-Add tests for every fix and feature.
-
-## Submitting Changes
-
-1. Branch from main (`git checkout -b my-change`).
-2. Keep the change to one logical piece; update the plan tracker if one exists.
-3. Run the full suite + lint; report failures before fixing, then fix.
-4. Open a PR describing what changed and why, with test evidence.
