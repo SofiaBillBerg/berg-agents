@@ -29,7 +29,9 @@ cspell.json
 docs/docs_web/
 /.quarto/
 **/*.quarto_ipynb
-
+/_site/
+/.berg-agents/memory/
+/.berg-agents/.*
 # node
 **/node_modules
 **/.pnp
