@@ -337,6 +337,52 @@ textarea:focus {
   padding: 0.5rem 1rem;
 }
 
+/* Override layer: docs/styles/quartz-contrast.css loads after the themes
+   and never toggles, carrying light !important surfaces that would punch
+   pale holes into dark mode. The `body` prefix outranks those rules, so
+   dark holds with no dependence on toggle body classes. */
+body pre,
+body .code,
+body .quarto-code-cell {
+  background-color: #2f1539 !important;
+  border-color: #5a2c68 !important;
+  color: #f3e8f7 !important;
+}
+
+body code {
+  background-color: #3a1c44 !important;
+  color: #f0a6e8 !important;
+}
+
+body pre code {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+body table,
+body td {
+  background-color: #2a1230 !important;
+  color: #f3e8f7 !important;
+}
+
+body table th {
+  background: linear-gradient(135deg, #7d029c, #3b528b) !important;
+  color: #fff !important;
+}
+
+body table tbody tr:nth-child(even) {
+  background-color: #301539 !important;
+}
+
+body .tocify,
+body .tocify-header,
+body .tocify-subheader,
+body .quarto-code-tools,
+body .quarto-code-tools .btn {
+  background: #2f1539 !important;
+  color: #f3e8f7 !important;
+}
+
 html {
   scroll-behavior: smooth;
 }

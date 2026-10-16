@@ -327,7 +327,7 @@ new store.
 ### The render complains about a missing file or stale output
 
 Each `.qmd` is one page; `README.md` at the repo root is generated from
-`docs/README.qmd` — never edit it by hand. Keep file names and case
+`docs/index.qmd` — never edit it by hand. Keep file names and case
 consistent with the links in `_quarto.yml`, and re-run `quarto render`
 after moving pages.
 

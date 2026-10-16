@@ -81,7 +81,7 @@ npm run build:ui     # writes ui/dist/<surface>.js if the manifest declares an e
   | Plugins        | `berg_plugins/<plugin-id>/`        | one home per plugin (manifest, code, UI bundle)                       |
   | Docs           | `
 *.qmd`, `
-plugins/*.qmd` | Quarto source; `README.md` generated from `README.qmd`                |
+plugins/*.qmd` | Quarto source; `README.md` generated from `index.qmd`                 |
 
 ## 4. Architecture rules you must respect
 
@@ -154,7 +154,7 @@ See [`plugins/PLUGIN-UI.qmd`](plugins/PLUGIN-UI.qmd) and [`plugins/SHARED-TODO.q
 ## 7. Documentation discipline
 
 - Source is always `.qmd` under `docs/`. The root `README.md` is generated
-  from `docs/README.qmd` by `project_utils/render_readme.sh` (post-render
+  from `docs/index.qmd` by `project_utils/render_readme.sh` (post-render
   step in `_quarto.yml`); never hand-edit `README.md`.
 - The site build is `quarto render`, which runs the configured pre-render
   scripts (`run_apidocs.sh`, `run_diagrams.sh`) and post-render

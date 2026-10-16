@@ -9,4 +9,4 @@ You may want to try searching to find the page's new location.
 
 ![Berg-Agents Overview](visualizations/svg/packages_berg_agents.core.svg "Berg Agents core structure")
 
-[Home](README.qmd)
+[Home](index.qmd)
