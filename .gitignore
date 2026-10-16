@@ -5,7 +5,6 @@
 /project_utils/licence/
 /tmp/
 /.tmp/
-docs/tutorials/
 /notes/*
 **/*errors*.txt
 project_utils/check_config.py

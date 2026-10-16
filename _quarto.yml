@@ -24,7 +24,7 @@ website:
   llms-txt: true
   page-navigation: true
   search:
-    keyboard-shortcut: [ "?", "H" ]
+    keyboard-shortcut: ["?", "H"]
     copy-button: true
     type: textbox
   favicon: docs/styles/logo/favicon.png
@@ -63,10 +63,28 @@ website:
           href: docs/USAGE.qmd
         - text: "Plugin UI"
           href: docs/plugins/PLUGIN-UI.qmd
+        - text: "Shared-ToDo pilot"
+          href: docs/plugins/SHARED-TODO.qmd
+        - text: "Manifest reference"
+          href: docs/plugins/MANIFEST.qmd
+        - text: "Memory & Compaction"
+          href: docs/MEMORY.qmd
         - text: "Tools"
           href: docs/TOOLS.qmd
         - text: "Configuration"
           href: docs/CONFIGURATION.qmd
+    - title: "Tutorials"
+      contents:
+        - text: "Adding a Custom Agent"
+          href: docs/tutorials/quickstart_agents.qmd
+        - text: "Multi-step Harness Workflow"
+          href: docs/tutorials/harness_workflow.qmd
+        - text: "Adding an MCP Server"
+          href: docs/tutorials/mcp_integration.qmd
+        - text: "Human-in-the-Loop"
+          href: docs/tutorials/hilt_lifecycle.qmd
+        - text: "Calling Tools Directly"
+          href: docs/tutorials/advanced_tools.qmd
 
     - title: "Reference"
       contents:
@@ -169,12 +187,12 @@ extensions:
       icon: icon
       target: _self
   linkrot:
-    fail-on-error: false      # Set to true to fail the build if broken links are found
-    timeout: 10               # Timeout in seconds for each URL check
-    user-agent: "Quarto-Linkrot/1.0"  # User agent string for requests
-    cache-results: true       # Cache results to avoid checking the same URL multiple times
-    debug: true              # Enable debug logging
-    output-file: "linkrot-report.txt"         # Write results to a file (e.g., "linkrot-report.txt")
+    fail-on-error: false # Set to true to fail the build if broken links are found
+    timeout: 10 # Timeout in seconds for each URL check
+    user-agent: "Quarto-Linkrot/1.0" # User agent string for requests
+    cache-results: true # Cache results to avoid checking the same URL multiple times
+    debug: true # Enable debug logging
+    output-file: "linkrot-report.txt" # Write results to a file (e.g., "linkrot-report.txt")
     skip-patterns: # List of regex patterns to skip
       - "example\\.com"
       - "localhost"

@@ -3,7 +3,7 @@ title: "berg_agents"
 format: html
 ---
 
-**Last updated:** 2026-09-06
+**Last updated:** 2026-10-16
 
 # BergAgents
 
@@ -16,7 +16,7 @@ Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
 ## Engine
 
-- **Harness** (`berg_agents/core/harness.py`): guardian → planner → implementation → curator, plus a learning gate
+- **Harness** (`berg_agents/core/harness/orchestrator.py`): guardian → planner → implementation → curator, plus a learning gate
   recording task → model → outcome.
   Results are `completed`, `needs_human_review`, or `failed` dicts.
 - **Loop** (`berg_agents/core/loop.py`): framework-free LLM↔tool cycle yielding typed events, with HITL pause/resume,
@@ -44,7 +44,7 @@ app.execute("Fix the flaky sync test", task_type="standard")
 
 ## Configure
 
-`.berg-agents/bergagents.jsonc` - `providers`, `harness`, `model_routing` (models per complexity), `hitl_rules`, `hitl_rules`
+`{config}/bergagents.jsonc` (`BERG_AGENTS_CONFIG_DIR` → `.berg-config` → `.berg-agents` → `~/.berg-agents`) - `providers`, `harness`, `model_routing` (models per complexity), `hitl_rules`
 (auto_execute / notify_after / ask_before / human_leads), `plugins`, per-agent complexity.
 Secrets in `.env` via `${env:VAR}`; `BERG_AGENT_*` env vars override everything.
 Full reference in [Configuration](../docs/CONFIGURATION.qmd).
@@ -62,5 +62,9 @@ pytest  # offline: mocks only, ALLOW_MODEL_REQUESTS=False
 - [Configuration](../docs/CONFIGURATION.qmd) - providers, routing, HITL
 - [Tools](../docs/TOOLS.qmd) - built-ins, capabilities, MCP
 - [API](../docs/API.qmd) - module map
+- [Memory](../docs/MEMORY.qmd) - persistent memory, compaction, recall
+- [Plugin UI](../docs/plugins/PLUGIN-UI.qmd) - runtime plugin UI bridge
+- [Shared-ToDo](../docs/plugins/SHARED-TODO.qmd) - pilot plugin walkthrough
+- [Manifest](../docs/plugins/MANIFEST.qmd) - plugin manifest reference
 - [Contributing](../docs/CONTRIBUTING.qmd) - architecture rules
 - [FAQ](../docs/FAQ.qmd) - troubleshooting
