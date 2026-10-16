@@ -21,7 +21,7 @@
 /* Berg Agents - base component primitives. */
 
 body {
-    font-family: var(--berg-font-sans);
+    font-family: var(--berg-font-sans), sans-serif;
     font-size: var(--berg-fs-base);
     line-height: var(--berg-lh-base);
     color: var(--berg-text);
@@ -41,7 +41,7 @@ a:hover {
 
 button,
 .btn {
-    font-family: var(--berg-font-sans);
+    font-family: var(--berg-font-sans), sans-serif;
     font-size: var(--berg-fs-sm);
     font-weight: var(--berg-fw-medium);
     padding: var(--berg-sp-2) var(--berg-sp-4);
@@ -84,7 +84,7 @@ button.primary:hover,
 input,
 textarea,
 select {
-    font-family: var(--berg-font-sans);
+    font-family: var(--berg-font-sans), sans-serif;
     font-size: var(--berg-fs-sm);
     padding: var(--berg-sp-2) var(--berg-sp-3);
     border: 1px solid var(--berg-border);
@@ -103,7 +103,7 @@ select:focus {
 
 code,
 pre {
-    font-family: var(--berg-font-mono);
+    font-family: var(--berg-font-mono), monospace;
     background: var(--berg-code-bg);
     color: var(--berg-code-text);
     border-radius: var(--berg-radius-sm);

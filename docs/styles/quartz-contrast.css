@@ -31,106 +31,89 @@
 
 /* Extra CSS for better quartz-contrast */
 
-/* Increase the contrast for TOC and button. Light rules apply only on
-   light systems; dark rules on dark systems (this site currently has no
-   Quarto light/dark toggle configured, so the OS setting decides). */
-@media (prefers-color-scheme: light) {
-  .tocify,
-  .tocify-header,
-  .tocify-subheader,
-  .quarto-code-tools,
-  .quarto-code-tools .btn {
-    background: #f8edf8 !important;
-    border-radius: 4px;
-    color: #222 !important;
-    font-size: 1em !important;
-    font-weight: 600;
-  }
+/* Increase the contrast for TOC and button. The plain rules are the
+   light theme; the `body.quarto-dark` variants apply when the reader
+   picks dark in the navbar toggle (theme: {light, dark}). */
+.tocify,
+.tocify-header,
+.tocify-subheader,
+.quarto-code-tools,
+.quarto-code-tools .btn {
+  background: #f8edf8 !important;
+  border-radius: 4px;
+  color: #222 !important;
+  font-size: 1em !important;
+  font-weight: 600;
 }
 
-@media (prefers-color-scheme: dark) {
-  .tocify,
-  .tocify-header,
-  .tocify-subheader,
-  .quarto-code-tools,
-  .quarto-code-tools .btn {
-    background: #1e1e1e !important;
-    border-radius: 4px;
-    color: #e9ecef !important;
-    font-size: 1em !important;
-    font-weight: 600;
-  }
+body.quarto-dark .tocify,
+body.quarto-dark .tocify-header,
+body.quarto-dark .tocify-subheader,
+body.quarto-dark .quarto-code-tools,
+body.quarto-dark .quarto-code-tools .btn {
+  background: #2f1539 !important;
+  border-radius: 4px;
+  color: #f3e8f7 !important;
+  font-size: 1em !important;
+  font-weight: 600;
 }
 
 /* background and text color */
 
 /* -- scss:defaults -- */
-@media (prefers-color-scheme: light) {
-  pre,
-  code,
-  .code,
-  .quarto-code-cell {
-    background: rgb(248 237 248 / 76%) !important;
-    color: #191970 !important;
-    font-size: 1em;
-  }
+pre,
+code,
+.code,
+.quarto-code-cell {
+  background: #f3e8f7 !important;
+  color: #7d029c !important;
+  font-size: 1em;
 }
 
-/* Dark system: keep code on dark surfaces instead of the pale pink. */
-@media (prefers-color-scheme: dark) {
-  pre,
-  .code,
-  .quarto-code-cell {
-    background: #1e1e1e !important;
-    color: #e9ecef !important;
-  }
+/* Toggle dark: plum surfaces instead of pale pink. */
+body.quarto-dark pre,
+body.quarto-dark .code,
+body.quarto-dark .quarto-code-cell {
+  background: #2f1539 !important;
+  color: #f3e8f7 !important;
+}
 
-  code {
-    background: #2c2c2c !important;
-    color: #f0a6e8 !important;
-  }
+body.quarto-dark code {
+  background: #3a1c44 !important;
+  color: #f0a6e8 !important;
+}
 
-  pre code {
-    background: transparent !important;
-    color: inherit !important;
-  }
+body.quarto-dark pre code {
+  background: transparent !important;
+  color: inherit !important;
 }
 
 /* For better visibility on dark background */
-@media (prefers-color-scheme: light) {
-  .quarto-code-tools .btn {
-    background: #eee !important;
-    border: 1px solid #fcf1f8;
-    color: #222 !important;
-  }
+.quarto-code-tools .btn {
+  background: #eee !important;
+  border: 1px solid #fcf1f8;
+  color: #222 !important;
 }
 
-@media (prefers-color-scheme: dark) {
-  .quarto-code-tools .btn {
-    background: #2c2c2c !important;
-    border: 1px solid #404040;
-    color: #e9ecef !important;
-  }
+body.quarto-dark .quarto-code-tools .btn {
+  background: #3a1c44 !important;
+  border: 1px solid #5a2c68;
+  color: #f3e8f7 !important;
 }
 
-/* Improved contrast for plots and tables — light systems only. */
-@media (prefers-color-scheme: light) {
-  table,
-  th,
-  td {
-    background: #fff !important;
-    color: #222 !important;
-  }
+/* Improved contrast for plots and tables (light theme). */
+table,
+th,
+td {
+  background: #fff !important;
+  color: #222 !important;
 }
 
-/* Dark system: tables stay dark; the header gradient comes from
-   custom.css. */
-@media (prefers-color-scheme: dark) {
-  table,
-  td {
-    background: #1e1e1e !important;
-    color: #e9ecef !important;
-  }
+/* Toggle dark: plum tables; header gradient comes from custom-dark.css. */
+body.quarto-dark table,
+body.quarto-dark td {
+  background: #2a1230 !important;
+  color: #f3e8f7 !important;
 }
 
 /* Improved contrast for plotly and DT widgets */

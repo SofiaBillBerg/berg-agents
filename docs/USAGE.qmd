@@ -85,7 +85,7 @@ cd berg_agents/ui/webapp && NEXT_PUBLIC_API_BASE_URL=http://localhost:8001 npm r
 ```
 
 The dev server is cross-origin, so it needs the backend URL at startup (inlined by Next.js) --- without it all `/api/*` calls 404 against Next.js itself.
-The backend allows CORS from `localhost` / `127.0.0.1` on ports 3000--3001 only.
+The backend allows CORS from any `localhost` / `127.0.0.1` port (origin regex on the server); dev usually runs on 3000 or 3001.
 Production needs none of this: one origin serves API plus static build.
 
 ### Plugin surfaces

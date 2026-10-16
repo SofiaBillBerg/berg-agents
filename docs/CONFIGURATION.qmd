@@ -65,7 +65,8 @@ The main fields (environment name in brackets):
 - `ollama_*` / `openai_*` --- legacy flat connection keys; the `providers` block below is preferred.
 - JSON-encoded arrays: `BERG_AGENT_SKILLS`, `BERG_AGENT_PLUGINS`, `BERG_AGENT_WEB_SEARCH_BACKENDS`, `BERG_AGENT_MEMORY`, `BERG_AGENT_TODOS_ENABLED`, `BERG_AGENT_SUMMARIZATION_TRIGGER`, `BERG_AGENT_SUMMARIZATION_KEEP`.
 
-Unknown `BERG_AGENT_*` keys are ignored, never fatal.
+Unknown `BERG_AGENT_*` keys pass through as extra fields (`extra="allow"`);
+they never fail startup.
 
 ## 4. The `providers` block (preferred)
 

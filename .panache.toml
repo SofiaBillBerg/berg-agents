@@ -11,7 +11,7 @@ line-ending = "lf"
 [extensions]
 autolinks = true
 citations = true
-emoji = false
+emoji = true
 fancy-lists = true
 hard-line-breaks = false
 implicit-figures = true

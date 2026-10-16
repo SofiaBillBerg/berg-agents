@@ -94,10 +94,12 @@ app = BergAgentsApp.create()
 result = app.execute("Summarize README.md", task_type="generic")
 ```
 
-#### 2. Stream a task's events (SSE)
+#### 2. Stream a chat run
 
 ```bash
-curl -N http://127.0.0.1:8001/api/harness/1234/events
+curl -N -X POST http://127.0.0.1:8001/api/chat/stream \
+  -H 'Content-Type: application/json' \
+  -d '{ "message": "Summarize README.md" }'
 ```
 
 #### 3. Register a custom agent and use it
@@ -119,16 +121,12 @@ curl -X POST http://127.0.0.1:8001/api/tool/execute \
 
 MCP tools join the normal tool loop once their server is declared in `mcp.json`.
 
-#### 5. Answer a HITL pause via the API
+#### 5. Answer a HITL pause
 
-High-risk tools pause; the web UI shows Approve / Reject / Edit.
-Over REST, HITL answers travel on the thread respond endpoint:
-
-```bash
-curl -X POST http://127.0.0.1:8001/api/harness/1234/respond \
-  -H 'Content-Type: application/json' \
-  -d '{ "decision": "approve" }'
-```
+High-risk tools pause; there is no separate REST endpoint for the answer.
+Approve, reject, or edit where the pause appeared: the
+`Approve and resume? [y/N]:` prompt in the TUI, or the Approve / Reject /
+Edit card in the web UI (edit rewrites the tool arguments before the run).
 
 --------------------------------------------------------------------------------
 

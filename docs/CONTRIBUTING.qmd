@@ -13,18 +13,13 @@ contribution should make the system **more** self-consistent, not less.
 
 ## 1. Core principles
 
-- **One logical piece at a time.** Do not bundle an unrelated refactor,
+- **Small, reviewable changes.** Do not bundle an unrelated refactor,
   a dependency upgrade, and a bug fix into one change - it is impossible to
   review or roll back safely.
-- **Permission default = ASK.** Never push, open a PR, merge, rebase, or
-  ev en commit to `origin` without explicit approval from Sofia.
-  Local git
-  actions are also off-limits without approval; the maintainers handle
-  git directly.
-- **Never edit code you have not read in the current session.** If a file
-  has drifted, re-read it first.
-- **Plan before big changes.** Non-trivial work lives in `.opencode/plans/`
-  - keep `tasklog.md` per-task and `projectlog.md` per-project current.
+- **Only `main` is shared.** Work on a branch, open a pull request, and
+  never push to `main`. Maintainers handle merging and releases.
+- **Discuss big changes first.** Non-trivial work should start as an issue
+  or a short plan both sides agree on, not as a surprise PR.
 - **No live-model or live-provider tests.** `ALLOW_MODEL_REQUESTS=False`
   in `tests/conftest.py` is never bypassed - tests use mocks only.
   Real
@@ -35,12 +30,9 @@ contribution should make the system **more** self-consistent, not less.
 ### Workspace
 
 1. The working tree is everything - `.berg-agents/` (config, sessions,
-   memory), `sharedtodos/` (user tasks), and `.opencode/` (plans, notes)
-   are git-ignored but shared for continuity.
+   memory) and `sharedtodos/` (user tasks) are git-ignored local state.
    Do not delete them.
-2. Node and Bun are not always on `PATH` (shell is non-interactive).
-   Use absolute binaries (e.g. `~/.bun/bin/bun`,
-   `~/.nvm/versions/node/v24.21.0/bin/node`).
+2. UI and plugin-bundle builds need Node 24+ or Bun alongside Python.
 3. Use `uv` for all Python environment and dependency work.
 
 ### First-time install
@@ -87,7 +79,9 @@ npm run build:ui     # writes ui/dist/<surface>.js if the manifest declares an e
   | Providers      | `berg_agents/providers/`           | provider-centric resolution - never add a global provider flag        |
   | Config         | `berg_agents/config/`              | single resolver in `paths.py`; settings, config manager               |
   | Plugins        | `berg_plugins/<plugin-id>/`        | one home per plugin (manifest, code, UI bundle)                       |
-  | Docs           | `docs/*.qmd`, `docs/plugins/*.qmd` | Quarto source; `README.md` generated from `README.qmd`                |
+  | Docs           | `
+*.qmd`, `
+plugins/*.qmd` | Quarto source; `README.md` generated from `README.qmd`                |
 
 ## 4. Architecture rules you must respect
 
@@ -102,12 +96,11 @@ npm run build:ui     # writes ui/dist/<surface>.js if the manifest declares an e
    mounts manifest-declared UI at runtime.
    Adding a plugin line to
    `registry.tsx` is a known gap to fix, not acceptable architecture.
-4. **User data is inviolable.** `sharedtodos/` is her data - never
-   auto-delete, rewrite cache, or reformat it as a \"clean-up\" step.
-   Older
-   nested memory files were explicitly left in place for manual merge.
+4. **User data is inviolable.** `sharedtodos/` is your data - never
+   auto-delete, rewrite, or reformat it as a "clean-up" step. Older
+   nested memory files were deliberately left in place for manual merge.
 5. **Memory path is flat.** `FileStore` rooted at the config directory,
-   namespace empty, `agent_name=\"memory\"` so `MEMORY.md` lands at
+   namespace empty, `agent_name="memory"` so `MEMORY.md` lands at
    `{config}/memory/MEMORY.md`.
    Double-nesting is a known regression.
 6. **Compaction ordering is load-bearing.** Compaction (mutable history)
@@ -118,7 +111,7 @@ npm run build:ui     # writes ui/dist/<surface>.js if the manifest declares an e
    do not cache connections across asyncio tasks.
 8. **Permission default = ask** for tools surfaced in chat (high-risk /
    HITL) and for any agent that runs unsafe steps.
-9. **Comments must stay** - source comments are clarity, not \"AI slop\".
+9. **Comments must stay** - source comments are clarity, not "AI slop".
 
 ## 5. Adding a tool
 
@@ -130,7 +123,7 @@ npm run build:ui     # writes ui/dist/<surface>.js if the manifest declares an e
 4. Declare its HITL class implicitly by `risk_class`: high-risk auto-gates.
 5. Write tests under `tests/` using mocks only; do not forward to live
    providers.
-6. Document it in `docs/TOOLS.qmd` and (if user-facing) `FAQ.qmd`.
+6. Document it in [`TOOLS.qmd`](TOOLS.qmd) and (if user-facing) [`FAQ.qmd`](FAQ.qmd).
 
 ## 6. Writing a plugin
 
@@ -156,26 +149,22 @@ Follow `berg_plugins/shared-todo/` as the conformance baseline:
    `refreshKey`, etc.).
    Tries on `refreshKey` is how it stays in sync.
 
-See `docs/plugins/PLUGIN-UI.qmd` and `docs/plugins/SHARED-TODO.qmd` for
-the full contract.
+See [`plugins/PLUGIN-UI.qmd`](plugins/PLUGIN-UI.qmd) and [`plugins/SHARED-TODO.qmd`](plugins/SHARED-TODO.qmd) for the full contract.
 
 ## 7. Documentation discipline
 
-- Source is always **`.qmd`** in `docs/`.
-  `README.md` is generated from
-  `docs/README.qmd` (`project_utils/render_readme.sh`); never hand-edit
-  `README.md`.
-- `quarto render` runs `run_apidocs.sh`, `run_diagrams.sh`, and (for
-  `render_readme.sh`) the exported docs output.
-  Check `_site/` (not
-  `docs/docs_web/`) is the publishable build when used as a website.
-- Update the page's front-matter (`title`, `author`) - author = you,
-  Sofia Billger Bergström.
-- Keep internal links relative and verify them after moving files - e.g.
-  `docs/plugins/...qmd` capitalization must match `_quarto.yml`.
-- Add new capabilities to `TOOLS.qmd`; architecture decisions to
-  `docs/…` and notes/
-- Every plan page update is a real deliverable; do not ship \"TODO\" pages.
+- Source is always `.qmd` under `docs/`. The root `README.md` is generated
+  from `docs/README.qmd` by `project_utils/render_readme.sh` (post-render
+  step in `_quarto.yml`); never hand-edit `README.md`.
+- The site build is `quarto render`, which runs the configured pre-render
+  scripts (`run_apidocs.sh`, `run_diagrams.sh`) and post-render
+  (`render_readme.sh`). The publishable output lands in `_site/`.
+- Keep `title` and `author` front-matter current on every page you touch.
+- Keep internal links relative and verify them after moving files. Quarto
+  file names are case-sensitive: `docs/plugins/SHARED-TODO.qmd` must match
+  `_quarto.yml` exactly.
+- New tools go in `TOOLS.qmd`; new plugins in `docs/plugins/`; durable
+  architecture decisions in the decisions log and `notes/`.
 
 ## 8. Testing
 
@@ -204,22 +193,18 @@ ruff format --check .
   or avoid killing server processes inside tests.
 - `agent-browser --enable react-devtools` is required for React component
   tracing during UI work.
-- `git` remote operations (push, gh pr, merge) happen only on explicit
-  user approval.
-- Do not run `sudo`; ask Sofia.
+- `git` remote operations (push to `main`, merge, releases) are
+  maintainers-only.
+- Do not run `sudo` for project work; the toolchain installs unprivileged.
 
 ## 10. Open a pull request
 
 1. Keep it scoped - one logical piece.
-2. Branch from `main`; no history rewriting shared.
+2. Branch from `main`; push only to your PR branch, never to `main`.
 3. Describe **what** changed and **why**; include test evidence and manual
    checks you performed.
 4. Update docs if any public surface changed (new tool, env key, file path,
    mutation pattern).
-5. Move plan files in `.opencode/plans/` if one tracks this work.
-6. Wait for explicit approval before any push.
-
-```markdown
 ## 11. Bootstrap checklist for a fresh checkout
 
 - [ ] Python 3.12+, uv, `.venv` activated
@@ -229,5 +214,5 @@ ruff format --check .
 - [ ] Config directory resolves to the right project path
 - [ ] `ruff check . && ruff format --check .` clean
 - [ ] `pytest -q` passes
-- [ ] Agent and docs updated
+- [ ] Docs updated where the change is user-visible
 ```

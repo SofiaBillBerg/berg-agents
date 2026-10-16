@@ -28,15 +28,15 @@ model that just saved a fact does not need to re-read the file to see it.
 Only the main notebook is injected that way: other memory files appear
 by name only, referenced through it.
 
-<|message|> File on disk | Purpose |
+| File on disk | Purpose |
 |---|---|
 | `{config}/memory/MEMORY.md` | The auto-injected notebook. Plain Markdown. |
 | `{config}/memory/<topic>.md` | Append-on-topic files. Read only on request. |
 | `{config}/memory.db` | SQLite fallback store when file-backed mode is unavailable. |
 | `{config}/runs.db` | Paired with `StepPersistence` (see below). |
 
-Where `{config}` is the resolved config directory (`.berg-agents`/
-`.berg-config` etc.; see `CONFIGURATION.qmd`).
+Where `{config}` is the resolved config directory (`.berg-config` /
+`.berg-agents` / `~/.berg-agents`; see `CONFIGURATION.qmd`).
 
 ## Memory tools
 
@@ -53,14 +53,14 @@ The model can call the standard memory toolset:
 The companion guidance (in `context_capabilities._MEMORY_GUIDANCE`) states
 plainly that `MEMORY.md` is already present in context, which prevents the
 observed failure mode of the model using `read_file`/`read_memory` to
-re-fetch it and hitting \"file not found\".
+re-fetch it and hitting "file not found".
 
 ## Writing and editing memory by hand
 
 Because the canonical store is `FileStore`, `MEMORY.md` is ordinary
 Markdown --- read it, edit it, grep it, or version-control the folder.
-Changes show up on the next request (see next section for the context-body
-limit that applies).
+Changes show up on the next request, bounded by the snapshot limit
+described below.
 
 A previous nested-path bug left an earlier file at
 `{config}/memory/.berg-agents/berg-agents/MEMORY.md`.
@@ -90,12 +90,12 @@ summarisation last.
    newest sets (`keep_pairs=3`).
 3. **ClampOversizedMessages** --- head/tail-truncates a single oversized
    part (e.g. a runaway generation).
-4. **SummarisingCompaction** --- one model call, reached only when tiers 1--3
-   cannot reclaim enough (`max_messages=1`, `keep_messages=20`,
+4. **SummarisingCompaction** --- one model call, reached only when tiers
+   1-3 cannot reclaim enough (`max_messages=1`, `keep_messages=20`,
    `receipts=True`).
 
-Tierd strategies report what they dropped as a receipt, so compaction is
-legible rather than looking like silent amnesia.
+Tiered strategies report what they dropped as a receipt, so a compaction
+reads as an explicit note rather than silent amnesia.
 `ReportContextUsage`
 emits used/window/fraction events after compaction, feeding the live
 context gauge in the web UI.
@@ -120,13 +120,13 @@ extending the capability list.
 
 ## Persistence and recall of prior turns
 
-- `StepPersistence(store=SqliteStepStore, agent_name=\"chat\")` snapshots
+- `StepPersistence(store=SqliteStepStore, agent_name="chat")` snapshots
   every settled step into `{config}/runs.db`.
-- `ConversationSearch(SnapshotHistorySource(store), scope=\"conversation\")`
+- `ConversationSearch(SnapshotHistorySource(store), scope="conversation")`
   gives the model keyword recall across those snapshots, including turns
   that compaction has dropped.
 
-Together these give the model a useful \"what did we do earlier?\" path
+Together these give the model a useful "what did we do earlier?" path
 that does not depend on the raw context window.
 
 ## Conversation (chat session) persistence
@@ -140,10 +140,10 @@ restored conversations and each dumped message gets a namespaced id.
 
 ## Known gaps
 
-- `LearningGate` / harness integration are not yet routed into the chat
-  path (deferred by the maintainer).
+- `LearningGate` / harness gating for the chat path is deferred, not
+  yet routed.
 - Skills/MCP exposed as adapter plugins are working but their status as
-  \"plugins\" versus first-class configuration systems is still open.
+  "plugins" versus first-class configuration systems is still open.
 - SQLite connections in the session store must be per-operation (not
   cached) to satisfy thread affinity under `asyncio.to_thread`; the doc's
   troubleshooting entry covers symptoms.

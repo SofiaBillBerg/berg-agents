@@ -29,8 +29,8 @@ source .venv/bin/activate
 uv pip install -e .
 ```
 
-The editable install layers into the project path, so changing `berg_agents/` code is visible without
-reinstalling.
+The editable install means changing `berg_agents/` code takes effect
+without reinstalling.
 
 ## 3. Configure provider + config directory
 
@@ -42,10 +42,8 @@ The config dir is resolved in this order (
 3. An existing `{project-root}/.berg-agents` directory
 4. `~/.berg-agents`
 
-On this checkout the directory is already `.berg-agents`; that matches
-`step-3`.
-Set the env var if you want to run elsewhere or to keep data
-out of the source tree.
+On this checkout the directory is already `.berg-agents`; that matches `step-3`.
+Set the env var if you want to run elsewhere or to keep data out of the source tree.
 
 ### 3.1 Minimal provider (Ollama)
 
@@ -54,25 +52,24 @@ allowed):
 
 ```jsonc
 {
-  \"BERG_AGENT_PROVIDER\": \"ollama\",
-  \"BERG_AGENT_OLLAMA_BASE_URL\": \"http://localhost:11434\",
-  \"providers\": {
-    \"ollama\": {
-      \"options\": { \"baseURL\": \"http://localhost:11434/v1\", \"apiKey\": \"\" },
-      \"models\": { \"qwen3.5:9b\": {} }
+  "BERG_AGENT_PROVIDER": "ollama",
+  "BERG_AGENT_OLLAMA_BASE_URL": "http://localhost:11434",
+  "providers": {
+    "ollama": {
+      "options": { "baseURL": "http://localhost:11434/v1", "apiKey": "" },
+      "models": { "qwen3.5:9b": {} }
     }
   },
-  \"defaultModel\": \"qwen3.5:9b\",
-  \"harness\": { \"enable_learning\": true, \"enable_hitl\": true },
-  \"BERG_AGENT_SKILLS\": \"[\\\"./.agents/skills/\\\"]\",
-   \"BERG_AGENT_PLUGINS\": \"[\\\"./.shared_todo/\\\"]\"
+  "defaultModel": "qwen3.5:9b",
+  "harness": { "enable_learning": true, "enable_hitl": true },
+  "BERG_AGENT_SKILLS": "["./.agents/skills/"]",
+   "BERG_AGENT_PLUGINS": "["./.shared_todo/"]"
 }
 ```
 
 ### 3.2 Secrets (always via `.env`)
 
-Place a `.env` at the project root and reference values with
-`${env:VAR_NAME}` / `${VAR}` - never inline a key.
+Place a `.env` at the project root and reference values with `${env:VAR_NAME}` / `${VAR}` - never inline a key.
 
 ```dotenv
 OLLAMA_API_KEY=
@@ -83,21 +80,15 @@ CONTEXT7_API_KEY=
 BERG_AGENT_OMNIROUTE_API_KEY=
 ```
 
-Rule: config values may be whole-string placeholders (`\"${env:KEY}\"`); an
-unset one then falls back to default instead of persisting empty.
+Rule: config values may be whole-string placeholders (`"${env:KEY}"`); an unset one then falls back to default instead of persisting empty.
 
-Paths and plugins live under `{config}/` (`bergagents.jsonc`,
-`mcp.json`, `profiles.yaml`, `plugins/`, `active_session`, session and
-memory databases).
+Paths and plugins live under `{config}/` (`bergagents.jsonc`, `mcp.json`, `profiles.yaml`, `plugins/`, `active_session`, session and memory databases).
 
 ### 3.3 MCP (optional)
 
-Point `BERG_AGENT_MCP_SERVERS` at a JSON file (default
-`{config}/mcp.json`).
-Each entry is `http` or `stdio`, with
-`${env:...}` for secrets.
-Use `enabled: false` as the startup kill-switch
-for a server; the UI toggle becomes authoritative after startup.
+Point `BERG_AGENT_MCP_SERVERS` at a JSON file (default is `{config}/mcp.json`).
+Each entry is `http` or `stdio`, with `${env:...}` for secrets.
+Use `enabled: false` as the startup kill-switch for a server; the UI toggle becomes authoritative after startup.
 
 See [CONFIGURATION](CONFIGURATION.qmd) for the full reference.
 
@@ -119,8 +110,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8001 npx next dev -p 3000
 ```
 
 Port precedence is usually 3001 if 3000 is taken.
-FastAPI enables CORS
-from `localhost`/`127.0.0.1` on ports 3000-3001.
+FastAPI allows CORS from any `localhost`/`127.0.0.1` port.
 
 ## 5. Optional shared-todo bundle build
 
@@ -191,7 +181,7 @@ the created app for background use.
   | Variable                         | What it does                                                   |
   | ---                              | ---                                                            |
   | `BERG_AGENTS_CONFIG_DIR`         | Override config directory (highest precedence)                 |
-  | `BERG_AGENT_*`                   | / Overrides for any typed setting (provider, MCP path, skills) |
+  | `BERG_AGENT_*`                   | Overrides for any typed setting (provider, MCP path, skills) |
   | `BERG_AGENT_WEB_SEARCH_BACKENDS` | Which web backends are used (list, JSON)                       |
   | `BERG_AGENT_SKILLS`              | JSON array of skill directories                                |
   | `BERG_AGENT_PLUGINS`             | JSON array of plugin directory paths                           |
@@ -203,24 +193,23 @@ the created app for background use.
 
 ## 9. Path gotchas (observed)
 
-- `.berg-agents/` (or `.berg-config`) must be considered user data;
-  never wipe it.
-  Destructive deletes inside `.berg-agents/memory/` or
-  `sharedtodos/` only ever manual.
+- Never wipe `.berg-agents/` (or `.berg-config`). It holds config,
+  sessions, and memory.
+- Never delete inside `.berg-agents/memory/` or `sharedtodos/` by hand
+  as cleanup; those are your data.
 - Plugin bundles are served with `Cache-Control: no-cache`, but a hard
   reload clears any rare stale copy after a rebuild.
 - Only one config directory wins; keep `.berg-config` and `.berg-agents`
   from silently splitting config/state data across locations.
-- If you started from a detached plugin path, the config lives wherever
-  `{project-root}/ `.berg-agents/\` resolves.
+- Non-project roots resolve to the `~/.berg-agents` fallback, so set
+  `BERG_AGENTS_CONFIG_DIR` explicitly when working outside the checkout.
 
 ## 10. Next steps
 
-- [Usage Examples](USAGE.qmd) \u2014 commands, API, web dev loop, HITL
-- [Configuration](CONFIGURATION.qmd) \u2014 provider-centric blocks & env vars
-- [Tools](TOOLS.qmd) \u2014 what the agent can touch and approval gates
-- [Memory & Compaction](MEMORY.qmd) \u2014 how MEMORY.md injection works
-- [Shared-ToDo pilot](plugins/SHARED-TODO.qmd) and
-  [Plugin UI](plugins/PLUGIN-UI.qmd) \u2014 conformance reference
+- [Usage Examples](USAGE.qmd) - commands, API, web dev loop, HITL
+- [Configuration](CONFIGURATION.qmd) - provider-centric blocks & env vars
+- [Tools](TOOLS.qmd) - what the agent can touch and approval gates
+- [Memory & Compaction](MEMORY.qmd) - how MEMORY.md injection works
+- [Shared-ToDo pilot](plugins/SHARED-TODO.qmd) and [Plugin UI](plugins/PLUGIN-UI.qmd) - conformance reference
 
 See [CONTRIBUTING](CONTRIBUTING.qmd) for coding + testing rules.

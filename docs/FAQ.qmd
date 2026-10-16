@@ -30,7 +30,7 @@ conversation window.
 
 ### Why did the agent call `read_memory` to fetch something I see on screen?
 
-Earlier guidance said \"read a listed file with read_memory\" and didn't
+Earlier guidance said "read a listed file with read_memory" and didn't
 state that `MEMORY.md` is already in context.
 That has now been fixed
 (`guidance` override in
@@ -41,10 +41,10 @@ snapshot still uses the stale guidance, rebuild / restart the app.
 
 ### My memory path is wrong (nested `.berg-agents/berg-agents`)
 
-This was caused by `Memory(namespace=<config>.name, agent_name=\"berg-agents\")`
+This was caused by `Memory(namespace=<config>.name, agent_name="berg-agents")`
 composing `scope/filename` twice.
 That has been replaced with
-`namespace=\"\"`, `agent_name=\"memory\"`, and FileStore rooted at the
+`namespace=""`, `agent_name="memory"`, and FileStore rooted at the
 config directory, so the notebook lands at
 `{config}/memory/MEMORY.md`.
 If the old nesting left a file in your
@@ -183,66 +183,60 @@ the cross-origin loop instead needs `NEXT_PUBLIC_API_BASE_URL`.
 4. After rebuilding, do a full reload --- but note `/berg-plugins/*` is
    served with `no-cache`, so rebuilds surface naturally.
 
-### Web plugin clipboard/copy button not working
-
-Port the sandbox's constraints: the embedded render/runtime cannot access
-the network.
-Functions requiring network calls inside web render are
-not supported.
-
 ### Next.js hydration errors / 404s on `_next`
 
-Run the full production build (`npm run build`), then the gated
-`npm run tsc` separately.
-Production deploy serves both the API and
-static assets from one origin --- expect no `/api/*` 404s after
-`BERG_AGENT` mode.
+Run the production build (`npm run build` in `berg_agents/ui/webapp`)
+and typecheck separately (`tsc --noEmit --skipLibCheck`). Production
+serves the API and the static export from one origin, so `/api/*` 404s
+after a fresh build mean the export is stale or missing — rebuild.
 
-### The frontend dev server upstream badge is \"offline\"
+### The dev server cannot reach the backend
 
-Ensure both ports (backend + dev, 3000--3001) and CORS defaults match;
-backend blocks mismatched ports within the 3000/3001 range by design.
+The frontend dev loop is cross-origin: start it with
+`NEXT_PUBLIC_API_BASE_URL=http://localhost:8001` and keep both ends on
+the expected ports (backend 8001, dev 3000–3001 — the backend only
+allows CORS from `localhost`/`127.0.0.1` on those two ports).
 
 ## Safety, approvals and sandboxing
 
 ### Why do high-risk tools pause for approval?
 
 `risk_class=high` tools (`bash`, `edit_file`, `patch_file`, `write_file`,
-`implement_task`) surface a HITL consult --- TUI (`A]`) vs web
-(Approve/Reject/Edit).
+`implement_task`) pause for approval — a prompt in the TUI, an
+Approve / Reject / Edit card in the web UI.
 Low-risk (`list_files`, `read_file`, `search_code`,
 `plan_task`) run immediately.
 
-Read-only deployments register mutating tools **out-of-band** and deny
-the whole mutation set when `read_only=True` or `allow_shell=False` ---
-stronger than asking the model not to run them.
+Read-only deployments withhold mutating tools at registration when
+`read_only=True` (and `bash` when `allow_shell=False`) — the tools are
+absent from the schema, so there is nothing to approve.
 
 ### Are path escapes possible from `read_file`?
 
-No --- normalize happens in `_io.py`; `..`/`~`/outside-root are rejected.
-Same enforcement every subprocess tool (`bash`, workspace JP entirely).
+No — paths are normalized in `berg_agents/tools/_io.py`: `..`, `~`, and
+absolute paths outside the root are rejected, including for `bash`.
 
 ### Is `bash` sandboxed in any way?
 
-The working directory is set to the workspace root, and timeout bounded
-(30s default).
-There is no container separation in this OSS build ---
-grant shell only to trusted models/users, or run with `allow_shell=False`.
+The working directory is the workspace root, and each call has a bounded
+timeout (30s default). There is no container isolation — grant shell
+only to trusted setups, or run with `allow_shell=False`.
 
 ### Do risky secrets ever enter git?
 
-Never: keys come from environment variables / `.env` / config
-placeholders and the grace of gitignore.
-`api_key` defaults to \"\".
+Never in source: keys come from environment variables, `.env`, or
+`${env:VAR}` config placeholders (all git-ignored).
+`api_key` defaults to "".
 
 ## Sessions and continuity
 
 ### How do sessions stay synced across tabs?
 
-The server owns `active_session` (per project); new windows adopt it.
-Each page reloads storage events after tools.
-`Cache-Control: no-cache`
-on HTML stops old page shells from latching on.
+The server owns `active_session` (per project); fresh tabs and windows
+adopt it instead of minting new sessions. The chat widget and the
+`/history` page re-read on storage events so tabs agree, and HTML is
+served with `Cache-Control: no-cache` so a tab never runs a stale app
+shell beside fresh pages.
 Storage mutation clears
 only per-tab keys.
 
@@ -292,8 +286,7 @@ renewed itself; scroll to the latest turn or start a new session.
 
 A sensitive server (e.g. `github`, `memory`) requires approval each
 run and displays a 🔒 badge.
-`disable` via config or UI permanently
-disables it.
+`disable` via config or UI permanently disables it.
 Read-only (`context7`, `docs`, `reference`) runs without
 pulses and cannot be denied mid-run even when toggled off.
 
@@ -306,47 +299,37 @@ runtime (`/api/plugins`), else a delete/reload bug is in play.
 
 ## Development and test notes
 
-### Debugging config/data without running the server
+### Inspecting state without the full server
 
-1. `python -m berg_agents` runs a desktop app; for REST-only verified tests,
-   expose only `list_web_plugins` or `list_chat_plugins` to skip servers.
-2. `GET /api/plugins` (FastAPI allows local calls without auth).
-3. `GET /api/sessions/current` lets you inspect pointers without opening
-   `/history`.
-4. `GET /api/context` lists runtime + config sources resolved.
+- `GET /api/plugins`, `/api/sessions/current`, and `/api/context` can be
+  curled against a running backend to check plugin inventory, the active
+  session pointer, and resolved config without opening the UI.
+- For cheap offline checks in scripts, prefer
+  `chat_integration.list_chat_plugins()` over booting a test server (a
+  live server can hang on MCP stdio keep-alive processes).
 
-### Tests need the provider/mcp processes alive
+### Tests never touch live providers
 
-Tests in this repo must not launch MCP stdio servers or call real
-providers - tests are mocked; huge model requests route via `allow_mock`.
-Use
-offline mocks and pre-seeded JSON.
-Never set `ALLOW_MODEL_REQUESTS=True`
-in `conftest.py` (project policy).
+Tests are mocked and offline (`ALLOW_MODEL_REQUESTS=False` in
+`tests/conftest.py` is never bypassed). Never launch MCP stdio servers or
+call real models from a test.
 
-### SQLite thread/coroutines
+### SQLite connections are per-operation
 
-Open per-operation connections inside `asyncio.to_thread`; cached
-connections fail on thread switching with class-of-X SQLite errors.
-The
-conversation DB already does this.
-Follow that exact pattern in all new stores.
-
-### CRLF/on-disk end-of-line safety
-
-File tools preserve line endings (LF/CRLF), with edit fallbacks for
-whitespace/quote/dash variants.
-Do not hand-edit files with mixed
-endings.
+Stores accessed from `asyncio.to_thread` must open a short-lived
+connection per operation. A cached connection fails when the thread pool
+schedules the next call on another worker (sqlite3 thread affinity).
+The session store already works this way; follow the same pattern in any
+new store.
 
 ## Quarto and documentation
 
-### Why does Quarto render warn about re-render?
+### The render complains about a missing file or stale output
 
-Docs are Quarto-owned; each `.qmd` ships as a module.
-`docs/README.md` is
-a generated artifact sourced from `README.qmd` --- never edit it by hand.
-Keep filenames and case consistent with `quarto.yml` links.
+Each `.qmd` is one page; `README.md` at the repo root is generated from
+`docs/README.qmd` — never edit it by hand. Keep file names and case
+consistent with the links in `_quarto.yml`, and re-run `quarto render`
+after moving pages.
 
 ### The Unsloth auth key in my older environment is named differently
 

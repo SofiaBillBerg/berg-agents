@@ -6,11 +6,13 @@ format: html
 
 # Tutorial - Adding a Custom Agent
 
-This tutorial adds a real subagent to the harness: subclass `AbstractAgent`, register it on the app, and run a task through it. Code: `berg_agents/core/interface.py` (`AbstractAgent`), `berg_agents/app.py` (`register_agent`, `execute`).
+This tutorial adds a real subagent to the harness: subclass `AbstractAgent`, register it on the app, and run a task
+through it. Code: `berg_agents/core/interface.py` (`AbstractAgent`), `berg_agents/app.py` (`register_agent`, `execute`).
 
 ## 1. Write the agent class
 
-Every subagent implements two methods: `can_handle(task)` returning a 0–1 confidence, and `execute(task, context, model)` returning an `AgentResult`.
+Every subagent implements two methods: `can_handle(task)` returning a 0–1 confidence, and
+`execute(task, context, model)` returning an `AgentResult`.
 
 ```python
 # my_package/agents/custom_reviewer.py
@@ -42,7 +44,8 @@ class CustomReviewer(AbstractAgent):
         return AgentResult(success=True, output=f"Review snippet: {snippet}")
 ```
 
-Check `AgentResult`'s fields in `berg_agents/core/interface.py` before constructing it — the contract is `success`, `output`, `error`, `needs_human_review`, `review_reasons`, `model_used`, `tokens_used`, `metadata`.
+Check `AgentResult`'s fields in `berg_agents/core/interface.py` before constructing it — the contract is `success`,
+`output`, `error`, `needs_human_review`, `review_reasons`, `model_used`, `tokens_used`, `metadata`.
 
 ## 2. Register it on the app
 
@@ -63,9 +66,11 @@ result = app.execute("Review the login flow for obvious issues", task_type="gene
 print(result)
 ```
 
-`execute(description, task_type)` returns the harness result dict, including the selected agent, the model used, and any HITL decision if a pause occurred. Learning stats: `app.get_learning_stats()`.
+`execute(description, task_type)` returns the harness result dict, including the selected agent, the model used, and any
+HITL decision if a pause occurred. Learning stats: `app.get_learning_stats()`.
 
 ## Notes
 
-- `preferred_complexity` should match a level in your `model_routing` config (`trivial`, `standard`, `complex`, `critical`); per-agent tuning also lives under the `agents` key in `bergagents.jsonc`.
+- `preferred_complexity` should match a level in your `model_routing` config (`trivial`, `standard`, `complex`,
+  `critical`); per-agent tuning also lives under the `agents` key in `bergagents.jsonc`.
 - Keep the change to one logical piece: new file, registration, test, docs. See [CONTRIBUTING](../CONTRIBUTING.qmd).

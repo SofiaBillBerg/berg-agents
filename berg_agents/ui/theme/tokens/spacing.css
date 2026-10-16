@@ -30,12 +30,10 @@
     --berg-sp-6: 2rem; /* 32px */
     --berg-sp-7: 3rem; /* 48px */
     --berg-sp-8: 4rem; /* 64px */
-
     --berg-radius-sm: 4px;
     --berg-radius: 6px;
     --berg-radius-lg: 12px;
-
-    --berg-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --berg-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
-    --berg-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --berg-shadow-sm: 0 1px 2px rgb(0 0 0 / 5%);
+    --berg-shadow-md: 0 2px 4px rgb(0 0 0 / 10%);
+    --berg-shadow-lg: 0 4px 12px rgb(0 0 0 / 15%);
 }

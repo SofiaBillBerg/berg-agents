@@ -4,6 +4,7 @@ project:
   resources:
     - _site/search-index.json
     - _site/docs/404.html
+    - docs/styles/logo/favicon.png
   type: website
 
   output-dir: _site
@@ -12,7 +13,6 @@ project:
     - "project_utils/run_diagrams.sh"
   render:
     - "docs/**/*.qmd"
-    - "!pdf_docs/*.qmd"
     - "!.*/*.*"
     - "!notes/*.*"
     - "!apidocs/**/*.*"
@@ -24,18 +24,17 @@ website:
   llms-txt: true
   page-navigation: true
   search:
-    keyboard-shortcut: ["?", "H"]
+    keyboard-shortcut: [ "?", "H" ]
     copy-button: true
     type: textbox
   favicon: docs/styles/logo/favicon.png
   image: docs/styles/logo/favicon.png
-  margin-header: |
-    ![Berg Agents Logo](docs/styles/logo/favicon.png)
+  margin-header: ""
 
   navbar:
     logo: docs/styles/logo/favicon.png
     logo-alt: "Berg Agents Logo"
-    logo-href: docs/README.qmd
+    #logo-href: docs/README.qmd
     left:
       - text: "Home"
         href: docs/README.qmd
@@ -100,20 +99,6 @@ website:
           href: docs/CHANGELOG.qmd
         - text: "FAQ & Troubleshooting"
           href: docs/FAQ.qmd
-  #    - title: "Tutorials"
-  #      contents:
-  #        - text: "Tutorials Overview"
-  #          href: docs/TUTORIALS.qmd
-  #        - text: "Quickstart Agents"
-  #          href: docs/tutorials/quickstart_agents.qmd
-  #        - text: "MCP Integration"
-  #          href: docs/tutorials/mcp_integration.qmd
-  #        - text: "Human-in-the-loop"
-  #          href: docs/tutorials/hilt_lifecycle.qmd
-  #        - text: "Harness Workflow"
-  #          href: docs/tutorials/harness_workflow.qmd
-  #        - text: "Advanced Tools"
-  #          href: docs/tutorials/advanced_tools.qmd
   page-footer:
     right:
       - text: "License"
@@ -122,7 +107,8 @@ website:
 format:
   html:
     theme:
-      - docs/styles/custom.css
+      light: docs/styles/custom.css
+      dark: docs/styles/custom-dark.css
     css:
       - docs/styles/quartz-contrast.css
       - docs/styles/dt-wrap.css
@@ -169,6 +155,7 @@ filters:
   - lua-env
   - linkrot
   - preview-colour
+  - embedio
 
 extensions:
   badge:
@@ -187,7 +174,7 @@ extensions:
       icon: icon
       target: _self
   linkrot:
-    fail-on-error: false # Set to true to fail the build if broken links are found
+    fail-on-error: true # Set to true to fail the build if broken links are found
     timeout: 10 # Timeout in seconds for each URL check
     user-agent: "Quarto-Linkrot/1.0" # User agent string for requests
     cache-results: true # Cache results to avoid checking the same URL multiple times

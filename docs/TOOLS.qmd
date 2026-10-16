@@ -6,11 +6,9 @@ format: html
 
 # Tools
 
-This page is the complete, accurate catalog of tools the chat agent can
-invoke, where they come from, and how approval, read-only, and shell
+What follows is the tool catalog: what the chat agent can call, where
+each tool comes from, and how approval, read-only mode, and shell
 disabling change the effective set.
-Re-run the implementation only from
-**live code** (this page intentionally avoids guessing).
 
 Everything that runs is generic: the same function body is shared by
 the TUI (the agent's own tool loop), the web UI (slash commands through
@@ -21,16 +19,16 @@ arrives in chat as an `error`-status message --- never as a traceback.
 
 ## 1. How the tool set is assembled
 
-  | Layer                      | Source module                                       | When it attaches                                                                  | Filter switches                                                         |
-  | ---                        | ---                                                 | ---                                                                               | ---                                                                     |
-  | Workspace file tools       | `berg_agents/agents/factory.py` (`create_tools`)    | Always in `WorkspaceToolset`                                                      | `read_only=True` hides mutating tools; `allow_shell=False` hides `bash` |
-  | Plan / implement delegates | `berg_agents/agents/workspace_toolset.py`           | Non-read-only mode                                                                | Uses `PlannerDeps` and `ImplementationDeps`                             |
-  | Web helpers                | `berg_agents/capabilities/web_backends.py`          | If `BERG_AGENT_WEB_SEARCH_BACKENDS` is configured to at least one working backend | Backends without dependencies are skipped                               |
-  | Memory (notebook)          | `berg_agents/plugin_system/context_capabilities.py` | When the `Memory` capability is available                                         | Degrades to SQLite if `FileStore` fails                                 |
-  | Step persistence / recall  | Same as above                                       | When both `StepPersistence` and `ConversationSearch` load                         | Requires runs DB write access                                           |
-  | MCP toolsets               | `.berg-agents/mcp.json` (configurable)              | At startup, per server                                                            | Kill-switch (`enabled: false`), runtime enable/disable, sensitive gate  |
-  | Skills                     | `BERG_AGENT_SKILLS`                                 | As deferred toolsets; body not attached to every call                             | Progressively loaded; tool metadata exposed as `berg-plugin-skill-*`    |
-  | Plugin tools               | Enabled plugins that register `ToolCapability`      | Each turn (live state)                                                            | \"Plugin OFF\" removes them next turn; `POST /api/plugins/{id}/disable` |
+| Layer                      | Source module                                       | When it attaches                                                                  | Filter switches                                                         |
+  |----------------------------|-----------------------------------------------------|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| Workspace file tools       | `berg_agents/agents/factory.py` (`create_tools`)    | Always in `WorkspaceToolset`                                                      | `read_only=True` hides mutating tools; `allow_shell=False` hides `bash` |
+| Plan / implement delegates | `berg_agents/agents/workspace_toolset.py`           | Non-read-only mode                                                                | Uses `PlannerDeps` and `ImplementationDeps`                             |
+| Web helpers                | `berg_agents/capabilities/web_backends.py`          | If `BERG_AGENT_WEB_SEARCH_BACKENDS` is configured to at least one working backend | Backends without dependencies are skipped                               |
+| Memory (notebook)          | `berg_agents/plugin_system/context_capabilities.py` | When the `Memory` capability is available                                         | Degrades to SQLite if `FileStore` fails                                 |
+| Step persistence / recall  | Same as above                                       | When both `StepPersistence` and `ConversationSearch` load                         | Requires runs DB write access                                           |
+| MCP toolsets               | `{config}/mcp.json` (configurable)                  | At startup, per server                                                            | Kill-switch (`enabled: false`), runtime enable/disable, sensitive gate  |
+| Skills                     | `BERG_AGENT_SKILLS`                                 | As deferred toolsets; body not attached to every call                             | Progressively loaded; tool metadata exposed as `berg-plugin-skill-*`    |
+| Plugin tools               | Enabled plugins that register `ToolCapability`      | Each turn (live state)                                                            | "Plugin OFF" removes them next turn; `POST /api/plugins/{id}/disable`   |
 
 On a given machine, confirm the exact tools by running
 `/tools` in the chat UI or `GET /api/tools` in the web UI / curl.
@@ -47,20 +45,20 @@ Path normalization: arguments are workspace-relative; the `/workspace/`
 prefix is accepted and normalized; `..`, `~`, or anything outside the root
 is rejected.
 
-  | Tool             | Risk class | Signature                                                         | Notes                                                                                                                   |
-  | ---              | ---        | ---                                                               | ---                                                                                                                     |
-  | `list_files`     | low        | `list_files(file_path: str = \".\") -> str`                       | Recursive listing capped at 2000 files; skips `.git`, `node_modules`, `__pycache__`, `.venv`, `.next`, `dist`, `.turbo` |
-  | `read_file`      | low        | `read_file(file_path: str) -> str`                                | `ValueError` path errors are reported as strings                                                                        |
-  | `search_code`    | low        | `search_code(pattern: str, directory: str = \".\") -> str`        | Simple string substring match; 50 hit cap, 2000 scanned files, 1M file size limit                                       |
-  | `bash`           | high       | `bash(command: str, timeout: int = 30) -> str`                    | Runs with `stderr=STDOUT` inside the workspace root; requires approval                                                  |
-  | `edit_file`      | high       | `edit_file(file_path: str, content: str) -> str`                  | Whole-file overwrite (see *Harness note* below)                                                                         |
-  | `patch_file`     | high       | `patch_file(file_path: str, old_text: str, new_text: str) -> str` | Single contiguous replacement; target occurrence count must be 1                                                        |
-  | `write_file`     | high       | `write_file(file_path: str, content: str) -> str`                 | Create/overwrite using atomic writes                                                                                    |
-  | `plan_task`      | low        | `plan_task(description: str) -> str`                              | Read-only, isolated planner agent (`PlannerDeps`); call this before any multi-step `implement_task`                     |
-  | `implement_task` | high       | `implement_task(plan: str, task_type: str = \"generic\") -> str`  | Isolated implementation agent with workspace tools; needs explicit user approval before use                             |
+| Tool             | Risk class | Signature                                                         | Notes                                                                                                      |
+  |------------------|------------|-------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
+| `list_files`     | low        | `list_files(file_path: str = ".") -> str`                         | Bounded recursive listing; skips `.git`, `node_modules`, `__pycache__`, `.venv`, `.next`, `dist`, `.turbo` |
+| `read_file`      | low        | `read_file(file_path: str) -> str`                                | `ValueError` path errors are reported as strings                                                           |
+| `search_code`    | low        | `search_code(pattern: str, directory: str = ".") -> str`          | Simple string substring match; 50 hit cap, 2000 scanned files, 1M file size limit                          |
+| `bash`           | high       | `bash(command: str, timeout: int = 30) -> str`                    | Runs with `stderr=STDOUT` inside the workspace root; requires approval                                     |
+| `edit_file`      | high       | `edit_file(file_path: str, content: str) -> str`                  | Whole-file overwrite (see *Harness note* below)                                                            |
+| `patch_file`     | high       | `patch_file(file_path: str, old_text: str, new_text: str) -> str` | Single contiguous replacement; target occurrence count must be 1                                           |
+| `write_file`     | high       | `write_file(file_path: str, content: str) -> str`                 | Create/overwrite using atomic writes                                                                       |
+| `plan_task`      | low        | `plan_task(description: str) -> str`                              | Read-only, isolated planner agent (`PlannerDeps`); call this before any multi-step `implement_task`        |
+| `implement_task` | high       | `implement_task(plan: str, task_type: str = "generic") -> str`    | Isolated implementation agent with workspace tools; needs explicit user approval before use                |
 
-Risk class maps directly to HITL policy: **low** runs without approval;
-**high** pauses for a HITL round-trip (TUI prompt or web Approve/Reject/
+Risk class maps directly to HITL policy: **low** runs without approval; **high** pauses for a HITL round-trip (TUI
+prompt or web Approve/Reject/
 Edit).
 Restricting mutating tools is supported in two ways:
 
@@ -69,21 +67,18 @@ Restricting mutating tools is supported in two ways:
 - `allow_shell=False` drops `bash`.
   Both are per-deployment flags.
 
-### Harness check (`context_capabilities` and friends)
+### Path safety
 
-- `read_file`/`write_file` etc. are the only thing plugins and UI use
-  with the workspace root by default.
-  They never use a tool outside the
-  root.
-- Atomic writes and the normalized path helper live in
-  `berg_agents/agents/_io.py`.
+All file tools resolve inside the workspace root (`..`, `~`, and absolute
+paths outside the root are rejected). Atomic writes and the normalization
+helper live in `berg_agents/tools/_io.py`.
 
 ## 3. Web tools
 
 Berg-agents ships two web tools for search and fetch, both built over a
 registered backend list (`BERG_AGENT_WEB_SEARCH_BACKENDS`).
 Defaults:
-`[\"ollama\", \"duckduckgo\", \"direct\"]`.
+`["ollama", "duckduckgo", "direct"]`.
 
 | Backend name | Keyword var | Search | Fetch | Behaviour |
 |---|---|---|---|
@@ -93,10 +88,10 @@ Defaults:
 
 Functions exposed to the agent:
 - `web_search(query: str, max_results: int = 5)` --- clamped to 1--10;
-silently skips broken backends and returns a \"no results/set OLLAMA_API_KEY\"
-message if none succeed.
+  silently skips broken backends and returns a "no results/set OLLAMA_API_KEY"
+  message if none succeed.
 - `web_fetch(url: str)` --- fetches one page through the first backend that
-supports fetch.
+  supports fetch.
 
 Unknown backend names warn and are skipped, not fatal.
 See `CONFIGURATION`
@@ -111,14 +106,15 @@ Notebook name: `MEMORY.md` in
 Per-project isolation is derived from owning the
 config directory; no namespace is used.
 
-  | Tool           | Shape                                                      | What it does                                                     |
-  | ---            | ---                                                        | ---                                                              |
-  | `write_memory` | `write_memory(content, file=MAIN_FILENAME, old_text=None)` | Append by default; replace exact once via `old_text` (pass empty |
+| Tool           | Shape                                                      | What it does                                                     |
+  |----------------|------------------------------------------------------------|------------------------------------------------------------------|
+| `write_memory` | `write_memory(content, file=MAIN_FILENAME, old_text=None)` | Append by default; replace exact once via `old_text` (pass empty |
 `content` to delete a passage); file size enforced through
 `max_memory_size` (~ truncation) \|
 \| `read_memory` \| `read_memory(file: str)` \| Returns a bounded excerpt of a **topic file**; do NOT use for
 `MEMORY.md` (already injected, lives outside the workspace) \|
-\| `search_memory` \| `search_memory(query: str)` \| Bounded keyword search across memory files (snippet-shaped response) \|
+\| `search_memory` \| `search_memory(query: str)` \| Bounded keyword search across memory files (snippet-shaped
+response) \|
 \| `delete_memory` \| `delete_memory(file: str)` \| Removes the entire memory file \|
 
 Memory snapshot (the main notebook) is injected at *every* request inside
@@ -140,16 +136,13 @@ Two capabilities together provide history recall:
   gives a keyword-searchable prefix query over steps previously
   compacted away.
 
-They share one store so a compacted turn stays recoverable.
-No direct
-per-tool call names are exposed; the capability injects the effect into
-the system prompt and runs on every turn.
-`ConversationSearch` does
-not surface errors visibly --- it publishes internal exceptions to logs.
+They share one store so a compacted turn stays recoverable. Neither
+capability adds a directly callable tool; they act through the system
+prompt on every turn.
 
 ## 6. MCP toolsets
 
-External MCP servers are declared in `.berg-agents/mcp.json` (path
+External MCP servers are declared in `{config}/mcp.json` (path
 configurable via `BERG_AGENT_MCP_SERVERS`).
 They add tools prefixed by
 `{server_name}_` to avoid clashes.
@@ -161,13 +154,12 @@ Both transports are supported:
 Gating:
 - *sensitive* servers (e.g. `github`, `memory`) pause for HITL
 - *read-only* and `context7`/`docs`/`reference` run without interruption
-- **Kill-switch**: `\"enabled\": false` in each entry.
-(Config is the
-startup default only --- runtime state is authoritative, UI toggles take
-over per turn.)
+- **Kill-switch**: `"enabled": false` in each entry. (Config is the
+  startup default only --- runtime state is authoritative, UI toggles take
+  over per turn.)
 - Co-existence with agents: the same server appears as
-`berg-plugin-mcp-*` in `/api/plugins` so the 🧩 Plugins browser shows
-its transport + approval flag.
+  `berg-plugin-mcp-*` in `/api/plugins` so the 🧩 Plugins browser shows
+  its transport + approval flag.
 
 ## 7. Skills (deferred)
 
@@ -185,7 +177,7 @@ syntax).
 
 ## 8. Plugin tools
 
-A plugin that registers `ToolCapability` entries has its tool(s) parsed
+A plugin that registers `ToolCapability` entries has its tool (s) parsed
 into the chat path every turn, tied to its enabled state.
 
 Calling paths (two surfaces):
@@ -193,14 +185,15 @@ Calling paths (two surfaces):
 1. Through chat: normal model → tool calling.
 2. Through UI (and `/api` clients):
    `POST /api/plugins/{plugin_id}/tools/{tool_name}`
-   - valid plugin, must exist + be enabled
-   - tool match = either advertised name or function `__name__` so
-     non-model helpers (e.g. `list_todo_items`) stay callable
-   - run with the project as cwd
-   - non-string values JSON-encoded; strings returned directly
-   - 404 for unknown plugin/tool in any state.
+    - valid plugin, must exist + be enabled
+    - tool match = either advertised name or function `__name__` so
+      non-model helpers (e.g. `list_todo_items`) stay callable
+    - run with the project as cwd
+    - non-string values JSON-encoded; strings returned directly
+    - 404 for unknown plugin/tool in any state.
 
-Full conformance example: shared-todo (`docs/plugins/SHARED-TODO.qmd`).
+Full conformance example: shared-todo (`
+plugins/SHARED-TODO.qmd`).
 
 ## 9. Approval, safety & hardening
 
@@ -222,14 +215,13 @@ Full conformance example: shared-todo (`docs/plugins/SHARED-TODO.qmd`).
 
 `GET  /api/tools` --- tool names and risk classes.
 `POST /api/tool/execute` --- execute one tool in-band; body
-`{ \"tool\": \"...\", \"args\": { \"file_path\": \"...\" } }` (args may also be a
+`{ "tool": "...", "args": { "file_path": "..." } }` (args may also be a
 string treated as `file_path`).
 Returns `ToolExecuteResponse`.
 Used by
 slash commands typed into the chat box (`/read_file foo` → tool call).
 
-Ill-conceived calls contribute to learning stats (`GET /api/learning-stats`
-aggregated view).
+Tool outcomes feed learning stats (`GET /api/learning-stats`).
 `run_task` is special-cased to launch a full harness task.
 
 ## 11. How to add a new tool

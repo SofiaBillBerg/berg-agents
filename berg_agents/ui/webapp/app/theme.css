@@ -40,7 +40,7 @@
     --berg-bg: #f8edf8;
     --berg-surface: #fffafa;
     --berg-surface-tint: #f1f3f4;
-    --berg-surface-soft: rgba(248, 237, 248, 0.76);
+    --berg-surface-soft: rgb(248 237 248 / 76%);
     --berg-border: #e9ecef;
     --berg-muted: #551a8b; /* callout label colour */
 
@@ -51,7 +51,7 @@
     --berg-status-error: #d73027;
 
     /* Code */
-    --berg-code-bg: rgba(248, 237, 248, 0.76);
+    --berg-code-bg: rgb(248 237 248 / 76%);
     --berg-code-text: #551a8b;
 
     /* Gradients */
@@ -64,9 +64,8 @@
     --berg-gradient-soft: linear-gradient(135deg, #3358b5, #f285d5);
 
     /* Typography tokens */
-    --berg-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --berg-font-sans: "Inter", -apple-system, blinkmacsystemfont, "Segoe UI", roboto, sans-serif;
     --berg-font-mono: "Fira Code", "Monaco", "Consolas", monospace;
-
     --berg-fs-xs: 0.75rem; /* 12px - meta */
     --berg-fs-sm: 0.875rem; /* 14px - small body */
     --berg-fs-base: 1rem; /* 16px - body */
@@ -75,12 +74,10 @@
     --berg-fs-xl: 1.5rem; /* 24px - heading */
     --berg-fs-2xl: 2rem; /* 32px - section title */
     --berg-fs-3xl: 2.5rem; /* 40px - banner title */
-
     --berg-fw-regular: 400;
     --berg-fw-medium: 500;
     --berg-fw-semibold: 600;
     --berg-fw-bold: 700;
-
     --lh-tight: 1.2;
     --berg-lh-base: 1.6;
     --berg-lh-loose: 1.8;
@@ -95,14 +92,12 @@
     --berg-sp-6: 2rem; /* 32px */
     --berg-sp-7: 3rem; /* 48px */
     --berg-sp-8: 4rem; /* 64px */
-
     --berg-radius-sm: 4px;
     --berg-radius: 6px;
     --berg-radius-lg: 12px;
-
-    --berg-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --berg-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
-    --berg-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --berg-shadow-sm: 0 1px 2px rgb(0 0 0 / 5%);
+    --berg-shadow-md: 0 2px 4px rgb(0 0 0 / 10%);
+    --berg-shadow-lg: 0 4px 12px rgb(0 0 0 / 15%);
 }
 
 /* Dark mode - Sofia's builder dark (notes/theme.css) for the app
@@ -110,13 +105,13 @@
    pop. Verbatim mapping; do not retune. */
 .dark {
     /* Neutrals - near-white copy on near-black rose surfaces */
-    --berg-text: oklch(99.11% 0.0154 336.34);
-    --berg-bg: oklch(12% 0.0154 336.34);
-    --berg-surface: oklch(21.03% 0.0308 336.34);
-    --berg-surface-tint: oklch(27.21% 0.0231 336.34);
-    --berg-surface-soft: oklch(21.03% 0.0308 336.34 / 0.76);
-    --berg-border: oklch(28% 0.0154 336.34);
-    --berg-muted: oklch(70.5% 0.0308 336.34); /* callout label colour */
+    --berg-text: oklch(99.11% 0.0154 336.34deg);
+    --berg-bg: oklch(12% 0.0154 336.34deg);
+    --berg-surface: oklch(21.03% 0.0308 336.34deg);
+    --berg-surface-tint: oklch(27.21% 0.0231 336.34deg);
+    --berg-surface-soft: oklch(21.03% 0.0308 336.34deg / 76%);
+    --berg-border: oklch(28% 0.0154 336.34deg);
+    --berg-muted: oklch(70.5% 0.0308 336.34deg); /* callout label colour */
 
     /* Status - lifted for contrast on dark surfaces */
     --berg-status-info: #9db1e8;
@@ -125,10 +120,9 @@
     --berg-status-error: #f08a80;
 
     /* Code - builder surface + rose accent pops on near-black */
-    --berg-code-bg: oklch(21.03% 0.0308 336.34);
-    --berg-code-text: oklch(77% 0.13 336.34);
-
-    --berg-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --berg-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.5);
-    --berg-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.6);
+    --berg-code-bg: oklch(21.03% 0.0308 336.34deg);
+    --berg-code-text: oklch(77% 0.13 336.34deg);
+    --berg-shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --berg-shadow-md: 0 2px 4px rgb(0 0 0 / 50%);
+    --berg-shadow-lg: 0 4px 12px rgb(0 0 0 / 60%);
 }

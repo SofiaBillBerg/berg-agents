@@ -60,12 +60,12 @@ body::before {
     pointer-events: none;
     background: radial-gradient(
             1200px 600px at 50% -10%,
-            rgba(125, 2, 156, 0.06),
+            rgb(125 2 156 / 6%),
             transparent 60%
     ),
     radial-gradient(
             900px 500px at 100% 100%,
-            rgba(33, 144, 140, 0.05),
+            rgb(33 144 140 / 5%),
             transparent 60%
     );
 }
@@ -81,16 +81,16 @@ body::before {
 }
 
 *::-webkit-scrollbar-thumb {
-    background: rgba(85, 26, 139, 0.25);
+    background: rgb(85 26 139 / 25%);
     border-radius: var(--berg-radius);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-    background: rgba(85, 26, 139, 0.45);
+    background: rgb(85 26 139 / 45%);
 }
 
 ::selection {
-    background: rgba(125, 2, 156, 0.2);
+    background: rgb(125 2 156 / 20%);
     color: var(--berg-text);
 }
 
@@ -102,6 +102,7 @@ body::before {
     margin: 0 auto;
     padding: var(--berg-sp-3) var(--berg-sp-5) var(--berg-sp-3);
     font-family: var(--berg-font-sans), sans-serif;
+
     /* Fills the space left below the Navbar inside the flex shell
        (body > #root). Not 100dvh: that would ignore the navbar height
        and push the input bar off-screen (the cropped bottom). */
@@ -134,7 +135,7 @@ button {
 
 button:hover {
     background: var(--berg-surface-tint);
-    border-color: rgba(125, 2, 156, 0.4);
+    border-color: rgb(125 2 156 / 40%);
     box-shadow: var(--berg-shadow-md);
     transform: translateY(-1px);
 }
@@ -165,8 +166,8 @@ button:disabled {
    --field-background token. */
 .dark .input-bar textarea,
 .dark .input-bar-textarea {
-    background: oklch(23.5% 0.045 293);
-    border-color: oklch(36% 0.05 293);
+    background: oklch(23.5% 0.045 293deg);
+    border-color: oklch(36% 0.05 293deg);
 }
 
 @keyframes berg-bubble-in {
@@ -174,6 +175,7 @@ button:disabled {
         opacity: 0;
         transform: translateY(6px);
     }
+
     to {
         opacity: 1;
         transform: none;
@@ -209,8 +211,8 @@ button:disabled {
 .input-bar-textarea:focus,
 .input-bar textarea:focus {
     outline: none;
-    border-color: rgba(125, 2, 156, 0.5);
-    box-shadow: 0 0 0 4px rgba(125, 2, 156, 0.12);
+    border-color: rgb(125 2 156 / 50%);
+    box-shadow: 0 0 0 4px rgb(125 2 156 / 12%);
 }
 
 .input-bar-textarea:disabled,
@@ -224,7 +226,7 @@ button:disabled {
 .reasoning-block {
     margin-bottom: var(--berg-sp-2);
     font-size: var(--berg-fs-sm);
-    background: rgba(125, 2, 156, 0.05);
+    background: rgb(125 2 156 / 5%);
     border-left: 2px solid var(--berg-brand-purple);
     border-radius: 0 var(--berg-radius) var(--berg-radius) 0;
     padding: 0 var(--berg-sp-2);
@@ -288,7 +290,7 @@ button:disabled {
 
 .message-list-item.message-role-system {
     border-left: 3px solid var(--berg-muted);
-    background: rgba(120, 120, 120, 0.06);
+    background: rgb(120 120 120 / 6%);
 }
 
 .message-list-item.message-role-system .text-xs.font-semibold {

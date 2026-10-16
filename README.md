@@ -14,7 +14,7 @@ knitr::opts_chunk\$set( collapse = TRUE, comment = “\#\>” )
 
     <!-- badges: end -->
 
-    ![Berg-Agents Overview](visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
+    ![Berg-Agents Overview](docs/visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
 
     ## Quick Start
 
@@ -81,7 +81,7 @@ The config directory resolves via `BERG_AGENTS_CONFIG_DIR` →
 See [CONFIGURATION] for the full reference.
 
 <figure>
-<img src="visualizations/svg/packages_berg_agents.svg"
+<img src="docs/visualizations/svg/packages_berg_agents.svg"
 title="Berg Agents Config Modules" alt="Berg-Agents Config" />
 <figcaption aria-hidden="true">Berg-Agents Config</figcaption>
 </figure>
@@ -121,18 +121,17 @@ operations always need explicit approval.
 ## License
 
 **Version**: 0.2.0 \| **License**: GNU Affero General Public License v3
-(AGPL-3.0-only)
 
-  [QUICKSTART]: QUICKSTART.qmd
-  [USAGE]: USAGE.qmd
-  [CONFIGURATION]: CONFIGURATION.qmd
-  [Shared-ToDo]: plugins/SHARED-TODO.qmd
-  [Plugin UI]: plugins/PLUGIN-UI.qmd
-  [MEMORY]: MEMORY.qmd
-  [API]: API.qmd
-  [TOOLS]: TOOLS.qmd
-  [MANIFEST]: plugins/MANIFEST.qmd
-  [CHEATSHEET]: CHEATSHEET.qmd
-  [CONTRIBUTING]: CONTRIBUTING.qmd
-  [FAQ]: FAQ.qmd
-  [CHANGELOG]: CHANGELOG.qmd
+  [QUICKSTART]: docs/QUICKSTART.qmd
+  [USAGE]: docs/USAGE.qmd
+  [CONFIGURATION]: docs/CONFIGURATION.qmd
+  [Shared-ToDo]: docs/plugins/SHARED-TODO.qmd
+  [Plugin UI]: docs/plugins/PLUGIN-UI.qmd
+  [MEMORY]: docs/MEMORY.qmd
+  [API]: docs/API.qmd
+  [TOOLS]: docs/TOOLS.qmd
+  [MANIFEST]: docs/plugins/MANIFEST.qmd
+  [CHEATSHEET]: docs/CHEATSHEET.qmd
+  [CONTRIBUTING]: docs/CONTRIBUTING.qmd
+  [FAQ]: docs/FAQ.qmd
+  [CHANGELOG]: docs/CHANGELOG.qmd

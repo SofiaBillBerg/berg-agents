@@ -22,5 +22,8 @@
   },
   "scripts": {
     "prepare": "husky"
+  },
+  "allowScripts": {
+    "puppeteer": true
   }
 }

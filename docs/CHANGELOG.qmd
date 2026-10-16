@@ -30,7 +30,8 @@ plan notes; versions are repository-wide, not subsystem-specific.
   tool dispatch.
 - **Real plugin pilot**: `berg-plugin-shared-todo` with 10 tools and its
   own UI bundle (full manifest reference in
-  `docs/plugins/SHARED-TODO.qmd`).
+  `
+plugins/SHARED-TODO.qmd`).
 - **Plugin UI bridge**: manifests declare a `ui:` block; the backend
   resolves it to a `entry_url`/`entry_built` pair and the host mounts the
   plugin's built React component through `window.BergRuntime` (React,

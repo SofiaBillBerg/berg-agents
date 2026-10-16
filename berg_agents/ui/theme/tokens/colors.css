@@ -44,7 +44,7 @@
     --berg-bg: #fbf7fb;
     --berg-surface: #fffafa;
     --berg-surface-tint: #f1f3f4;
-    --berg-surface-soft: rgba(248, 237, 248, 0.76);
+    --berg-surface-soft: rgb(248 237 248 / 76%);
     --berg-border: #e9ecef;
     --berg-muted: #551a8b; /* callout label colour */
 
@@ -55,7 +55,7 @@
     --berg-status-error: #d73027;
 
     /* Code */
-    --berg-code-bg: rgba(248, 237, 248, 0.76);
+    --berg-code-bg: rgb(248 237 248 / 76%);
     --berg-code-text: #551a8b;
 
     /* Gradients */
