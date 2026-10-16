@@ -8,14 +8,13 @@ knitr::opts_chunk\$set( collapse = TRUE, comment = “\#\>” )
 
     <!-- badges: start -->
 
-    > BergAgents - A local, LLM-driven code assistant with a **framework-agnostic core** and provider-centric configuration.
-    > Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture.
-    > The system follows a harness-based execution model with multiple specialized agents working together.
-    > The system is designed to work against any OpenAI-compatible provider, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
+    > BergAgents --- a local, LLM-driven coding assistant with a **framework-agnostic core** and provider-centric configuration.
+    > A multi-agent system built on Pydantic AI: Guardian, Planner, Implementation, Curator and Learning agents run a harness-based execution model with human-in-the-loop approval gates.
+    > Any OpenAI-compatible provider works with zero code changes, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
     <!-- badges: end -->
 
-    ![Berg-Agents Overview](docs/visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
+    ![Berg-Agents Overview](visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
 
     ## Quick Start
 
@@ -31,91 +30,109 @@ knitr::opts_chunk\$set( collapse = TRUE, comment = “\#\>” )
     # Web UI (default: http://127.0.0.1:8001)
     python -m berg_agents --web
 
+Full walkthrough: [QUICKSTART].
+
 ## What it is
 
-See [docs/USAGE.qmd] for TUI, Python API, and web examples.
+- **Harness engine** — Guardian (risk gate) → Planner (breakdown) →
+  Implementation (edits) → Curator (review), plus Learning stats. See
+  [USAGE].
+- **Provider-centric config** — each model carries its own provider,
+  `baseURL` and `apiKey`. No global provider flag. See [CONFIGURATION].
+- **Real plugin system** — discovery, capabilities, generic tool
+  dispatch, and plugin-owned UI bundles. Pilot: shared-todo. See
+  [Shared-ToDo] and [Plugin UI].
+- **Memory that persists** — a `MEMORY.md` notebook injected every
+  request, tiered compaction, step persistence with keyword recall. See
+  [MEMORY].
 
-1.  **Customizing the Harness via `bergagents.jsonc`**
-
-    ``` jsonc
-    {
-      "providers": {
-        "openai": {
-          "baseURL": "https://api.openai.com",
-          "apiKey": "${env:OPENAI_API_KEY}"
-        }
-      },
-      "harness": {
-        "enable_learning": true,
-        "enable_inference": true
-      },
-      "model_routing": {
-        "gpt-4o": { "provider": "openai", "complexity": 2 },
-        "claude-3-sonnet": { "provider": "anthropic", "complexity": 1 }
-      }
+``` jsonc
+// {config}/bergagents.jsonc — providers, harness, routing, plugins
+{
+  "providers": {
+    "ollama": {
+      "options": { "baseURL": "http://localhost:11434/v1", "apiKey": "" },
+      "models": { "qwen3.5:9b": {} }
     }
-    ```
+  },
+  "harness": { "enable_learning": true, "enable_hitl": true },
+  "defaultModel": "qwen3.5:9b"
+}
+```
 
-    This file lives in `.berg-agents` and is automatically merged
-    with environment overrides.
+Secrets live in `.env` as `${env:VAR_NAME}` references — never inline.
+The config directory resolves via `BERG_AGENTS_CONFIG_DIR` →
+`.berg-config` → `.berg-agents` → `~/.berg-agents`.
 
 ## Configuration
 
 ``` bash
-.berg-agents/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
-.env                      # secrets referenced as `${env:VAR_NAME}`
+{config}/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
+.env                        # secrets referenced as `${env:VAR_NAME}`
 ```
 
 | Layer | Source |
 |----|----|
-| Config file | `.berg-agents` - `providers` block + `harness`/`model_routing`/`hitl_rules` |
+| Config file | `{config}/bergagents.jsonc` — `providers` block plus `harness` / `model_routing` / `hitl_rules` / `plugins` / `agents` |
 | Secrets | `.env` file, referenced with `${env:VAR_NAME}` |
 | Overrides | `BERG_AGENT_*` environment variables |
-| External tools | `.berg-agents` for MCP server configuration |
+| External tools | `{config}/mcp.json` for MCP server configuration |
 
-See [docs/CONFIGURATION.qmd] for the full reference.
+See [CONFIGURATION] for the full reference.
 
 <figure>
-<img src="docs/visualizations/svg/packages_berg_agents.svg"
+<img src="visualizations/svg/packages_berg_agents.svg"
 title="Berg Agents Config Modules" alt="Berg-Agents Config" />
 <figcaption aria-hidden="true">Berg-Agents Config</figcaption>
 </figure>
 
 ## Documentation
 
-| Page | Description |
-|----|----|
-| [QUICKSTART] | Installation and first run |
-| [USAGE][docs/USAGE.qmd] | TUI, Python API, and web workflows |
-| [API] | Module map for the codebase |
-| [TOOLS] | Built-in tools, capabilities, and MCP |
-| [CONFIGURATION][docs/CONFIGURATION.qmd] | Provider-centric config, `.env`, and env vars |
-| [CONTRIBUTING] | Guidelines for contributing |
-| [FAQ] | Common questions and troubleshooting |
-| **TUTORIALS** (this page) | Step-by-step examples for common tasks |
+| Page                   | Description                                   |
+|------------------------|-----------------------------------------------|
+| [QUICKSTART]           | Installation and first run                    |
+| [USAGE]                | TUI, Python API, and web workflows            |
+| [API]                  | Module map for the codebase                   |
+| [TOOLS]                | Tool catalog with signatures and risk classes |
+| [CONFIGURATION]        | Provider-centric config, `.env`, and env vars |
+| [MEMORY]               | Memory, compaction, and persistence           |
+| [PLUGIN-UI][Plugin UI] | Runtime plugin UI bridge                      |
+| [SHARED-TODO]          | Plugin pilot walkthrough                      |
+| [MANIFEST]             | Plugin manifest reference                     |
+| [CHEATSHEET]           | Commands, endpoints, and env keys             |
+| [CONTRIBUTING]         | Guidelines for contributing                   |
+| [FAQ]                  | Common questions and troubleshooting          |
+| [CHANGELOG]            | Versioned change tracking                     |
 
 ## Getting Help
 
 - Read the [QUICKSTART guide][QUICKSTART] for installation
-- Check [USAGE examples][docs/USAGE.qmd] for common workflows
+- Check [USAGE examples][USAGE] for common workflows
 - See [TOOLS documentation][TOOLS] to understand agent capabilities
 - Review [FAQ] for troubleshooting tips
 - API reference is in [API]
-- Explore the \[TUTORIALS\] section above for ready-to-run snippets
 
 ## Contributing
 
-Please read our [CONTRIBUTING] guide for details on coding standards,
-testing, and the submission process.
+Please read our [CONTRIBUTING] guide for architecture rules, coding
+standards, testing, and the submission process. Note: git remote
+operations always need explicit approval.
 
 ## License
 
-**Version**: 0.2.0 \| **License**: GNU Affero General Public License
+**Version**: 0.2.0 \| **License**: GNU Affero General Public License v3
+(AGPL-3.0-only)
 
-  [docs/USAGE.qmd]: docs/USAGE.qmd
-  [docs/CONFIGURATION.qmd]: docs/CONFIGURATION.qmd
-  [QUICKSTART]: docs/QUICKSTART.qmd
-  [API]: docs/API.qmd
-  [TOOLS]: docs/TOOLS.qmd
-  [CONTRIBUTING]: docs/CONTRIBUTING.qmd
-  [FAQ]: docs/FAQ.qmd
+  [QUICKSTART]: QUICKSTART.qmd
+  [USAGE]: USAGE.qmd
+  [CONFIGURATION]: CONFIGURATION.qmd
+  [Shared-ToDo]: plugins/SHARED-TODO.qmd
+  [Plugin UI]: plugins/PLUGIN-UI.qmd
+  [MEMORY]: MEMORY.qmd
+  [API]: API.qmd
+  [TOOLS]: TOOLS.qmd
+  [MANIFEST]: plugins/MANIFEST.qmd
+  [CHEATSHEET]: CHEATSHEET.qmd
+  [CONTRIBUTING]: CONTRIBUTING.qmd
+  [FAQ]: FAQ.qmd
+  [CHANGELOG]: CHANGELOG.qmd
