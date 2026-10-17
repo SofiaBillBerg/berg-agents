@@ -359,12 +359,12 @@ figcaption {
 
 /* Blockquotes */
 blockquote {
-  border-left: 4px solid #21908c;
-  background-color: #3b52cccc;
+  border-left: 4px solid #7d029c;
+  background-color: rgb(125 2 156 / 8%);
   padding: 1rem;
   margin: 1rem 0;
   font-style: italic;
-  color: #495057;
+  color: #4a2b52;
 }
 
 /* Lists definitions */

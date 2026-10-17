@@ -8,17 +8,17 @@ project:
   type: website
 
   output-dir: _site
-  pre-render:
-    - "project_utils/run_apidocs.sh"
-    - "project_utils/run_diagrams.sh"
+  # pre-render: # Moved to production profile
+  #  - "project_utils/run_apidocs.sh"
+   # - "project_utils/run_diagrams.sh"
   render:
     - "docs/**/*.qmd"
     - "agpl-3.0.md"
     - "!.*/*.*"
     - "!notes/*.*"
     - "!apidocs/**/*.*"
-  post-render:
-    - "project_utils/render_readme.sh"
+  # post-render: # Moved to production profile
+    # - "project_utils/render_readme.sh"
 website:
   title: "Berg Agents"
   back-to-top-navigation: true
@@ -180,7 +180,7 @@ extensions:
     timeout: 10 # Timeout in seconds for each URL check
     user-agent: "Quarto-Linkrot/1.0" # User agent string for requests
     cache-results: true # Cache results to avoid checking the same URL multiple times
-    debug: true # Enable debug logging
+    debug: false # Enable debug logging
     output-file: "linkrot-report.txt" # Write results to a file (e.g., "linkrot-report.txt")
     skip-patterns: # List of regex patterns to skip
       - "example\\.com"

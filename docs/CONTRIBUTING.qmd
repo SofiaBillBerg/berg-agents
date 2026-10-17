@@ -6,213 +6,88 @@ format: html
 
 # Contributing
 
-Bug fixes, features, plugin work, and documentation improvements are all
-welcome.
-The rules below keep the architecture coherent - every
-contribution should make the system **more** self-consistent, not less.
+Thanks for helping out. Bug fixes, features, plugin work, and docs
+improvements are all welcome. This page covers the setup and the few
+conventions that make changes easy to review.
 
-## 1. Core principles
-
-- **Small, reviewable changes.** Do not bundle an unrelated refactor,
-  a dependency upgrade, and a bug fix into one change - it is impossible to
-  review or roll back safely.
-- **Only `main` is shared.** Work on a branch, open a pull request, and
-  never push to `main`. Maintainers handle merging and releases.
-- **Discuss big changes first.** Non-trivial work should start as an issue
-  or a short plan both sides agree on, not as a surprise PR.
-- **No live-model or live-provider tests.** `ALLOW_MODEL_REQUESTS=False`
-  in `tests/conftest.py` is never bypassed - tests use mocks only.
-  Real
-  providers are exercised manually in the browser or TUI.
-
-## 2. Development setup
-
-### Workspace
-
-1. The working tree is everything - `.berg-agents/` (config, sessions,
-   memory) and `sharedtodos/` (user tasks) are git-ignored local state.
-   Do not delete them.
-2. UI and plugin-bundle builds need Node 24+ or Bun alongside Python.
-3. Use `uv` for all Python environment and dependency work.
-
-### First-time install
+## Getting started
 
 ```bash
 uv venv
-cd .venv  # implied by project root
 source .venv/bin/activate
 uv pip install -e .
 ```
 
-### Front-end (once, then on change)
+Python 3.12+ and `uv` are the baseline. Node 24+ or Bun is needed for
+the web UI and plugin bundles.
+
+## Build the front-end
+
+The web UI is a Next.js app that FastAPI serves as a static export:
 
 ```bash
 cd berg_agents/ui/webapp
 npm install   # or: bun install
-npm run build # static export served by FastAPI on one origin
+npm run build
 ```
 
-### Plugin bundles (shared-todo and any others)
+Plugins with a UI ship a built bundle too:
 
 ```bash
 cd berg_plugins/<plugin>
 npm install
-npm run build:ui     # writes ui/dist/<surface>.js if the manifest declares an entry
+npm run build:ui
 ```
 
-### Configuration
+## Making changes
 
-- Copy/adapt `.berg-agents/bergagents.jsonc` and put secrets in `.env`
-  under `${env:VAR_NAME}` references - never in source.
-- Verify the active config dir with `BERG_AGENTS_CONFIG_DIR` before you
-  assume a data location.
+- Keep a pull request to one change. Small PRs get reviewed faster.
+- `ruff check .` and `ruff format --check .` should pass. Public
+  functions, classes, and methods get docstrings.
+- Tests run offline with mocks (`pytest -q`). `ALLOW_MODEL_REQUESTS`
+  stays `False` in `tests/conftest.py` — no live models in tests.
+- Update the docs when you change something user-facing. Docs are
+  Quarto `.qmd` files under `docs/`; the root `README.md` is generated
+  from `docs/index.qmd`, so edit the `.qmd` and never `README.md`.
 
-## 3. Where code lives
+## Where things live
 
-  | Area           | Location                           | Notes                                                                 |
-  | ---            | ---                                | ---                                                                   |
-  | Harness/agents | `berg_agents/agents/`              | `AbstractAgent`, Guardian, Planner, Implementation, Curator, Learning |
-  | Tools (specs)  | `berg_agents/agents/factory.py`    | `ToolSpec` values, risk classes, native + MCP tools                   |
-  | Web + TUI      | `berg_agents/ui/`                  | `server.py`, `routes.py`, `session_store.py`, FastAPI helpers         |
-  | Web front-end  | `berg_agents/ui/webapp/app/`       | Next.js, HeroUI, plugins, runtime (`BergRuntime`)                     |
-  | Plugin system  | `berg_agents/plugin_system/`       | discovery, capabilities, memory, compaction, sessions                 |
-  | Providers      | `berg_agents/providers/`           | provider-centric resolution - never add a global provider flag        |
-  | Config         | `berg_agents/config/`              | single resolver in `paths.py`; settings, config manager               |
-  | Plugins        | `berg_plugins/<plugin-id>/`        | one home per plugin (manifest, code, UI bundle)                       |
-  | Docs           | `
-*.qmd`, `
-plugins/*.qmd` | Quarto source; `README.md` generated from `index.qmd`                 |
+| Area | Location |
+| --- | --- |
+| Harness and agents | `berg_agents/agents/` |
+| Tool specs | `berg_agents/agents/factory.py` |
+| Web API and TUI | `berg_agents/ui/` |
+| Web front-end | `berg_agents/ui/webapp/app/` |
+| Plugin system | `berg_agents/plugin_system/` |
+| Providers | `berg_agents/providers/` |
+| Config | `berg_agents/config/` |
+| Plugins | `berg_plugins/<plugin-id>/` |
+| Docs | `docs/` (Quarto `.qmd`) |
 
-## 4. Architecture rules you must respect
+## A few things worth knowing
 
-1. **Config single source of truth.** All config files resolve through
-   `berg_agents/config/paths.resolve_config_dir` - mirror one logic means
-   no hard-coded `.berg-agents`/`.berg-config` strings elsewhere.
-2. **Provider-centric config.** A model carries its own provider,
-   `baseURL`, and `apiKey`.
-   No global provider flag, EVER.
-3. **Plugin installing must not require a host edit.** Plugins ship a built
-   JS bundle; the host imports the plugin source in no place - it only
-   mounts manifest-declared UI at runtime.
-   Adding a plugin line to
-   `registry.tsx` is a known gap to fix, not acceptable architecture.
-4. **User data is inviolable.** `sharedtodos/` is your data - never
-   auto-delete, rewrite, or reformat it as a "clean-up" step. Older
-   nested memory files were deliberately left in place for manual merge.
-5. **Memory path is flat.** `FileStore` rooted at the config directory,
-   namespace empty, `agent_name="memory"` so `MEMORY.md` lands at
-   `{config}/memory/MEMORY.md`.
-   Double-nesting is a known regression.
-6. **Compaction ordering is load-bearing.** Compaction (mutable history)
-   is registered **before** `Memory` (request-only injection) - otherwise
-   a memory block is dropped by the rewrite.
-   Do not re-order.
-7. **Session store is per-operation connections.** sqlite3 thread affinity;
-   do not cache connections across asyncio tasks.
-8. **Permission default = ask** for tools surfaced in chat (high-risk /
-   HITL) and for any agent that runs unsafe steps.
-9. **Comments must stay** - source comments are clarity, not "AI slop".
+- Config resolves through one function,
+  `berg_agents/config/paths.py::resolve_config_dir`. Use it instead of
+  hardcoding a directory name.
+- Models carry their own provider, `baseURL`, and `apiKey` in the
+  `providers` block of `bergagents.jsonc`. There is no global provider
+  flag.
+- Plugins ship a built JS bundle; the host mounts it at runtime and
+  never imports plugin source. See
+  [`plugins/PLUGIN-UI.qmd`](plugins/PLUGIN-UI.qmd) and
+  [`plugins/MANIFEST.qmd`](plugins/MANIFEST.qmd).
+- Memory lives at `{config}/memory/MEMORY.md` and is injected into every
+  request. Compaction is registered before the memory capability — that
+  order matters.
+- The session store opens a SQLite connection per operation. Caching a
+  connection across threads breaks under `asyncio.to_thread`.
 
-## 5. Adding a tool
+## Pull requests
 
-1. Implement the function in `berg_agents/agents/` (or as a `ToolCapability`
-   in a plugin).
-2. Wrap it as `make_tool_spec(... name=..., risk_class=low|high ...)` so it
-   inherits atomic writes, timeouts, path normalization.
-3. Add it to `create_tools()` (or the plugin capability registrations).
-4. Declare its HITL class implicitly by `risk_class`: high-risk auto-gates.
-5. Write tests under `tests/` using mocks only; do not forward to live
-   providers.
-6. Document it in [`TOOLS.qmd`](TOOLS.qmd) and (if user-facing) [`FAQ.qmd`](FAQ.qmd).
+1. Branch from `main`.
+2. Describe what changed and why, and include test results or manual
+   checks you ran.
+3. Wait for review before merging.
 
-## 6. Writing a plugin
-
-Follow `berg_plugins/shared-todo/` as the conformance baseline:
-
-1. `plugin.yaml` with `metadata`, `entry`, `capabilities`, and - if the
-   plugin has UI - a `ui:` block (`entry`, `export`, `placement`, `label`,
-   `width`).
-2. Real `BergPlugin` subclass imported from `berg_agents.plugin_system`
-   (no local stubs).
-3. `PluginContext` is populated via `load_config` with schema defaults so
-   config is alive - never read env/config manually in the entry point.
-4. Capabilities are stored persistently: use `persist=True` for
-   per-plugin identity fields (skill path / MCP server name etc.).
-5. Ship a built bundle produced by esbuild (`build-ui.mjs`); treat
-   React/ReactDOM/component libraries as **externals** against
-   `window.BergRuntime` so there is exactly one React instance.
-6. Use `apiBase()` from the runtime helper - never bake `process.env`
-   into the bundle.
-   SetCache-Control is handled by the host, but keep the
-   URL stable and rebuild freely.
-7. Give the plugin UI the `PluginSurfaceProps` contract (`view`,
-   `refreshKey`, etc.).
-   Tries on `refreshKey` is how it stays in sync.
-
-See [`plugins/PLUGIN-UI.qmd`](plugins/PLUGIN-UI.qmd) and [`plugins/SHARED-TODO.qmd`](plugins/SHARED-TODO.qmd) for the full contract.
-
-## 7. Documentation discipline
-
-- Source is always `.qmd` under `docs/`. The root `README.md` is generated
-  from `docs/index.qmd` by `project_utils/render_readme.sh` (post-render
-  step in `_quarto.yml`); never hand-edit `README.md`.
-- The site build is `quarto render`, which runs the configured pre-render
-  scripts (`run_apidocs.sh`, `run_diagrams.sh`) and post-render
-  (`render_readme.sh`). The publishable output lands in `_site/`.
-- Keep `title` and `author` front-matter current on every page you touch.
-- Keep internal links relative and verify them after moving files. Quarto
-  file names are case-sensitive: `docs/plugins/SHARED-TODO.qmd` must match
-  `_quarto.yml` exactly.
-- New tools go in `TOOLS.qmd`; new plugins in `docs/plugins/`; durable
-  architecture decisions in the decisions log and `notes/`.
-
-## 8. Testing
-
-```bash
-source .venv/bin/activate
-ruff check .
-ruff format --check .
- pytest -q
-```
-
-- Suite is offline; mock HITL, tools, MCP.
-  Never live models.
-- Use markers (`slow`, etc.) when adding expensive tests - slow tests must
-  not run by default in CI.
-- Common entry points for plugins: instead of `TestClient(create_app())`
-  (which can hang waiting for stdio MCP processes), use cheap helpers
-  like `chat_integration.list_chat_plugins()`.
-- Sub-second feedback: use `py_compile` + `ruff` on touched files before
-  waiting for a full run.
-- `sqlite` tests must be per-operation; never share a `Connection` across
-  threads.
-
-## 9. Toolchain gotchas (observed)
-
-- `keep_alive` MCP keep-stdio servers can block `pytest`; bound the run
-  or avoid killing server processes inside tests.
-- `agent-browser --enable react-devtools` is required for React component
-  tracing during UI work.
-- `git` remote operations (push to `main`, merge, releases) are
-  maintainers-only.
-- Do not run `sudo` for project work; the toolchain installs unprivileged.
-
-## 10. Open a pull request
-
-1. Keep it scoped - one logical piece.
-2. Branch from `main`; push only to your PR branch, never to `main`.
-3. Describe **what** changed and **why**; include test evidence and manual
-   checks you performed.
-4. Update docs if any public surface changed (new tool, env key, file path,
-   mutation pattern).
-## 11. Bootstrap checklist for a fresh checkout
-
-- [ ] Python 3.12+, uv, `.venv` activated
-- [ ] `uv pip install -e .`
-- [ ] Web UI built (`npm run build`)
-- [ ] Any plugin bundles built (`npm run build:ui`)
-- [ ] Config directory resolves to the right project path
-- [ ] `ruff check . && ruff format --check .` clean
-- [ ] `pytest -q` passes
-- [ ] Docs updated where the change is user-visible
-```
+If you are unsure about a change, open an issue first and we can agree
+on an approach before you write code.

@@ -128,23 +128,23 @@ table tbody tr:nth-child(even) {
 }
 
 .callout-note {
-  border-left-color: #9fb2e3;
-  background-color: rgb(159 178 227 / 12%);
+  border-left-color: #b8c7ee;
+  background-color: rgb(159 178 227 / 18%);
 }
 
 .callout-important {
   border-left-color: #fde725;
-  background-color: rgb(253 231 37 / 10%);
+  background-color: rgb(253 231 37 / 14%);
 }
 
 .callout-warning {
   border-left-color: #fd9f07;
-  background-color: rgb(253 159 7 / 12%);
+  background-color: rgb(253 159 7 / 16%);
 }
 
 .callout-caution {
   border-left-color: #e35d5d;
-  background-color: rgb(227 93 93 / 12%);
+  background-color: rgb(227 93 93 / 16%);
 }
 
 /* Navbar (same brand gradient as light) */
@@ -166,8 +166,8 @@ table tbody tr:nth-child(even) {
 
 /* TOC */
 #TOC {
-  background-color: #241026;
-  border: 1px solid #5a2c68;
+  background-color: #341a3e;
+  border: 1px solid #6b3a7a;
   border-radius: 6px;
   padding: 1rem;
   margin-bottom: 2rem;
@@ -186,7 +186,7 @@ table tbody tr:nth-child(even) {
 #TOC ul,
 #TOC li,
 #TOC a {
-  color: #c9a8e8;
+  color: #d9c8e8;
   text-decoration: none;
 }
 
@@ -381,6 +381,135 @@ body .quarto-code-tools,
 body .quarto-code-tools .btn {
   background: #2f1539 !important;
   color: #f3e8f7 !important;
+}
+
+/* Syntax highlighting: the default pygments palette is tuned for light
+   backgrounds, so keywords/strings/comments land dark-on-dark. Restate
+   every token class with colors that read on plum. */
+body .highlight .hll {
+  background-color: rgb(255 255 255 / 8%);
+}
+body .highlight .c,
+body .highlight .c1,
+body .highlight .cm,
+body .highlight .cs,
+body .highlight .ch,
+body .highlight .cp,
+body .highlight .cpf {
+  color: #8a7f94;
+} /* comments */
+body .highlight .k,
+body .highlight .kc,
+body .highlight .kd,
+body .highlight .kn,
+body .highlight .kp,
+body .highlight .kr,
+body .highlight .kt {
+  color: #c792ea;
+} /* keywords */
+body .highlight .m,
+body .highlight .mf,
+body .highlight .mh,
+body .highlight .mi,
+body .highlight .mn,
+body .highlight .mo,
+body .highlight .il {
+  color: #f78c6c;
+} /* numbers */
+body .highlight .s,
+body .highlight .s1,
+body .highlight .s2,
+body .highlight .sa,
+body .highlight .sb,
+body .highlight .sc,
+body .highlight .dl,
+body .highlight .sd {
+  color: #98c379;
+} /* strings */
+body .highlight .se {
+  color: #f0a6e8;
+} /* string escapes */
+body .highlight .si,
+body .highlight .sx {
+  color: #f0a6e8;
+} /* interpolation */
+body .highlight .sr {
+  color: #98c379;
+} /* regex */
+body .highlight .nf,
+body .highlight .fm {
+  color: #82aaff;
+} /* functions */
+body .highlight .na {
+  color: #f78c6c;
+} /* attributes */
+body .highlight .nb,
+body .highlight .nc,
+body .highlight .nd,
+body .highlight .ne,
+body .highlight .ni,
+body .highlight .nl,
+body .highlight .nn,
+body .highlight .no,
+body .highlight .nt,
+body .highlight .nv,
+body .highlight .vc,
+body .highlight .vg,
+body .highlight .vi,
+body .highlight .vm {
+  color: #f3e8f7;
+} /* names: body text */
+body .highlight .o,
+body .highlight .ow {
+  color: #89ddff;
+} /* operators */
+body .highlight .p,
+body .highlight .pi {
+  color: #d9c8e8;
+} /* punctuation */
+body .highlight .w {
+  color: #f3e8f7;
+} /* whitespace */
+body .highlight .err {
+  color: #ff6b6b;
+  background-color: transparent;
+}
+body .highlight .ge {
+  font-style: italic;
+} /* generic emph */
+body .highlight .gs {
+  font-weight: bold;
+} /* generic strong */
+body .highlight .gu {
+  color: #c792ea;
+} /* generic heading */
+body .highlight .gt {
+  color: #89ddff;
+} /* generic traceback */
+body .highlight .gp,
+body .highlight .go {
+  color: #8a7f94;
+} /* prompt / output */
+body .highlight .gi {
+  color: #98c379;
+} /* inserted */
+body .highlight .gd {
+  color: #ff6b6b;
+} /* deleted */
+body .highlight .l,
+body .highlight .ld,
+body .highlight .mb,
+body .highlight .bp {
+  color: #f3e8f7;
+}
+
+/* Diagrams ship with a white background baked into the SVG; frame them
+   so they read as figures instead of holes punched in the page. */
+body figure img {
+  border: 1px solid #5a2c68;
+  border-radius: 6px;
+  padding: 0.5rem;
+  background: #fff;
 }
 
 html {
