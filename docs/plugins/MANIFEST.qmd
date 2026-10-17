@@ -190,5 +190,8 @@ lifecycle:
 - [ ] If `ui:` is declared: bundle built at `ui.entry`, React as externals, `apiBase` helper used, export name matches, `PluginSurfaceProps` accepted
 - [ ] `lifecycle` reflects the right startup posture (`auto_enable`, `deferred`, `priority`)
 
-Known gap: the host's plugin list still needs one `pluginId` entry in `app/plugins/registry.tsx` per plugin to be *listed*; everything after that is runtime-driven.
-Making that mapping fully data-driven is open work --- do not treat the line as architecture.
+The listing is fully data-driven: `app/plugins/registry.tsx` keeps no
+plugin list. The host discovers surfaces from `GET /api/plugins` and
+runtime-imports whatever `ui.entry_url` the manifest declares, so a new
+plugin needs no host edit at all --- drop the package in, build its
+bundle, and it appears.

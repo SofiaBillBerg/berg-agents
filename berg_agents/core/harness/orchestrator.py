@@ -880,6 +880,20 @@ class Harness:
         """
         self._agents[name] = agent
 
+    @property
+    def learning_gate(self) -> LearningGate:
+        """The gate recording task outcomes (read-only).
+
+        Chat and other non-orchestrator paths record through this
+        accessor so every execution surface feeds the same stats.
+        """
+        return self._learning_gate
+
+    @property
+    def learning_enabled(self) -> bool:
+        """Whether outcomes are recorded on this harness."""
+        return self._enable_learning
+
     def get_learning_stats(self) -> dict[str, Any]:
         """Return learning/outcome statistics.
 

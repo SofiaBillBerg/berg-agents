@@ -375,6 +375,25 @@ def create_router(
         # contributes a toolset, which we don't use - hence declaring
         # it explicitly.)
 
+        # Learning: chat is the main surface, so its turns feed the same
+        # outcome store as harness tasks - otherwise learning never fires.
+        def _record_chat_outcome(success: bool) -> None:
+            try:
+                harness = request.app.state.harness
+                if harness is None or not harness.learning_enabled:
+                    return
+                harness.learning_gate.record(
+                    {
+                        "task_type": "chat",
+                        "complexity": "standard",
+                        "description": "chat turn"},
+                    {"success": success, "inference_attempted": True},
+                    model_used=model_id or sessions.active_model or "unknown",
+                    success=success,
+                )
+            except Exception as exc:
+                logger.warning("learning record skipped: %s", exc)
+
         async def _log_run_cancelled(run_cancelled: object) -> None:
             # Fired when a client stop/disconnect cancels the run, so
             # the "Stop" button is observable server-side.
@@ -384,6 +403,7 @@ def create_router(
             # on_complete receives the AgentRunResult: persist both the
             # display transcript (any browser can resume it) and the
             # Conversation (usage + id carry into the next turn).
+            _record_chat_outcome(success=True)
             if not session_id:
                 return
             try:
@@ -465,6 +485,7 @@ def create_router(
             # server-side, send a readable summary: the frontend shows
             # it and the failed-send recovery can act on it.
             logger.error("chat model request failed: %s", exc)
+            _record_chat_outcome(success=False)
             text = str(exc)
             hint = ""
             lowered = text.lower()

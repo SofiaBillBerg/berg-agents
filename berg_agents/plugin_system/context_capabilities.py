@@ -176,6 +176,7 @@ def build_compaction_capabilities() -> list[Any]:
             ReportContextUsage,
             SummarizingCompaction,
             TieredCompaction,
+            WarnNearLimits,
         )
 
         capabilities.append(
@@ -202,7 +203,12 @@ def build_compaction_capabilities() -> list[Any]:
         # Observes the compacted request, so register it after the
         # compaction capability (a monitor registered before one sees
         # what triggered it rather than the corrected history).
-        capabilities.append(ReportContextUsage())
+        # WarnNearLimits warns the model as the window fills so it can
+        # wrap up gracefully; it never compacts, so it cannot
+        # double-compact with the tiered chain.
+        capabilities.extend([
+            ReportContextUsage(),
+            WarnNearLimits(max_context_fraction=0.9)])
     except Exception as exc:
         logger.warning("Compaction capabilities unavailable: %s", exc)
     return capabilities
