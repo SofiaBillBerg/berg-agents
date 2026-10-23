@@ -165,7 +165,7 @@ class EventBus:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error processing event: {e}")
+                logger.exception(f"Error processing event: {e}")
 
     async def _dispatch_event(self, event: Event) -> None:
         """Dispatch event to matching handlers."""
@@ -187,7 +187,7 @@ class EventBus:
         # Log errors
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error(
+                logger.exception(
                     f"Handler {handlers_to_call[i]} failed for {event.type}: {result}"
                 )
 

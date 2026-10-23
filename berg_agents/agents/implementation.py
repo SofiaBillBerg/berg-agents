@@ -672,12 +672,12 @@ try:
         build_implementation_agent()
     )
 except Exception as e:
-    logger.error(f"Error building implementation agent: {e}")
+    logger.exception(f"Error building implementation agent: {e}")
     try:
         # Retry with explicit first-declared model (None = first in registry)
         implementation_agent = build_implementation_agent(model_id=None)
     except Exception as e:
-        logger.error(f"Error building implementation agent (retry): {e}")
+        logger.exception(f"Error building implementation agent (retry): {e}")
         # Last resort: known declared model that always exists in this repo
         implementation_agent = build_implementation_agent(
             model_id="nemotron-3-nano:30b-cloud"

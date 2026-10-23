@@ -176,6 +176,7 @@ class RuntimeDependencyChecker:
     """Check dependencies at runtime."""
 
     def __init__(self, registry: PluginRegistry) -> None:
+        """Initialize with plugin registry."""
         self.registry = registry
 
     async def check_before_enable(self, plugin_id: str) -> None:

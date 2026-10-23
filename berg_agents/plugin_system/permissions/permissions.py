@@ -147,7 +147,7 @@ class PermissionChecker:
         """
         entry = self.registry.get(plugin_id)
         if not entry:
-            logger.error(f"Permission check for unknown plugin: {plugin_id}")
+            logger.exception(f"Permission check for unknown plugin: {plugin_id}")
             return False
 
         # Check if permission was declared

@@ -79,6 +79,7 @@ class PluginCache:
     """Cache for plugin metadata."""
 
     def __init__(self, cache_file: Path) -> None:
+        """Initialize cache with a file path."""
         self.cache_file = cache_file
         self.cache: dict[str, PluginMetadata] = {}
 

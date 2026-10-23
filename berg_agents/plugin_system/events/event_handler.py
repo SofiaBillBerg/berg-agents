@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
+"""Event handling, filtering, transformation, and persistence."""
+
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -54,6 +56,7 @@ class EventTransformer:
         """Map event data fields."""
 
         def transform(event: Event) -> Event:
+            """Transform event data fields based on mapping."""
             new_data = {}
             for old_key, new_key in mapping.items():
                 if old_key in event.data:
@@ -81,6 +84,7 @@ class EventStore:
     """Persistent event storage."""
 
     def __init__(self, db_path: Path) -> None:
+        """Initialize event store with database path."""
         self.db_path = db_path
 
     async def save(self, event: Event) -> None:
@@ -112,6 +116,7 @@ class EventMonitor:
     """Monitor event bus activity."""
 
     def __init__(self, event_bus: EventBus) -> None:
+        """Initialize event monitor with event bus."""
         self.event_bus = event_bus
         self.stats: dict[str, int] = {}
 

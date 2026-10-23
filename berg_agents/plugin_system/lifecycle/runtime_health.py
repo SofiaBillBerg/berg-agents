@@ -60,7 +60,7 @@ class HealthMonitor:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Health monitor error: {e}")
+                logger.exception(f"Health monitor error: {e}")
 
     async def _check_all_plugins(self) -> None:
         """Check health of all enabled plugins."""
@@ -86,4 +86,4 @@ class HealthMonitor:
             except TimeoutError:
                 logger.warning(f"Health check timeout: {entry.metadata.id}")
             except Exception as e:
-                logger.error(f"Health check failed: {entry.metadata.id}: {e}")
+                logger.exception(f"Health check failed: {entry.metadata.id}: {e}")

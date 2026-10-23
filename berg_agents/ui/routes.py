@@ -34,10 +34,8 @@ import pathlib
 from typing import Any
 
 from berg_agents.core.harness import Harness
+from berg_agents.ui.route_handlers.providers import register_provider_routes
 from berg_agents.ui.schemas import (
-    ActiveProvider,
-    ProviderInfo,
-    ProviderListResponse,
     SessionCreateRequest,
     SessionRenameRequest,
     ToolExecuteRequest,
@@ -56,6 +54,9 @@ from pydantic_ai.ui.vercel_ai.request_types import (
 )
 
 logger = logging.getLogger(__name__)
+
+#: Give up on a chat stream after this many consecutive empty responses.
+_MAX_EMPTY_STREAM_ATTEMPTS = 2
 
 
 async def _run_plugin_tool(
@@ -178,50 +179,6 @@ class BergVercelAIAdapter(VercelAIAdapter):
         return DeferredToolResults(approvals=approvals) if approvals else None
 
 
-def _register_provider_routes(
-    router: APIRouter,
-    sessions: SessionManager,
-    providers: list[dict[str, Any]],
-) -> None:
-    """Register provider listing and selection endpoints.
-
-    :param router: Router to attach endpoints to.
-    :param sessions: Session store holding the active selection.
-    :param providers: Configured provider/model pairs.
-    """
-
-    @router.get("/api/providers")
-    async def list_providers() -> ProviderListResponse:
-        """List all configured provider/model pairs.
-
-        :return: Provider list response.
-        """
-        return ProviderListResponse(
-            providers=[ProviderInfo(**item) for item in providers]
-        )
-
-    @router.get("/api/providers/active")
-    async def get_active_provider() -> ActiveProvider:
-        """Get the currently active provider/model pair.
-
-        :return: Active provider response.
-        """
-        return ActiveProvider(
-            provider=sessions.active_provider, model=sessions.active_model
-        )
-
-    @router.post("/api/providers/active")
-    async def set_active_provider(selection: ActiveProvider) -> ActiveProvider:
-        """Switch the active provider/model pair.
-
-        :param selection: Provider/model to activate.
-        :return: The activated provider/model.
-        """
-        sessions.active_provider = selection.provider
-        sessions.active_model = selection.model
-        return selection
-
-
 def _unique_ui_message_id(msg: Any, role: str, index: int) -> str:
     """Message ids for restored sessions (React keys + SDK identity).
 
@@ -233,7 +190,7 @@ def _unique_ui_message_id(msg: Any, role: str, index: int) -> str:
     """
     # NOTE: Reuses the adapter default, then disambiguates. Same reader
     # the chat path uses, so restored ids stay consistent with live ones.
-    from pydantic_ai.ui.vercel_ai._adapter import _generate_message_id
+    from pydantic_ai.ui.vercel_ai._adapter import _generate_message_id  # ruff: ignore[import-private-name]
 
     return f"{_generate_message_id(msg, role, index)}-{role}-{index}"
 
@@ -459,8 +416,8 @@ def create_router(
                 except UnexpectedModelBehavior as exc:
                     if "ended without content" not in str(exc):
                         raise
-                    if attempt == 2:
-                        logger.error(
+                    if attempt == _MAX_EMPTY_STREAM_ATTEMPTS:
+                        logger.exception(
                             "chat stream empty twice - giving up: %s", exc
                         )
                         raise
@@ -485,7 +442,7 @@ def create_router(
             # used to surface as an opaque 500 dump. Log the full body
             # server-side, send a readable summary: the frontend shows
             # it and the failed-send recovery can act on it.
-            logger.error("chat model request failed: %s", exc)
+            logger.exception("chat model request failed: %s", exc)
             _record_chat_outcome(success=False)
             text = str(exc)
             hint = ""
@@ -588,7 +545,7 @@ def create_router(
             set_plugin_enabled,
         )
 
-        state = await set_plugin_enabled(plugin_id, True)
+        state = await set_plugin_enabled(plugin_id, enabled=True)
         if state is None:
             raise HTTPException(
                 status_code=404, detail=f"Unknown plugin '{plugin_id}'."
@@ -610,7 +567,7 @@ def create_router(
             set_plugin_enabled,
         )
 
-        state = await set_plugin_enabled(plugin_id, False)
+        state = await set_plugin_enabled(plugin_id, enabled=False)
         if state is None:
             raise HTTPException(
                 status_code=404, detail=f"Unknown plugin '{plugin_id}'."
@@ -865,7 +822,11 @@ def create_router(
         from berg_agents.config.settings import get_settings
 
         settings = get_settings()
-        root = Path(sessions._harness_root_dir()).expanduser().resolve()
+        # Offload the blocking resolve off the event loop (async handlers
+        # should not do blocking pathlib work directly).
+        root = await asyncio.to_thread(
+            lambda: Path(sessions._harness_root_dir()).expanduser().resolve()
+        )
 
         def _exists(entry: Any) -> bool:
             raw = (
@@ -1079,5 +1040,5 @@ def create_router(
                 tool=name, output=f"{name} failed: {exc}", status="error"
             )
 
-    _register_provider_routes(router, sessions, providers)
+    register_provider_routes(router, sessions, providers)
     return router

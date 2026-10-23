@@ -1,4 +1,5 @@
-#  Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+#  Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 #
 #  Copyright (c) 2026.

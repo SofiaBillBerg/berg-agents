@@ -55,7 +55,7 @@ class SecureFilesystem:
     async def read_file(self, path: str) -> str:
         """Read file with permission check."""
         if not await self.checker.check(
-            self.plugin_id, PermissionCategory.FILESYSTEM_READ, target=path
+                self.plugin_id, PermissionCategory.FILESYSTEM_READ, target=path
         ):
             raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied read access to {path}"
@@ -65,12 +65,12 @@ class SecureFilesystem:
         await self._audit("read_file", {"path": path})
 
         # Perform operation
-        return Path(path).read_text()
+        return Path(path).read_text(encoding="utf-8")
 
     async def write_file(self, path: str, content: str) -> None:
         """Write file with permission check."""
         if not await self.checker.check(
-            self.plugin_id, PermissionCategory.FILESYSTEM_WRITE, target=path
+                self.plugin_id, PermissionCategory.FILESYSTEM_WRITE, target=path
         ):
             raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied write access to {path}"
@@ -100,7 +100,7 @@ class SecureNetwork:
     async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
         """HTTP request with permission check."""
         if not await self.checker.check(
-            self.plugin_id, PermissionCategory.NETWORK_OUTBOUND, target=url
+                self.plugin_id, PermissionCategory.NETWORK_OUTBOUND, target=url
         ):
             raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied network access to {url}"
@@ -143,20 +143,20 @@ class AuditLogger:
     async def log(self, entry: AuditEntry) -> None:
         """Write audit entry."""
         async with self._lock:
-            with self.log_file.open("a") as f:
+            with self.log_file.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(asdict(entry), default=str) + "\n")
 
     async def query(
-        self,
-        plugin_id: str | None = None,
-        operation: str | None = None,
-        since: datetime | None = None,
-        limit: int = 100,
+            self,
+            plugin_id: str | None = None,
+            operation: str | None = None,
+            since: datetime | None = None,
+            limit: int = 100,
     ) -> list[AuditEntry]:
         """Query audit log."""
         entries = []
 
-        with self.log_file.open("r") as f:
+        with self.log_file.open("r", encoding="utf-8") as f:
             for line in f:
                 entry_dict = json.loads(line)
                 entry = AuditEntry(**entry_dict)
@@ -184,16 +184,17 @@ class PluginHITL:
     """Human-in-the-loop approval for plugins."""
 
     def __init__(
-        self, hitl_manager: HITLManager
+            self, hitl_manager: HITLManager
     ) -> None:  # TODO: Define HITLRequest class
+        """Initialize with HITL manager."""
         self.hitl_manager = hitl_manager
 
     async def request_approval(
-        self,
-        plugin_id: str,
-        operation: str,
-        details: dict[str, Any],
-        risk_level: RiskClass = RISK_HIGH,
+            self,
+            plugin_id: str,
+            operation: str,
+            details: dict[str, Any],
+            risk_level: RiskClass = RISK_HIGH,
     ) -> bool:
         """Request user approval for operation.
 

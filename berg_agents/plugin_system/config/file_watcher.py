@@ -33,6 +33,7 @@ class FileWatcher:
     """Watch a file for changes and trigger callbacks."""
 
     def __init__(self, filepath: Path) -> None:
+        """Initialize the file watcher."""
         self.filepath = filepath
         self.last_mtime = self._get_mtime()
         self.callbacks: list[Callable[[], Awaitable[None]]] = []
@@ -81,10 +82,10 @@ class FileWatcher:
                         try:
                             await callback()
                         except Exception as e:
-                            logger.error(f"Error in callback: {e}")
+                            logger.exception(f"Error in callback: {e}")
                 await asyncio.sleep(1.0)
             except Exception as e:
-                logger.error(f"Error in file watcher: {e}")
+                logger.exception(f"Error in file watcher: {e}")
                 await asyncio.sleep(1.0)
 
 
@@ -92,6 +93,7 @@ class FileSystemWatcher:
     """Watch multiple files for changes."""
 
     def __init__(self) -> None:
+        """Initialize the file system watcher."""
         self.watchers: dict[str, FileWatcher] = {}
 
     async def watch_file(

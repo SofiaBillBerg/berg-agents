@@ -85,6 +85,7 @@ class PluginConfigManager:
     """Manage plugin configurations."""
 
     def __init__(self, config_dir: Path | None = None) -> None:
+        """Initialize the plugin configuration manager."""
         self.config_dir = config_dir or _project_config_dir()
         self._cache: dict[str, dict[str, Any]] = {}
         self._env_pattern = re.compile(r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)}")
@@ -318,14 +319,14 @@ class PluginConfigManager:
         # Load existing file to preserve other fields
         existing = {}
         if config_file.exists():
-            with config_file.open() as f:
+            with config_file.open(encoding="utf-8") as f:
                 existing = yaml.safe_load(f) or {}
 
         # Update settings
         existing["settings"] = settings
 
         # Write back
-        with config_file.open("w") as f:
+        with config_file.open("w", encoding="utf-8") as f:
             yaml.safe_dump(existing, f, default_flow_style=False)
 
 
@@ -340,6 +341,7 @@ class PluginConfigWatcher:
     def __init__(
         self, config_manager: PluginConfigManager, lifecycle: PluginLifecycle
     ) -> None:
+        """Initialize the plugin config watcher."""
         self.config_manager = config_manager
         self.lifecycle = lifecycle
         self.watchers: dict[
@@ -380,4 +382,4 @@ class PluginConfigWatcher:
                         f"Plugin {plugin_id} does not support live reconfiguration"
                     )
         except Exception as e:
-            logger.error(f"Failed to reload configuration for {plugin_id}: {e}")
+            logger.exception(f"Failed to reload configuration for {plugin_id}: {e}")

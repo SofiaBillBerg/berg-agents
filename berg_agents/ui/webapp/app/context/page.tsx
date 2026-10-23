@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -34,6 +34,7 @@ import { Card, Chip, Spinner } from "@heroui/react";
 import { API_BASE } from "@/envConfig";
 
 import { LearningPanel } from "../components/LearningPanel.tsx";
+import { SharedContextEditor } from "../components/SharedContextEditor.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 import type { PluginInfo } from "../components/PluginCatalog.tsx";
 
@@ -189,6 +190,10 @@ export default function ContextPage() {
             . Runtime state comes from the plugin system
             {plugins.length > 0 ? ` (${plugins.length} plugins)` : ""}.
           </p>
+          {/* Human-owned Shared Context: view/edit it in-app (E1). */}
+          <div className="mb-4">
+            <SharedContextEditor />
+          </div>
           {/* NOTE: Runtime overlay — config lists what exists, the
               plugin map adds live state (toggled off, approval flags). */}
           {(() => {

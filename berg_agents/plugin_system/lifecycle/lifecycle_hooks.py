@@ -213,12 +213,12 @@ class PluginLifecycle:
             logger.info(f"Disabled plugin: {plugin_id}")
 
         except TimeoutError:
-            logger.error(
+            logger.exception(
                 f"Disable timeout for {plugin_id}, forcing state change"
             )
             await self._set_state(entry, PluginState.ERROR)
         except Exception as e:
-            logger.error(f"Disable failed for {plugin_id}: {e}")
+            logger.exception(f"Disable failed for {plugin_id}: {e}")
             await self._set_state(entry, PluginState.ERROR)
 
     async def unload(self, plugin_id: str) -> None:
@@ -267,15 +267,15 @@ class PluginLifecycle:
             logger.info(f"Unloaded plugin: {plugin_id}")
 
         except TimeoutError:
-            logger.error(f"Unload timeout for {plugin_id}, forcing removal")
+            logger.exception(f"Unload timeout for {plugin_id}, forcing removal")
             await self.registry.unregister(plugin_id)
         except Exception as e:
-            logger.error(f"Unload failed for {plugin_id}: {e}")
+            logger.exception(f"Unload failed for {plugin_id}: {e}")
             await self.registry.unregister(plugin_id)
 
     async def _handle_error(self, entry: PluginEntry, error: Exception) -> None:
         """Handle plugin error."""
-        logger.error(f"Plugin error: {entry.metadata.id}: {error}")
+        logger.exception(f"Plugin error: {entry.metadata.id}: {error}")
 
         # Store error
         entry.error = error
@@ -289,7 +289,7 @@ class PluginLifecycle:
                 context = await self._create_context(entry)
                 await entry.instance.on_error(context, error)
             except Exception as e:
-                logger.error(f"on_error hook failed: {e}")
+                logger.exception(f"on_error hook failed: {e}")
 
         # Emit event
         await self.event_bus.emit(

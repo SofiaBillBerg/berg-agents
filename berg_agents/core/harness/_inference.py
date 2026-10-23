@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
-"""Inference helpers for Harness (split from harness.py).
+"""Inference helpers for Harness (split from previous file "harness.py").
 
 The Harness is the canonical task-execution engine. It wires the
 Pydantic AI agent modules into one deterministic flow:
@@ -55,8 +55,6 @@ from berg_agents.agents.implementation import ImplementationDeps
 from berg_agents.core.interface import TaskComplexity
 
 logger = logging.getLogger(__name__)
-
-__all__ = ["Harness"]
 
 #: Per-call timeout (seconds) for synchronous model inference.
 #: The registry default (``6000000``ms in bergagents.jsonc) is

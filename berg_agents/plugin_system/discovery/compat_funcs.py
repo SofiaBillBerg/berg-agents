@@ -74,7 +74,7 @@ def parse_skill(skill_path: Path) -> Any:
         logger.debug("berg_agents not available for skill parsing")
         return None
     except Exception as e:
-        logger.error(f"Failed to parse skill {skill_path}: {e}")
+        logger.exception(f"Failed to parse skill {skill_path}: {e}")
         return None
 
 
@@ -105,5 +105,5 @@ def create_mcp_toolset(mcp_spec: dict[str, Any]) -> Any:
         }
 
     except Exception as e:
-        logger.error(f"Failed to create MCP toolset: {e}")
+        logger.exception(f"Failed to create MCP toolset: {e}")
         return None

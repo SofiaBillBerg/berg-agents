@@ -36,6 +36,7 @@ class BergPlugin(ABC):
     """Base class for all berg_agents plugins."""
 
     def __init__(self) -> None:
+        """Initialize the plugin."""
         self._event_bus: EventBus | None = None
         self._plugin_id: str | None = None
 

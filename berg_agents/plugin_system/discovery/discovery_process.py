@@ -16,7 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
-
+"""Plugin discovery process."""
 # Discovery Algorithm
 
 
@@ -69,7 +69,7 @@ def discover_package_plugins() -> list[PluginMetadata]:
 
 def parse_manifest(manifest_path: Path) -> PluginMetadata:
     """Parse plugin manifest file."""
-    with Path(manifest_path).open() as f:
+    with Path(manifest_path).open(encoding="utf-8") as f:
         manifest = yaml.safe_load(f)
     return PluginMetadata(
         id=manifest.get("id"),
@@ -140,7 +140,7 @@ class PluginDiscovery:
         discovered = []
         for result in results:
             if isinstance(result, Exception):
-                logger.error(f"Discovery failed: {result}")
+                logger.exception(f"Discovery failed: {result}")
             else:
                 discovered.extend(result)
 
@@ -203,7 +203,7 @@ class PluginDiscovery:
         Returns:
             Plugin metadata
         """
-        with Path(manifest_path).open() as f:
+        with Path(manifest_path).open(encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         # Parse dependencies
@@ -248,7 +248,12 @@ class PluginDiscovery:
         )
 
     def _extract_metadata(self, plugin_class, name: str) -> PluginMetadata:
-        """Extract metadata from plugin class."""
+        """Extract metadata from plugin class.
+
+        :param plugin_class: The plugin class to extract metadata from
+        :param name: The name of the plugin
+        :return: The extracted plugin metadata
+        """
         return PluginMetadata(
             id=getattr(plugin_class, "plugin_id", name),
             version=getattr(plugin_class, "plugin_version", "0.0.1"),

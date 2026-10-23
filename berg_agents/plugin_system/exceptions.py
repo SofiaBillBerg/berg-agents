@@ -16,11 +16,14 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
+"""Custom exceptions for the plugin system."""
+
 
 class ConfigValidationError(Exception):
     """Raised when configuration validation fails."""
 
     def __init__(self, message: str) -> None:
+        """Initialize ConfigValidationError with a message."""
         super().__init__(message)
         self.message = message
 
@@ -42,7 +45,7 @@ class PluginNotFoundError(Exception):
 
 
 class DependencyNotFoundError(Exception):
-    """Class to check dependency not found"""
+    """Class to check dependency not found."""
 
 
 class DependencyError(Exception):

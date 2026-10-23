@@ -28,7 +28,6 @@ from berg_agents.plugin_system.events.event_bus import (
     EventHandler,
 )
 
-
 # [Request-Response Pattern](../08-plugin-event-system#Request-Response Pattern)
 
 
