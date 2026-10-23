@@ -221,26 +221,31 @@ def create_app(
         # Production UI on the same origin (single :8001).
         # Mounted after the API router so /api/* always wins.
         #
-        # The static export writes sub-routes as top-level "<route>.html"
-        # files (e.g. dist/agents.html), which Starlette's StaticFiles
-        # will NOT resolve for "/agents" (it only serves index.html inside
-        # a matching directory). Explicit routes cover them, with HEAD
-        # declared alongside GET.
-        for route_page in ("agents", "context", "history"):
-            page_file = _WEB_DIST / f"{route_page}.html"
-            if page_file.is_file():
+        # The static export writes each route as a "<route>.html" file
+        # (e.g. dist/agents.html, and nested ones like
+        # dist/dev/plugins.html). Starlette's StaticFiles only serves a
+        # directory's index.html, so a clean "/agents" or nested
+        # "/dev/plugins" would 404 without an explicit route. Discover
+        # every exported page from disk and register it (GET + HEAD), so
+        # adding a route — nested or not — needs no server edit.
+        for page_file in sorted(_WEB_DIST.rglob("*.html")):
+            rel = page_file.relative_to(_WEB_DIST)
+            route_path = "/" + rel.with_suffix("").as_posix()
+            # "/" plus Next's framework internals stay with StaticFiles.
+            if route_path in ("/index", "/404", "/_not-found"):
+                continue
 
-                def _serve_page(
-                    _path: Path = page_file,
-                ) -> FileResponse:
-                    return FileResponse(_path, media_type="text/html")
+            def _serve_page(
+                _path: Path = page_file,
+            ) -> FileResponse:
+                return FileResponse(_path, media_type="text/html")
 
-                app.api_route(
-                    f"/{route_page}",
-                    methods=["GET", "HEAD"],
-                    name=f"webapp-{route_page}",
-                    include_in_schema=False,
-                )(_serve_page)
+            app.api_route(
+                route_path,
+                methods=["GET", "HEAD"],
+                name="webapp" + route_path.replace("/", "-"),
+                include_in_schema=False,
+            )(_serve_page)
         app.mount(
             "/", StaticFiles(directory=_WEB_DIST, html=True), name="webapp"
         )

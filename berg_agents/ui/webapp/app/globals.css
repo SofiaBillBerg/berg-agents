@@ -24,10 +24,19 @@
  * Only includes variables users need to customize
  * @see https://heroui.com/docs/react/getting-started/theming
  */
-@import url("tailwindcss");
-@import url("@heroui/styles");
-@import url("./styles.css");
-@import url("./theme.css");
+/*
+ * Tailwind v4 (CSS-first) must be imported as a bare module specifier,
+ * NOT `@import url("tailwindcss")`. The url() form is treated as an
+ * external CSS import that PostCSS/Next cannot resolve to the bundle,
+ * so Tailwind's theme + preflight + utilities layers are dropped
+ * entirely — the app falls back to block layout with no utilities
+ * (the exact "fixed / can't scroll" regression). Keep this as a string.
+ * Order matters: tailwindcss, then @heroui/styles, then local theme.
+ */
+@import "tailwindcss";
+@import "@heroui/styles";
+@import "./styles.css";
+@import "./theme.css";
 
 /* https://heroui.com/en/themes?chroma=0.13&hue=336.3409276429381&lightness=0.77&formRadius=small&fontFamily=public-sans&base=0.0154 */
 
@@ -43,90 +52,90 @@
 .default,
 [data-theme="light"],
 [data-theme="default"] {
-    /* Theme Colors (Light Mode) - Sofia's HeroUI builder theme
+  /* Theme Colors (Light Mode) - Sofia's HeroUI builder theme
        (notes/theme.css), except --background which she asked to soften
        toward pale pink (was near-white, now #f8edf8). */
-    --accent: oklch(77% 0.13 336.34deg);
-    --accent-foreground: oklch(15% 0.026 336.34deg);
-    --background: oklch(95.79% 0.0187 325.72deg);
-    --border: oklch(90% 0.0154 336.34deg);
-    --danger: oklch(65.32% 0.24 35.64deg);
-    --danger-foreground: oklch(99.11% 0 0deg);
-    --default: oklch(94% 0.0154 336.34deg);
-    --default-foreground: oklch(21.03% 0.0059 336.34deg);
-    --field-background: oklch(100% 0.0077 336.34deg);
-    --field-border: transparent;
-    --field-foreground: oklch(21.03% 0.0154 336.34deg);
-    --field-placeholder: oklch(55.17% 0.0308 336.34deg);
-    --focus: oklch(77% 0.13 336.34deg);
-    --foreground: oklch(21.03% 0.0154 336.34deg);
-    --muted: oklch(55.17% 0.0308 336.34deg);
-    --overlay: oklch(100% 0.0046 336.34deg);
-    --overlay-foreground: oklch(21.03% 0.0154 336.34deg);
-    --scrollbar: oklch(87.1% 0.0154 336.34deg);
-    --segment: oklch(100% 0.0154 336.34deg);
-    --segment-foreground: oklch(21.03% 0.0154 336.34deg);
-    --separator: oklch(92% 0.0154 336.34deg);
-    --success: oklch(73.29% 0.1995 160.71deg);
-    --success-foreground: oklch(21.03% 0.0059 160.71deg);
-    --surface: oklch(100% 0.0077 336.34deg);
-    --surface-foreground: oklch(21.03% 0.0154 336.34deg);
-    --surface-secondary: oklch(95.24% 0.0123 336.34deg);
-    --surface-secondary-foreground: oklch(21.03% 0.0154 336.34deg);
-    --surface-tertiary: oklch(93.73% 0.0123 336.34deg);
-    --surface-tertiary-foreground: oklch(21.03% 0.0154 336.34deg);
-    --warning: oklch(78.19% 0.1634 82.23deg);
-    --warning-foreground: oklch(21.03% 0.0059 82.23deg);
+  --accent: oklch(77% 0.13 336.34deg);
+  --accent-foreground: oklch(15% 0.026 336.34deg);
+  --background: oklch(95.79% 0.0187 325.72deg);
+  --border: oklch(90% 0.0154 336.34deg);
+  --danger: oklch(65.32% 0.24 35.64deg);
+  --danger-foreground: oklch(99.11% 0 0deg);
+  --default: oklch(94% 0.0154 336.34deg);
+  --default-foreground: oklch(21.03% 0.0059 336.34deg);
+  --field-background: oklch(100% 0.0077 336.34deg);
+  --field-border: transparent;
+  --field-foreground: oklch(21.03% 0.0154 336.34deg);
+  --field-placeholder: oklch(55.17% 0.0308 336.34deg);
+  --focus: oklch(77% 0.13 336.34deg);
+  --foreground: oklch(21.03% 0.0154 336.34deg);
+  --muted: oklch(55.17% 0.0308 336.34deg);
+  --overlay: oklch(100% 0.0046 336.34deg);
+  --overlay-foreground: oklch(21.03% 0.0154 336.34deg);
+  --scrollbar: oklch(87.1% 0.0154 336.34deg);
+  --segment: oklch(100% 0.0154 336.34deg);
+  --segment-foreground: oklch(21.03% 0.0154 336.34deg);
+  --separator: oklch(92% 0.0154 336.34deg);
+  --success: oklch(73.29% 0.1995 160.71deg);
+  --success-foreground: oklch(21.03% 0.0059 160.71deg);
+  --surface: oklch(100% 0.0077 336.34deg);
+  --surface-foreground: oklch(21.03% 0.0154 336.34deg);
+  --surface-secondary: oklch(95.24% 0.0123 336.34deg);
+  --surface-secondary-foreground: oklch(21.03% 0.0154 336.34deg);
+  --surface-tertiary: oklch(93.73% 0.0123 336.34deg);
+  --surface-tertiary-foreground: oklch(21.03% 0.0154 336.34deg);
+  --warning: oklch(78.19% 0.1634 82.23deg);
+  --warning-foreground: oklch(21.03% 0.0059 82.23deg);
 
-    /* Border Radius */
-    --radius: 0.5rem;
-    --field-radius: 0.25rem;
+  /* Border Radius */
+  --radius: 0.5rem;
+  --field-radius: 0.25rem;
 
-    /* Font Family */
+  /* Font Family */
 
-    /* Make sure to load Public Sans font in your app */
-    --font-sans: var(--font-public-sans);
+  /* Make sure to load Public Sans font in your app */
+  --font-sans: var(--font-public-sans);
 }
 
 .dark,
 [data-theme="dark"] {
-    color-scheme: dark;
+  color-scheme: dark;
 
-    /* Theme Colors (Dark Mode) - Sofia's HeroUI builder theme
+  /* Theme Colors (Dark Mode) - Sofia's HeroUI builder theme
        (notes/theme.css) verbatim, except --field-background which is
        shifted blue-purple (hue 293) per her direction: input fields
        must not hold the red tint. Do not retune anything else. */
-    --accent: oklch(77% 0.13 336.34deg);
-    --accent-foreground: oklch(15% 0.026 336.34deg);
-    --background: oklch(12% 0.0154 336.34deg);
-    --border: oklch(28% 0.0154 336.34deg);
-    --danger: oklch(59.4% 0.2028 34.53deg);
-    --danger-foreground: oklch(99.11% 0 0deg);
-    --default: oklch(27.4% 0.0154 336.34deg);
-    --default-foreground: oklch(99.11% 0 0deg);
-    --field-background: oklch(23.5% 0.045 293deg);
-    --field-border: transparent;
-    --field-foreground: oklch(99.11% 0.0154 336.34deg);
-    --field-placeholder: oklch(70.5% 0.0308 336.34deg);
-    --focus: oklch(77% 0.13 336.34deg);
-    --foreground: oklch(99.11% 0.0154 336.34deg);
-    --muted: oklch(70.5% 0.0308 336.34deg);
-    --overlay: oklch(21.03% 0.0308 336.34deg);
-    --overlay-foreground: oklch(99.11% 0.0154 336.34deg);
-    --scrollbar: oklch(70.5% 0.0154 336.34deg);
-    --segment: oklch(39.64% 0.0154 336.34deg);
-    --segment-foreground: oklch(99.11% 0.0154 336.34deg);
-    --separator: oklch(25% 0.0154 336.34deg);
-    --success: oklch(73.29% 0.1995 160.71deg);
-    --success-foreground: oklch(21.03% 0.0059 160.71deg);
-    --surface: oklch(21.03% 0.0308 336.34deg);
-    --surface-foreground: oklch(99.11% 0.0154 336.34deg);
-    --surface-secondary: oklch(25.7% 0.0231 336.34deg);
-    --surface-secondary-foreground: oklch(99.11% 0.0154 336.34deg);
-    --surface-tertiary: oklch(27.21% 0.0231 336.34deg);
-    --surface-tertiary-foreground: oklch(99.11% 0.0154 336.34deg);
-    --warning: oklch(82.03% 0.1431 86.24deg);
-    --warning-foreground: oklch(21.03% 0.0059 86.24deg);
+  --accent: oklch(77% 0.13 336.34deg);
+  --accent-foreground: oklch(15% 0.026 336.34deg);
+  --background: oklch(12% 0.0154 336.34deg);
+  --border: oklch(28% 0.0154 336.34deg);
+  --danger: oklch(59.4% 0.2028 34.53deg);
+  --danger-foreground: oklch(99.11% 0 0deg);
+  --default: oklch(27.4% 0.0154 336.34deg);
+  --default-foreground: oklch(99.11% 0 0deg);
+  --field-background: oklch(23.5% 0.045 293deg);
+  --field-border: transparent;
+  --field-foreground: oklch(99.11% 0.0154 336.34deg);
+  --field-placeholder: oklch(70.5% 0.0308 336.34deg);
+  --focus: oklch(77% 0.13 336.34deg);
+  --foreground: oklch(99.11% 0.0154 336.34deg);
+  --muted: oklch(70.5% 0.0308 336.34deg);
+  --overlay: oklch(21.03% 0.0308 336.34deg);
+  --overlay-foreground: oklch(99.11% 0.0154 336.34deg);
+  --scrollbar: oklch(70.5% 0.0154 336.34deg);
+  --segment: oklch(39.64% 0.0154 336.34deg);
+  --segment-foreground: oklch(99.11% 0.0154 336.34deg);
+  --separator: oklch(25% 0.0154 336.34deg);
+  --success: oklch(73.29% 0.1995 160.71deg);
+  --success-foreground: oklch(21.03% 0.0059 160.71deg);
+  --surface: oklch(21.03% 0.0308 336.34deg);
+  --surface-foreground: oklch(99.11% 0.0154 336.34deg);
+  --surface-secondary: oklch(25.7% 0.0231 336.34deg);
+  --surface-secondary-foreground: oklch(99.11% 0.0154 336.34deg);
+  --surface-tertiary: oklch(27.21% 0.0231 336.34deg);
+  --surface-tertiary-foreground: oklch(99.11% 0.0154 336.34deg);
+  --warning: oklch(82.03% 0.1431 86.24deg);
+  --warning-foreground: oklch(21.03% 0.0059 86.24deg);
 }
 
 /* https://heroui.com/en/themes?chroma=0.13&hue=336.3409276429381&lightness=0.77&formRadius=small&fontFamily=public-sans&base=0.0154 */

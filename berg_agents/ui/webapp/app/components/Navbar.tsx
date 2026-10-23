@@ -18,8 +18,6 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-
-
 /*
  * Navbar component - top navigation bar with links to Chat, Agents, and Stats.
  * Simple div-based navbar (HeroUI v3 doesn't ship a dedicated Navbar).
@@ -28,15 +26,18 @@
 "use client";
 
 import Link from "next/link";
-import {usePathname} from "next/navigation";
-import {Suspense} from "react";
+import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 
 /** Navigation items - links to the main pages. */
 const NAV_ITEMS = [
   { href: "/", label: "Chat", icon: "💬" },
   { href: "/agents", label: "Agents", icon: "🤖" },
   { href: "/context", label: "Context", icon: "📚" },
-  { href: "/history", label: "History", icon: "🕘" }];
+  { href: "/history", label: "History", icon: "🕘" },
+  // Plugin dev harness: standalone route for working on plugin
+  // surfaces and tools without a live agent run.
+  { href: "/dev/plugins", label: "Dev", icon: "🧩" }];
 
 /**
  * Inner nav links - isolated so `usePathname` always renders inside a

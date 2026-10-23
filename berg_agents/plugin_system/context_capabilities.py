@@ -31,7 +31,9 @@ to Ollama/OpenAI-compatible endpoints):
     old tool results, clamp a runaway part) and only falls back to
     ``SummarizingCompaction`` when those cannot reclaim enough. Per the
     harness docs this is the recommended default: summarization turns
-    input tokens into output tokens billed at a premium.
+    input tokens into output tokens billed at a premium. Wrapped in
+    ``FallbackCompaction`` so a model error during compaction degrades to
+    a deterministic trim instead of killing the request.
 ``ReportContextUsage``
     Emits ``ContextUsageEvent`` (used/window/fraction) so the web UI can
     show a live context gauge.
@@ -160,6 +162,13 @@ def build_compaction_capabilities() -> list[Any]:
     4. ``SummarizingCompaction`` — one model call, reached only when the
        tiers above cannot reclaim enough.
 
+    The whole escalation is wrapped in ``FallbackCompaction``: if a model
+    call inside it raises a ``ModelAPIError`` (the summary request is still
+    too large, or a ``FallbackModel`` is exhausted), a deterministic
+    ``SlidingWindowCompaction`` trims to the newest turns with no LLM call,
+    so a failed summarization degrades to a shorter history instead of
+    killing the request.
+
     ``receipts=True`` on the boundary-crossing strategies appends a note
     recording what was dropped, so a compaction is legible to the model
     rather than looking like silent amnesia.
@@ -173,30 +182,55 @@ def build_compaction_capabilities() -> list[Any]:
             ClampOversizedMessages,
             ClearToolResults,
             DeduplicateFileReads,
+            FallbackCompaction,
             ReportContextUsage,
+            SlidingWindowCompaction,
             SummarizingCompaction,
             TieredCompaction,
             WarnNearLimits,
         )
 
+        # Wrap the escalation in FallbackCompaction: the tiered chain is
+        # the primary attempt, and if any model call inside it raises a
+        # ModelAPIError (the summary request is still too large, or a
+        # FallbackModel is exhausted), the deterministic no-LLM
+        # SlidingWindowCompaction trims instead of failing the request.
         capabilities.append(
-            TieredCompaction(
-                tiers=[
-                    DeduplicateFileReads(file_key=_workspace_file_key),
-                    ClearToolResults(max_tokens=1, keep_pairs=3),
-                    ClampOversizedMessages(max_part_tokens=40_000),
-                    SummarizingCompaction(
-                        # Inherits the running agent's model; reached
-                        # only when cheaper tiers fall short.
+            FallbackCompaction(
+                fallback_chain=[
+                    TieredCompaction(
+                        tiers=[
+                            DeduplicateFileReads(file_key=_workspace_file_key),
+                            ClearToolResults(max_tokens=1, keep_pairs=3),
+                            ClampOversizedMessages(max_part_tokens=40_000),
+                            SummarizingCompaction(
+                                # Inherits the running agent's model; reached
+                                # only when cheaper tiers fall short.
+                                max_messages=1,
+                                keep_messages=20,
+                                receipts=True,
+                            )],
+                        # A fraction resolves against the model's real
+                        # window, so one setting is right for a 128K model
+                        # and a 1M one alike. The fallback covers local
+                        # endpoints the pricing registry does not know.
+                        target_fraction=_TARGET_FRACTION,
+                        fallback_context_window=_DEFAULT_FALLBACK_WINDOW,
+                    ),
+                    # Emergency last resort: trim to the newest turns with
+                    # no model call, so an errored summarization degrades to
+                    # a shorter history instead of a dead request. The
+                    # max_messages trigger is only required for validation
+                    # here — as a chain strategy its `before_model_request`
+                    # never fires, and `compact()` trims to keep_messages.
+                    SlidingWindowCompaction(
                         max_messages=1,
                         keep_messages=20,
                         receipts=True,
                     )],
-                # A fraction resolves against the model's real window,
-                # so one setting is right for a 128K model and a 1M one
-                # alike. The fallback covers local endpoints the
-                # pricing registry does not know.
-                target_fraction=_TARGET_FRACTION,
+                # Trigger at the same fraction the tiers target; resolved
+                # against the model's window with the same local fallback.
+                max_fraction=_TARGET_FRACTION,
                 fallback_context_window=_DEFAULT_FALLBACK_WINDOW,
             )
         )

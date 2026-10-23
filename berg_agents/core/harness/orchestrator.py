@@ -67,6 +67,7 @@ from berg_agents.core.harness._routing import (
     _extract_planned_actions,
     _failed_result,
     _review_gate_result,
+    _shift_complexity,
     _task_plans_mutation,
 )
 from berg_agents.core.interface import TaskComplexity
@@ -368,6 +369,23 @@ class Harness:
             task_id or str(task.get("task_id", "") or "") or self._new_id()
         )
         complexity = estimate_complexity(description, task_type)
+        # Learning adaptation: a persisted per-task-type complexity
+        # direction shifts routing — sustained failures route harder,
+        # easy wins route cheaper — which moves the resolved model tier
+        # because complexity maps onto the model. See LearningGate.
+        if self._enable_learning:
+            direction = self._learning_gate.complexity_override(task_type)
+            if direction:
+                shifted = _shift_complexity(complexity, direction)
+                if shifted != complexity:
+                    logger.info(
+                        "Learning routed %s %s: %s -> %s",
+                        task_type,
+                        direction,
+                        complexity.value,
+                        shifted.value,
+                    )
+                    complexity = shifted
         # Both routing signals are pure; the stronger one
         # feeds the guardian confidence check below.
         planner_score = self._planner.can_handle(task)
