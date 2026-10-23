@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -22,13 +23,11 @@ It parses Python files to extract classes, functions, and their calls, then crea
 """
 
 import ast
-import os
-
 from ast import AST
 from collections import defaultdict
+import os
 from pathlib import Path
 from typing import Any
-
 
 MERMAID_THEME_FLOWCHART = """
     %% Plasma Pastel Theme Configuration %%

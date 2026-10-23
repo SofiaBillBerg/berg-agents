@@ -7,14 +7,12 @@ bypassing the circular import issues by using a simplified architecture.
 """
 
 import asyncio
+from dataclasses import dataclass
 import logging
+from pathlib import Path
 import sys
 
-from dataclasses import dataclass
-from pathlib import Path
-
 import yaml
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -59,7 +57,7 @@ class SimplePluginManager:
                 continue
 
             try:
-                with Path(manifest_path).open() as f:
+                with Path(manifest_path).open(encoding="utf-8") as f:
                     data = yaml.safe_load(f)
 
                 metadata = PluginMetadata(

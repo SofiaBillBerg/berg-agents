@@ -15,7 +15,7 @@
     },
     "github": {
       "command": ["npx", "-y", "@modelcontextprotocol/server-github"],
-      "enabled": false,
+      "enabled": true,
       "environment": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       },
@@ -28,7 +28,7 @@
     },
     "memory": {
       "command": ["npx", "-y", "@modelcontextprotocol/server-memory"],
-      "enabled": false,
+      "enabled": true,
       "type": "local"
     },
           "next-devtools": {

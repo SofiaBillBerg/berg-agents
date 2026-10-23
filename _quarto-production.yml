@@ -1,5 +1,5 @@
 pre-render:
-    - "project_utils/run_apidocs.sh"
-    - "project_utils/run_diagrams.sh"
-  post-render:
-    - "project_utils/render_readme.sh"
+  - "project_utils/run_apidocs.sh"
+  - "project_utils/run_diagrams.sh"
+post-render:
+  - "project_utils/render_readme.sh"

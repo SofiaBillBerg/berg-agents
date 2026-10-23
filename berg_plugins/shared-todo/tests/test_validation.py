@@ -1,4 +1,4 @@
-"""Quick sanity‑check script."""
+"""Quick sanity-check script."""
 
 from shared_todo import (
     is_integrated_into_berg_agents,
@@ -6,7 +6,6 @@ from shared_todo import (
     validate_shared_todo_config,
     validate_user_config,
 )
-
 
 # 1️ Validate a minimal config
 cfg = validate_shared_todo_config({

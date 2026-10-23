@@ -21,12 +21,10 @@ Tool functions for Shared ToDo plugin.
 These functions are exposed to the AI agent for todo list management.
 """
 
-import logging
-
 from datetime import datetime
+import logging
 from pathlib import Path
 from typing import Annotated, Any
-
 
 logger = logging.getLogger(__name__)
 
@@ -96,15 +94,10 @@ def _split_sections(content: str) -> tuple[str, str, str]:
         elif line.startswith("## Notes"):
             current = notes_lines
             continue
-        elif line.startswith("## Subtasks"):
+        elif line.startswith("## Subtasks") or line.startswith("## "):
             current = None
             continue
-        elif line.startswith("## "):
-            current = None
-            continue
-        elif line.startswith("# "):
-            continue
-        elif line.startswith("**") and "**:" in line:
+        elif line.startswith("# ") or (line.startswith("**") and "**:" in line):
             continue
         if current is not None:
             current.append(line)
@@ -417,7 +410,7 @@ def update_todo(
 
 ## Notes
 
-{current_notes if current_notes else "<!-- Add notes here -->"}
+{current_notes or "<!-- Add notes here -->"}
 """
 
     todo_file.write_text(new_content)

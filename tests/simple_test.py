@@ -5,12 +5,10 @@ Simple test of plugin discovery and shared_todo functionality.
 
 import asyncio
 import logging
+from pathlib import Path
 import sys
 
-from pathlib import Path
-
 import pytest
-
 
 # Configure logging
 logging.basicConfig(
@@ -111,7 +109,7 @@ async def test_shared_todo_standalone():
         logger.info("\n✓ SharedToDo tools work correctly!")
 
     except Exception as e:
-        logger.error(f"SharedToDo test failed: {e}", exc_info=True)
+        logger.exception(f"SharedToDo test failed: {e}")
 
 
 async def test_plugin_yaml_parsing():
@@ -123,15 +121,15 @@ async def test_plugin_yaml_parsing():
 
         # Parse the shared_todo plugin.yaml
         yaml_path = (
-            Path(__file__).parent
-            / "berg_plugins"
-            / "shared_todo"
-            / "plugin.yaml"
+                Path(__file__).parent
+                / "berg_plugins"
+                / "shared_todo"
+                / "plugin.yaml"
         )
 
         logger.info(f"Loading: {yaml_path}")
 
-        with Path(yaml_path).open() as f:
+        with Path(yaml_path).open(encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         logger.info("Plugin YAML data:")

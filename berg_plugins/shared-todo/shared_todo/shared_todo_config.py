@@ -1,11 +1,11 @@
-"""Validate that all required configuration fields are present and correctly formatted.
+r"""Validate that all required configuration fields are present and correctly formatted.
 
 **What to check**
 - Presence of mandatory keys (e.g., `plugin_id`, `enabled`, `log_level`).
 - Correct data types (strings, booleans, enums).
 - Absence of stray/unexpected keys (optional but helpful for sanity).
 
-# How to use it
+**How to use it**
 
 user_cfg = {
     "plugin_id": "shared_todo",

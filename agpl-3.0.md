@@ -134,9 +134,8 @@ Component, and (b) serves only to enable use of the work with that
 Major Component, or to implement a Standard Interface for which an
 implementation is available to the public in source code form.
 A
-"Major Component", in this context, means a major essential component
-(kernel, window system, and so on) of the specific operating system
-(if any) on which the executable work runs, or a compiler used to
+"Major Component", in this context, means a major essential component (kernel, window system, and so on) of the specific
+operating system (if any) on which the executable work runs, or a compiler used to
 produce the work, or an object code interpreter used to run it.
 
 The "Corresponding Source" for a work in object code form means all
@@ -227,7 +226,7 @@ terms of section 4, provided that you also meet all of these
 conditions:
 
 - a) The work must carry prominent notices stating that you modified
-     it, and giving a relevant date.
+  it, and giving a relevant date.
 - b\) The work must carry prominent notices stating that it is
   released under this License and any conditions added under
   section 7.
@@ -265,12 +264,12 @@ sections 4 and 5, provided that you also convey the machine-readable
 Corresponding Source under the terms of this License, in one of these
 ways:
 
-- a) Convey the object code in, or embodied in, a physical product
-     (including a physical distribution medium), accompanied by the
-     Corresponding Source fixed on a durable physical medium
-     customarily used for software interchange.
-- b\) Convey the object code in, or embodied in, a physical product
-  (including a physical distribution medium), accompanied by a
+- a) Convey the object code in, or embodied in, a physical product (including a physical distribution medium),
+  accompanied by the
+  Corresponding Source fixed on a durable physical medium
+  customarily used for software interchange.
+- b\) Convey the object code in, or embodied in, a physical product (including a physical distribution medium),
+  accompanied by a
   written offer, valid for at least three years and valid for as
   long as you offer spare parts or customer support for that product
   model, to give anyone who possesses the object code either (1) a
@@ -378,8 +377,7 @@ this License without regard to the additional permissions.
 
 When you convey a copy of a covered work, you may at your option
 remove any additional permissions from that copy, or from any part of
-it.
-(Additional permissions may be written to require their own
+it. (Additional permissions may be written to require their own
 removal in certain cases when you modify the work.)
 You may place
 additional permissions on material, added by you to a covered work,
@@ -390,7 +388,7 @@ add to a covered work, you may (if authorized by the copyright holders
 of that material) supplement the terms of this License with terms:
 
 - a) Disclaiming warranty or limiting liability differently from the
-     terms of sections 15 and 16 of this License; or
+  terms of sections 15 and 16 of this License; or
 - b\) Requiring preservation of specified reasonable legal notices or
   author attributions in that material or in the Appropriate Legal
   Notices displayed by works containing it; or
@@ -496,8 +494,8 @@ You may not impose any further restrictions on the exercise of the
 rights granted or affirmed under this License.
 For example, you may
 not impose a license fee, royalty, or other charge for exercise of
-rights granted under this License, and you may not initiate litigation
-(including a cross-claim or counterclaim in a lawsuit) alleging that
+rights granted under this License, and you may not initiate litigation (including a cross-claim or counterclaim in a
+lawsuit) alleging that
 any patent claim is infringed by making, using, selling, offering for
 sale, or importing the Program or any portion of it.
 
@@ -525,8 +523,8 @@ make, use, sell, offer for sale, import and otherwise run, modify and
 propagate the contents of its contributor version.
 
 In the following three paragraphs, a "patent license" is any express
-agreement or commitment, however denominated, not to enforce a patent
-(such as an express permission to practice a patent or covenant not to
+agreement or commitment, however denominated, not to enforce a patent (such as an express permission to practice a
+patent or covenant not to
 sue for patent infringement).
 To "grant" such a patent license to a
 party means to make such an agreement or commitment not to enforce a

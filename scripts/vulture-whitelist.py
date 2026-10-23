@@ -1,4 +1,4 @@
-# Vulture whitelist - false positives and intentionally-public APIs
+"""Vulture whitelist - false positives and intentionally-public APIs."""
 
 # Dataclass field annotations (pydantic/vulture can't distinguish from variables)
 ignore_names = [

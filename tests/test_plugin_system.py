@@ -20,16 +20,13 @@ Tests:
 """
 
 import asyncio
+from dataclasses import dataclass
 import logging
+from pathlib import Path
 import sys
 
-from dataclasses import dataclass
-from pathlib import Path
-
-import pytest
-
 from berg_agents.plugin_system.plugin_manager import PluginManager
-
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
@@ -58,6 +55,7 @@ class MockBergAgentsApp:
     """Mock BergAgentsApp for testing."""
 
     def __init__(self) -> None:
+        """Mock app initialization."""
         self.name = "test-app"
 
 
@@ -66,6 +64,7 @@ class MockHarness:
     """Mock Harness for testing."""
 
     def __init__(self) -> None:
+        """Mock harness initialization."""
         self.name = "test-harness"
 
 
@@ -174,5 +173,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("\nTest interrupted by user")
     except Exception as e:
-        logger.error(f"\n✗ Test failed: {e}", exc_info=True)
+        logger.exception(f"\n✗ Test failed: {e}")
         sys.exit(1)

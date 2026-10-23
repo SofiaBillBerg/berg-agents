@@ -10,14 +10,14 @@ project:
   output-dir: _site
   # pre-render: # Moved to production profile
   #  - "project_utils/run_apidocs.sh"
-   # - "project_utils/run_diagrams.sh"
+  # - "project_utils/run_diagrams.sh"
   render:
     - "docs/**/*.qmd"
     - "agpl-3.0.md"
     - "!.*/*.*"
     - "!notes/*.*"
     - "!apidocs/**/*.*"
-  # post-render: # Moved to production profile
+    # post-render: # Moved to production profile
     # - "project_utils/render_readme.sh"
 website:
   title: "Berg Agents"
@@ -25,7 +25,7 @@ website:
   llms-txt: true
   page-navigation: true
   search:
-    keyboard-shortcut: ["?", "H"]
+    keyboard-shortcut: [ "?", "H" ]
     copy-button: true
     type: textbox
   favicon: docs/styles/logo/favicon.png
@@ -181,7 +181,7 @@ extensions:
     user-agent: "Quarto-Linkrot/1.0" # User agent string for requests
     cache-results: true # Cache results to avoid checking the same URL multiple times
     debug: false # Enable debug logging
-    output-file: "linkrot-report.txt" # Write results to a file (e.g., "linkrot-report.txt")
+    output-file: ".code_quality_outputs/linkrot-report.txt" # Write results to a file (e.g., "linkrot-report.txt")
     skip-patterns: # List of regex patterns to skip
       - "example\\.com"
       - "localhost"
