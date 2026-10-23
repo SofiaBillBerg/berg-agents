@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -153,8 +154,8 @@ class DependencyResolver:
         self.registry = registry
 
     async def resolve(
-        self,
-        plugins: list[PluginMetadata],
+            self,
+            plugins: list[PluginMetadata],
     ) -> tuple[list[str], list[str]]:
         """Resolve dependencies and return load order.
 
@@ -208,8 +209,8 @@ class ConflictResolver:
     """Resolve version conflicts."""
 
     def resolve_conflicts(
-        self,
-        plugins: list[PluginMetadata],
+            self,
+            plugins: list[PluginMetadata],
     ) -> list[PluginMetadata]:
         """Resolve version conflicts.
 
@@ -255,8 +256,8 @@ class ConflictResolver:
             for candidate in candidates:
                 version = Version.parse(candidate.version)
                 if all(
-                    VersionConstraint.parse(c).matches(version)
-                    for c in constraints
+                        VersionConstraint.parse(c).matches(version)
+                        for c in constraints
                 ):
                     resolved.append(candidate)
                     break

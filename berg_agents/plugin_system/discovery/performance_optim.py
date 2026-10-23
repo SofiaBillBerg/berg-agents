@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -15,8 +16,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
-
-# Performance Optimizations
+"""Performance Optimizations"""
 
 import asyncio
 import importlib

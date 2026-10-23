@@ -1,5 +1,6 @@
 /*
- * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+ * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+* The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -37,9 +38,9 @@ export interface ChatTranscriptProps {
 export interface ToolResult {
   /** Name of the tool (e.g. "read_file", "run_task") */
   tool: string;
-  /** Raw input arguments (JSON-serialised string) - optional */
+  /** Raw input arguments (JSON-serialized string) - optional */
   input?: string;
-  /** Output from the tool - must be JSON-serialisable */
+  /** Output from the tool - must be JSON-serializable */
   output?: any;
   /** Whether the card is currently expanded */
   expanded?: boolean;

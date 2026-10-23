@@ -17,11 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.15",
     "Operating System :: OS Independent"]
 dependencies = [
-    "jsonschema>=4.26.0",
-    "pydantic-ai-harness[code-mode]==0.55.0",
-    "pydantic-ai-slim[duckduckgo,web-fetch]>=2.51.0",
-    "python-dotenv>=1.2.3",
-    "pyyaml>=6.0.3"] # use dependency groups
+    "cryptography>=50.0.2"] # use dependency groups
 
 [build-system]
 requires = ["uv-build>=0.11.26,<0.22"]
@@ -48,6 +44,11 @@ notebooks = [
     "nbformat>=5.11.1",
     "notebook>=7.6.2"]
 agent-deps = [
+    "jsonschema>=4.26.0",
+    "pydantic-ai-harness[code-mode]==0.55.0",
+    "pydantic-ai-slim[duckduckgo,web-fetch]", #>=2.57.0",
+    "python-dotenv>=1.2.3",
+    "pyyaml>=6.0.3",
     "click>=8.1.7",
     "fastapi",
     "httpx2>=2.9.1",
@@ -66,13 +67,13 @@ agent-deps = [
     "pydantic-ai>=2.30.0",
     "pydantic-config>=0.4.0",
     "pyyaml>=6.0.3",
-    "a2a>=0.44",
+    #  "a2a>=0.44",
     "openai-agents>=0.22.0",
-    "mempalace>=3.9.0",
-    "pydantic-ai-harness[acp]>=0.27.0",
+    "mempalace>=3.11.0",
+    "pydantic-ai-harness[acp]", #>=0.27.0",
     "ai>=0.5.2",
     "a2a-sdk[all]>=0.3.21",
-    "pydantic-ai-slim>=2.35.3",
+    "pydantic-ai-slim", #>=2.35.3",
     "typesafe-sdk>=0.7.4"]
 docs = ["pydoctor>=25.10.1", "quarto>=0.1.0"]
 dev = [
@@ -104,7 +105,7 @@ tests = [
     "twisted>=26.4.0"]
 
 [optional-dependencies]
-dev-usage= ["berg-plugin-shared-todo"]
+dev-usage = ["berg-plugin-shared-todo"]
 # [project.scripts]
 # berg_agents = "berg_agents.cli:main"
 
@@ -213,7 +214,7 @@ extend-select = [
     "FBT"]
 task-tags = ["TODO", "FIX", "BUG", "CHECK", "CONTROL"]
 extend-ignore = [
-    "too-many-blank-lines",                      # Blank-line count is the formatter's job; E303 fights `ruff format` under preview.
+    "too-many-blank-lines", # Blank-line count is the formatter's job; E303 fights `ruff format` under preview.
     "boolean-default-value-positional-argument",
     "boolean-type-hint-positional-argument",
     "too-many-arguments",
@@ -463,7 +464,7 @@ redundant-condition = "error"
 
 
 [tool.ty.analysis]
-respect-type-ignore-comments=true
+respect-type-ignore-comments = true
 
 [tool.ty.environment]
 extra-paths = ["berg_agents/", "stubs/", ".venv/"]

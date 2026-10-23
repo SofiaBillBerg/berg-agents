@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -152,7 +153,27 @@ uv pip install -e . || {
   exit 1
 }
 
-# 6. Start the application
+# 6. Build Shared-ToDo package
+echo "▶ Building Shared-ToDo package..."
+cd berg_plugins/shared-todo && bun run build:ui || {
+  echo "❌ Shared-ToDo package ui build failed"
+  exit 1
+}
+
+# 7. Build Shared-ToDo package
+echo "▶ Building Shared-ToDo package..."
+uv build || {
+  echo "❌ Shared-ToDo package build failed"
+  exit 1
+}
+
+# 8. Build Berg-Agents package
+echo "▶ Building Berg-Agents package..."
+cd $PROJECT_ROOT && uv build || {
+  echo "❌ Berg-Agents package build failed"
+  exit 1
+}
+# 9. Start the application
 echo "=========================================="
 echo "🎯 Success! Launching app on port $bergport..."
 echo "=========================================="

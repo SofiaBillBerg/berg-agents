@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -16,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
-"""Harness orchestrator - the deterministic engine (split from harness.py).
+"""Harness orchestrator - the deterministic engine (split from previous file "harness. py").
 
 Imports inference and routing helpers from sibling modules. Keeps the public
 `Harness` API identical so `from berg_agents.core.harness import Harness` still works.
@@ -67,7 +68,6 @@ from berg_agents.core.harness._routing import (
     _extract_planned_actions,
     _failed_result,
     _review_gate_result,
-    _shift_complexity,
     _task_plans_mutation,
 )
 from berg_agents.core.interface import TaskComplexity
@@ -369,23 +369,6 @@ class Harness:
             task_id or str(task.get("task_id", "") or "") or self._new_id()
         )
         complexity = estimate_complexity(description, task_type)
-        # Learning adaptation: a persisted per-task-type complexity
-        # direction shifts routing — sustained failures route harder,
-        # easy wins route cheaper — which moves the resolved model tier
-        # because complexity maps onto the model. See LearningGate.
-        if self._enable_learning:
-            direction = self._learning_gate.complexity_override(task_type)
-            if direction:
-                shifted = _shift_complexity(complexity, direction)
-                if shifted != complexity:
-                    logger.info(
-                        "Learning routed %s %s: %s -> %s",
-                        task_type,
-                        direction,
-                        complexity.value,
-                        shifted.value,
-                    )
-                    complexity = shifted
         # Both routing signals are pure; the stronger one
         # feeds the guardian confidence check below.
         planner_score = self._planner.can_handle(task)

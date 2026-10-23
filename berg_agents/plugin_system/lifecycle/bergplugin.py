@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -57,7 +58,7 @@ class BergPlugin(ABC):
         """Called when plugin encounters an error."""
 
     async def on_config_change(
-        self, context: PluginContext, new_config: dict[str, Any]
+            self, context: PluginContext, new_config: dict[str, Any]
     ) -> None:
         """Called when plugin configuration changes."""
 
@@ -86,10 +87,10 @@ class BergPlugin(ABC):
     # === Event Helpers ===
 
     async def emit(
-        self,
-        event_type: str,
-        data: dict[str, Any] | None = None,
-        correlation_id: str | None = None,
+            self,
+            event_type: str,
+            data: dict[str, Any] | None = None,
+            correlation_id: str | None = None,
     ) -> None:
         """Emit an event from this plugin."""
         if self._event_bus and self._plugin_id:
@@ -101,10 +102,10 @@ class BergPlugin(ABC):
             )
 
     def subscribe(
-        self,
-        event_pattern: str,
-        handler: Any,
-        priority: int = 0,
+            self,
+            event_pattern: str,
+            handler: Any,
+            priority: int = 0,
     ) -> str:
         """Subscribe to events."""
         if self._event_bus:

@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -87,10 +88,11 @@ def build_chat_agent(
         make_web_search,
     )
     from berg_agents.config.settings import get_settings
-    from berg_agents.providers.models import resolve_model_instance
+    from berg_agents.core.shared_context import SECTIONS, SharedContext
     from berg_agents.plugin_system.context_capabilities import (
         build_context_capabilities,
     )
+    from berg_agents.providers.models import resolve_model_instance
     from pydantic_ai import Agent
     from pydantic_ai.capabilities import WebFetch, WebSearch
     from pydantic_ai_harness import Planning
@@ -106,6 +108,62 @@ def build_chat_agent(
         if f"{root_dir}" in settings.system_prompt
         else settings.system_prompt
     )
+
+    # Shared Context: the human-owned foundation this agent leverages.
+    # Rendered fresh per request (this builder runs per /api/chat/stream),
+    # project scope shadowing global. The block below is the read path;
+    # the two tools are the contribute path (author + why recorded).
+    shared_context = SharedContext.resolve(root_dir)
+    rendered_context = shared_context.render()
+    if rendered_context:
+        system_prompt += (
+            "\n\n# Shared context (human-owned; project shadows global)\n"
+            f"{rendered_context}\n\n"
+            "This is your persistent shared context with the user, kept as plain "
+            "files the human also edits. Keep it current: use "
+            "write_shared_context / append_shared_context to record durable "
+            "facts, preferences, and what/why learnings (always say why)."
+        )
+
+    def write_shared_context(section: str, content: str, why: str) -> str:
+        """Overwrite a human-owned shared-context section (project scope).
+
+        Args:
+            section: One of preferences, project, task-state, files, notes, learnings.
+            content: Full new Markdown content for the section.
+            why: Why this change is being made (the what/why discipline).
+
+        Returns:
+            A short status line.
+        """
+        if section not in SECTIONS:
+            return f"Unknown section '{section}'. Valid: {', '.join(SECTIONS)}."
+        changed = shared_context.write(
+            section, content, author="agent", why=why, scope="project"
+        )
+        verb = "Updated" if changed else "No change to"
+        return f"{verb} shared context '{section}' (project scope)."
+
+    def append_shared_context(section: str, text: str, why: str) -> str:
+        """Append a line to a human-owned shared-context section (project scope).
+
+        Args:
+            section: One of preferences, project, task-state, files, notes, learnings.
+            text: Text to append on a new line.
+            why: Why this is worth remembering.
+
+        Returns:
+            A short status line.
+        """
+        if section not in SECTIONS:
+            return f"Unknown section '{section}'. Valid: {', '.join(SECTIONS)}."
+        changed = shared_context.append(
+            section, text, author="agent", why=why, scope="project"
+        )
+        verb = "Appended to" if changed else "No change to"
+        return f"{verb} shared context '{section}' (project scope)."
+
+    shared_context_tools = [write_shared_context, append_shared_context]
 
     # Shared workspace root for file tools and subagent delegates.
     toolset = WorkspaceToolset(
@@ -129,7 +187,7 @@ def build_chat_agent(
         retries={"output": 3},
         # NOTE: Enabled plugin tools (shared-todo pilot). Empty by
         # default — low-risk tools need no HITL approval.
-        tools=list(plugin_tools) if plugin_tools else [],
+        tools=[*shared_context_tools, *(plugin_tools or [])],
         toolsets=[toolset, *build_mcp_toolsets(exclude=disabled_mcp)],
         capabilities=[
             # Provider-adaptive web tools: provider-native first where

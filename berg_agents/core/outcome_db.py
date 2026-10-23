@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -111,8 +112,8 @@ def load(path: str, table: str, limit: int = 500) -> list[dict[str, Any]]:
         con = sqlite3.connect(path)
         cur = con.cursor()
         for (data,) in cur.execute(
-            f"SELECT data FROM {table} ORDER BY id DESC LIMIT ?",
-            (limit,),
+                f"SELECT data FROM {table} ORDER BY id DESC LIMIT ?",
+                (limit,),
         ):
             try:
                 parsed = json.loads(data)

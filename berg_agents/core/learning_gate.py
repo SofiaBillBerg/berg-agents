@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -52,21 +53,6 @@ HIGH_SUCCESS_RATE = 0.95
 MIN_OUTCOMES_FOR_DOWNGRADE = 10
 
 
-def _adjustment_direction(adjustment: dict[str, Any]) -> str | None:
-    """Map an adjustment's rule to a routing direction.
-
-    :param adjustment: Adjustment dict produced by ``_evaluate_rules``.
-    :return: ``"up"`` for a complexity upgrade, ``"down"`` for a
-        downgrade, or None when the rule is not a routing rule.
-    """
-    rule = str(adjustment.get("rule", ""))
-    if "upgrade" in rule:
-        return "up"
-    if "downgrade" in rule:
-        return "down"
-    return None
-
-
 def _store_in_mempalace(insight: dict[str, Any]) -> None:
     """No-op: MemPalace is not an automatic log.
 
@@ -100,16 +86,6 @@ class LearningGate:
         self._rule_adjustments: list[dict[str, Any]] = load(
             self._db_path, "learning_adjustments", limit=20
         )
-        # Complexity-direction overrides routing consults:
-        # task_type -> "up" | "down", latest adjustment winning. Rebuilt
-        # here from persisted adjustments so a restart restores routing,
-        # not just the stats.
-        self._complexity_overrides: dict[str, str] = {}
-        for adjustment in self._rule_adjustments:
-            direction = _adjustment_direction(adjustment)
-            task_type = adjustment.get("task_type")
-            if direction and task_type:
-                self._complexity_overrides[str(task_type)] = direction
 
     def record(
         self,
@@ -283,44 +259,19 @@ class LearningGate:
                 "action": f"Consider downgrading complexity for {task_type} (success rate: {success_rate:.0%})"}
         return None
 
-    def _apply_adjustment(self, adjustment: dict[str, Any]) -> None:
-        """Apply a routing-rule adjustment as a complexity direction.
-
-        ``record`` already persisted this adjustment to
-        ``learning_adjustments``; applying it means routing will consult
-        the direction. Register the per-task-type override so
-        :meth:`complexity_override` can hand it to the router on the
-        next task of that type.
+    @staticmethod
+    def _apply_adjustment(adjustment: dict[str, Any]) -> None:
+        """Apply a routing rule adjustment.
 
         :param adjustment: The adjustment to apply.
         """
-        direction = _adjustment_direction(adjustment)
-        task_type = adjustment.get("task_type")
-        if direction and task_type:
-            self._complexity_overrides[str(task_type)] = direction
-            logger.info(
-                "Learning Gate applied %s complexity for %s (%s)",
-                direction,
-                task_type,
-                adjustment.get("action"),
-            )
-        else:
-            logger.info(
-                "Learning Gate adjustment (no routing effect): %s",
-                adjustment.get("action"),
-            )
-
-    def complexity_override(self, task_type: str) -> str | None:
-        """Return the learned routing direction for a task type.
-
-        Routing consults this to shift complexity (moving the resolved
-        model tier with the evidence). See
-        :func:`berg_agents.core.harness._routing._shift_complexity`.
-
-        :param task_type: Task type being routed.
-        :return: ``"up"``, ``"down"``, or None when no rule applies.
-        """
-        return self._complexity_overrides.get(task_type)
+        # record() already appended this adjustment; applying is a
+        # no-op beyond the log. Real adaptation is NOT pure outcome
+        # statistics — that lever was removed on purpose. It belongs to
+        # the Shared Context learning model (WHAT/WHY), designed
+        # separately. See notes/session-model-map.md and the
+        # session-model baseline.
+        logger.info("Learning Gate adjustment: %s", adjustment["action"])
 
     def get_stats(self) -> dict[str, Any]:
         """Get comprehensive learning statistics.

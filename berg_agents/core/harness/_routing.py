@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -33,40 +34,6 @@ from berg_agents.core.learning_gate import LearningGate
 from berg_agents.core.tool_spec import ToolSpec
 
 logger = logging.getLogger(__name__)
-
-#: Complexity levels ascending — the routing lever. Higher levels resolve
-#: to heavier models (resolve_implementation_model maps complexity onto a
-#: model tier) and, at the top, always pause for human review.
-_COMPLEXITY_ORDER = (
-    TaskComplexity.TRIVIAL,
-    TaskComplexity.STANDARD,
-    TaskComplexity.COMPLEX,
-    TaskComplexity.CRITICAL,
-)
-
-
-def _shift_complexity(
-    complexity: TaskComplexity, direction: str
-) -> TaskComplexity:
-    """Shift a complexity one bounded step in a learning direction.
-
-    A sustained-failure ``"up"`` step routes harder; a high-success
-    ``"down"`` step routes cheaper. Clamped to the level range so a
-    sequence of adjustments can never escape the enum.
-
-    :param complexity: Baseline complexity from ``estimate_complexity``.
-    :param direction: ``"up"`` or ``"down"`` (anything else is a no-op).
-    :return: The shifted complexity level.
-    """
-    try:
-        index = _COMPLEXITY_ORDER.index(complexity)
-    except ValueError:
-        return complexity
-    if direction == "up":
-        index = min(index + 1, len(_COMPLEXITY_ORDER) - 1)
-    elif direction == "down":
-        index = max(index - 1, 0)
-    return _COMPLEXITY_ORDER[index]
 
 
 @dataclass

@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -29,6 +30,7 @@ import asyncio
 from functools import cached_property
 import json
 import logging
+import pathlib
 from typing import Any
 
 from berg_agents.core.harness import Harness
@@ -407,9 +409,8 @@ def create_router(
             if not session_id:
                 return
             try:
-                from pydantic_ai import ConversationTypeAdapter
-
                 from berg_agents.ui import session_store
+                from pydantic_ai import ConversationTypeAdapter
 
                 root = sessions._harness_root_dir()
                 store = session_store.get_store(root)
@@ -549,7 +550,7 @@ def create_router(
         # defaults in the tool signature land inside the project.
         import os
 
-        had_cwd = os.getcwd()
+        had_cwd = pathlib.Path.cwd()
         os.chdir(root_dir)
         try:
             result = await _run_plugin_tool(
@@ -891,6 +892,99 @@ def create_router(
             "active": {
                 "provider": sessions.active_provider,
                 "model": sessions.active_model}}
+
+    @router.get("/api/context/shared")
+    async def shared_context_catalog() -> dict[str, Any]:
+        """Catalog of the human-owned Shared Context for the in-app editor.
+
+        :return: Dict with ``scopes`` (global/project -> path), per-section
+            content presence, and recent journal history.
+        """
+        from berg_agents.core.shared_context import SECTIONS, SharedContext
+
+        ctx = SharedContext.resolve(sessions._harness_root_dir())
+        return {
+            "scopes": ctx.scopes(),
+            "sections": [
+                {
+                    "name": name,
+                    "has_content": bool(ctx.read(name).strip()),
+                    "by_scope": {
+                        layer.scope: bool(layer.read(name).strip())
+                        for layer in ctx.layers
+                    }}
+                for name in SECTIONS
+            ],
+            "history": ctx.history()[:25]}
+
+    @router.get("/api/context/shared/{section}")
+    async def shared_context_section(section: str) -> dict[str, Any]:
+        """Read one Shared Context section (project shadows global).
+
+        :param section: Section name (an entry of ``SECTIONS``).
+        :return: Effective content, scopes, and this section's history.
+        :raises HTTPException: 404 for an unknown section.
+        """
+        from berg_agents.core.shared_context import SECTIONS, SharedContext
+
+        if section not in SECTIONS:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Unknown section '{section}'. Valid: {', '.join(SECTIONS)}.",
+            )
+        ctx = SharedContext.resolve(sessions._harness_root_dir())
+        return {
+            "section": section,
+            "content": ctx.read(section),
+            "scopes": ctx.scopes(),
+            "history": ctx.history(section)[:25]}
+
+    @router.put("/api/context/shared/{section}")
+    async def shared_context_write(
+        section: str, body: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Write/append a section from the in-app editor (author ``human:ui``).
+
+        Sections are validated against ``SECTIONS`` so only known context
+        files are writable — no arbitrary paths (workspace files ride the
+        one shared file-access path, added with E2).
+
+        :param section: Section name.
+        :param body: ``content`` (required), optional ``mode``
+            ("write"/"append"), ``scope`` ("project"/"global"), ``why``.
+        :return: The stored result and effective content.
+        :raises HTTPException: 404 unknown section, 422 bad body.
+        """
+        from berg_agents.core.shared_context import SECTIONS, SharedContext
+
+        if section not in SECTIONS:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Unknown section '{section}'. Valid: {', '.join(SECTIONS)}.",
+            )
+        content = body.get("content")
+        if not isinstance(content, str):
+            raise HTTPException(
+                status_code=422, detail="Body needs a string 'content'."
+            )
+        mode = str(body.get("mode") or "write")
+        scope = str(body.get("scope") or "project")
+        why = str(body.get("why") or "")
+        ctx = SharedContext.resolve(sessions._harness_root_dir())
+        if mode == "append":
+            changed = ctx.append(
+                section, content, author="human:ui", why=why, scope=scope
+            )
+        else:
+            changed = ctx.write(
+                section, content, author="human:ui", why=why, scope=scope
+            )
+        return {
+            "section": section,
+            "changed": changed,
+            "mode": mode,
+            "scope": scope,
+            "content": ctx.read(section)}
 
     @router.get("/api/learning-stats")
     async def learning_stats() -> dict[str, Any]:

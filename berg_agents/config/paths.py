@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -54,6 +55,18 @@ _GLOBAL_DIR_NAME = ".berg-agents"
 def project_root() -> Path:
     """The checkout root (parent of the ``berg_agents`` package)."""
     return _PROJECT_ROOT
+
+
+def global_config_dir() -> Path:
+    """The global shared config dir (``~/.berg-agents``).
+
+    The project overlay (:func:`resolve_config_dir`) shadows this per
+    section; the Shared Context layer reads both, so this is the one
+    place the global location is defined.
+
+    :return: Absolute path to the global config dir.
+    """
+    return Path.home() / _GLOBAL_DIR_NAME
 
 
 def resolve_config_dir(root: Path | None = None) -> Path:
