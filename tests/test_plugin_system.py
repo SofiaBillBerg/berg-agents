@@ -68,7 +68,7 @@ class MockHarness:
         self.name = "test-harness"
 
 
-async def main():
+async def main() -> None:
     """Run plugin system tests."""
     logger.info("=== Berg Agents Plugin System Test ===\n")
 

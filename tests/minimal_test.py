@@ -137,7 +137,7 @@ class SimplePluginManager:
         return self.plugins.get(plugin_id)
 
 
-async def main():
+async def main() -> None:
     """Test the minimal plugin system."""
     logger.info("=== Minimal Plugin System Test ===\n")
 
@@ -150,7 +150,7 @@ async def main():
 
     # Load shared_todo plugin
     logger.info("")
-    plugin = await manager.load_plugin("berg-plugin-shared-todo")
+    await manager.load_plugin("berg-plugin-shared-todo")
 
     # Test the plugin's tools
     logger.info("\n=== Testing SharedToDo Tools ===\n")

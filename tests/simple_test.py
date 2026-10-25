@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Simple test of plugin discovery and shared_todo functionality.
-"""
+"""Simple test of plugin discovery and shared_todo functionality."""
 
 import asyncio
 import logging
@@ -60,7 +58,7 @@ async def test_discovery():
         return []
 
 
-async def test_shared_todo_standalone():
+async def test_shared_todo_standalone() -> None:
     """Test shared_todo tools directly, without the plugin system."""
     logger.info("\n=== Testing SharedToDo Tools ===")
 
@@ -112,7 +110,7 @@ async def test_shared_todo_standalone():
         logger.exception(f"SharedToDo test failed: {e}")
 
 
-async def test_plugin_yaml_parsing():
+async def test_plugin_yaml_parsing() -> None:
     """Test that plugin.yaml can be parsed correctly."""
     logger.info("\n=== Testing Plugin YAML Parsing ===")
 
@@ -121,10 +119,10 @@ async def test_plugin_yaml_parsing():
 
         # Parse the shared_todo plugin.yaml
         yaml_path = (
-                Path(__file__).parent
-                / "berg_plugins"
-                / "shared_todo"
-                / "plugin.yaml"
+            Path(__file__).parent
+            / "berg_plugins"
+            / "shared_todo"
+            / "plugin.yaml"
         )
 
         logger.info(f"Loading: {yaml_path}")
@@ -151,7 +149,7 @@ async def test_plugin_yaml_parsing():
         logger.error(f"YAML parsing failed: {e}", exc_info=True)
 
 
-async def main():
+async def main() -> None:
     """Run all tests."""
     logger.info("=== Simple Plugin System Test ===")
 

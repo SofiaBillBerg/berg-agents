@@ -34,17 +34,13 @@ import importlib.util
 
 
 def is_plugin_installable() -> bool:
-    """
-    Returns True if a distributable package named 'shared_todo_plugin' can be found.
-    """
+    """Returns True if a distributable package named 'shared_todo_plugin' can be found."""
     spec = importlib.util.find_spec("shared_todo_plugin")
     return spec is not None
 
 
 def is_integrated_into_berg_agents() -> bool:
-    """
-    Returns True if the shared todo functionality is imported as part of berg_agents.
-    """
+    """Returns True if the shared todo functionality is imported as part of berg_agents."""
     try:
         __import__("berg_agents.shared_todo")
         return True

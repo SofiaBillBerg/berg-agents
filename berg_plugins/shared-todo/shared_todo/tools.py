@@ -94,7 +94,7 @@ def _split_sections(content: str) -> tuple[str, str, str]:
         elif line.startswith("## Notes"):
             current = notes_lines
             continue
-        elif line.startswith("## Subtasks") or line.startswith("## "):
+        elif line.startswith(("## Subtasks", "## ")):
             current = None
             continue
         elif line.startswith("# ") or (line.startswith("**") and "**:" in line):
@@ -141,9 +141,9 @@ def create_todo(
 
     content = f"""# {title}
 
-**Status:** todo  
-**Created:** {timestamp}  
-**Updated:** {timestamp}  
+**Status:** todo
+**Created:** {timestamp}
+**Updated:** {timestamp}
 
 ## Description
 
@@ -395,9 +395,9 @@ def update_todo(
     # Build updated content
     new_content = f"""# {new_title}
 
-**Status:** {new_status}  
-**Created:** {created_at}  
-**Updated:** {timestamp}  
+**Status:** {new_status}
+**Created:** {created_at}
+**Updated:** {timestamp}
 {f"**Completed:** {timestamp}  " if new_status == "done" else ""}
 
 ## Description

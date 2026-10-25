@@ -116,3 +116,4 @@ entities.json
 /.berg-agents/plugins/
 /feat_dev/test_standalone_todos/
 /.berg-agents/active_session
+/.envrc

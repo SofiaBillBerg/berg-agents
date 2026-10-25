@@ -16,7 +16,7 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Shared ToDo Plugin for Berg Agents
+Shared ToDo Plugin for Berg Agents.
 
 Provides collaborative todo list management between user and agent.
 Todos are stored as Markdown files for easy editing by both parties.
@@ -104,7 +104,6 @@ class SharedToDoPlugin(BergPlugin):
         try:
             # Parse settings - use defaults if no settings provided.
             # PluginContext.settings is a plain dict from the config manager.
-            settings_dict = context.settings or {}
             # context.settings is a plain dict; coerce it to our config model
             self.settings = TodoSettings(**context.settings or {})
             logger.info(f"Plugin settings validated: {self.settings}")
@@ -271,9 +270,9 @@ class SharedToDoPlugin(BergPlugin):
 
         content = f"""# {todo.title}
 
-**Status:** {todo.status}  
-**Created:** {todo.created_at}  
-**Updated:** {todo.updated_at}  
+**Status:** {todo.status}
+**Created:** {todo.created_at}
+**Updated:** {todo.updated_at}
 {f"**Completed:** {todo.completed_at}  " if todo.completed_at else ""}
 
 ## Description
@@ -297,7 +296,7 @@ class SharedToDoPlugin(BergPlugin):
         Returns:
             Parsed todo item
         """
-        content = path.read_text()
+        content = path.read_text(encoding="utf-8")
         lines = content.split("\n")
 
         # Parse title (first line after #)

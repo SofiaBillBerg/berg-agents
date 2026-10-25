@@ -46,8 +46,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # Allow overriding the config file location via env var
 CONFIG_PATH_ENV = os.getenv("SH_TODO_CONFIG_PATH")
 DEFAULT_CONFIG_PATH = (
-    Path(CONFIG_PATH_ENV) if CONFIG_PATH_ENV else PROJECT_ROOT / ".berg-agents" / ".shared_todo" / "config.yaml")
-REQUIRED_ENV = {"SH_TODO_ENABLED": bool, "SH_TODO_LOG_LEVEL": str}
+    Path(CONFIG_PATH_ENV)
+    if CONFIG_PATH_ENV
+    else PROJECT_ROOT / ".berg-agents" / ".shared_todo" / "config.yaml"
+)
+REQUIRED_ENV = {
+    "SH_TODO_ENABLED": bool,
+    "SH_TODO_LOG_LEVEL": str}
 
 
 def load_user_config() -> dict:
@@ -71,17 +76,22 @@ def load_user_config() -> dict:
                 """
                 if isinstance(obj, str):
                     # Replace ${env:VAR} or ${VAR} with os.environ value or empty string if not set
-                    def replace_match(match):
+                    def replace_match(match) -> str:
                         """Replace regex match with environment variable value.
 
                         :param match:  The regex match object.
                         :return:  The environment variable value or empty string if not set.
                         """
-                        var_name = (match.group(1) if match.group(1) else match.group(2))
+                        var_name = (
+                            match.group(1) or match.group(2)
+                        )
                         return os.getenv(var_name, "")
 
-                    return re.sub(r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}|\\$([A-Za-z_][A-Za-z0-9_]*)", replace_match,
-                                  obj, )
+                    return re.sub(
+                        r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}|\\$([A-Za-z_][A-Za-z0-9_]*)",
+                        replace_match,
+                        obj,
+                    )
                 elif isinstance(obj, dict):
                     return {k: expand_env_vars(v) for k, v in obj.items()}
                 elif isinstance(obj, list):
@@ -107,7 +117,9 @@ def validate_user_config() -> dict:
     merged = {**cfg, **env_cfg}
 
     # Set defaults for optional keys before validation
-    merged.setdefault("SH_TODO_ENABLED", True)  # default to True if not provided
+    merged.setdefault(
+        "SH_TODO_ENABLED", True
+    )  # default to True if not provided
     merged.setdefault("SH_TODO_LOG_LEVEL", "INFO")  # default log level
 
     # Validate required keys (now guaranteed to exist because of setdefault)
@@ -124,11 +136,16 @@ def validate_user_config() -> dict:
                 merged[key] = bool(value)
         # For non bool types keep the original check
         elif not isinstance(value, expected_type):
-            raise ValueError(f"Configuration '{key}' must be a {expected_type.__name__}")
+            raise ValueError(
+                f"Configuration '{key}' must be a {expected_type.__name__}"
+            )
 
     # Optional: coerce types (adjusted)
-    merged["SH_TODO_LOG_LEVEL"] = str(merged.get("SH_TODO_LOG_LEVEL", "INFO")).upper()
+    merged["SH_TODO_LOG_LEVEL"] = str(
+        merged.get("SH_TODO_LOG_LEVEL", "INFO")
+    ).upper()
     return merged
+
 
 # Example usage removed for library import safety
 # The validate_user_config function is available for external scripts;
