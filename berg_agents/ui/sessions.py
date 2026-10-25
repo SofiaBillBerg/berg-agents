@@ -45,16 +45,19 @@ class SessionManager:
         *,
         active_provider: str = "ollama",
         active_model: str = "",
+        active_agent: str | None = None,
         root_dir: str = ".",
     ) -> None:
         """Initialize session state.
 
         :param active_provider: Initially selected provider name.
         :param active_model: Initially selected model identifier.
+        :param active_agent: Initially selected agent (None = default chat agent).
         :param root_dir: Workspace root directory for file tools.
         """
         self.active_provider = active_provider
         self.active_model = active_model
+        self.active_agent = active_agent
         self._root_dir = root_dir
 
     def _harness_root_dir(self) -> str:

@@ -57,6 +57,8 @@ def build_chat_agent(
     plugin_tools: list[Any] | None = None,
     disabled_mcp: frozenset[str] = frozenset(),
     disabled_skills: frozenset[str] = frozenset(),
+    active_agent: str | None = None,
+    active_agent_description: str | None = None,
 ) -> Any:
     """Build a pydantic_ai ``Agent`` for the streaming chat endpoint.
 
@@ -108,6 +110,18 @@ def build_chat_agent(
         if f"{root_dir}" in settings.system_prompt
         else settings.system_prompt
     )
+
+    # Active agent routing: when the user has chosen an agent (via
+    # /api/agents/active), this turn runs as that agent - its persona
+    # and preferred complexity shape the prompt. Mirrors model selection.
+    active_agent = (active_agent or "").strip() or None
+    if active_agent:
+        persona = f"You are acting as the '{active_agent}' agent."
+        if active_agent_description:
+            persona = f"{persona} {active_agent_description}"
+        system_prompt = (
+            f"{persona}\n\n{system_prompt}" if system_prompt else persona
+        )
 
     # Shared Context: the human-owned foundation this agent leverages.
     # Rendered fresh per request (this builder runs per /api/chat/stream),

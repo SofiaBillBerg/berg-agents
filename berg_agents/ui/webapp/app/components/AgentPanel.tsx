@@ -1,11 +1,10 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
- *
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
@@ -19,7 +18,7 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-import {Avatar, Card, Chip} from "@heroui/react";
+import { Avatar, Card, Chip } from "@heroui/react";
 
 export interface AgentInfo {
   name: string;
@@ -32,12 +31,17 @@ export interface AgentPanelProps {
   agents?: AgentInfo[];
   activeAgent?: string | null;
   compact?: boolean;
+  /** Make each agent selectable; called with the clicked agent's name.
+      Omit to keep the panel read-only (display only). */
+  onSelect?: (name: string) => void;
 }
 
 /**
  * AgentPanel component.
  * Displays all registered agents from the harness with their
- * capabilities, descriptions, and current activity status.
+ * capabilities, descriptions, and current activity status. When
+ * `onSelect` is provided each agent is a button with a clear active
+ * state; without it the panel stays read-only.
  *
  * @param props - Component properties
  * @returns JSX element rendering the agent directory list
@@ -45,7 +49,8 @@ export interface AgentPanelProps {
 export function AgentPanel({
   agents = [],
   activeAgent,
-  compact = false}: AgentPanelProps) {
+  compact = false,
+  onSelect}: AgentPanelProps) {
   if (!agents || agents.length === 0) {
     return (
       <section aria-label="Registered agents" className="agent-panel empty">
@@ -64,25 +69,42 @@ export function AgentPanel({
         aria-label="Registered agents"
         className="agent-panel compact flex min-h-11 flex-wrap items-center gap-1.5 p-1"
       >
-        {agents.map((agent) => (
-          <div key={agent.name} className="flex items-center gap-1.5">
-            <Avatar
-              color={activeAgent === agent.name ? "success" : "default"}
-              size="sm"
+        {agents.map((agent) => {
+          const isActive = activeAgent === agent.name;
+          const row = (
+            <div className="flex items-center gap-1.5">
+              <Avatar color={isActive ? "success" : "default"} size="sm">
+                {agent.name?.substring(0, 2).toUpperCase() || "??"}
+              </Avatar>
+              {isActive ? (
+                <Chip color="accent" size="sm" variant="soft">
+                  {agent.name}
+                </Chip>
+              ) : (
+                <Chip size="sm" variant="secondary">
+                  {agent.name}
+                </Chip>
+              )}
+            </div>
+          );
+          // Read-only when no handler; otherwise a clear pressable chip.
+          if (!onSelect) {
+            return <div key={agent.name}>{row}</div>;
+          }
+          return (
+            <button
+              key={agent.name}
+              type="button"
+              aria-pressed={isActive}
+              className={`cursor-pointer rounded-full transition hover:opacity-90 ${
+                isActive ? "ring-2 ring-[var(--success)]" : ""
+              }`}
+              onClick={() => onSelect(agent.name)}
             >
-              {agent.name?.substring(0, 2).toUpperCase() || "??"}
-            </Avatar>
-            {activeAgent === agent.name ? (
-              <Chip color="accent" size="sm" variant="soft">
-                {agent.name}
-              </Chip>
-            ) : (
-              <Chip size="sm" variant="secondary">
-                {agent.name}
-              </Chip>
-            )}
-          </div>
-        ))}
+              {row}
+            </button>
+          );
+        })}
       </div>
     );
   }
@@ -94,7 +116,7 @@ export function AgentPanel({
           <Card.Title>Registered Agents</Card.Title>
           <Card.Description>
             {agents.length} available
-            {activeAgent ? ` . ${activeAgent} active` : ""}
+            {activeAgent ? ` · ${activeAgent} active` : ""}
           </Card.Description>
         </Card.Header>
         {/* Responsive grid: one column on phones, two on tablets,
@@ -102,11 +124,8 @@ export function AgentPanel({
         <Card.Content className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {agents.map((agent) => {
             const isActive = activeAgent === agent.name;
-            return (
-              <Card
-                key={agent.name}
-                variant={isActive ? "secondary" : "transparent"}
-              >
+            const card = (
+              <Card variant={isActive ? "secondary" : "transparent"}>
                 <Card.Header className="flex items-start gap-3">
                   <Avatar
                     className="mt-0.5"
@@ -140,6 +159,24 @@ export function AgentPanel({
                   ))}
                 </Card.Content>
               </Card>
+            );
+            // Read-only when no handler; otherwise the whole card is the
+            // select button (selected = ring + the Active chip above).
+            if (!onSelect) {
+              return <div key={agent.name}>{card}</div>;
+            }
+            return (
+              <button
+                key={agent.name}
+                type="button"
+                aria-pressed={isActive}
+                className={`block w-full rounded-lg text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] ${
+                  isActive ? "ring-2 ring-[var(--success)]" : "hover:opacity-95"
+                }`}
+                onClick={() => onSelect(agent.name)}
+              >
+                {card}
+              </button>
             );
           })}
         </Card.Content>

@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,8 +19,6 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-
-
 /*
  * Agents page - dedicated view for registered agents and their details.
  * Fetches agent list from /api/agents on the client.
@@ -28,15 +26,18 @@
 
 "use client";
 
-import type {AgentInfo} from "@/harness/webhook";
+import type { AgentInfo } from "@/harness/webhook";
 
-import {useEffect, useState} from "react";
-import {Card, Spinner} from "@heroui/react";
+import { useEffect, useState } from "react";
+import { Card, Spinner } from "@heroui/react";
 
-import {API_BASE} from "@/envConfig";
+import { API_BASE } from "@/envConfig";
 
-import {AgentPanel} from "../components/AgentPanel.tsx";
-import {Navbar} from "../components/Navbar.tsx";
+import { AgentPanel } from "../components/AgentPanel.tsx";
+import { Navbar } from "../components/Navbar.tsx";
+
+/** localStorage key for the selected (active) agent — behavior TBD. */
+const SELECTED_AGENT_KEY = "berg-selected-agent";
 
 /**
  * AgentsPage - client component that fetches and displays all registered
@@ -46,6 +47,37 @@ export default function AgentsPage() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Selection is just a persisted active-state for now (routing behavior
+  // is TBD); localStorage keeps it visible across reloads/navigation.
+  const [activeAgent, setActiveAgent] = useState<string | null>(() => {
+    try {
+      return typeof window !== "undefined"
+        ? localStorage.getItem(SELECTED_AGENT_KEY)
+        : null;
+    } catch {
+      return null;
+    }
+  });
+  // Click the active agent again to clear the selection.
+  // Side effects (persist + backend sync) stay OUTSIDE the state
+  // updater: React expects the updater to be pure, and running them
+  // inside it (as before) caused StrictMode double-invocation to fire
+  // the PUT twice with toggled values, leaving the backend out of sync.
+  const selectAgent = (name: string) => {
+    const next = activeAgent === name ? null : name;
+    setActiveAgent(next);
+    try {
+      if (next) localStorage.setItem(SELECTED_AGENT_KEY, next);
+      else localStorage.removeItem(SELECTED_AGENT_KEY);
+    } catch {
+      // Private-mode storage: selection stays in memory only.
+    }
+    void fetch(`${API_BASE}/api/agents/active`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent: next })}).catch(() => undefined);
+  };
 
   useEffect(() => {
     const fetchAgents = async () => {
@@ -112,9 +144,16 @@ export default function AgentsPage() {
           <h1 className="text-2xl font-bold mb-4">Registered Agents</h1>
           <p className="text-sm text-muted-foreground mb-4">
             {agents.length} agent(s) available - each handles different task
-            types via the BergAgents harness pipeline.
+            types via the BergAgents harness pipeline.{" "}
+            {activeAgent
+              ? `Active: ${activeAgent} (selection saved; routing behavior to be wired).`
+              : "Click an agent to select it."}
           </p>
-          <AgentPanel activeAgent={null} agents={agents} />
+          <AgentPanel
+            activeAgent={activeAgent}
+            agents={agents}
+            onSelect={selectAgent}
+          />
         </div>
       </div>
     </>

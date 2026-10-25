@@ -34,6 +34,9 @@ import pathlib
 from typing import Any
 
 from berg_agents.core.harness import Harness
+from berg_agents.ui.route_handlers.agents import register_agent_routes
+from berg_agents.ui.route_handlers.context import register_context_routes
+from berg_agents.ui.route_handlers.learning import register_learning_routes
 from berg_agents.ui.route_handlers.providers import register_provider_routes
 from berg_agents.ui.schemas import (
     SessionCreateRequest,
@@ -210,28 +213,9 @@ def create_router(
     """
     router = APIRouter()
 
-    @router.get("/api/agents")
-    async def list_agents() -> list[dict[str, Any]]:
-        """List all registered agents.
-
-        :return: A list of dictionaries containing information about each agent.
-        """
-        return harness.get_agent_info()
-
-    @router.get("/api/agents/{name}")
-    async def get_agent(name: str) -> dict[str, Any]:
-        """Return info for one agent by name.
-
-        :param name: The name of the agent to retrieve.
-        :return: A dictionary containing information about the specified agent.
-        :raises HTTPException: 404 when the agent name is unknown.
-        """
-        try:
-            return harness.get_agent(name).get_info()
-        except KeyError:
-            raise HTTPException(
-                status_code=404, detail=f"Agent '{name}' not found"
-            ) from None
+    register_agent_routes(router, harness=harness, sessions=sessions)
+    register_context_routes(router, sessions=sessions)
+    register_learning_routes(router, harness=harness)
 
     @router.post("/api/chat/stream")
     async def chat_stream(
@@ -311,12 +295,31 @@ def create_router(
             disabled_mcp,
             disabled_skills,
         ) = await get_chat_plugin_state()
+
+        # Active agent selection (set via /api/agents/active, e.g. from
+        # the Agents page or the chat header). Routes the next message to
+        # that agent: build_chat_agent adopts its persona. None = default
+        # chat agent.
+        active_agent = sessions.active_agent
+        active_agent_description: str | None = None
+        if active_agent:
+            try:
+                info = harness.get_agent(active_agent).get_info()
+                active_agent_description = info.get("description")
+            except KeyError:
+                # Selection went stale (agent unregistered) - fall back to
+                # the default chat agent rather than failing the turn.
+                sessions.active_agent = None
+                active_agent = None
+
         agent = build_chat_agent(
             model_id,
             root_dir=sessions._harness_root_dir(),
             plugin_tools=plugin_tools,
             disabled_mcp=disabled_mcp,
             disabled_skills=disabled_skills,
+            active_agent=active_agent,
+            active_agent_description=active_agent_description,
         )
 
         # sdk_version=6 enables tool-approval streaming (human-in-the-loop).
@@ -802,158 +805,6 @@ def create_router(
                 ),
                 "source": "delegate"}])
         return {"tools": tools, "mcp_servers": list_servers()}
-
-    @router.get("/api/context")
-    async def context_catalog() -> dict[str, Any]:
-        """Catalog of everything the agent may load as context.
-
-        Memory files (``settings.memory``), skills (parsed frontmatter
-        only, no bodies), and MCP servers (names + enabled flags -
-        live tool names need a running session). Mirrors the TUI
-        ``/memory`` ``/skills`` ``/mcps`` listings for the web UI.
-
-        :return: Dict with ``memory``, ``skills``, ``mcp_servers``,
-            and the active provider/model.
-        """
-        from pathlib import Path
-
-        from berg_agents.capabilities.mcp_toolsets import list_servers
-        from berg_agents.capabilities.skills import list_skills
-        from berg_agents.config.settings import get_settings
-
-        settings = get_settings()
-        # Offload the blocking resolve off the event loop (async handlers
-        # should not do blocking pathlib work directly).
-        root = await asyncio.to_thread(
-            lambda: Path(sessions._harness_root_dir()).expanduser().resolve()
-        )
-
-        def _exists(entry: Any) -> bool:
-            raw = (
-                str(entry[0])
-                if isinstance(entry, (list, tuple)) and entry
-                else str(entry or "")
-            )
-            if not raw:
-                return False
-            candidate = Path(raw).expanduser()
-            if candidate.is_absolute():
-                return candidate.is_file()
-            return (root / candidate).is_file()
-
-        return {
-            "memory": [
-                {"path": str(m), "exists": _exists(m)}
-                for m in (settings.memory or [])
-            ],
-            "skills": list_skills(
-                settings.skills, root_dir=sessions._harness_root_dir()
-            ),
-            "mcp_servers": list_servers(),
-            "active": {
-                "provider": sessions.active_provider,
-                "model": sessions.active_model}}
-
-    @router.get("/api/context/shared")
-    async def shared_context_catalog() -> dict[str, Any]:
-        """Catalog of the human-owned Shared Context for the in-app editor.
-
-        :return: Dict with ``scopes`` (global/project -> path), per-section
-            content presence, and recent journal history.
-        """
-        from berg_agents.core.shared_context import SECTIONS, SharedContext
-
-        ctx = SharedContext.resolve(sessions._harness_root_dir())
-        return {
-            "scopes": ctx.scopes(),
-            "sections": [
-                {
-                    "name": name,
-                    "has_content": bool(ctx.read(name).strip()),
-                    "by_scope": {
-                        layer.scope: bool(layer.read(name).strip())
-                        for layer in ctx.layers
-                    }}
-                for name in SECTIONS
-            ],
-            "history": ctx.history()[:25]}
-
-    @router.get("/api/context/shared/{section}")
-    async def shared_context_section(section: str) -> dict[str, Any]:
-        """Read one Shared Context section (project shadows global).
-
-        :param section: Section name (an entry of ``SECTIONS``).
-        :return: Effective content, scopes, and this section's history.
-        :raises HTTPException: 404 for an unknown section.
-        """
-        from berg_agents.core.shared_context import SECTIONS, SharedContext
-
-        if section not in SECTIONS:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Unknown section '{section}'. Valid: {', '.join(SECTIONS)}.",
-            )
-        ctx = SharedContext.resolve(sessions._harness_root_dir())
-        return {
-            "section": section,
-            "content": ctx.read(section),
-            "scopes": ctx.scopes(),
-            "history": ctx.history(section)[:25]}
-
-    @router.put("/api/context/shared/{section}")
-    async def shared_context_write(
-        section: str, body: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Write/append a section from the in-app editor (author ``human:ui``).
-
-        Sections are validated against ``SECTIONS`` so only known context
-        files are writable — no arbitrary paths (workspace files ride the
-        one shared file-access path, added with E2).
-
-        :param section: Section name.
-        :param body: ``content`` (required), optional ``mode``
-            ("write"/"append"), ``scope`` ("project"/"global"), ``why``.
-        :return: The stored result and effective content.
-        :raises HTTPException: 404 unknown section, 422 bad body.
-        """
-        from berg_agents.core.shared_context import SECTIONS, SharedContext
-
-        if section not in SECTIONS:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Unknown section '{section}'. Valid: {', '.join(SECTIONS)}.",
-            )
-        content = body.get("content")
-        if not isinstance(content, str):
-            raise HTTPException(
-                status_code=422, detail="Body needs a string 'content'."
-            )
-        mode = str(body.get("mode") or "write")
-        scope = str(body.get("scope") or "project")
-        why = str(body.get("why") or "")
-        ctx = SharedContext.resolve(sessions._harness_root_dir())
-        if mode == "append":
-            changed = ctx.append(
-                section, content, author="human:ui", why=why, scope=scope
-            )
-        else:
-            changed = ctx.write(
-                section, content, author="human:ui", why=why, scope=scope
-            )
-        return {
-            "section": section,
-            "changed": changed,
-            "mode": mode,
-            "scope": scope,
-            "content": ctx.read(section)}
-
-    @router.get("/api/learning-stats")
-    async def learning_stats() -> dict[str, Any]:
-        """Return learning/outcome statistics.
-
-        :return: A dictionary containing learning statistics.
-        """
-        return harness.get_learning_stats()
 
     @router.post("/api/tool/execute")
     async def execute_tool(request: ToolExecuteRequest) -> ToolExecuteResponse:

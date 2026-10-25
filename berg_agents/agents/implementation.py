@@ -44,6 +44,7 @@ from berg_agents.providers.tiers import model_for_complexity
 from berg_agents.tools._io import _atomic_write, _normalize_target
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.capabilities import ReinjectSystemPrompt
 
 logger = logging.getLogger(__name__)
 
@@ -267,6 +268,11 @@ def build_implementation_agent(
         # Explicit name labels this agent's Logfire run span.
         name=IMPLEMENTATION_AGENT_NAME,
         deps_type=ImplementationDeps,
+        # Cross-agent message sharing passes a prior run's messages into
+        # this one; ReinjectSystemPrompt keeps this agent's own system
+        # prompt at the head (otherwise a non-empty history suppresses
+        # it). See pydantic-ai message-history sharing.
+        capabilities=[ReinjectSystemPrompt()],
         # Plain-text output so the model can freely call tools
         # and return a final answer string. A structured output
         # schema would risk `UnexpectedModelBehavior` retry

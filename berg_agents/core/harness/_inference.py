@@ -130,7 +130,10 @@ def _inference_prompt(
 
 
 async def _await_inference(
-    agent: Any, prompt: str, deps: ImplementationDeps
+    agent: Any,
+    prompt: str,
+    deps: ImplementationDeps,
+    message_history: Any = None,
 ) -> Any:
     """Run one implementation-agent call under an explicit timeout.
 
@@ -138,6 +141,9 @@ async def _await_inference(
         agent: Built implementation agent.
         prompt: Fully rendered task prompt.
         deps: Per-run implementation dependencies.
+        message_history: Optional prior run's messages to share context
+            with this run (pydantic-ai message-sharing). ``None`` keeps
+            the current isolated-run behaviour.
 
     Returns:
         The Pydantic AI run result.
@@ -147,7 +153,8 @@ async def _await_inference(
             ``_INFERENCE_TIMEOUT_S``.
     """
     return await asyncio.wait_for(
-        agent.run(prompt, deps=deps), timeout=_INFERENCE_TIMEOUT_S
+        agent.run(prompt, deps=deps, message_history=message_history),
+        timeout=_INFERENCE_TIMEOUT_S,
     )
 
 

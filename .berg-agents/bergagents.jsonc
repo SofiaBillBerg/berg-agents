@@ -1,9 +1,5 @@
 {
   //# BergAgents Configuration file (JSONC format, comments allowed).
-  "COHERE_API_KEY": "${env:COHERE_API_KEY}",
-  "COHERE_BASE_URL": "${env:COHERE_BASE_URL}",
-  "COHERE_MODEL": "${env:COHERE_MODEL}",
-  "COHERE_SERVER_PORT": "${env:COHERE_SERVER_PORT}",
   "BERG_AGENT_OPENAI_API_KEY": "${env:BERG_AGENT_OPENAI_API_KEY}",
   "BERG_AGENT_OPENAI_MODEL": "${env:BERG_AGENT_OPENAI_MODEL}",
   "BERG_AGENT_OPENAI_BASE_URL": "${env:BERG_AGENT_OPENAI_BASE_URL}",
@@ -28,7 +24,7 @@
   //# ["ollama", "duckduckgo", "direct"].
   "BERG_AGENT_WEB_SEARCH_BACKENDS": "[\"ollama\", \"duckduckgo\", \"direct\"]",
   //# BergAgents memory: JSON array of AGENTS.md file paths, always loaded.
-  "BERG_AGENT_MEMORY": "[\"BERGMEMORY.md\", \"AGENTS.md\"]",
+  "BERG_AGENT_MEMORY": "[ \"AGENTS.md\"]",
   "BERG_AGENT_PLUGINS": "[\"./.shared_todo/\"]",
   //# BergAgents todo list: when true (default) the agent gets a write_todos
   //# tool to maintain a structured task list during execution.
@@ -63,8 +59,8 @@
     "unsloth": {
       "npm": "@ai-sdk/openai-compatible",
       "options": {
-        "baseURL": "${env:UNSLOTH_BASE_URL}",
-        "apiKey": "${env:UNSLOTH_API_KEY}",
+        "baseURL": "${env:BERG_AGENT_UNSLOTH_BASE_URL}",
+        "apiKey": "${env:BERG_AGENT_UNSLOTH_API_KEY}",
         "timeout": 120000
       },
       "models": {
@@ -87,7 +83,7 @@
       "options": {
         "baseURL": "http://localhost:11434/v1",
         "timeout": 120000,
-        "apiKey": "${env:OLLAMA_API_KEY}"
+        "apiKey": "${env:BERG_AGENT_OLLAMA_API_KEY}"
       },
       "models": {
         "ornith:9b-q4_K_M": {

@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -44,6 +44,7 @@ import InputBar from "./components/InputBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
 import AgentPanel from "./components/AgentPanel.tsx";
+import AgentSelector from "./components/AgentSelector.tsx";
 import LearningPanel from "./components/LearningPanel.tsx";
 import ChatTranscript, {
   CHAT_SCROLL_ID} from "./components/ChatTranscript.tsx";
@@ -664,9 +665,14 @@ function ChatContent() {
       }
 
       // -----------------------------------------------------------------
-      // Anything else - let the message flow to the AI model.
+      // Anything else: a slash-prefixed token that is not a recognised
+      // command. Do NOT forward it to the model - that produced the
+      // confused "Thinking..." + wasted tool calls (e.g. /agent). Surface
+      // a clear "unknown command" instead and keep the turn cheap.
       // -----------------------------------------------------------------
-      return { handled: false };
+      return {
+        handled: true,
+        card: `Unknown command: ${cmd}\nType /help for the available commands.`};
     },
     [agents, backendTools, clearMessages, input, learningStats, messages],
   );
@@ -883,6 +889,7 @@ function ChatContent() {
           </Button>
           <span className="flex-1" />
           <ThemeToggle />
+          <AgentSelector />
           <ProviderSelector />
           <span title="Download this conversation as a Markdown file">
             <Button

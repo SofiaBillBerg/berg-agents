@@ -409,17 +409,19 @@ class Harness:
         # echo. The HITL card then shows what will truly happen,
         # and approve/edit operate on real arguments.
         planned_actions: list[dict[str, Any]] | None = None
+        plan_messages: Any = None
         if (
             verdict.needs_human_review
             and not approved
             and self._wants_inference(metadata)
             and _task_plans_mutation(task_type, description)
         ):
-            planned_actions = self._plan_mutating_actions(
+            planned_actions, plan_messages = self._plan_mutating_actions(
                 description=description,
                 task_type=task_type,
                 complexity=complexity,
                 metadata=metadata,
+                message_history=None,
             )
         # Early return: a human must review before anything
         # else runs (see _review_gate_result); approved resumes
@@ -482,6 +484,7 @@ class Harness:
                     plan=plan,
                     steps=steps,
                     metadata=metadata,
+                    message_history=plan_messages,
                 )
             except _ModelUnavailableError as exc:
                 return _failed_result(
@@ -586,7 +589,8 @@ class Harness:
         task_type: str,
         complexity: TaskComplexity,
         metadata: dict[str, Any],
-    ) -> list[dict[str, Any]] | None:
+        message_history: Any = None,
+    ) -> tuple[Any, list[Any] | None]:
         """Ask the model (read-only) what mutating actions it intends.
 
         Runs a planning inference with no mutating tools registered:
@@ -607,14 +611,17 @@ class Harness:
         """
         if not self._wants_inference(metadata):
             # Fallback when inference disabled: return concrete planned actions so HITL shows real steps (fix: was dict, needs list)
-            return [
-                {
-                    "action": task_type,
-                    "args": {
-                        "description": description,
-                        "summary": "planned: " + description[:200],
-                        "file": "summary.md"}}
-            ]
+            return (
+                [
+                    {
+                        "action": task_type,
+                        "args": {
+                            "description": description,
+                            "summary": "planned: " + description[:200],
+                            "file": "summary.md"}}
+                ],
+                None,
+            )
         requested = _requested_model_id(metadata)
         try:
             agent = build_implementation_agent(
@@ -633,20 +640,31 @@ class Harness:
             deps = ImplementationDeps(
                 task_type=task_type, complexity=complexity.value
             )
-            run_result = asyncio.run(_await_inference(agent, prompt, deps))
+            run_result = asyncio.run(
+                _await_inference(
+                    agent, prompt, deps, message_history=message_history
+                )
+            )
         except Exception as exc:
             logger.warning(
                 "Mutation planning inference failed; "
                 "falling back to placeholder actions: %s",
                 exc,
             )
-            return {
-                "status": "needs_human_review",
-                "action": task_type,
-                "args": {
-                    "description": description,
-                    "summary": "planned: " + description[:200]}}
-        return _extract_planned_actions(getattr(run_result, "output", ""))
+            return (
+                {
+                    "status": "needs_human_review",
+                    "action": task_type,
+                    "args": {
+                        "description": description,
+                        "summary": "planned: " + description[:200]}},
+                None,
+            )
+        new_messages = getattr(run_result, "new_messages", None)
+        plan_messages = new_messages() if callable(new_messages) else None
+        return _extract_planned_actions(
+            getattr(run_result, "output", "")
+        ), plan_messages
 
     def _run_inference(
         self,
@@ -657,6 +675,7 @@ class Harness:
         plan: dict[str, Any] | None,
         steps: list[dict[str, Any]],
         metadata: dict[str, Any],
+        message_history: Any = None,
     ) -> tuple[str, dict[str, Any]]:
         """Run the implementation agent synchronously.
 
@@ -747,7 +766,11 @@ class Harness:
         run_result: Any = None
         for _ in range(OUTPUT_RETRIES + 1):
             try:
-                run_result = asyncio.run(_await_inference(agent, prompt, deps))
+                run_result = asyncio.run(
+                    _await_inference(
+                        agent, prompt, deps, message_history=message_history
+                    )
+                )
                 last_unexpected = None
                 break
             except UnexpectedModelBehavior as exc:
