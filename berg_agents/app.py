@@ -58,7 +58,7 @@ class _CreateOptions:
 
 
 def _apply_explicit_config(
-        opts: _CreateOptions, config: dict[str, Any]
+    opts: _CreateOptions, config: dict[str, Any]
 ) -> None:
     """Apply the explicit .berg-agents configuration dict (highest priority).
 
@@ -84,7 +84,7 @@ def _apply_explicit_config(
 
 
 def _apply_global_settings(
-        opts: _CreateOptions, config: dict[str, Any] | None
+    opts: _CreateOptions, config: dict[str, Any] | None
 ) -> None:
     """Merge bergagents.jsonc settings for options not set explicitly.
 
@@ -117,7 +117,7 @@ def _apply_global_settings(
 
 
 def _guardian_gate_kwargs(
-        hitl_rules: dict[str, Any] | None,
+    hitl_rules: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Build GuardianDeps kwargs from known HITL gate lists.
 
@@ -133,10 +133,10 @@ def _guardian_gate_kwargs(
     gate_kwargs: dict[str, Any] = {}
     if hitl_rules:
         for key in (
-                "auto_execute",
-                "notify_after",
-                "ask_before",
-                "human_leads",
+            "auto_execute",
+            "notify_after",
+            "ask_before",
+            "human_leads",
         ):
             value = hitl_rules.get(key)
             if isinstance(value, list):
@@ -145,7 +145,7 @@ def _guardian_gate_kwargs(
 
 
 def _apply_agent_overrides(
-        harness: Harness, agent_overrides: dict[str, Any] | None
+    harness: Harness, agent_overrides: dict[str, Any] | None
 ) -> None:
     """Apply per-agent preferred-complexity overrides to a harness.
 
@@ -171,11 +171,11 @@ class BergAgentsApp:
     """
 
     def __init__(
-            self,
-            *,
-            harness: Harness | None = None,
-            enable_learning: bool = True,
-            enable_inference: bool = True,
+        self,
+        *,
+        harness: Harness | None = None,
+        enable_learning: bool = True,
+        enable_inference: bool = True,
     ) -> None:
         """Initialize the BergAgents app.
 
@@ -245,7 +245,7 @@ class BergAgentsApp:
         uvicorn.run(create_app(self.harness), host=host, port=port)
 
     def execute(
-            self, description: str, task_type: str = "generic"
+        self, description: str, task_type: str = "generic"
     ) -> dict[str, Any]:
         """Execute a task through the harness.
 

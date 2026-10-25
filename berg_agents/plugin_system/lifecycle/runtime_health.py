@@ -20,6 +20,7 @@
 # Runtime health monitoring
 
 import asyncio
+import contextlib
 import logging
 
 from berg_agents.plugin_system.lifecycle.lifecycle_hooks import PluginLifecycle
@@ -46,10 +47,8 @@ class HealthMonitor:
         """Stop health monitoring."""
         if self.task:
             self.task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self.task
-            except asyncio.CancelledError:
-                pass
 
     async def _monitor_loop(self) -> None:
         """Periodic health check loop."""
@@ -86,4 +85,6 @@ class HealthMonitor:
             except TimeoutError:
                 logger.warning(f"Health check timeout: {entry.metadata.id}")
             except Exception as e:
-                logger.exception(f"Health check failed: {entry.metadata.id}: {e}")
+                logger.exception(
+                    f"Health check failed: {entry.metadata.id}: {e}"
+                )

@@ -48,7 +48,7 @@ class PluginLifecycle:
         registry: PluginRegistry,
         event_bus: EventBus,
         config: dict[str, Any],
-    ):
+    ) -> None:
         self.registry = registry
         self.event_bus = event_bus
         self.config = config
@@ -231,11 +231,10 @@ class PluginLifecycle:
         if entry.state == PluginState.ENABLED:
             await self.disable(plugin_id)
 
-        if entry.state not in (
+        if entry.state not in {
             PluginState.LOADED,
             PluginState.DISABLED,
-            PluginState.ERROR,
-        ):
+            PluginState.ERROR}:
             logger.debug(
                 f"Plugin {plugin_id} cannot be unloaded from state {entry.state}"
             )

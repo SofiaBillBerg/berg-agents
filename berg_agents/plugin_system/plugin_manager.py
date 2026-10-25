@@ -91,10 +91,10 @@ class PluginManager:
     """
 
     def __init__(
-            self,
-            app: Any,
-            harness: Any,
-            config: dict[str, Any] | None = None,
+        self,
+        app: Any,
+        harness: Any,
+        config: dict[str, Any] | None = None,
     ) -> None:
         """Initialize plugin manager.
 
@@ -147,7 +147,7 @@ class PluginManager:
         logger.info("Plugin system initialized")
 
     async def discover_plugins(
-            self, search_paths: list[Path | str]
+        self, search_paths: list[Path | str]
     ) -> list[PluginMetadata]:
         """Discover plugins in the specified paths.
 
@@ -367,8 +367,8 @@ class PluginManager:
                     plugin_enabled = self._plugins.get(plugin_id)
                     context_enabled = self._contexts.get(plugin_id)
                     if (
-                            plugin_enabled is not None
-                            and context_enabled is not None
+                        plugin_enabled is not None
+                        and context_enabled is not None
                     ):
                         await plugin_enabled.on_disable(context_enabled)
                     await self._unregister_capabilities(plugin_id)
@@ -379,7 +379,9 @@ class PluginManager:
                         {"plugin_id": plugin_id},
                     )
                 except Exception as e:
-                    logger.exception(f"Failed to disable plugin {plugin_id}: {e}")
+                    logger.exception(
+                        f"Failed to disable plugin {plugin_id}: {e}"
+                    )
                     self.registry.update_state(plugin_id, PluginState.ERROR)
                     return
 
@@ -533,7 +535,7 @@ class PluginManager:
             "enabled": entry.state == PluginState.ENABLED}
 
     async def list_plugins(
-            self, state: PluginState | None = None
+        self, state: PluginState | None = None
     ) -> list[dict[str, Any]]:
         """List all plugins.
 
@@ -591,10 +593,9 @@ class PluginManager:
                     f"Required dependency not found: {dep.id}"
                 )
 
-            if dep_entry.state not in (
-                    PluginState.LOADED,
-                    PluginState.ENABLED,
-            ):
+            if dep_entry.state not in {
+                PluginState.LOADED,
+                PluginState.ENABLED}:
                 # Try to load dependency first
                 await self.load_plugin(dep.id or "unknown")
 
@@ -705,7 +706,7 @@ class PluginManager:
         return context
 
     async def _register_capabilities(
-            self, plugin_id: str, plugin: BergPlugin
+        self, plugin_id: str, plugin: BergPlugin
     ) -> None:
         """Register plugin capabilities with berg_agents.
 
@@ -742,7 +743,9 @@ class PluginManager:
                 # Add other capability types as needed
 
             except Exception as e:
-                logger.exception(f"Failed to register capability {cap.type}: {e}")
+                logger.exception(
+                    f"Failed to register capability {cap.type}: {e}"
+                )
 
     async def _unregister_capabilities(self, plugin_id: str) -> None:
         """Unregister plugin capabilities.

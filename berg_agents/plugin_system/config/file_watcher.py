@@ -23,6 +23,7 @@
 
 import asyncio
 from collections.abc import Awaitable, Callable
+import contextlib
 import logging
 from pathlib import Path
 
@@ -65,10 +66,8 @@ class FileWatcher:
         self._running = False
         if self.task:
             self.task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self.task
-            except asyncio.CancelledError:
-                pass
 
     async def _watch_loop(self) -> None:
         """Main watch loop."""

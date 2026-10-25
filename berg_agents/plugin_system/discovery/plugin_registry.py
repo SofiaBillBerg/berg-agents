@@ -18,6 +18,7 @@
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
 """Plugin registry for managing discovered plugins."""
+from __future__ import annotations
 
 import asyncio
 import logging
@@ -61,7 +62,7 @@ class PluginRegistry:
             logger.info(f"Registered plugin: {metadata.id} v{metadata.version}")
             return entry
 
-    def update_state(self, plugin_id: str, state: "PluginState") -> None:
+    def update_state(self, plugin_id: str, state: PluginState) -> None:
         """Update plugin state."""
         if plugin_id in self._plugins:
             self._plugins[plugin_id].state = state
@@ -111,7 +112,7 @@ class PluginRegistry:
 
         return caps
 
-    async def unregister(self, plugin_id):
+    async def unregister(self, plugin_id) -> None:
         """Unregister a plugin."""
         async with self._lock:
             if plugin_id in self._plugins:

@@ -25,14 +25,14 @@ Integrates with berg_agents approval system when available.
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class HITLStatus(str, Enum):
+class HITLStatus(StrEnum):
     """HITL request status."""
 
     PENDING = "pending"
@@ -157,7 +157,7 @@ class HITLManager:
                 return False
             if request.status == HITLStatus.APPROVED:
                 return True
-            elif request.status in (HITLStatus.DENIED, HITLStatus.TIMEOUT):
+            elif request.status in {HITLStatus.DENIED, HITLStatus.TIMEOUT}:
                 return False
             await asyncio.sleep(0.1)
 

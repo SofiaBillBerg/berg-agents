@@ -26,7 +26,7 @@ Builds the web application around one injected harness: routes in
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
@@ -75,7 +75,7 @@ def _mount_plugin_assets(app: Any) -> None:
 
 
 @asynccontextmanager
-async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def _lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     """Warm the plugin tool cache at server startup.
 
     Failure-isolated: plugin errors only log, the server always starts.
@@ -233,7 +233,7 @@ def create_app(
             rel = page_file.relative_to(_WEB_DIST)
             route_path = "/" + rel.with_suffix("").as_posix()
             # "/" plus Next's framework internals stay with StaticFiles.
-            if route_path in ("/index", "/404", "/_not-found"):
+            if route_path in {"/index", "/404", "/_not-found"}:
                 continue
 
             def _serve_page(

@@ -90,7 +90,7 @@ class _Layer:
         return path.read_text(encoding="utf-8") if path.is_file() else ""
 
     def write(
-            self, section: str, body: str, *, author: str = "human", why: str = ""
+        self, section: str, body: str, *, author: str = "human", why: str = ""
     ) -> bool:
         """Overwrite one section and journal the change.
 
@@ -115,7 +115,7 @@ class _Layer:
         return True
 
     def append(
-            self, section: str, text: str, *, author: str = "human", why: str = ""
+        self, section: str, text: str, *, author: str = "human", why: str = ""
     ) -> bool:
         """Append a line/block to one section, preserving a trailing newline.
 
@@ -150,7 +150,7 @@ class _Layer:
         return records
 
     def _journal(
-            self, section: str, *, author: str, why: str, summary: str
+        self, section: str, *, author: str, why: str, summary: str
     ) -> None:
         """Append one record to a section's history journal."""
         record = {
@@ -238,13 +238,13 @@ class SharedContext:
         return result
 
     def write(
-            self,
-            section: str,
-            body: str,
-            *,
-            author: str = "human",
-            why: str = "",
-            scope: str = "project",
+        self,
+        section: str,
+        body: str,
+        *,
+        author: str = "human",
+        why: str = "",
+        scope: str = "project",
     ) -> bool:
         """Overwrite one section in a given scope and journal it."""
         return self._layer_for(scope).write(
@@ -252,13 +252,13 @@ class SharedContext:
         )
 
     def append(
-            self,
-            section: str,
-            text: str,
-            *,
-            author: str = "human",
-            why: str = "",
-            scope: str = "project",
+        self,
+        section: str,
+        text: str,
+        *,
+        author: str = "human",
+        why: str = "",
+        scope: str = "project",
     ) -> bool:
         """Append to one section in a given scope and journal it."""
         return self._layer_for(scope).append(

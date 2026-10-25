@@ -220,9 +220,9 @@ class PluginConfigManager:
     def _parse_env_value(self, value: str) -> Any:
         """Parse environment variable value."""
         # Boolean
-        if value.lower() in ("true", "yes", "1"):
+        if value.lower() in {"true", "yes", "1"}:
             return True
-        if value.lower() in ("false", "no", "0"):
+        if value.lower() in {"false", "no", "0"}:
             return False
 
         # Number
@@ -382,4 +382,6 @@ class PluginConfigWatcher:
                         f"Plugin {plugin_id} does not support live reconfiguration"
                     )
         except Exception as e:
-            logger.exception(f"Failed to reload configuration for {plugin_id}: {e}")
+            logger.exception(
+                f"Failed to reload configuration for {plugin_id}: {e}"
+            )

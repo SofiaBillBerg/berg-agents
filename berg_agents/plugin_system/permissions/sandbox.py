@@ -21,7 +21,7 @@
 
 # Sandboxing
 import asyncio
-from enum import Enum
+from enum import StrEnum
 import json
 import logging
 import os
@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 # Sandbox Levels
 
 
-class SandboxLevel(str, Enum):
+class SandboxLevel(StrEnum):
     """Plugin sandbox isolation levels."""
 
     NONE = "none"  # No sandboxing (trusted plugins)
@@ -181,10 +181,9 @@ class ContainerSandbox:
         """Determine network mode based on permissions."""
         has_network = any(
             p.category
-            in (
+            in {
                 PermissionCategory.NETWORK_OUTBOUND,
-                PermissionCategory.NETWORK_INBOUND,
-            )
+                PermissionCategory.NETWORK_INBOUND}
             for p in self.permissions
         )
 

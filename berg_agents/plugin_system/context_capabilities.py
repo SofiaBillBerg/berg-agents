@@ -349,12 +349,7 @@ def build_persistence_capabilities(
         database = step_database(root_dir)
         database.parent.mkdir(parents=True, exist_ok=True)
         store = SqliteStepStore(database=database)
-        capabilities.append(StepPersistence(store=store, agent_name="chat"))
-        capabilities.append(
-            ConversationSearch(
-                SnapshotHistorySource(store), scope="conversation"
-            )
-        )
+        capabilities.extend((StepPersistence(store=store, agent_name="chat"), ConversationSearch(SnapshotHistorySource(store), scope="conversation")))
     except Exception as exc:
         logger.warning("Persistence capabilities unavailable: %s", exc)
     return capabilities

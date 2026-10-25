@@ -118,6 +118,7 @@ def available() -> bool:
 # back through dispatch_request(usage=..., conversation_id=...).
 # ---------------------------------------------------------------------------
 
+
 @contextmanager
 def _conversation_connection(root_dir: str | Path) -> Any:
     """Short-lived SQLite connection for conversation JSON (WAL enabled).

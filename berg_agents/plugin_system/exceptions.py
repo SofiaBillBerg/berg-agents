@@ -94,7 +94,7 @@ class PermissionDeniedError(Exception):
 
 # Missing exception classes that lifecycle_hooks.py expects
 class HealthStatus:
-    """Health status for plugins - stub class, real one in runtime_health"""
+    """Health status for plugins - stub class, real one in runtime_health."""
 
 
 class PluginUnloadError(Exception):

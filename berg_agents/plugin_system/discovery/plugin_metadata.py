@@ -18,6 +18,7 @@
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
 """Module for plugin metadata."""
+
 # Plugin Metadata
 
 from dataclasses import dataclass, field

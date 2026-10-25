@@ -231,7 +231,7 @@ def resolve_model_instance(
     # guess at: the OpenAI SDK would append
     # ``/chat/completions`` to it and produce a 404.
     api = str(resolved.get("api", "") or "").strip().lower()
-    if api in ("anthropic-messages", "anthropic"):
+    if api in {"anthropic-messages", "anthropic"}:
         from pydantic_ai.models.anthropic import AnthropicModel
         from pydantic_ai.providers.anthropic import AnthropicProvider
 

@@ -19,10 +19,10 @@
 
 """Plugin source enumeration."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class PluginSource(str, Enum):
+class PluginSource(StrEnum):
     """Plugin discovery sources."""
 
     BUILTIN = "builtin"

@@ -23,7 +23,7 @@
 import asyncio
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 import json
 import logging
 from pathlib import Path
@@ -55,7 +55,7 @@ class SecureFilesystem:
     async def read_file(self, path: str) -> str:
         """Read file with permission check."""
         if not await self.checker.check(
-                self.plugin_id, PermissionCategory.FILESYSTEM_READ, target=path
+            self.plugin_id, PermissionCategory.FILESYSTEM_READ, target=path
         ):
             raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied read access to {path}"
@@ -70,7 +70,7 @@ class SecureFilesystem:
     async def write_file(self, path: str, content: str) -> None:
         """Write file with permission check."""
         if not await self.checker.check(
-                self.plugin_id, PermissionCategory.FILESYSTEM_WRITE, target=path
+            self.plugin_id, PermissionCategory.FILESYSTEM_WRITE, target=path
         ):
             raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied write access to {path}"
@@ -80,7 +80,7 @@ class SecureFilesystem:
         await self._audit("write_file", {"path": path, "size": len(content)})
 
         # Perform operation
-        Path(path).write_text(content)
+        Path(path).write_text(content, encoding="utf-8")
 
     async def _audit(self, operation: str, details: dict[str, Any]) -> None:
         """Write to audit log."""
@@ -100,7 +100,7 @@ class SecureNetwork:
     async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
         """HTTP request with permission check."""
         if not await self.checker.check(
-                self.plugin_id, PermissionCategory.NETWORK_OUTBOUND, target=url
+            self.plugin_id, PermissionCategory.NETWORK_OUTBOUND, target=url
         ):
             raise PermissionDeniedError(  # TODO: Define PermissionDeniedError
                 f"Plugin {self.plugin_id} denied network access to {url}"
@@ -147,11 +147,11 @@ class AuditLogger:
                 f.write(json.dumps(asdict(entry), default=str) + "\n")
 
     async def query(
-            self,
-            plugin_id: str | None = None,
-            operation: str | None = None,
-            since: datetime | None = None,
-            limit: int = 100,
+        self,
+        plugin_id: str | None = None,
+        operation: str | None = None,
+        since: datetime | None = None,
+        limit: int = 100,
     ) -> list[AuditEntry]:
         """Query audit log."""
         entries = []
@@ -184,17 +184,17 @@ class PluginHITL:
     """Human-in-the-loop approval for plugins."""
 
     def __init__(
-            self, hitl_manager: HITLManager
+        self, hitl_manager: HITLManager
     ) -> None:  # TODO: Define HITLRequest class
         """Initialize with HITL manager."""
         self.hitl_manager = hitl_manager
 
     async def request_approval(
-            self,
-            plugin_id: str,
-            operation: str,
-            details: dict[str, Any],
-            risk_level: RiskClass = RISK_HIGH,
+        self,
+        plugin_id: str,
+        operation: str,
+        details: dict[str, Any],
+        risk_level: RiskClass = RISK_HIGH,
     ) -> bool:
         """Request user approval for operation.
 
@@ -233,7 +233,7 @@ class PluginHITL:
 # Trust Levels
 
 
-class TrustLevel(str, Enum):
+class TrustLevel(StrEnum):
     """Plugin trust levels."""
 
     UNTRUSTED = "untrusted"  # Unknown source, full sandboxing
@@ -254,7 +254,7 @@ class TrustManager:
 
     def get_sandbox_level(self, trust: TrustLevel) -> SandboxLevel:
         """Determine sandbox level from trust."""
-        if trust == TrustLevel.BUILTIN or trust == TrustLevel.VERIFIED:
+        if trust in {TrustLevel.BUILTIN, TrustLevel.VERIFIED}:
             return SandboxLevel.NONE
         elif trust == TrustLevel.COMMUNITY:
             return SandboxLevel.PROCESS

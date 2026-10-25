@@ -92,7 +92,7 @@ class SecretStore:
 
     async def store_secret(self, plugin_id: str, key: str, value: str) -> None:
         """Store an encrypted secret."""
-        encrypted = self.encrypt(value)
+        self.encrypt(value)
         # Store in secure location (e.g., keyring, vault)
 
     async def retrieve_secret(self, plugin_id: str, key: str) -> str | None:

@@ -21,6 +21,8 @@
 
 # Version Parsing
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 import re
 
@@ -36,7 +38,7 @@ class Version:
     build: str | None = None
 
     @classmethod
-    def parse(cls, version_string: str) -> "Version":
+    def parse(cls, version_string: str) -> Version:
         """Parse version string."""
         pattern = r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$"
         match = re.match(pattern, version_string)
@@ -62,7 +64,7 @@ class Version:
             v += f"+{self.build}"
         return v
 
-    def __lt__(self, other: "Version") -> bool:
+    def __lt__(self, other: Version) -> bool:
         """Compare versions."""
         if self.major != other.major:
             return self.major < other.major
@@ -94,7 +96,7 @@ class VersionConstraint:
         self.matchers = self._parse(constraint_str)
 
     @classmethod
-    def parse(cls, constraint_str: str) -> "VersionConstraint":
+    def parse(cls, constraint_str: str) -> VersionConstraint:
         """Parse constraint string."""
         return cls(constraint_str)
 

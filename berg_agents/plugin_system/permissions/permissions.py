@@ -20,7 +20,7 @@
 # Permission Categories
 # Permission System
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 import logging
 from typing import Any
 
@@ -29,7 +29,7 @@ from berg_agents.plugin_system.discovery.plugin_registry import PluginRegistry
 logger = logging.getLogger(__name__)
 
 
-class PermissionCategory(str, Enum):
+class PermissionCategory(StrEnum):
     """Plugin permission categories."""
 
     # Filesystem
@@ -101,10 +101,7 @@ class Permission:
         from pathlib import Path
 
         path_obj = Path(path)
-        for pattern in allowed_patterns:
-            if fnmatch.fnmatch(str(path_obj), pattern):
-                return True
-        return False
+        return any(fnmatch.fnmatch(str(path_obj), pattern) for pattern in allowed_patterns)
 
     def _check_domain_scope(self, url: str, allowed_domains: list[str]) -> bool:
         """Check if URL domain is allowed."""
@@ -147,7 +144,9 @@ class PermissionChecker:
         """
         entry = self.registry.get(plugin_id)
         if not entry:
-            logger.exception(f"Permission check for unknown plugin: {plugin_id}")
+            logger.exception(
+                f"Permission check for unknown plugin: {plugin_id}"
+            )
             return False
 
         # Check if permission was declared

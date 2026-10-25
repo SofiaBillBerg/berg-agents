@@ -60,17 +60,17 @@ def _build_custom_css() -> str:
         " */\n\n"
     )
     body = (
-            _read("tokens/colors.css")
-            + "\n"
-            + _read("tokens/typography.css")
-            + "\n"
-            + _read("tokens/spacing.css")
-            + "\n"
-            + _read("components/base.css")
-            + "\n"
-            + _read("components/banner.css")
-            + "\n"
-            + _read("presets/light.css")
+        _read("tokens/colors.css")
+        + "\n"
+        + _read("tokens/typography.css")
+        + "\n"
+        + _read("tokens/spacing.css")
+        + "\n"
+        + _read("components/base.css")
+        + "\n"
+        + _read("components/banner.css")
+        + "\n"
+        + _read("presets/light.css")
     )
     return header + body
 

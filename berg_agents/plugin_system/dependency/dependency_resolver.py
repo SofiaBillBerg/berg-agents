@@ -157,7 +157,7 @@ class LoadOrderCalculator:
         must still load before dependents.
         """
         # Build dependency constraints
-        graph = DependencyGraph()
+        DependencyGraph()
         for plugin_id in load_order:
             # Would need access to metadata here
             pass
