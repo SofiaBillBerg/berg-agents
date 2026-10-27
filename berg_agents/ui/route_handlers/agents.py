@@ -26,10 +26,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
-
 from berg_agents.core.harness import Harness
 from berg_agents.ui.sessions import SessionManager
+from fastapi import APIRouter, HTTPException
 
 
 def register_agent_routes(
