@@ -140,7 +140,7 @@ restored conversations and each dumped message gets a namespaced id.
 
 ## Known gaps
 
-- `LearningGate` / harness gating for the chat path is deferred, not
+- `RouterStats` / harness gating for the chat path is deferred, not
   yet routed.
 - Skills/MCP exposed as adapter plugins are working but their status as
   "plugins" versus first-class configuration systems is still open.

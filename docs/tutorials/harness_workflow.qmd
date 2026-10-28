@@ -49,7 +49,7 @@ result = app.execute(
 print(result)
 ```
 
-The returned dict contains the selected agent, the model used, and any HITL decision if a pause occurred. `app.get_learning_stats()` returns success rates and model-tier stats.
+The returned dict contains the selected agent, the model used, and any HITL decision if a pause occurred. `app.get_router_stats()` returns success rates and model-tier stats.
 
 ## 5. Inspect the result
 

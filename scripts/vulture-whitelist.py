@@ -37,7 +37,7 @@ ignore_names = [
     "_validate_checkpoint_dir",
     # route handlers (FastAPI decorators, can't trace)
     "chat_stream",
-    "learning_stats",
+    "router_stats",
     "list_providers",
     "get_active_provider",
     "set_active_provider",

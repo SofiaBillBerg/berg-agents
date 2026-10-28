@@ -19,11 +19,11 @@
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 set -euo pipefail
 if ! command -v quarto >/dev/null 2>&1; then
-	echo "Quarto not found in PATH. Install Quarto." >&2
+  echo "Quarto not found in PATH. Install Quarto." >&2
 else
-	echo "Building Quarto site to _site..."
-	quarto render
-	echo "Quarto site built to _site"
-	quarto render docs/index.qmd --to gfm --output README.md
-	echo "README.md generated"
+  echo "Building Quarto site to _site..."
+  quarto render
+  echo "Quarto site built to _site"
+  quarto render docs/index.qmd --to gfm --output README.md
+  echo "README.md generated"
 fi

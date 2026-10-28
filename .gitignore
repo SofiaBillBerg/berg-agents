@@ -1,8 +1,13 @@
 
 **/*.db
+/notes/sofias_notes.md
 /berg_plugins/plugin_dev/
 /.run/
+/project_utils/setup-local-filter.sh
 /project_utils/licence/
+/project_utils/crlf_to_lf.sh
+/decisions/
+
 /tmp/
 /.tmp/
 /notes/*
@@ -19,7 +24,7 @@ project_utils/crlf_to_lf.sh
 **/*.bk
 **/*.bak
 cspell.json
-/.venv/
+/.venv
 # R
 /renv/
 **/*.RData

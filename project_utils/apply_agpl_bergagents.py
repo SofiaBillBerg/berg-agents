@@ -1,4 +1,5 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+# The system follows a harness-based execution model with multiple specialized agents working together.
 #
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
@@ -17,10 +18,13 @@
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
 """Project utility to apply AGPLv3 license headers to source files in a directory tree."""
+
 import os
+import pathlib
+
 
 AGPL_TEXT = (
-    "Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. "
+    "Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. \n"
     "The system follows a harness-based execution model with multiple specialized agents working together.\n\n"
     "Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>\n\n"
     "This program is free software: you can redistribute it and/or modify\n\n"
@@ -36,14 +40,13 @@ AGPL_TEXT = (
 )
 
 EXCLUDED_DIRS = {
-    'node_modules',
-    '.next',
-    '.venv',
-    'venv',
-    '.git',
-    'dist',
-    'build'
-}
+    "node_modules",
+    ".next",
+    ".venv",
+    "venv",
+    ".git",
+    "dist",
+    "build"}
 
 
 def get_commented_header(extension):
@@ -52,22 +55,24 @@ def get_commented_header(extension):
     :param extension:  File extension (e.g., '.py', '.js', '.ts', etc.)
     :return:  String containing the commented AGPLv3 header or None if the extension is not supported.
     """
-    if extension in ['.ts', '.css', '.js', '.tsx', '.jsx', '.mjs']:
-        lines = [f" * {line}".rstrip() for line in AGPL_TEXT.split('\n')]
+    if extension in {".ts", ".css", ".js", ".tsx", ".jsx", ".mjs"}:
+        lines = [f" * {line}".rstrip() for line in AGPL_TEXT.split("\n")]
         return "/*\n" + "\n".join(lines) + "\n */\n\n"
-    elif extension in ['.py', '.sh']:
-        lines = [f"# {line}".rstrip() for line in AGPL_TEXT.split('\n')]
+    elif extension in {".py", ".sh"}:
+        lines = [f"# {line}".rstrip() for line in AGPL_TEXT.split("\n")]
         return "\n".join(lines) + "\n\n"
     return None
 
 
-def main():
-    """ Main function to traverse the directory tree and add AGPLv3 headers to source files.    """
+def main() -> None:
+    """Main function to traverse the directory tree and add AGPLv3 headers to source files."""
     processed_count = 0
 
-    for root, dirs, files in os.walk('.'):
+    for root, dirs, files in os.walk("."):
         # Modify dirs in-place to drop explicit exclusions AND any dot-directories (.*)
-        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS and not d.startswith('.')]
+        dirs[:] = [
+            d for d in dirs if d not in EXCLUDED_DIRS and not d.startswith(".")
+        ]
 
         for file in files:
             _, ext = os.path.splitext(file)
@@ -79,11 +84,15 @@ def main():
             file_path = os.path.join(root, file)
 
             try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                with pathlib.Path(file_path).open(
+                    "r", encoding="utf-8", errors="ignore"
+                ) as f:
                     content = f.read()
 
                 if "GNU Affero General Public License" not in content:
-                    with open(file_path, 'w', encoding='utf-8') as f:
+                    with pathlib.Path(file_path).open(
+                        "w", encoding="utf-8"
+                    ) as f:
                         f.write(header + content)
                     print(f"Added AGPLv3 header to: {file_path}")
                     processed_count += 1
@@ -93,5 +102,5 @@ def main():
     print(f"Execution completed. Successfully updated {processed_count} files.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -67,7 +67,7 @@ print(result)
 ```
 
 `execute(description, task_type)` returns the harness result dict, including the selected agent, the model used, and any
-HITL decision if a pause occurred. Learning stats: `app.get_learning_stats()`.
+HITL decision if a pause occurred. Learning stats: `app.get_router_stats()`.
 
 ## Notes
 

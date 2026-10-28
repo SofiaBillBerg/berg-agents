@@ -125,7 +125,7 @@ plugins/SHARED-TODO.qmd`).
 
 ### Not yet done
 
-- `LearningGate` and harness gating for the chat path (deferred by the
+- `RouterStats` and harness gating for the chat path (deferred by the
   maintainer).
 - Whether skills and MCP belong in the plugin registry at all vs.
   first-class (open architecture question).
