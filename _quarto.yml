@@ -17,8 +17,8 @@ project:
     - "!.*/*.*"
     - "!notes/*.*"
     - "!apidocs/**/*.*"
-    # post-render: # Moved to production profile
-    # - "project_utils/render_readme.sh"
+  post-render: # Moved to production profile
+    - "project_utils/render_readme.sh"
 website:
   title: "Berg Agents"
   back-to-top-navigation: true

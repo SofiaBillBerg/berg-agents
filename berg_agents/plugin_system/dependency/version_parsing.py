@@ -24,12 +24,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import total_ordering
 import re
 
 
+@total_ordering
 @dataclass
 class Version:
-    """Semantic version."""
+    """Semantic version.
+
+    ``@total_ordering`` fills in ``__le__``/``__gt__``/``__ge__`` from
+    ``__lt__`` plus the dataclass ``__eq__``. Without it the comparison
+    constraints in :class:`VersionConstraint` (``>=``, ``<=``, ``>``, ``<``)
+    raised ``TypeError`` — only ``=`` and an exact match worked.
+    """
 
     major: int
     minor: int
@@ -128,20 +136,23 @@ class VersionConstraint:
                 matchers.extend(self._parse(part))
             return matchers
 
-        # Comparison operators
+        # Comparison operators. Each matcher closes over its OWN
+        # target: binding `version` as a default argument fixes the
+        # classic late-binding bug where every returned lambda
+        # captured the last value the loop assigned.
         for op in [">=", "<=", ">", "<", "="]:
             if constraint.startswith(op):
-                version = Version.parse(constraint[len(op) :])
+                target = Version.parse(constraint[len(op) :])
                 if op == ">=":
-                    return [lambda v: v >= version]
+                    return [lambda v, rhs=target: v >= rhs]
                 elif op == "<=":
-                    return [lambda v: v <= version]
+                    return [lambda v, rhs=target: v <= rhs]
                 elif op == ">":
-                    return [lambda v: v > version]
+                    return [lambda v, rhs=target: v > rhs]
                 elif op == "<":
-                    return [lambda v: v < version]
+                    return [lambda v, rhs=target: v < rhs]
                 elif op == "=":
-                    return [lambda v: v == version]
+                    return [lambda v, rhs=target: v == rhs]
 
         # Exact version
         version = Version.parse(constraint)

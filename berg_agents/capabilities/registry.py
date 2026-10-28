@@ -26,6 +26,8 @@ Replaces duplicate hardlists previously scattered across
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 
 class _ToolCatalogImpl:
     """Internal tool-routing constants and helpers.
@@ -47,7 +49,7 @@ class _ToolCatalogImpl:
         "fix",
     )
 
-    TOOL_REQUIREMENTS: dict[str, list[str]] = {
+    TOOL_REQUIREMENTS: ClassVar[dict[str, list[str]]] = {
         "edit_file": ["read_file", "edit_file"],
         "new_file": ["new_file"],
         "read_file": ["read_file"],

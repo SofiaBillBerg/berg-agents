@@ -1,29 +1,34 @@
-# berg_agents
+<!-- README.md is generated from index.qmd. Please edit that file -->
 
-<!-- badges: start -->
+\`\`\`{r} \#\| include: false
 
-> BergAgents --- a local, LLM-driven coding assistant with a **framework-agnostic core** and provider-centric configuration.
-> A multi-agent system built on Pydantic AI: Guardian, Planner, Implementation, Curator and Learning agents run a harness-based execution model with human-in-the-loop approval gates.
-> Any OpenAI-compatible provider works with zero code changes, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
+knitr::opts_chunk\$set( collapse = TRUE, comment = “\#\>” )
 
-<!-- badges: end -->
+    # berg_agents
 
-![Berg-Agents Overview](docs/visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
+    <!-- badges: start -->
 
-## Quick Start
+    > BergAgents --- a local, LLM-driven coding assistant with a **framework-agnostic core** and provider-centric configuration.
+    > A multi-agent system built on Pydantic AI: Guardian, Planner, Implementation, Curator and Learning agents run a harness-based execution model with human-in-the-loop approval gates.
+    > Any OpenAI-compatible provider works with zero code changes, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
-```bash
-# Install dependencies (uv is recommended)
-uv venv .venv
-source .venv/bin/activate
-uv pip install -e .
+    <!-- badges: end -->
 
-# Interactive terminal UI
-python -m berg_agents --tui
+    ![Berg-Agents Overview](docs/visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
 
-# Web UI (default: http://127.0.0.1:8001)
-python -m berg_agents --web
-```
+    ## Quick Start
+
+    ```bash
+    # Install dependencies (uv is recommended)
+    uv venv .venv
+    source .venv/bin/activate
+    uv pip install -e .
+
+    # Interactive terminal UI
+    python -m berg_agents --tui
+
+    # Web UI (default: http://127.0.0.1:8001)
+    python -m berg_agents --web
 
 Full walkthrough: [QUICKSTART].
 
@@ -115,7 +120,7 @@ operations always need explicit approval.
 
 ## License
 
-**Version**: 0.2.0 | **License**: GNU Affero General Public License v3
+**Version**: 0.2.0 \| **License**: GNU Affero General Public License v3
 
   [QUICKSTART]: docs/QUICKSTART.qmd
   [USAGE]: docs/USAGE.qmd

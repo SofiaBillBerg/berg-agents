@@ -193,67 +193,21 @@ class Harness:
         :return: Completed result dict when the bypass applies,
             else None to continue normal routing.
         """
+
+        # Mutating work is NOT this method's job: leave it to
+        # execute_task's plan-then-gate, which is the one path that
+        # honours a recorded approval (``hitl_decision`` approve/edit).
+        # Gating here instead re-gated an approved resume, and the old
+        # version raised TypeError here for every mutating task.
         if _task_plans_mutation(task_type, description):
-            # Send to planner - never hardcode file paths; planner decides from user's request
-            planned = self._plan_mutating_actions(
-                task_type=task_type,
-                description=description,
-                complexity=complexity,
-                metadata=metadata,
-                resolved_id=resolved_id,
-                verdict=verdict,
-                confidence=confidence,
-                planner_score=planner_score,
-                impl_score=impl_score,
-            )
-            if (
-                planned
-                and isinstance(planned, list)
-                and len(planned) > 0
-                and isinstance(planned[0], dict)
-                and "args" in planned[0]
-            ):
-                return {
-                    "status": "needs_human_review",
-                    "action": planned[0]["action"],
-                    "args": planned[0]["args"],
-                    "task_id": resolved_id,
-                    "review_reasons": [
-                        "Proposed: "
-                        + planned[0]["args"].get("path", "unknown action")
-                    ]}
-            return {
-                "status": "needs_human_review",
-                "action": "unknown",
-                "args": {
-                    "description": description,
-                    "summary": "Planner could not determine file path from request"},
-                "task_id": resolved_id,
-                "review_reasons": [
-                    "No concrete file path proposed by planner for: "
-                    + description
-                ]}
+            return None
         if not self._wants_inference(metadata):
-            # Must plan concrete actions with real paths - not echo request
-            planned = self._plan_mutating_actions(
-                task_type=task_type,
-                description=description,
-                complexity=complexity,
-                metadata=metadata,
-                resolved_id=resolved_id,
-                verdict=verdict,
-                confidence=confidence,
-                planner_score=planner_score,
-                impl_score=impl_score,
-            )
-            return planned or [
-                {
-                    "action": task_type,
-                    "args": {
-                        "description": description,
-                        "summary": "planned: " + description[:200],
-                        "path": "summary.md"}}
-            ]
+            # Non-mutating + no inference: fall through so execute_task
+            # runs its single offline fallback. The previous version
+            # returned a *list* of placeholder actions here — wrong
+            # return type for this method, and a second, duplicate
+            # answer path.
+            return None
         logger.info(
             "Task %s direct model interaction: running model directly",
             resolved_id,
@@ -450,13 +404,15 @@ class Harness:
         plan: dict[str, Any] | None = None
         if complexity in {TaskComplexity.COMPLEX, TaskComplexity.CRITICAL}:
             plan = build_plan(description, task_type, complexity)
-        # Ensure plan carries concrete actions (functional, not decorative)
-        # Ensure COMPLEX/CRITICAL plan carries concrete steps; empty plan filled with step template.if plan is not None and (plan.get("steps") is None or not plan.get("steps")):
-        plan["steps"] = (
-            [step.model_dump() for step in plan_steps_for(task_type)]
-            if not plan.get("steps")
-            else plan.get("steps")
-        )
+        # Ensure a planned task carries concrete steps. The guard used
+        # to be glued onto the end of this comment, so `plan["steps"]`
+        # ran unconditionally and crashed on any trivial/standard task
+        # (plan is None there) — only the broken bypass return above
+        # kept it from being reached.
+        if plan is not None and not plan.get("steps"):
+            plan["steps"] = [
+                step.model_dump() for step in plan_steps_for(task_type)
+            ]
         # Complexity maps directly onto its model id,
         # and the resolver always adds the provider prefix.
         model = resolve_implementation_model(complexity.value, self._model_cfg)

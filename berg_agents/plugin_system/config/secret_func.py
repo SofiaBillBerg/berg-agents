@@ -23,7 +23,7 @@
 
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, ClassVar
 
 # Secret Detection
 from cryptography.fernet import Fernet
@@ -32,7 +32,7 @@ from cryptography.fernet import Fernet
 class SecretDetector:
     """Detect and protect secrets in configuration."""
 
-    SECRET_PATTERNS = [
+    SECRET_PATTERNS: ClassVar[list[str]] = [
         r"token",
         r"api[_-]?key",
         r"password",
