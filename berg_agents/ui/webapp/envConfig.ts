@@ -20,7 +20,6 @@
  */
 
 
-
 /**
  * Client-side environment configuration and API utilities for Next.js.
  * NEXT_PUBLIC_* variables are inlined at build time by Next.js.
@@ -46,7 +45,7 @@ export const BuildAgentProxy = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 // running the frontend standalone, e.g.
 // NEXT_PUBLIC_API_BASE_URL=http://localhost:8001 bun run next dev
 export const API_BASE = (
-  process.env.NEXT_PUBLIC_API_BASE_URL || ""
+    process.env.NEXT_PUBLIC_API_BASE_URL || ""
 ).replace(/\/+$/, "");
 
 /**
@@ -58,8 +57,8 @@ export const API_BASE = (
  * @returns Fetch Promise with response
  */
 export async function apiFetch(path: string, options: RequestInit = {}) {
-  const url = `${API_BASE}${path}`;
-  return fetch(url, options);
+    const url = `${API_BASE}${path}`;
+    return fetch(url, options);
 }
 
 export default BuildAgentProxy;

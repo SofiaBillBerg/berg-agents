@@ -315,18 +315,18 @@ button:disabled {
     font-style: italic;
 }
 
-/* === Learning Panels === */
+/* === Router Stats Panels === */
 
-.learning-panel {
+.router-stats-panel {
     margin: var(--berg-sp-2) 0;
 }
 
-.learning-panel.empty {
+.router-stats-panel.empty {
     color: var(--berg-muted);
     font-size: var(--berg-fs-sm);
 }
 
-.learning-panel.compact {
+.router-stats-panel.compact {
     display: flex;
     gap: var(--berg-sp-2);
     flex-wrap: wrap;
