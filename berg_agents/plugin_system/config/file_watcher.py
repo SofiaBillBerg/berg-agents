@@ -47,7 +47,8 @@ class FileWatcher:
             return (
                 self.filepath.stat().st_mtime if self.filepath.exists() else 0.0
             )
-        except Exception:
+        except Exception as e:
+            logger.exception(f"Error getting mtime for {self.filepath}: {e}")
             return 0.0
 
     def on_change(self, callback: Callable[[], Awaitable[None]]) -> None:

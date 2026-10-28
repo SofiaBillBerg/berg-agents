@@ -1,200 +1,200 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "https://berg-agents.dev/schemas/plugin-manifest.json",
-    "title": "Berg Agents Plugin Manifest",
-    "description": "Schema for Berg Agents plugin manifest",
-    "type": "object",
-    "required": [
-        "id",
-        "version",
-        "name",
-        "description",
-        "entry_point"
-    ],
-    "properties": {
-        "id": {
-            "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9-]*$",
-            "minLength": 3,
-            "maxLength": 64,
-            "examples": [
-                "berg-plugin-github"
-            ]
-        },
-        "version": {
-            "type": "string",
-            "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?(\\+[a-zA-Z0-9.]+)?$"
-        },
-        "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-        },
-        "description": {
-            "oneOf": [
-                {
-                    "type": "string"
-                },
-                {
-                    "type": "null"
-                }
-            ]
-        },
-        "author": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string",
-                    "format": "email"
-                },
-                "url": {
-                    "type": "string",
-                    "format": "uri"
-                }
-            }
-        },
-        "license": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9.-]+$"
-        },
-        "homepage": {
-            "type": "string",
-            "format": "uri"
-        },
-        "repository": {
-            "type": "string",
-            "format": "uri"
-        },
-        "tags": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        },
-        "icon": {
-            "type": "string"
-        },
-        "entry_point": {
-            "type": "string",
-            "pattern": "^[a-zA-Z_][a-zA-Z0-9_.]+:[a-zA-Z_][a-zA-Z0-9_]+$"
-        },
-        "requirements": {
-            "type": "object",
-            "properties": {
-                "python": {
-                    "type": "string"
-                },
-                "berg_agents": {
-                    "type": "string"
-                },
-                "system": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "dependencies": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "required": [
-                    "id",
-                    "version"
-                ],
-                "properties": {
-                    "id": {
-                        "type": "string"
-                    },
-                    "version": {
-                        "type": "string"
-                    },
-                    "optional": {
-                        "type": "boolean"
-                    },
-                    "peer": {
-                        "type": "boolean"
-                    }
-                }
-            }
-        },
-        "capabilities": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "required": [
-                    "type"
-                ],
-                "properties": {
-                    "type": {
-                        "enum": [
-                            "tool",
-                            "agent",
-                            "provider",
-                            "backend"
-                        ]
-                    },
-                    "id": {
-                        "type": "string"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "description": {
-                        "type": "string"
-                    },
-                    "risk_level": {
-                        "enum": [
-                            "low",
-                            "medium",
-                            "high"
-                        ]
-                    },
-                    "deferred": {
-                        "type": "boolean"
-                    }
-                }
-            }
-        },
-        "settings_schema": {
-            "$ref": "#/definitions/jsonSchema"
-        },
-        "permissions": {
-            "type": "array",
-            "items": {
-                "oneOf": [
-                    {
-                        "type": "string"
-                    },
-                    {
-                        "type": "object"
-                    }
-                ]
-            }
-        },
-        "lifecycle": {
-            "type": "object",
-            "properties": {
-                "auto_enable": {
-                    "type": "boolean"
-                },
-                "deferred": {
-                    "type": "boolean"
-                },
-                "priority": {
-                    "type": "integer",
-                    "minimum": 0
-                }
-            }
-        }
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://berg-agents.dev/schemas/plugin-manifest.json",
+  "title": "Berg Agents Plugin Manifest",
+  "description": "Schema for Berg Agents plugin manifest",
+  "type": "object",
+  "required": [
+    "id",
+    "version",
+    "name",
+    "description",
+    "entry_point"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "minLength": 3,
+      "maxLength": 64,
+      "examples": [
+        "berg-plugin-github"
+      ]
     },
-    "definitions": {
-        "jsonSchema": {
-            "type": "object"
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?(\\+[a-zA-Z0-9.]+)?$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "description": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
         }
+      ]
+    },
+    "author": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "license": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9.-]+$"
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri"
+    },
+    "repository": {
+      "type": "string",
+      "format": "uri"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "icon": {
+      "type": "string"
+    },
+    "entry_point": {
+      "type": "string",
+      "pattern": "^[a-zA-Z_][a-zA-Z0-9_.]+:[a-zA-Z_][a-zA-Z0-9_]+$"
+    },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "python": {
+          "type": "string"
+        },
+        "berg_agents": {
+          "type": "string"
+        },
+        "system": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "optional": {
+            "type": "boolean"
+          },
+          "peer": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "tool",
+              "agent",
+              "provider",
+              "backend"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "risk_level": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "deferred": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "settings_schema": {
+      "$ref": "#/definitions/jsonSchema"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          }
+        ]
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "properties": {
+        "auto_enable": {
+          "type": "boolean"
+        },
+        "deferred": {
+          "type": "boolean"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     }
+  },
+  "definitions": {
+    "jsonSchema": {
+      "type": "object"
+    }
+  }
 }

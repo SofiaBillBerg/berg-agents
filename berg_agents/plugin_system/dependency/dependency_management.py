@@ -87,7 +87,7 @@ class DependencyGraph:
                         return cycle
                 elif neighbor in rec_stack:
                     # Found cycle - reconstruct path
-                    cycle = [neighbor]
+                    cycle: list[str] = [neighbor]
                     current = node
                     while current != neighbor:
                         cycle.append(current)

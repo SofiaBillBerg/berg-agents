@@ -27,7 +27,9 @@ except ValueError as e:
 """
 
 import os
+
 from pathlib import Path
+
 
 # ----------------------------------------------------------------------
 # Load environment variables from .env (if python-dotenv is installed)
@@ -82,9 +84,7 @@ def load_user_config() -> dict:
                         :param match:  The regex match object.
                         :return:  The environment variable value or empty string if not set.
                         """
-                        var_name = (
-                            match.group(1) or match.group(2)
-                        )
+                        var_name = match.group(1) or match.group(2)
                         return os.getenv(var_name, "")
 
                     return re.sub(

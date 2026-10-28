@@ -18,6 +18,7 @@
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
 """Plugin registry for managing discovered plugins."""
+
 from __future__ import annotations
 
 import asyncio

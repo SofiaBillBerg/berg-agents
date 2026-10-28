@@ -18,6 +18,7 @@
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
 """Base class for all berg_agents plugins."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

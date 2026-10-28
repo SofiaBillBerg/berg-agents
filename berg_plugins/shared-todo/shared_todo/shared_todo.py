@@ -34,9 +34,11 @@ In the function on_load(), the plugin performs several validation checks to ensu
 """
 
 import logging
+
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, ValidationError
 from shared_todo.shared_todo_distribution import (
     is_integrated_into_berg_agents,
     is_plugin_installable,
@@ -49,7 +51,7 @@ from shared_todo.shared_todo_user_cfg import validate_user_config
 from berg_agents.plugin_system.lifecycle.bergplugin import BergPlugin
 from berg_agents.plugin_system.plugin_context import PluginContext
 from berg_agents.plugin_system.plugin_contract import ToolCapability
-from pydantic import BaseModel, ValidationError
+
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +197,7 @@ class SharedToDoPlugin(BergPlugin):
         """
         # NOTE: Absolute package import works when the plugin dir is
         # on sys.path (see PluginManager._import_plugin).
+        from pydantic_ai.tools import Tool
         from shared_todo.tools import (
             add_subtask,
             complete_todo,
@@ -207,8 +210,6 @@ class SharedToDoPlugin(BergPlugin):
             set_subtask_done,
             update_todo,
         )
-
-        from pydantic_ai.tools import Tool
 
         return [
             ToolCapability(tool=Tool(create_todo), risk_level="low"),

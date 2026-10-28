@@ -58,7 +58,9 @@ def parse_skill(skill_path: Path) -> Any:
             skill = {
                 "path": str(skill_path),
                 "content": (
-                    skill_path.read_text(encoding="utf-8") if skill_path.exists() else ""
+                    skill_path.read_text(encoding="utf-8")
+                    if skill_path.exists()
+                    else ""
                 )}
         logger.info(f"Parsed skill as plugin: {skill_path}")
 

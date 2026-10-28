@@ -101,7 +101,10 @@ class Permission:
         from pathlib import Path
 
         path_obj = Path(path)
-        return any(fnmatch.fnmatch(str(path_obj), pattern) for pattern in allowed_patterns)
+        return any(
+            fnmatch.fnmatch(str(path_obj), pattern)
+            for pattern in allowed_patterns
+        )
 
     def _check_domain_scope(self, url: str, allowed_domains: list[str]) -> bool:
         """Check if URL domain is allowed."""
