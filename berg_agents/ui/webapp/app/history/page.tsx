@@ -29,28 +29,28 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button, Card, Chip } from "@heroui/react";
-import { API_BASE } from "@/envConfig";
-import { SESSION_ID_KEY } from "@/harness/useAISDKChat";
+import {useEffect, useMemo, useState} from "react";
+import {useRouter} from "next/navigation";
+import {Button, Card, Chip} from "@heroui/react";
+import {API_BASE} from "@/envConfig";
+import {SESSION_ID_KEY} from "@/harness/useAISDKChat";
 
 import {
-  readSnapshots,
-  restoreSnapshotToLive,
-  writeSnapshots,
-  type ChatSnapshot} from "../components/ConversationHistory.tsx";
-import { Navbar } from "../components/Navbar.tsx";
+    type ChatSnapshot,
+    readSnapshots,
+    restoreSnapshotToLive,
+    writeSnapshots} from "../components/ConversationHistory.tsx";
+import {Navbar} from "../components/Navbar.tsx";
 
 interface ServerSession {
-  id: string;
-  title: string;
-  subtitle: string;
-  workspace: string;
-  updated_at: string;
-  message_count: number;
-  model: string | null;
-  outcome: string;
+    id: string;
+    title: string;
+    subtitle: string;
+    workspace: string;
+    updated_at: string;
+    message_count: number;
+    model: string | null;
+    outcome: string;
 }
 
 /**
@@ -60,289 +60,289 @@ interface ServerSession {
  * @returns Number of user-role messages.
  */
 function userTurns(snapshot: ChatSnapshot): number {
-  if (!Array.isArray(snapshot.messages)) return 0;
-  return snapshot.messages.filter(
-    (m) =>
-      typeof m === "object" &&
-      m !== null &&
-      (m as { role?: unknown }).role === "user",
-  ).length;
+    if (!Array.isArray(snapshot.messages)) return 0;
+    return snapshot.messages.filter(
+        (m) =>
+            typeof m === "object" &&
+            m !== null &&
+            (m as { role?: unknown }).role === "user",
+    ).length;
 }
 
 /** HistoryPage - server sessions + local snapshots, searchable. */
 export default function HistoryPage() {
-  const router = useRouter();
-  const [serverSessions, setServerSessions] = useState<ServerSession[] | null>(
-    null,
-  );
-  const [localSessions, setLocalSessions] = useState<ChatSnapshot[]>([]);
-  const [query, setQuery] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [draftTitle, setDraftTitle] = useState("");
+    const router = useRouter();
+    const [serverSessions, setServerSessions] = useState<ServerSession[] | null>(
+        null,
+    );
+    const [localSessions, setLocalSessions] = useState<ChatSnapshot[]>([]);
+    const [query, setQuery] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [renamingId, setRenamingId] = useState<string | null>(null);
+    const [draftTitle, setDraftTitle] = useState("");
 
-  // Server search (debounced): titles, subtitles, transcripts.
-  useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      try {
+    // Server search (debounced): titles, subtitles, transcripts.
+    useEffect(() => {
+        let cancelled = false;
+        const timer = window.setTimeout(async () => {
+            try {
+                const resp = await fetch(
+                    `${API_BASE}/api/sessions?q=${encodeURIComponent(query.trim())}`,
+                );
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                if (!cancelled && Array.isArray(data.sessions)) {
+                    setServerSessions(data.sessions);
+                    setError(null);
+                }
+            } catch (e) {
+                if (!cancelled) {
+                    setServerSessions(null);
+                    setError(query.trim() ? String(e) : null);
+                }
+            }
+        }, 300);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [query]);
+
+    useEffect(() => {
+        const reread = () => setLocalSessions(readSnapshots());
+        reread();
+        // NOTE: Same cross-tab staleness as the chat widget — re-read when
+        // another tab writes snapshots.
+        window.addEventListener("storage", reread);
+        return () => window.removeEventListener("storage", reread);
+    }, []);
+
+    const localResults = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return localSessions;
+        return localSessions.filter((s) => `${s.title}`.toLowerCase().includes(q));
+    }, [localSessions, query]);
+
+    const refreshServer = async () => {
+        try {
+            const resp = await fetch(
+                `${API_BASE}/api/sessions?q=${encodeURIComponent(query.trim())}`,
+            );
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            if (Array.isArray(data.sessions)) setServerSessions(data.sessions);
+        } catch (e) {
+            setError(String(e));
+        }
+    };
+
+    const restoreServer = async (session: ServerSession) => {
         const resp = await fetch(
-          `${API_BASE}/api/sessions?q=${encodeURIComponent(query.trim())}`,
+            `${API_BASE}/api/sessions/${encodeURIComponent(session.id)}`,
         );
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        if (!cancelled && Array.isArray(data.sessions)) {
-          setServerSessions(data.sessions);
-          setError(null);
+        restoreSnapshotToLive(Array.isArray(data.messages) ? data.messages : []);
+        try {
+            localStorage.setItem(SESSION_ID_KEY, session.id);
+        } catch {
+            // Private mode - session id stays in memory only.
         }
-      } catch (e) {
-        if (!cancelled) {
-          setServerSessions(null);
-          setError(query.trim() ? String(e) : null);
-        }
-      }
-    }, 300);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
+        // NOTE: Restoring adopts project-wide, so other windows converge.
+        await fetch(`${API_BASE}/api/sessions/current`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({id: session.id})}).catch(() => undefined);
+        router.push("/");
     };
-  }, [query]);
 
-  useEffect(() => {
-    const reread = () => setLocalSessions(readSnapshots());
-    reread();
-    // NOTE: Same cross-tab staleness as the chat widget — re-read when
-    // another tab writes snapshots.
-    window.addEventListener("storage", reread);
-    return () => window.removeEventListener("storage", reread);
-  }, []);
+    const removeServer = async (id: string) => {
+        await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(id)}`, {
+            method: "DELETE"});
+        await refreshServer();
+    };
 
-  const localResults = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return localSessions;
-    return localSessions.filter((s) => `${s.title}`.toLowerCase().includes(q));
-  }, [localSessions, query]);
+    const renameServer = async (id: string) => {
+        const title = draftTitle.trim();
+        if (!title) return;
+        const resp = await fetch(
+            `${API_BASE}/api/sessions/${encodeURIComponent(id)}`,
+            {
+                method: "PATCH",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({title})},
+        );
+        if (resp.ok) {
+            setRenamingId(null);
+            await refreshServer();
+        }
+    };
 
-  const refreshServer = async () => {
-    try {
-      const resp = await fetch(
-        `${API_BASE}/api/sessions?q=${encodeURIComponent(query.trim())}`,
-      );
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      if (Array.isArray(data.sessions)) setServerSessions(data.sessions);
-    } catch (e) {
-      setError(String(e));
-    }
-  };
+    const removeLocal = (id: string) => {
+        const next = localSessions.filter((s) => s.id !== id);
+        setLocalSessions(next);
+        writeSnapshots(next);
+    };
 
-  const restoreServer = async (session: ServerSession) => {
-    const resp = await fetch(
-      `${API_BASE}/api/sessions/${encodeURIComponent(session.id)}`,
-    );
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    restoreSnapshotToLive(Array.isArray(data.messages) ? data.messages : []);
-    try {
-      localStorage.setItem(SESSION_ID_KEY, session.id);
-    } catch {
-      // Private mode - session id stays in memory only.
-    }
-    // NOTE: Restoring adopts project-wide, so other windows converge.
-    await fetch(`${API_BASE}/api/sessions/current`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: session.id })}).catch(() => undefined);
-    router.push("/");
-  };
+    const restoreLocal = (session: ChatSnapshot) => {
+        restoreSnapshotToLive(session.messages);
+        router.push("/");
+    };
 
-  const removeServer = async (id: string) => {
-    await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(id)}`, {
-      method: "DELETE"});
-    await refreshServer();
-  };
+    return (
+        <>
+            <Navbar/>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="mx-auto w-full max-w-6xl p-4">
+                    <h1 className="text-2xl font-bold mb-4">History</h1>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Server sessions work in any browser; this browser&apos;s snapshots
+                        are local only. Restoring parks the current chat first, so nothing
+                        is lost.
+                    </p>
+                    <input
+                        aria-label="Search conversations"
+                        className="mb-3 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search titles, subtitles, transcripts…"
+                        value={query}
+                    />
+                    {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
 
-  const renameServer = async (id: string) => {
-    const title = draftTitle.trim();
-    if (!title) return;
-    const resp = await fetch(
-      `${API_BASE}/api/sessions/${encodeURIComponent(id)}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title })},
-    );
-    if (resp.ok) {
-      setRenamingId(null);
-      await refreshServer();
-    }
-  };
-
-  const removeLocal = (id: string) => {
-    const next = localSessions.filter((s) => s.id !== id);
-    setLocalSessions(next);
-    writeSnapshots(next);
-  };
-
-  const restoreLocal = (session: ChatSnapshot) => {
-    restoreSnapshotToLive(session.messages);
-    router.push("/");
-  };
-
-  return (
-    <>
-      <Navbar />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-6xl p-4">
-          <h1 className="text-2xl font-bold mb-4">History</h1>
-          <p className="text-sm text-muted-foreground mb-4">
-            Server sessions work in any browser; this browser&apos;s snapshots
-            are local only. Restoring parks the current chat first, so nothing
-            is lost.
-          </p>
-          <input
-            aria-label="Search conversations"
-            className="mb-3 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search titles, subtitles, transcripts…"
-            value={query}
-          />
-          {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
-
-          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-            Server sessions
-            {serverSessions ? ` (${serverSessions.length})` : ""}
-            <span className="flex-1" />
-            <Button
-              aria-label="Refresh server sessions"
-              size="sm"
-              variant="secondary"
-              onPress={() => void refreshServer()}
-            >
-              ↻
-            </Button>
-          </h2>
-          {serverSessions === null && !error && (
-            <p className="mb-3 text-xs text-muted-foreground">Loading…</p>
-          )}
-          {serverSessions !== null && serverSessions.length === 0 && (
-            <Card className="mb-3" variant="default">
-              <Card.Content>
-                <p className="text-sm text-muted-foreground">
-                  No server sessions yet — chat once and it appears here in
-                  every browser.
-                </p>
-              </Card.Content>
-            </Card>
-          )}
-          <div className="mb-4 flex flex-col gap-2">
-            {(serverSessions ?? []).map((s) => (
-              <Card key={s.id} variant="default">
-                <Card.Content className="flex items-center gap-2 p-2">
-                  <div className="min-w-0 flex-1">
-                    {renamingId === s.id ? (
-                      <input
-                        aria-label="Session title"
-                        className="w-full rounded-md border border-border bg-background px-1 py-0.5 text-sm"
-                        onChange={(e) => setDraftTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") void renameServer(s.id);
-                          if (e.key === "Escape") setRenamingId(null);
-                        }}
-                        value={draftTitle}
-                      />
-                    ) : (
-                      <p className="truncate text-sm font-medium">{s.title}</p>
+                    <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                        Server sessions
+                        {serverSessions ? ` (${serverSessions.length})` : ""}
+                        <span className="flex-1"/>
+                        <Button
+                            aria-label="Refresh server sessions"
+                            size="sm"
+                            variant="secondary"
+                            onPress={() => void refreshServer()}
+                        >
+                            ↻
+                        </Button>
+                    </h2>
+                    {serverSessions === null && !error && (
+                        <p className="mb-3 text-xs text-muted-foreground">Loading…</p>
                     )}
-                    <p className="truncate text-[11px] text-muted-foreground">
-                      {s.subtitle || s.workspace} ·{" "}
-                      {new Date(s.updated_at).toLocaleString()} ·{" "}
-                      {s.message_count} msgs
-                    </p>
-                  </div>
-                  <Chip size="sm" variant="soft">
-                    {s.workspace}
-                  </Chip>
-                  {renamingId === s.id ? (
-                    <Button
-                      aria-label="Save title"
-                      size="sm"
-                      variant="primary"
-                      onPress={() => void renameServer(s.id)}
-                    >
-                      Save
-                    </Button>
-                  ) : (
-                    <Button
-                      aria-label={`Rename ${s.title}`}
-                      size="sm"
-                      variant="secondary"
-                      onPress={() => {
-                        setRenamingId(s.id);
-                        setDraftTitle(s.title);
-                      }}
-                    >
-                      ✏️
-                    </Button>
-                  )}
-                  <Button
-                    aria-label={`Restore ${s.title}`}
-                    size="sm"
-                    variant="primary"
-                    onPress={() => void restoreServer(s)}
-                  >
-                    Restore
-                  </Button>
-                  <Button
-                    aria-label={`Delete ${s.title}`}
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => void removeServer(s.id)}
-                  >
-                    🗑
-                  </Button>
-                </Card.Content>
-              </Card>
-            ))}
-          </div>
+                    {serverSessions !== null && serverSessions.length === 0 && (
+                        <Card className="mb-3" variant="default">
+                            <Card.Content>
+                                <p className="text-sm text-muted-foreground">
+                                    No server sessions yet — chat once and it appears here in
+                                    every browser.
+                                </p>
+                            </Card.Content>
+                        </Card>
+                    )}
+                    <div className="mb-4 flex flex-col gap-2">
+                        {(serverSessions ?? []).map((s) => (
+                            <Card key={s.id} variant="default">
+                                <Card.Content className="flex items-center gap-2 p-2">
+                                    <div className="min-w-0 flex-1">
+                                        {renamingId === s.id ? (
+                                            <input
+                                                aria-label="Session title"
+                                                className="w-full rounded-md border border-border bg-background px-1 py-0.5 text-sm"
+                                                onChange={(e) => setDraftTitle(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") void renameServer(s.id);
+                                                    if (e.key === "Escape") setRenamingId(null);
+                                                }}
+                                                value={draftTitle}
+                                            />
+                                        ) : (
+                                            <p className="truncate text-sm font-medium">{s.title}</p>
+                                        )}
+                                        <p className="truncate text-[11px] text-muted-foreground">
+                                            {s.subtitle || s.workspace} ·{" "}
+                                            {new Date(s.updated_at).toLocaleString()} ·{" "}
+                                            {s.message_count} msgs
+                                        </p>
+                                    </div>
+                                    <Chip size="sm" variant="soft">
+                                        {s.workspace}
+                                    </Chip>
+                                    {renamingId === s.id ? (
+                                        <Button
+                                            aria-label="Save title"
+                                            size="sm"
+                                            variant="primary"
+                                            onPress={() => void renameServer(s.id)}
+                                        >
+                                            Save
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            aria-label={`Rename ${s.title}`}
+                                            size="sm"
+                                            variant="secondary"
+                                            onPress={() => {
+                                                setRenamingId(s.id);
+                                                setDraftTitle(s.title);
+                                            }}
+                                        >
+                                            ✏️
+                                        </Button>
+                                    )}
+                                    <Button
+                                        aria-label={`Restore ${s.title}`}
+                                        size="sm"
+                                        variant="primary"
+                                        onPress={() => void restoreServer(s)}
+                                    >
+                                        Restore
+                                    </Button>
+                                    <Button
+                                        aria-label={`Delete ${s.title}`}
+                                        size="sm"
+                                        variant="secondary"
+                                        onPress={() => void removeServer(s.id)}
+                                    >
+                                        🗑
+                                    </Button>
+                                </Card.Content>
+                            </Card>
+                        ))}
+                    </div>
 
-          <h2 className="mb-2 text-sm font-semibold">
-            This browser ({localResults.length})
-          </h2>
-          <div className="flex flex-col gap-2">
-            {localResults.map((s) => (
-              <Card key={s.id} variant="default">
-                <Card.Content className="flex items-center gap-2 p-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{s.title}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {new Date(s.timestamp).toLocaleString()} · {userTurns(s)}{" "}
-                      user turn
-                      {userTurns(s) === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                  <Button
-                    aria-label={`Restore ${s.title}`}
-                    size="sm"
-                    variant="primary"
-                    onPress={() => restoreLocal(s)}
-                  >
-                    Restore
-                  </Button>
-                  <Button
-                    aria-label={`Delete ${s.title}`}
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => removeLocal(s.id)}
-                  >
-                    🗑
-                  </Button>
-                </Card.Content>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </div>
-    </>
-  );
+                    <h2 className="mb-2 text-sm font-semibold">
+                        This browser ({localResults.length})
+                    </h2>
+                    <div className="flex flex-col gap-2">
+                        {localResults.map((s) => (
+                            <Card key={s.id} variant="default">
+                                <Card.Content className="flex items-center gap-2 p-2">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium">{s.title}</p>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            {new Date(s.timestamp).toLocaleString()} · {userTurns(s)}{" "}
+                                            user turn
+                                            {userTurns(s) === 1 ? "" : "s"}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        aria-label={`Restore ${s.title}`}
+                                        size="sm"
+                                        variant="primary"
+                                        onPress={() => restoreLocal(s)}
+                                    >
+                                        Restore
+                                    </Button>
+                                    <Button
+                                        aria-label={`Delete ${s.title}`}
+                                        size="sm"
+                                        variant="secondary"
+                                        onPress={() => removeLocal(s.id)}
+                                    >
+                                        🗑
+                                    </Button>
+                                </Card.Content>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </>
+    );
 }

@@ -20,7 +20,6 @@
  */
 
 
-
 "use client";
 
 import {Suspense, useEffect, useState} from "react";
@@ -41,40 +40,40 @@ import {installBergRuntime} from "./runtime/berg-runtime.ts";
  * identical.
  */
 export function ClientOnly() {
-  const [mounted, setMounted] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-    // Plugin UI bundles resolve React/HeroUI against this runtime, so
-    // it must exist before any plugin surface is imported.
-    installBergRuntime();
-    // Global uncaught error handler for frontend debugging
-    const handleError = (event: ErrorEvent) => {
-      console.error("Global UI error:", event.error);
-    };
+    useEffect(() => {
+        setMounted(true);
+        // Plugin UI bundles resolve React/HeroUI against this runtime, so
+        // it must exist before any plugin surface is imported.
+        installBergRuntime();
+        // Global uncaught error handler for frontend debugging
+        const handleError = (event: ErrorEvent) => {
+            console.error("Global UI error:", event.error);
+        };
 
-    const handleRejection = (event: PromiseRejectionEvent) => {
-      console.error("Unhandled promise rejection:", event.reason);
-    };
+        const handleRejection = (event: PromiseRejectionEvent) => {
+            console.error("Unhandled promise rejection:", event.reason);
+        };
 
-    window.addEventListener("error", handleError);
-    window.addEventListener("unhandledrejection", handleRejection);
+        window.addEventListener("error", handleError);
+        window.addEventListener("unhandledrejection", handleRejection);
 
-    return () => {
-      window.removeEventListener("error", handleError);
-      window.removeEventListener("unhandledrejection", handleRejection);
-    };
-  }, []);
+        return () => {
+            window.removeEventListener("error", handleError);
+            window.removeEventListener("unhandledrejection", handleRejection);
+        };
+    }, []);
 
-  if (!mounted) {
-    return <div className="p-8 text-sm">Loading chat...</div>;
-  }
+    if (!mounted) {
+        return <div className="p-8 text-sm">Loading chat...</div>;
+    }
 
-  return (
-    <ErrorBoundary>
-      <Suspense fallback={<div className="p-8 text-sm">Loading chat...</div>}>
-        <App />
-      </Suspense>
-    </ErrorBoundary>
-  );
+    return (
+        <ErrorBoundary>
+            <Suspense fallback={<div className="p-8 text-sm">Loading chat...</div>}>
+                <App/>
+            </Suspense>
+        </ErrorBoundary>
+    );
 }
