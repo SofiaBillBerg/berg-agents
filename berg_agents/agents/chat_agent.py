@@ -131,21 +131,26 @@ def build_chat_agent(
     rendered_context = shared_context.render()
     if rendered_context:
         system_prompt += (
-            "\n\n# Shared context (human-owned; project shadows global)\n"
+            "\n\n# Shared context (shared knowledge with the user; project "
+            "shadows global)\n"
             f"{rendered_context}\n\n"
-            "This is your persistent shared context with the user, kept as plain "
-            "files the human also edits. Keep it current: use "
+            "This is your shared working context with the user - plain files "
+            "you BOTH read and contribute to. Read it first; it holds "
+            "preferences, knowledge, research, work-notes, task-state, files, "
+            "notes and router_stats. Keep it current: use "
             "write_shared_context / append_shared_context to record durable "
-            "facts, preferences, and what/why learnings (always say why)."
+            "facts, preferences, knowledge, research findings, work notes, and "
+            "what/why router_stats (always say why). When you learn something "
+            "durable, write it here instead of re-researching it later."
         )
 
     def write_shared_context(section: str, content: str, why: str) -> str:
         """Overwrite a human-owned shared-context section (project scope).
 
         Args:
-            section: One of preferences, project, task-state, files, notes, learnings.
+            section: One of preferences, project, task-state, files, notes, router_stats.
             content: Full new Markdown content for the section.
-            why: Why this change is being made (the what/why discipline).
+            why: Why this change is being made (what/why discipline).
 
         Returns:
             A short status line.
@@ -162,7 +167,7 @@ def build_chat_agent(
         """Append a line to a human-owned shared-context section (project scope).
 
         Args:
-            section: One of preferences, project, task-state, files, notes, learnings.
+            section: One of preferences, project, task-state, files, notes, router_stats.
             text: Text to append on a new line.
             why: Why this is worth remembering.
 

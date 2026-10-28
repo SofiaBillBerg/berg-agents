@@ -152,7 +152,7 @@ def resolve_implementation_model(
     """Resolve the ``provider:model`` string for a complexity level.
 
     Looks up the complexity's model directly, then formats it through
-    :func:`resolve_model_string` so the result always carries the
+    :func:`berg_agents.providers.models.resolve_model_string` so the result always carries the
     ``provider:`` prefix Pydantic AI requires.
 
     Args:
