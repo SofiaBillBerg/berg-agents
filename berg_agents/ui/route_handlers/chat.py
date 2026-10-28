@@ -32,7 +32,10 @@ from typing import Any, Literal
 from berg_agents.agents.chat_agent import build_chat_agent
 from berg_agents.core.harness import Harness
 from berg_agents.core.turn import record_turn_outcome
+from berg_agents.ui import projects, transcripts
+from berg_agents.ui.projects import resolve_project
 from berg_agents.ui.sessions import SessionManager
+from berg_agents.ui.transcripts import append_messages, ensure_transcript
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic_ai import DeferredToolRequests, DeferredToolResults
@@ -144,6 +147,15 @@ async def _dispatch_chat_with_retry(
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+def transcript_message_count(root_dir: str, session_id: str) -> int:
+    """Messages already in the JSONL transcript (the append cursor)."""
+    return len(
+        transcripts.read_transcript(
+            session_id, projects.resolve_project(root_dir)
+        )["messages"]
+    )
+
+
 async def _track_chat_session(
     request: Request, sessions: SessionManager, model_id: str
 ) -> tuple[str | None, Any]:
@@ -173,8 +185,16 @@ async def _track_chat_session(
         )
         session_store.set_active_session(root_dir, session_id)
         conversation = session_store.load_conversation(session_id)
+        # Durable append-only transcript: create the project record and
+        # the session header line (idempotent — created_at is never
+        # rewritten, so it survives restarts and renames).
+        ensure_transcript(
+            session_id,
+            resolve_project(root_dir),
+            model=model_id or sessions.active_model,
+        )
     except Exception as exc:
-        logger.warning("Session tracking skipped: %s", exc)
+        logger.warning("Session tracking skipped: %s", exc, exc_info=True)
         session_id = None
         conversation = None
     return session_id, conversation
@@ -340,8 +360,17 @@ def register_chat_routes(
 
                 root = sessions._harness_root_dir()
                 store = session_store.get_store(root)
+                messages = result.all_messages()
                 await session_store.record_turn(
-                    store, session_id, result.all_messages()
+                    store, session_id, messages
+                )
+                # Append the same messages to the durable JSONL
+                # transcript, so a transcript survives the database.
+                append_messages(
+                    session_id,
+                    resolve_project(root),
+                    messages,
+                    start_index=transcript_message_count(root, session_id),
                 )
                 conversation_obj = getattr(result, "conversation", None)
                 if conversation_obj is not None:

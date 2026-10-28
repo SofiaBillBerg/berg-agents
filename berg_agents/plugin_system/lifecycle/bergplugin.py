@@ -65,7 +65,7 @@ class BergPlugin(ABC):
     ) -> None:
         """Called when plugin configuration changes."""
 
-    async def health_check(self, context: PluginContext) -> Any:
+    async def health_check(self, context: PluginContext) -> Any:  # ruff: ignore[no-self-use]
         """Check plugin health.
 
         :param context: The plugin context.
@@ -79,7 +79,7 @@ class BergPlugin(ABC):
 
     # === Capabilities ===
 
-    def get_capabilities(self) -> list[PluginCapability]:
+    def get_capabilities(self) -> list[PluginCapability]:  # ruff: ignore[no-self-use]
         """Return plugin capabilities."""
         return []
 

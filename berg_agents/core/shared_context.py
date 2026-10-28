@@ -33,7 +33,7 @@ project layer; pass ``scope="global"`` to author shared context.
 
 **Within a layer.** The current state is plain Markdown at
 ``<root>/<section>.md`` (what the human edits and the agent renders), and
-the history is an append-only JSONL journal at
+the history is an append-only `JSONL` journal at
 ``<root>/.history/<section>.jsonl`` where every change records
 who/what/when/**why**. The why is the point: learning here is what-and-why,
 never bare outcome counters.
@@ -100,7 +100,7 @@ class _Layer:
         :param section: Section name.
         :param body: Full new content for the file.
         :param author: Who made the change (``"human"`` or an agent id).
-        :param why: Reason for the change; the what/why discipline wants
+        :param why: Reason for the change; the `what/why` discipline wants
             it filled for substantive edits.
         :return: True when the content actually changed (and was journaled).
         """
@@ -170,7 +170,7 @@ class _Layer:
 
     @staticmethod
     def _summarize(previous: str, current: str) -> str:
-        """One-line description of a write's delta for the journal."""
+        """One-line description of a writes delta for the journal."""
         if not previous:
             return "created"
         if not current:

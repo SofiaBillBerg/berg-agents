@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from berg_agents.ui import projects, transcripts
 from berg_agents.ui.schemas import SessionCreateRequest, SessionRenameRequest
 from berg_agents.ui.sessions import SessionManager
 from fastapi import APIRouter, HTTPException
@@ -235,4 +236,10 @@ def register_session_routes(
             await store.delete(source=saved.summary)
         except ConversationConflict as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        # The durable JSONL transcript goes with the session: deleting
+        # one and leaving the other would be a two-copies problem.
+        transcripts.delete_transcript(
+            session_id,
+            projects.resolve_project(sessions._harness_root_dir()),
+        )
         return {"ok": True}

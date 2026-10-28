@@ -183,7 +183,7 @@
       },
       "standard": {
         "models": [
-          "genna3:12b"
+          "gemma3:12b"
         ],
         "max_tokens": 90000
       },

@@ -45,8 +45,8 @@ notebooks = [
     "notebook>=7.6.2"]
 agent-deps = [
     "jsonschema>=4.26.0",
-    "pydantic-ai-harness[code-mode]==0.55.0",
-    "pydantic-ai-slim[duckduckgo,web-fetch]", #>=2.57.0",
+    # "pydantic-ai-harness[code-mode]==0.55.0",
+    #  "pydantic-ai-slim[duckduckgo,web-fetch]", #>=2.57.0",
     "python-dotenv>=1.2.3",
     "pyyaml>=6.0.3",
     "click>=8.1.7",
@@ -64,17 +64,20 @@ agent-deps = [
     "uvicorn>=0.52.1",
     "httpx>=0.28.1",
     "autobahn>=26.7.1",
-    "pydantic-ai>=2.30.0",
+    #  "pydantic-ai>=2.30.0",
     "pydantic-config>=0.4.0",
     "pyyaml>=6.0.3",
     #  "a2a>=0.44",
     "openai-agents>=0.22.0",
     "mempalace>=3.11.0",
-    "pydantic-ai-harness[acp]", #>=0.27.0",
+    #"pydantic-ai-harness[acp]", #>=0.27.0",
     "ai>=0.5.2",
     "a2a-sdk[all]>=0.3.21",
-    "pydantic-ai-slim", #>=2.35.3",
-    "typesafe-sdk>=0.7.4"]
+    #"pydantic-ai-slim", #>=2.35.3",
+    "typesafe-sdk>=0.7.4",
+    "pydantic-ai>=2.63.0",
+    "pydantic-ai-harness[acp,code-mode]>=0.63.0",
+    "pydantic-ai-slim[duckduckgo,web-fetch]>=2.63.0"]
 docs = ["pydoctor>=25.10.1", "quarto>=0.1.0"]
 dev = [
     "black>=24.3.0",
