@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 class _CreateOptions:
     """Mutable option bundle for BergAgentsApp.create()."""
 
-    enable_learning: bool = True
+    enable_router_stats: bool = True
     enable_inference: bool = True
     model_routing: dict[str, Any] | None = None
     hitl_rules: dict[str, Any] | None = None
@@ -67,8 +67,8 @@ def _apply_explicit_config(
         config: User-supplied configuration dict.
     """
     harness_cfg = config.get("harness", {}) or {}
-    opts.enable_learning = harness_cfg.get(
-        "enable_learning", opts.enable_learning
+    opts.enable_router_stats = harness_cfg.get(
+        "enable_router_stats", opts.enable_router_stats
     )
     opts.enable_inference = harness_cfg.get(
         "enable_inference", opts.enable_inference
@@ -100,8 +100,8 @@ def _apply_global_settings(
         # harness
         s_harness = s_dict.get("harness") or {}
         if not config or "harness" not in (config or {}):
-            opts.enable_learning = s_harness.get(
-                "enable_learning", opts.enable_learning
+            opts.enable_router_stats = s_harness.get(
+                "enable_router_stats", opts.enable_router_stats
             )
             opts.enable_inference = s_harness.get(
                 "enable_inference", opts.enable_inference
@@ -174,18 +174,18 @@ class BergAgentsApp:
         self,
         *,
         harness: Harness | None = None,
-        enable_learning: bool = True,
+        enable_router_stats: bool = True,
         enable_inference: bool = True,
     ) -> None:
         """Initialize the BergAgents app.
 
         :param harness: Optional custom Harness instance.
-        :param enable_learning: Whether to enable the learning gate.
+        :param enable_router_stats: Whether to enable the Router Stats .
         :param enable_inference: Whether the default harness may
             call the model synchronously.
         """
         self.harness = harness or Harness(
-            enable_learning=enable_learning,
+            enable_router_stats=enable_router_stats,
             enable_inference=enable_inference,
         )
 
@@ -195,7 +195,7 @@ class BergAgentsApp:
 
         :param cls: Class to instantiate (subclassing supported).
         :param config: Optional configuration dict. Keys:
-                - enable_learning: bool (default True)
+                - enable_router_stats: bool (default True)
                 - enable_inference: bool (default True)
                 - model_routing: models by complexity
                 - hitl_rules: HITL gate list overrides
@@ -214,7 +214,7 @@ class BergAgentsApp:
         _apply_global_settings(opts, config)
 
         harness = Harness(
-            enable_learning=opts.enable_learning,
+            enable_router_stats=opts.enable_router_stats,
             enable_inference=opts.enable_inference,
             hitl_gates=GuardianDeps(**_guardian_gate_kwargs(opts.hitl_rules)),
             model_cfg=(
@@ -228,7 +228,7 @@ class BergAgentsApp:
 
         return cls(
             harness=harness,
-            enable_learning=opts.enable_learning,
+            enable_router_stats=opts.enable_router_stats,
             enable_inference=opts.enable_inference,
         )
 
@@ -258,12 +258,12 @@ class BergAgentsApp:
         task = {"description": description, "task_type": task_type}
         return self.harness.execute_task(task)
 
-    def get_learning_stats(self) -> dict[str, Any]:
-        """Get learning/outcome statistics.
+    def get_router_stats(self) -> dict[str, Any]:
+        """Get router/outcome statistics.
 
         :return: Dict with outcome stats.
         """
-        return self.harness.get_learning_stats()
+        return self.harness.get_router_stats()
 
     def register_agent(self, name: str, agent: Any) -> None:
         """Register a custom agent.

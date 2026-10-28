@@ -17,13 +17,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
-"""Server-side chat sessions (any browser, any directory).
+"""Server-side chat sessions (one global database).
 
-Local-storage sessions are per-browser-profile: Chrome never sees what
-OpenChamber's browser saved. This module persists the authoritative copy
-server-side in SQLite (one database per project root), following the
-Pydantic pattern of storing the framework side and converting at the
-edge: ``ModelMessages`` in, ``dump_messages`` UI JSON out.
+Local-storage sessions are per-browser-profile. This module persists the authoritative copy
+server-side in SQLite, following the Pydantic pattern of storing the
+framework side and converting at the edge: ``ModelMessages`` in,
+``dump_messages`` UI JSON out.
+
+**One database, globally found.** Sessions are user-owned, not
+repo-owned: a conversation started while working on one project must
+still open after the user switches projects, so there is deliberately
+no per-project copy. Each session records the ``workspace``
+(project display name) it belongs to, and the seq in a default title
+is counted within that workspace.
 
 Session identity is a stable id (client thread id or minted uuid):
 titles default to ``<project> #<seq> · <date>`` with the first user
@@ -42,6 +48,9 @@ from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
+#: The one session database, always under the **global** config dir.
+SESSION_DB_NAME = "sessions.db"
+
 try:
     from pydantic_ai_harness.step_persistence.conversations import (
         ConversationSummary,
@@ -54,14 +63,34 @@ except ImportError:  # pragma: no cover - harness optional at import time
 #: Client-minted ids must stay narrow (they become filenames/keys).
 _ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_:-]{0,63}")
 
+#: Cache keyed by the global dir (one cache entry, by design).
 _stores: dict[str, Any] = {}
 
 
-def _config_dir(root_dir: str | Path) -> Path:
-    """Resolved config dir for a project (shared rule, see paths.py).
+def _global_session_dir() -> Path:
+    """The global config dir — sessions live here, once, for every project.
 
-    Precedence: ``BERG_AGENTS_CONFIG_DIR``, project ``.berg-agents/``,
-    then the global ``~/.berg-agents/``.
+    Deliberately NOT :func:`resolve_config_dir`: resolving would pick a
+    project's ``.berg-agents/`` when one exists, which put a copy of the
+    user's sessions inside each repo and hid conversations from every
+    other project. ``BERG_AGENTS_CONFIG_DIR`` still overrides the
+    location when set (a deployment running with its own root).
+    """
+    from berg_agents.config.paths import global_config_dir
+
+    return global_config_dir()
+
+
+def _session_database() -> Path:
+    """Path of the one global session database (created by callers)."""
+    return _global_session_dir() / SESSION_DB_NAME
+
+
+def _config_dir(root_dir: str | Path) -> Path:
+    """Deprecated alias kept only for project-scoped non-session state.
+
+    Sessions must use :func:`_global_session_dir` instead — see the
+    module docstring. This resolver is for other per-project config.
     """
     from berg_agents.config.paths import resolve_config_dir
 
@@ -99,7 +128,9 @@ def set_active_session(root_dir: str | Path, session_id: str) -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(session_id, encoding="utf-8")
     except OSError as exc:
-        logger.warning("Active session pointer unwritable: %s", exc)
+        logger.warning(
+            "Active session pointer unwritable: %s", exc, exc_info=True
+        )
 
 
 def available() -> bool:
@@ -120,7 +151,7 @@ def available() -> bool:
 
 
 @contextmanager
-def _conversation_connection(root_dir: str | Path) -> Any:
+def _conversation_connection() -> Any:
     """Short-lived SQLite connection for conversation JSON (WAL enabled).
 
     Deliberately NOT cached: these run under ``asyncio.to_thread``,
@@ -132,18 +163,22 @@ def _conversation_connection(root_dir: str | Path) -> Any:
     Opening per operation matches how the harness's own conversation
     store works and removes the thread affinity entirely.
 
-    :param root_dir: Project root selecting the database.
+    The table is named ``conversation_records`` — the harness
+    ``SqliteConversationStore`` owns a *different* ``conversations``
+    table in the very same file, and sharing the name there was a
+    schema collision waiting to happen.
+
     :return: Context manager yielding an open connection.
     """
     import sqlite3
 
-    database = _config_dir(root_dir) / "conversations.db"
+    database = _session_database()
     database.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(database, timeout=10)
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute(
-            "CREATE TABLE IF NOT EXISTS conversations ("
+            "CREATE TABLE IF NOT EXISTS conversation_records ("
             "id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at TEXT NOT NULL)"
         )
         yield conn
@@ -159,15 +194,21 @@ def save_conversation(session_id: str, conversation_json: str) -> None:
     :param conversation_json: Output of ConversationTypeAdapter.dump_json.
     """
     try:
-        with _conversation_connection(session_id) as conn:
+        with _conversation_connection() as conn:
             conn.execute(
-                "INSERT INTO conversations (id, json, updated_at) "
+                "INSERT INTO conversation_records (id, json, updated_at) "
                 "VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
                 "json=excluded.json, updated_at=excluded.updated_at",
                 (session_id, conversation_json, datetime.now(UTC).isoformat()),
             )
     except Exception as exc:
-        logger.warning("Conversation save skipped: %s", exc)
+        # Usage/usage-budget carry-over lives here: a silent failure
+        # resets the budget every turn, so it is never debug-level.
+        logger.warning(
+            "Conversation save skipped (usage will not carry over): %s",
+            exc,
+            exc_info=True,
+        )
 
 
 def load_conversation(session_id: str) -> Any:
@@ -179,32 +220,36 @@ def load_conversation(session_id: str) -> Any:
     try:
         from pydantic_ai import ConversationTypeAdapter
 
-        with _conversation_connection(session_id) as conn:
+        with _conversation_connection() as conn:
             row = conn.execute(
-                "SELECT json FROM conversations WHERE id=?", (session_id,)
+                "SELECT json FROM conversation_records WHERE id=?",
+                (session_id,),
             ).fetchone()
         if not row:
             return None
         return ConversationTypeAdapter.validate_json(row[0])
     except Exception as exc:
-        logger.debug("Conversation load skipped: %s", exc)
+        logger.warning("Conversation load skipped: %s", exc, exc_info=True)
         return None
 
 
-def get_store(root_dir: str | Path) -> Any:
-    """Return the SQLite conversation store for a project root.
+def get_store(root_dir: str | Path | None = None) -> Any:
+    """Return the one global SQLite conversation store.
 
-    :param root_dir: Project root (database lives in the resolved
-        config directory, e.g. ``.berg-agents/chat_sessions.db``).
-    :return: Shared ``SqliteConversationStore`` for the root.
+    :param root_dir: Ignored for placement (kept for signature
+        compatibility). Sessions are global, not per-project — see the
+        module docstring.
+    :return: Shared ``SqliteConversationStore`` backed by
+        ``~/.berg-agents/sessions.db``.
     :raises ImportError: When the harness store is unavailable.
     """
     if not available():
         raise ImportError("pydantic_ai_harness step_persistence unavailable")
-    key = str(_config_dir(root_dir))
+    database = _session_database()
+    key = str(database)
     store = _stores.get(key)
     if store is None:
-        database = _config_dir(root_dir) / "chat_sessions.db"
+        database.parent.mkdir(parents=True, exist_ok=True)
         store = SqliteConversationStore(database=database)
         _stores[key] = store
     return store
@@ -275,8 +320,11 @@ async def ensure_session(
         return saved.summary
     except LookupError:
         pass
+    # The database is global, so numbering must count within this
+    # workspace — otherwise a project's second session is titled #14
+    # because the user has sessions from three other projects.
     existing = await store.listing(limit=10000)
-    seq = len(existing) + 1
+    seq = sum(1 for s in existing if s.workspace == workspace) + 1
     date = datetime.now().date().isoformat()
     summary = ConversationSummary(
         id=session_id,

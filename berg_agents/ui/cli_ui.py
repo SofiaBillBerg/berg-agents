@@ -20,7 +20,7 @@
 """Rich terminal UI for the harness layer.
 
 Renders the agent catalog, drives an interactive task session against a
-:class:`berg_agents.core.harness.Harness`, and displays results, learning
+:class:`berg_agents.core.harness.Harness`, and displays results, router
 statistics, and human-review prompts using the ``rich`` library.
 
 Every rendering function accepts an injectable
@@ -69,7 +69,7 @@ SLASH_COMMANDS: list[dict[str, str]] = [
         "category": "models"},
     {
         "name": "/stats",
-        "description": "Learning statistics",
+        "description": "Routing statistics",
         "category": "stats"},
     {
         "name": "/tools",
@@ -238,9 +238,9 @@ def render_result(
 def render_stats(
     stats: dict[str, Any] | None, console: Console | None = None
 ) -> None:
-    """Render harness learning/outcome statistics as a rich table.
+    """Render harness router/outcome statistics as a rich table.
 
-    :param stats: The mapping from :meth:`Harness.get_learning_stats`.
+    :param stats: The mapping from :meth:`Harness.get_router_stats`.
     :param console: Output console; defaults to a new :class:`Console`.
     :return: None
     """
@@ -250,7 +250,7 @@ def render_stats(
         console.print("[dim]No outcomes recorded yet.[/dim]")
         return
     table = Table(
-        title=f"Learning stats ({total} tasks)", header_style="bold magenta"
+        title=f"Router stats ({total} tasks)", header_style="bold magenta"
     )
     table.add_column("group")
     table.add_column("success rate", justify="right")
@@ -422,7 +422,7 @@ def _handle_slash_command(
         history.append((description, str(result.get("status"))))
         console.print()
     elif command == "/stats":
-        render_stats(harness.get_learning_stats(), console)
+        render_stats(harness.get_router_stats(), console)
     elif command == "/history":
         render_history(history, console)
     elif command == "/clear":

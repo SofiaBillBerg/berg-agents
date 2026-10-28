@@ -33,9 +33,11 @@ from berg_agents.core.harness import Harness
 from berg_agents.ui.route_handlers.agents import register_agent_routes
 from berg_agents.ui.route_handlers.chat import register_chat_routes
 from berg_agents.ui.route_handlers.context import register_context_routes
-from berg_agents.ui.route_handlers.learning import register_learning_routes
 from berg_agents.ui.route_handlers.plugins import register_plugin_routes
 from berg_agents.ui.route_handlers.providers import register_provider_routes
+from berg_agents.ui.route_handlers.router_stats import (
+    register_router_stats_routes,
+)
 from berg_agents.ui.route_handlers.sessions import register_session_routes
 from berg_agents.ui.route_handlers.tools import register_tool_routes
 from berg_agents.ui.sessions import SessionManager
@@ -63,7 +65,7 @@ def create_router(
     register_agent_routes(router, harness=harness, sessions=sessions)
     register_chat_routes(router, harness=harness, sessions=sessions)
     register_context_routes(router, sessions=sessions)
-    register_learning_routes(router, harness=harness)
+    register_router_stats_routes(router, harness=harness)
     register_plugin_routes(router, sessions=sessions)
     register_session_routes(router, sessions=sessions)
     register_tool_routes(router, harness=harness, sessions=sessions)

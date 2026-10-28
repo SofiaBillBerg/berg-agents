@@ -203,19 +203,19 @@ def create_app(
     )
     app.state.harness = resolved_harness
     app.state.sessions = sessions
-    _router = create_router(
+    router = create_router(
         resolved_harness, sessions, providers=resolved_providers
     )
     print(
         "DEBUG create_router routes:",
-        len(_router.routes),
+        len(router.routes),
         "chat/stream:",
         any(
             getattr(r, "path", None) == "/api/chat/stream"
-            for r in _router.routes
+            for r in router.routes
         ),
     )
-    app.include_router(_router)
+    app.include_router(router)
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
