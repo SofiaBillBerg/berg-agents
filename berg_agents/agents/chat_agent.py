@@ -50,6 +50,40 @@ def _shell_allowed() -> bool:
         "off"}
 
 
+def _planning_capability(root_dir: str, session_id: str | None) -> Any:
+    """Build ``Planning`` with a per-session plan store.
+
+    Why not ``Planning()``: with no ``store`` the plan is in-memory for
+    the duration of a single run, so ``write_plan`` followed by
+    ``read_plan`` in a later turn found nothing — observed live in the
+    UI. ``store_resolver`` is preferred over a shared ``store`` so each
+    session keeps its own plan instead of every session sharing one.
+
+    :param root_dir: Project root; the plan database lives with the
+        project's other state under ``~/.berg-agents/projects/<id>/``.
+    :param session_id: Session identifier, or None to skip persistence.
+    :return: A configured :class:`~pydantic_ai_harness.Planning`.
+    """
+    from pydantic_ai_harness import Planning
+    from pydantic_ai_harness.planning import SqlitePlanStore
+
+    if not session_id:
+        # No session (e.g. a probe): keep the ephemeral behaviour.
+        return Planning()
+
+    from berg_agents.ui.projects import project_dir, resolve_project
+
+    database = project_dir(resolve_project(root_dir).id) / "plan.db"
+
+    def _resolve(ctx: Any) -> Any:
+        # Imported per call so a relocated store is picked up per run.
+        return SqlitePlanStore(
+            database=str(database), session=session_id
+        )
+
+    return Planning(store_resolver=_resolve)
+
+
 def build_chat_agent(
     model_id: str | None = None,
     *,
@@ -59,6 +93,7 @@ def build_chat_agent(
     disabled_skills: frozenset[str] = frozenset(),
     active_agent: str | None = None,
     active_agent_description: str | None = None,
+    session_id: str | None = None,
 ) -> Any:
     """Build a pydantic_ai ``Agent`` for the streaming chat endpoint.
 
@@ -97,7 +132,6 @@ def build_chat_agent(
     from berg_agents.providers.models import resolve_model_instance
     from pydantic_ai import Agent
     from pydantic_ai.capabilities import WebFetch, WebSearch
-    from pydantic_ai_harness import Planning
 
     # Resolve the model from .berg-agents - resolve_model_instance reads
     # bergagents.jsonc and returns a fully-configured OpenAIChatModel.
@@ -219,7 +253,11 @@ def build_chat_agent(
             # Model-owned task plans with a live reminder: multi-step
             # work shows its todos/plan in the transcript instead of
             # happening invisibly. Eager — planning is core behavior.
-            Planning(),
+            #
+            # The store is resolved per run so a plan belongs to the
+            # session that wrote it. A shared store would leak one
+            # session's plan into every other one under the same root.
+            _planning_capability(root_dir=root_dir, session_id=session_id),
             # Context, memory, and recall: tiered compaction (keeps the
             # history inside the context window), a persistent Markdown
             # notebook, and step persistence + conversation search so

@@ -183,13 +183,38 @@ def fallback_model_id(cfg: dict[str, Any] | None = None) -> str | None:
     if not isinstance(default, str) or not default.strip():
         return None
     wanted = default.strip()
-    for provider, block in load_providers(cfg).items():
+    for block in load_providers(cfg).values():
         models = block.get("models") if isinstance(block, dict) else None
         if not isinstance(models, dict):
             continue
         for model_id in models:
             if model_id == wanted or model_id.endswith(f"/{wanted}"):
                 return model_id
+    return None
+
+
+def _declared_default(cfg: dict[str, Any] | None = None) -> str | None:
+    """The configured ``defaultModel`` when a provider declares it.
+
+    Kept private: :func:`resolve_model` consults it in its "no explicit
+    id" branch so that branch honours the config choice rather than
+    declaration order.
+
+    :param cfg: Optional plain configuration dictionary.
+    :return: ``defaultModel`` when declared, else None.
+    """
+    if cfg is None:
+        from berg_agents.config.settings import get_settings
+
+        cfg = get_settings().model_dump()
+    default = cfg.get("defaultModel")
+    if not isinstance(default, str) or not default.strip():
+        return None
+    wanted = default.strip()
+    for block in load_providers(cfg).values():
+        models = block.get("models") if isinstance(block, dict) else None
+        if isinstance(models, dict) and wanted in models:
+            return wanted
     return None
 
 
@@ -286,7 +311,23 @@ def resolve_model(
             ".berg-agents/bergagents.jsonc."
         )
 
-    #: No explicit id -> first declared model is the default.
+    #: No explicit id -> the configured ``defaultModel`` is the default.
+    # That is a deliberate config choice, whereas "first declared" is
+    # merely file order: a setup listing a large provider first would
+    # silently hand back that large model (observed: the 30B unsloth
+    # model for a ``None`` guardian/planner lookup). Fall back to the
+    # first declared id only when ``defaultModel`` is unset or the
+    # provider block it names is gone.
+    for (pname, mid), kwargs in table.items():
+        if mid == _declared_default(cfg):
+            display = kwargs.pop("_display_name", None)
+            return {
+                "model": mid,
+                "model_provider": "openai",
+                "_provider": pname,
+                "_display_name": display or f"{pname}: {mid}",
+                **kwargs}
+    #: ``defaultModel`` unset or no longer declared: first declared id.
     for (pname, mid), kwargs in table.items():
         display = kwargs.pop("_display_name", None)
         return {

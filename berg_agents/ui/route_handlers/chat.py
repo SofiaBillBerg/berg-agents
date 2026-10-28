@@ -305,6 +305,9 @@ def register_chat_routes(
             disabled_skills=disabled_skills,
             active_agent=active_agent,
             active_agent_description=active_agent_description,
+            # Scopes the plan store to this session so a plan written
+            # in one turn is still there in the next.
+            session_id=session_id,
         )
 
         # sdk_version=6 enables tool-approval streaming (human-in-the-loop).
@@ -361,9 +364,7 @@ def register_chat_routes(
                 root = sessions._harness_root_dir()
                 store = session_store.get_store(root)
                 messages = result.all_messages()
-                await session_store.record_turn(
-                    store, session_id, messages
-                )
+                await session_store.record_turn(store, session_id, messages)
                 # Append the same messages to the durable JSONL
                 # transcript, so a transcript survives the database.
                 append_messages(
