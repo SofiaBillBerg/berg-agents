@@ -409,13 +409,23 @@ def build_guardian_agent(
 
 # Default agent instance for the harness.
 # Built at import: model string resolution is offline (configuration only, no network).
-# Fallback keeps import safe when default model is not declared.
+# No model name is hardcoded here: the config is the only source. When
+# the configured model cannot be resolved the first declared model is
+# used instead, loudly, so a config typo is visible immediately.
 try:
     guardian_agent: Agent[GuardianDeps, GuardianDecision] = (
         build_guardian_agent()
     )
-except Exception:
-    guardian_agent = build_guardian_agent(model_id="nemotron-3-nano:30b-cloud")
+except Exception as exc:
+    logger.warning(
+        "Guardian agent: configured model unusable (%s); "
+        "falling back to the first declared model.",
+        exc,
+        exc_info=True,
+    )
+    from berg_agents.providers.registry import first_declared_model
+
+    guardian_agent = build_guardian_agent(first_declared_model())
 
 __all__ = [
     "ASK_BEFORE",

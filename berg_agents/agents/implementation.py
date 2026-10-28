@@ -673,18 +673,24 @@ def build_implementation_agent(
 # Building at import time must not crash when tier defaults point to
 # undeclared models (common when bergagents.jsonc is minimal) - fallback
 # to the first declared provider model. No network/LLM calls are made.
+#
+# No model name is hardcoded here: the config is the only source
+# (Sofia's rule). Naming a "rescue" model in code silently substituted
+# a different model whenever the config named an undeclared one, which
+# hid a typo instead of reporting it.
 try:
     implementation_agent: Agent[ImplementationDeps, str] = (
         build_implementation_agent()
     )
-except Exception as e:
-    logger.exception(f"Error building implementation agent: {e}")
-    try:
-        # Retry with explicit first-declared model (None = first in registry)
-        implementation_agent = build_implementation_agent(model_id=None)
-    except Exception as e:
-        logger.exception(f"Error building implementation agent (retry): {e}")
-        # Last resort: known declared model that always exists in this repo
-        implementation_agent = build_implementation_agent(
-            model_id="nemotron-3-nano:30b-cloud"
-        )
+except Exception as exc:
+    logger.warning(
+        "Implementation agent: configured model unusable (%s); "
+        "falling back to the first declared model.",
+        exc,
+        exc_info=True,
+    )
+    from berg_agents.providers.registry import first_declared_model
+
+    implementation_agent = build_implementation_agent(
+        model_id=first_declared_model()
+    )

@@ -452,17 +452,25 @@ def build_planner_agent(
 
 #: Module-level planner agent for the harness to import.
 #: Construction resolves the model string only; no network
-#: or LLM call happens until the agent is run. Falls back to first
-#: declared model when tier default is undeclared (keeps import safe).
+#: or LLM call happens until the agent is run.
+#:
+#: No model name is hardcoded here: the config is the only source
+#: (Sofia's rule). When resolution fails the tier default is dropped
+#: in favour of the first model the registry declares (``None``), and
+#: the failure is logged loudly so a typo in ``model_routing`` is
+#: visible instead of silently substituting some other model.
 try:
     planner_agent: Agent = build_planner_agent()
-except Exception:
-    try:
-        planner_agent = build_planner_agent(model_id=None)
-    except Exception:
-        planner_agent = build_planner_agent(
-            model_id="nemotron-3-nano:30b-cloud"
-        )
+except Exception as exc:
+    logger.warning(
+        "Planner agent: configured model unusable (%s); "
+        "falling back to the first declared model.",
+        exc,
+        exc_info=True,
+    )
+    from berg_agents.providers.registry import first_declared_model
+
+    planner_agent = build_planner_agent(first_declared_model())
 
 
 @planner_agent.tool

@@ -86,8 +86,8 @@
         "apiKey": "${env:BERG_AGENT_OLLAMA_API_KEY}"
       },
       "models": {     
-        "gemma:12b": {
-          "name": "gemma:12b"
+        "gemma3:12b": {
+          "name": "gemma3:12b"
         },    
         "bonsai-2:9b": {
           "name": "bonsai-2:9b"

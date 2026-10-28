@@ -67,7 +67,11 @@ import os
 import re
 from typing import Any
 
-__all__ = ["list_models", "load_providers", "resolve_model"]
+__all__ = [
+    "first_declared_model",
+    "list_models",
+    "load_providers",
+    "resolve_model"]
 
 #: camelCase JSONC option names -> python constructor kwarg names.
 _OPTION_KEY_ALIASES: dict[str, str] = {
@@ -156,6 +160,55 @@ def load_providers(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
         return raw
 
     return {}
+
+
+def fallback_model_id(cfg: dict[str, Any] | None = None) -> str | None:
+    """The config-named default model, when a provider declares it.
+
+    Used when a configured tier default cannot be resolved. Deliberately
+    NOT "the first model in the providers block": that is file order, so
+    it handed back whichever provider happens to be listed first — which
+    on this checkout is the 30B unsloth model, silently making a typo
+    resource-expensive. ``defaultModel`` is a deliberate, config-owned
+    choice, so it is the honest fallback.
+
+    :param cfg: Optional plain configuration dictionary.
+    :return: ``defaultModel`` when declared by some provider, else None.
+    """
+    if cfg is None:
+        from berg_agents.config.settings import get_settings
+
+        cfg = get_settings().model_dump()
+    default = cfg.get("defaultModel")
+    if not isinstance(default, str) or not default.strip():
+        return None
+    wanted = default.strip()
+    for provider, block in load_providers(cfg).items():
+        models = block.get("models") if isinstance(block, dict) else None
+        if not isinstance(models, dict):
+            continue
+        for model_id in models:
+            if model_id == wanted or model_id.endswith(f"/{wanted}"):
+                return model_id
+    return None
+
+
+def first_declared_model(cfg: dict[str, Any] | None = None) -> str | None:
+    """The first model id any provider declares, or None when none do.
+
+    Last resort only: providers are iterated in config-file order, so a
+    setup that lists a large model first gets the large model. Prefer
+    :func:`fallback_model_id`.
+
+    :param cfg: Optional plain configuration dictionary.
+    :return: Model id such as ``"ollama/gemma:12b"`` (the provider
+        prefix :func:`resolve_model` expects), or None.
+    """
+    for block in load_providers(cfg).values():
+        models = block.get("models") if isinstance(block, dict) else None
+        if isinstance(models, dict) and models:
+            return str(next(iter(models)))
+    return None
 
 
 def _iter_model_kwargs(
