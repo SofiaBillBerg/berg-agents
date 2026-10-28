@@ -24,7 +24,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 
 export interface MarkdownRendererProps {
-  content?: string;
+    content?: string;
 }
 
 /**
@@ -35,46 +35,47 @@ export interface MarkdownRendererProps {
  * @param props - Component properties
  * @returns JSX element rendering the formatted markdown
  */
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  // Guard empty content - render nothing
-  if (!content || content.trim() === "") {
-    return null;
-  }
+export function MarkdownRenderer({content}: MarkdownRendererProps) {
+    // Guard empty content - render nothing
+    if (!content || content.trim() === "") {
+        return null;
+    }
 
-  return (
-    <div className="markdown-content text-sm leading-relaxed">
-      <ReactMarkdown
-        components={{
-          code({ className, children, ...props }: any) {
-            const isInline =
-              !className &&
-              typeof children === "string" &&
-              !children.includes("\n");
-            if (isInline) {
-              return (
-                <code
-                  className="font-mono bg-surface-soft px-1.5 py-0.5 rounded text-xs text-muted"
-                  {...props}
-                >
-                  {children}
-                </code>
-              );
-            }
-            return (
-              <pre className="font-mono bg-surface-soft p-3 rounded-lg overflow-x-auto text-xs my-2 border border-border">
+    return (
+        <div className="markdown-content text-sm leading-relaxed">
+            <ReactMarkdown
+                components={{
+                    code({className, children, ...props}: any) {
+                        const isInline =
+                            !className &&
+                            typeof children === "string" &&
+                            !children.includes("\n");
+                        if (isInline) {
+                            return (
+                                <code
+                                    className="font-mono bg-surface-soft px-1.5 py-0.5 rounded text-xs text-muted"
+                                    {...props}
+                                >
+                                    {children}
+                                </code>
+                            );
+                        }
+                        return (
+                            <pre
+                                className="font-mono bg-surface-soft p-3 rounded-lg overflow-x-auto text-xs my-2 border border-border">
                 <code className={className} {...props}>
                   {children}
                 </code>
               </pre>
-            );
-          }}}
-        rehypePlugins={[rehypeHighlight]}
-        remarkPlugins={[remarkGfm]}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
-  );
+                        );
+                    }}}
+                rehypePlugins={[rehypeHighlight]}
+                remarkPlugins={[remarkGfm]}
+            >
+                {content}
+            </ReactMarkdown>
+        </div>
+    );
 }
 
 export default MarkdownRenderer;

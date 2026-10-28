@@ -29,70 +29,70 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {useCallback, useEffect, useState} from "react";
 
-import { API_BASE } from "@/envConfig";
+import {API_BASE} from "@/envConfig";
 
 interface AgentItem {
-  name: string;
-  description?: string;
+    name: string;
+    description?: string;
 }
 
 /** AgentSelector - header control for the active agent. */
 export default function AgentSelector() {
-  const [agents, setAgents] = useState<AgentItem[]>([]);
-  const [active, setActive] = useState<string | null>(null);
+    const [agents, setAgents] = useState<AgentItem[]>([]);
+    const [active, setActive] = useState<string | null>(null);
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const [listRes, activeRes] = await Promise.all([
-        fetch(`${API_BASE}/api/agents`),
-        fetch(`${API_BASE}/api/agents/active`)]);
-      if (listRes.ok) {
-        const data = await listRes.json();
-        setAgents(Array.isArray(data) ? data : data.agents || []);
-      }
-      if (activeRes.ok) {
-        const data = await activeRes.json();
-        setActive(typeof data?.agent === "string" ? data.agent : null);
-      }
-    } catch {
-      // Backend unreachable - keep the current selection in memory.
-    }
-  }, []);
+    const fetchAll = useCallback(async () => {
+        try {
+            const [listRes, activeRes] = await Promise.all([
+                fetch(`${API_BASE}/api/agents`),
+                fetch(`${API_BASE}/api/agents/active`)]);
+            if (listRes.ok) {
+                const data = await listRes.json();
+                setAgents(Array.isArray(data) ? data : data.agents || []);
+            }
+            if (activeRes.ok) {
+                const data = await activeRes.json();
+                setActive(typeof data?.agent === "string" ? data.agent : null);
+            }
+        } catch {
+            // Backend unreachable - keep the current selection in memory.
+        }
+    }, []);
 
-  useEffect(() => {
-    void fetchAll();
-  }, [fetchAll]);
+    useEffect(() => {
+        void fetchAll();
+    }, [fetchAll]);
 
-  /** Set the active agent on the backend (and locally). */
-  const onChange = (name: string) => {
-    const next = name === "" ? null : name;
-    setActive(next);
-    void fetch(`${API_BASE}/api/agents/active`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agent: next })}).catch(() => undefined);
-  };
+    /** Set the active agent on the backend (and locally). */
+    const onChange = (name: string) => {
+        const next = name === "" ? null : name;
+        setActive(next);
+        void fetch(`${API_BASE}/api/agents/active`, {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({agent: next})}).catch(() => undefined);
+    };
 
-  return (
-    <select
-      aria-label="Active agent"
-      className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-      value={active ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-      title={
-        active
-          ? `Active agent: ${active} - next message routes to it`
-          : "Default chat agent"
-      }
-    >
-      <option value="">Default chat agent</option>
-      {agents.map((a) => (
-        <option key={a.name} value={a.name}>
-          {a.name}
-        </option>
-      ))}
-    </select>
-  );
+    return (
+        <select
+            aria-label="Active agent"
+            className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+            value={active ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            title={
+                active
+                    ? `Active agent: ${active} - next message routes to it`
+                    : "Default chat agent"
+            }
+        >
+            <option value="">Default chat agent</option>
+            {agents.map((a) => (
+                <option key={a.name} value={a.name}>
+                    {a.name}
+                </option>
+            ))}
+        </select>
+    );
 }

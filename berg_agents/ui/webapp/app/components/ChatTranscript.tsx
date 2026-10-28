@@ -26,102 +26,102 @@ import {MessageList} from "./MessageList.tsx";
 import {ToolCard} from "./ToolCard";
 
 export interface ChatTranscriptProps {
-  transcript: Array<{ role: string; content: string }>;
-  isExecuting: boolean;
-  hitlRequest: unknown;
-  onExport?: () => void;
-  /** Optional tool results to display as collapsible cards */
-  toolResults?: ToolResult[];
+    transcript: Array<{ role: string; content: string }>;
+    isExecuting: boolean;
+    hitlRequest: unknown;
+    onExport?: () => void;
+    /** Optional tool results to display as collapsible cards */
+    toolResults?: ToolResult[];
 }
 
 /** Minimal description of a tool result for rendering */
 export interface ToolResult {
-  /** Name of the tool (e.g. "read_file", "run_task") */
-  tool: string;
-  /** Raw input arguments (JSON-serialized string) - optional */
-  input?: string;
-  /** Output from the tool - must be JSON-serializable */
-  output?: any;
-  /** Whether the card is currently expanded */
-  expanded?: boolean;
-  /** Callback to toggle expansion */
-  onToggle?: () => void;
+    /** Name of the tool (e.g. "read_file", "run_task") */
+    tool: string;
+    /** Raw input arguments (JSON-serialized string) - optional */
+    input?: string;
+    /** Output from the tool - must be JSON-serializable */
+    output?: any;
+    /** Whether the card is currently expanded */
+    expanded?: boolean;
+    /** Callback to toggle expansion */
+    onToggle?: () => void;
 }
 
 /** DOM id of the transcript scroll region (jump buttons target it). */
 export const CHAT_SCROLL_ID = "chat-scroll";
 
 export function ChatTranscript({
-  transcript,
-  isExecuting,
-  hitlRequest,
-  onExport,
-  toolResults}: ChatTranscriptProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+                                   transcript,
+                                   isExecuting,
+                                   hitlRequest,
+                                   onExport,
+                                   toolResults}: ChatTranscriptProps) {
+    const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Stick-to-bottom while new content streams in — but only when the
-  // user is already near the bottom, so reading back through history
-  // is never yanked away.
-  const lastCount = useRef(transcript.length);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (transcript.length !== lastCount.current) {
-      lastCount.current = transcript.length;
-      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-      if (nearBottom) {
-        el.scrollTop = el.scrollHeight;
-      }
-    }
-  }, [transcript]);
+    // Stick-to-bottom while new content streams in — but only when the
+    // user is already near the bottom, so reading back through history
+    // is never yanked away.
+    const lastCount = useRef(transcript.length);
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        if (transcript.length !== lastCount.current) {
+            lastCount.current = transcript.length;
+            const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            if (nearBottom) {
+                el.scrollTop = el.scrollHeight;
+            }
+        }
+    }, [transcript]);
 
-  return (
-    <>
-      <Card className="mb-2 min-h-0 flex-1 flex flex-col" variant="default">
-        <Card.Content className="p-1.5 min-h-0 flex-1 flex flex-col">
-          <div
-            ref={scrollRef}
-            id={CHAT_SCROLL_ID}
-            className="conversation-container"
-          >
-            <MessageList history={transcript} />
+    return (
+        <>
+            <Card className="mb-2 min-h-0 flex-1 flex flex-col" variant="default">
+                <Card.Content className="p-1.5 min-h-0 flex-1 flex flex-col">
+                    <div
+                        ref={scrollRef}
+                        id={CHAT_SCROLL_ID}
+                        className="conversation-container"
+                    >
+                        <MessageList history={transcript}/>
 
-            {/* HITL Pending Notice - HeroUI Alert with compound components */}
-            {hitlRequest != null && (
-              <Alert className="mt-3" status="warning">
-                <Alert.Indicator />
-                <Alert.Title>⏸️ Waiting for your approval</Alert.Title>
-                <Alert.Description>
-                  A task is pending your review above. Please check the HITL
-                  surface below to approve, reject, or edit the proposed action.
-                </Alert.Description>
-              </Alert>
+                        {/* HITL Pending Notice - HeroUI Alert with compound components */}
+                        {hitlRequest != null && (
+                            <Alert className="mt-3" status="warning">
+                                <Alert.Indicator/>
+                                <Alert.Title>⏸️ Waiting for your approval</Alert.Title>
+                                <Alert.Description>
+                                    A task is pending your review above. Please check the HITL
+                                    surface below to approve, reject, or edit the proposed action.
+                                </Alert.Description>
+                            </Alert>
+                        )}
+                    </div>
+                </Card.Content>
+            </Card>
+
+            {/* Thinking Bubble - HeroUI Spinner + Surface */}
+            {isExecuting && !hitlRequest && (
+                <Surface
+                    className="thinking-bubble p-3 mb-4 flex items-center gap-2"
+                    variant="secondary"
+                >
+                    <Spinner color="accent" size="sm"/>
+                    <span className="text-sm">Thinking...</span>
+                </Surface>
             )}
-          </div>
-        </Card.Content>
-      </Card>
 
-      {/* Thinking Bubble - HeroUI Spinner + Surface */}
-      {isExecuting && !hitlRequest && (
-        <Surface
-          className="thinking-bubble p-3 mb-4 flex items-center gap-2"
-          variant="secondary"
-        >
-          <Spinner color="accent" size="sm" />
-          <span className="text-sm">Thinking...</span>
-        </Surface>
-      )}
-
-      {/* Tool Result Cards - rendered below the thinking bubble */}
-      {toolResults && toolResults.length > 0 && (
-        <div className="mt-4 space-y-3">
-          {toolResults.map((tr, idx) => (
-            <ToolCard key={idx} {...tr} onToggle={tr.onToggle} />
-          ))}
-        </div>
-      )}
-    </>
-  );
+            {/* Tool Result Cards - rendered below the thinking bubble */}
+            {toolResults && toolResults.length > 0 && (
+                <div className="mt-4 space-y-3">
+                    {toolResults.map((tr, idx) => (
+                        <ToolCard key={idx} {...tr} onToggle={tr.onToggle}/>
+                    ))}
+                </div>
+            )}
+        </>
+    );
 }
 
 export default ChatTranscript;

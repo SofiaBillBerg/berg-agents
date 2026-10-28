@@ -20,7 +20,6 @@
  */
 
 
-
 /**
  * Main landing page for the Berg Agents web application.
  * Imports theme assets and renders the interactive client application.
@@ -43,9 +42,9 @@ import {ClientOnly} from "./client.tsx";
  * @returns JSX element rendering the client-only application.
  */
 export default function Page() {
-  return (
-    <Suspense fallback={<div className="p-8 text-sm">Loading chat...</div>}>
-      <ClientOnly />
-    </Suspense>
-  );
+    return (
+        <Suspense fallback={<div className="p-8 text-sm">Loading chat...</div>}>
+            <ClientOnly/>
+        </Suspense>
+    );
 }
