@@ -54,10 +54,13 @@ from typing import Any
 #: so the human edits them independently; the names are the vocabulary.
 SECTIONS: tuple[str, ...] = (
     "preferences",  # likes/dislikes; how work should be done
+    "knowledge",  # durable facts about project/framework (avoid re-research)
+    "research",  # findings worth keeping
+    "work-notes",  # ongoing work notes
     "project",  # what the project is and how it works well
     "task-state",  # current task, status, open threads
     "files",  # relevant files and references
-    "notes",  # freeform things worth remembering (human-authored)
+    "notes",  # freeform things worth remembering
     "learnings",  # what/why insights - never bare counters
 )
 
@@ -190,7 +193,7 @@ class SharedContext:
     layers: tuple[_Layer, ...]
 
     @classmethod
-    def resolve(cls, root_dir: str | Path | None = None) -> SharedContext:
+    def resolve(cls, root_dir: Path | None = None) -> SharedContext:
         """Resolve (and create) the global and project context stores.
 
         :param root_dir: Explicit project root; defaults to this checkout

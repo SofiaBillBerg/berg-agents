@@ -33,13 +33,13 @@ Pydantic AI agent modules into one deterministic flow:
     alike); otherwise deterministic templates only.
 6. Curator ``curate_task`` step when ``files_changed`` metadata
    is present.
-7. Learning outcome recording through ``LearningGate`` when
+7. Routing outcome recording through ``RouterStats `` when
    enabled (failures recorded with ``success=False``).
 
 The web layer (``ui.server``/``ui.routes``) and ``app.py`` depend
 only on the small method surface below: ``execute_task``,
 ``get_agent``/``get_agent_info``/``register_agent``, and
-``get_learning_stats``.
+``get_router_stats``.
 """
 
 from __future__ import annotations

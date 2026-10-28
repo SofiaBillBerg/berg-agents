@@ -30,7 +30,7 @@ from berg_agents.agents.guardian import GuardianDecision
 from berg_agents.capabilities.registry import ToolCatalog
 from berg_agents.core.hitl import DEFAULT_INTERRUPT_TOOLS
 from berg_agents.core.interface import RiskLevel, TaskComplexity
-from berg_agents.core.learning_gate import LearningGate
+from berg_agents.core.router_stats import RouterStats
 from berg_agents.core.tool_spec import ToolSpec
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class _AgentCard:
     """Display/override card for non-facade agents.
 
     Agents without an ``AbstractAgent`` facade (guardian,
-    implementation, curator, learning) still appear in the
+    implementation, curator, router_agent) still appear in the
     catalog and accept complexity overrides, so they get a card
     carrying the same fields ``AbstractAgent.get_info``
     reports. Cards are display metadata only; routing uses
@@ -78,7 +78,7 @@ def _tool_is_mutating(tool_name: str) -> bool:
     """Check whether a planned tool can mutate state.
 
     ``"general"`` never mutates; tools whose names carry a
-    read-only hint (per :class:`ToolSpec.is_read_only`)
+    read-only hint (per :class:`berg_agents/core/tool_spec.ToolSpec.is_read_only`)
     never mutate; anything in ``DEFAULT_INTERRUPT_TOOLS``
     or prefixed by one of its entries (``delete_file``,
     ``execute_command``) may mutate.
@@ -168,7 +168,7 @@ def _failed_result(
     verdict: GuardianDecision,
     model: str,
     error: str,
-    learning_gate: LearningGate | None,
+    router_stats: RouterStats | None,
 ) -> dict[str, Any]:
     """Build the model-unavailable failure result.
 
@@ -182,7 +182,7 @@ def _failed_result(
     :param verdict: Guardian review verdict (risk reporting only).
     :param model: Complexity-default model id label.
     :param error: Human-readable failure reason.
-    :param learning_gate: Gate recording the failure, or None to skip.
+    :param router_stats: Gate recording the failure, or None to skip.
 
     :return:        Failure result dict.
     """
@@ -195,8 +195,8 @@ def _failed_result(
         "model": model,
         "error": error,
         "inference_attempted": True}
-    if learning_gate is not None:
-        failed["learning"] = learning_gate.record(
+    if router_stats is not None:
+        failed["router_stats"] = router_stats.record(
             {
                 "task_type": task_type,
                 "complexity": complexity.value,

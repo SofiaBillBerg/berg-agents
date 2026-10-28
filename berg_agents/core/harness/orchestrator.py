@@ -71,7 +71,8 @@ from berg_agents.core.harness._routing import (
     _task_plans_mutation,
 )
 from berg_agents.core.interface import TaskComplexity
-from berg_agents.core.learning_gate import LearningGate
+from berg_agents.core.router_stats import RouterStats
+from berg_agents.core.turn import record_turn_outcome, run_turn
 from berg_agents.providers.registry import resolve_model
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 
@@ -82,7 +83,7 @@ class Harness:
     """Deterministic orchestration engine over agent modules.
 
     Holds the HITL gate overrides, the model-configuration override,
-    the agent registry, and the learning gate. All stage
+    the agent registry, and the Router Stats . All stage
     inputs/outputs are plain dicts so the flow stays testable
     without models or network.
     """
@@ -90,14 +91,14 @@ class Harness:
     def __init__(
         self,
         *,
-        enable_learning: bool = True,
+        enable_router_stats: bool = True,
         enable_inference: bool = False,
         hitl_gates: GuardianDeps | None = None,
         model_cfg: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the harness.
 
-        :param enable_learning: Record outcomes via LearningGate.
+        :param enable_router_stats: Record outcomes via RouterStats .
         :param enable_inference: Allow synchronous model
                 inference on this instance. Approved resumes
                 and ungated runs both call the model when True;
@@ -109,13 +110,13 @@ class Harness:
         :param model_cfg: Config override for model resolution;
                 live settings apply when None.
         """
-        self._enable_learning = enable_learning
+        self._enable_router_stats = enable_router_stats
         self._enable_inference = enable_inference
         # Fresh default gates per instance so deployments can
         # mutate their copy without touching the module.
         self._gates = hitl_gates or GuardianDeps()
         self._model_cfg = model_cfg
-        self._learning_gate = LearningGate()
+        self._router_stats = RouterStats()
         self._planner = Planner()
         # Planner is the only AbstractAgent facade; the rest
         # are catalog cards until facades land (later work).
@@ -149,9 +150,9 @@ class Harness:
                 preferred_complexity="trivial",
                 capabilities=["curation", "doc_updates"],
             ),
-            "learning": _AgentCard(
-                name="learning",
-                description="Tracks outcomes and advises routing",
+            "router_agent": _AgentCard(
+                name="router_agent",
+                description="Routes tasks and advises on model/agent choice",
                 preferred_complexity="standard",
                 capabilities=["outcome_tracking", "routing_advice"],
             )}
@@ -261,14 +262,21 @@ class Harness:
         selected = self._select_agent(task, planner_score, impl_score)
         steps = [step.model_dump() for step in plan_steps_for(task_type)]
         try:
-            answer, model_run = self._run_inference(
+            turn = run_turn(
+                self,
                 description=description,
                 task_type=task_type,
                 complexity=complexity,
                 plan=None,
                 steps=steps,
                 metadata=metadata,
+                root_dir=None,
+                model=model,
+                inference_attempted=True,
+                record=False,
             )
+            answer = turn.answer
+            model_run = turn.model_run
         except _ModelUnavailableError as exc:
             return _failed_result(
                 resolved_id=resolved_id,
@@ -278,8 +286,8 @@ class Harness:
                 verdict=verdict,
                 model=model,
                 error=str(exc),
-                learning_gate=(
-                    self._learning_gate if self._enable_learning else None
+                router_stats=(
+                    self._router_stats if self._enable_router_stats else None
                 ),
             )
         curation = curate_task(
@@ -308,13 +316,13 @@ class Harness:
                 "model_run": model_run},
             "curation": curation,
             "inference_attempted": True}
-        if self._enable_learning:
-            result["learning"] = self._learning_gate.record(
-                {
-                    "task_type": task_type,
-                    "complexity": complexity.value,
-                    "description": description},
-                {"success": True, "inference_attempted": True},
+        if self._enable_router_stats:
+            result["router_stats"] = record_turn_outcome(
+                self,
+                task_type=task_type,
+                complexity=complexity.value,
+                description=description,
+                inference_attempted=True,
                 model_used=model_run.get("model_id", model),
                 success=True,
             )
@@ -325,11 +333,11 @@ class Harness:
         task: dict[str, Any],
         task_id: str | None = None,
     ) -> dict[str, Any]:
-        """Run one task through guardian to learning.
+        """Run one task through guardian to router_agent.
 
         The guardian gate returns early on review; planning
         runs for complex/critical tasks only; curation runs
-        when ``files_changed`` metadata is present; learning
+        when ``files_changed`` metadata is present; router stats
         records the outcome when enabled. A ``hitl_decision``
         of ``approve`` in ``metadata`` marks a human-approved
         resume: the verdict is still computed for risk
@@ -473,11 +481,11 @@ class Harness:
         # model_run for observed files, and an empty run means
         # no observed files rather than an unbound name.
         model_run: dict[str, Any] = {}
+        turn: Any = None
         if inference_attempted:
             try:
-                answer: str
-                model_run: dict[str, Any]
-                answer, model_run = self._run_inference(
+                turn = run_turn(
+                    self,
                     description=description,
                     task_type=task_type,
                     complexity=complexity,
@@ -485,7 +493,18 @@ class Harness:
                     steps=steps,
                     metadata=metadata,
                     message_history=plan_messages,
+                    root_dir=None,
+                    model=model,
+                    inference_attempted=True,
+                    record=False,
                 )
+                answer = turn.answer
+                model_run = turn.model_run
+                implementation["answer"] = answer
+                implementation["model_run"] = model_run
+                requested_override = _requested_model_id(metadata)
+                if requested_override is not None:
+                    effective_model = str(model_run.get("model_id") or model)
             except _ModelUnavailableError as exc:
                 return _failed_result(
                     resolved_id=resolved_id,
@@ -495,21 +514,15 @@ class Harness:
                     verdict=verdict,
                     model=model,
                     error=str(exc),
-                    learning_gate=(
-                        self._learning_gate if self._enable_learning else None
+                    router_stats=(
+                        self._router_stats
+                        if self._enable_router_stats
+                        else None
                     ),
                 )
-            implementation["answer"] = answer
-            implementation["model_run"] = model_run
-            # Reconcile the result label with the actually-run
-            # model: an explicit ``requested_model`` override
-            # wins over complexity routing, so the label must name
-            # ``model_run.model_id``. Without an override the
-            # complexity default is kept beside it as
-            # ``complexity_model`` so both labels stay explainable.
-            requested_override = _requested_model_id(metadata)
-            if requested_override is not None:
-                effective_model = str(model_run.get("model_id") or model)
+        # Reconcile happens inside the inference block above;
+        # nothing else to do here.
+
         # Deterministic offline fallback (no phrase
         # matching): with inference disabled the model
         # never ran, so chat-mode tasks would complete
@@ -551,19 +564,18 @@ class Harness:
             # what complexity routing chose before the
             # session override won (routes active model).
             result["complexity_model"] = model
-        # Learning observes successes only; gated tasks never
+        # RouterAgent observes successes only; gated tasks never
         # executed, so recording them would skew the stats.
-        if self._enable_learning:
-            insight = self._learning_gate.record(
-                {
-                    "task_type": task_type,
-                    "complexity": complexity.value,
-                    "description": description},
-                {"success": True, "inference_attempted": inference_attempted},
+        if self._enable_router_stats:
+            result["router_stats"] = record_turn_outcome(
+                self,
+                task_type=task_type,
+                complexity=complexity.value,
+                description=description,
+                inference_attempted=inference_attempted,
                 model_used=effective_model,
                 success=True,
             )
-            result["learning"] = insight
         return result
 
     def _wants_inference(self, metadata: dict[str, Any]) -> bool:
@@ -700,7 +712,7 @@ class Harness:
             exhausted) falls back to the normalized plain-text
             body via ``_render_answer`` instead of failing, so
             callers still complete with ``inference_attempted``
-            True and learning recorded.
+            True and router_stats recorded.
 
         :raises:
             _ModelUnavailableError: On unknown models,
@@ -905,26 +917,26 @@ class Harness:
         self._agents[name] = agent
 
     @property
-    def learning_gate(self) -> LearningGate:
+    def router_stats(self) -> RouterStats:
         """The gate recording task outcomes (read-only).
 
         Chat and other non-orchestrator paths record through this
         accessor so every execution surface feeds the same stats.
         """
-        return self._learning_gate
+        return self._router_stats
 
     @property
-    def learning_enabled(self) -> bool:
+    def router_enabled(self) -> bool:
         """Whether outcomes are recorded on this harness."""
-        return self._enable_learning
+        return self._enable_router_stats
 
-    def get_learning_stats(self) -> dict[str, Any]:
-        """Return learning/outcome statistics.
+    def get_router_stats(self) -> dict[str, Any]:
+        """Return router/outcome statistics.
 
         :return: Stats mapping with outcome counters plus
             insight and adjustment tallies.
         """
-        return self._learning_gate.get_stats()
+        return self._router_stats.get_stats()
 
     @staticmethod
     def _new_id() -> str:

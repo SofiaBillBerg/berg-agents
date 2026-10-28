@@ -36,8 +36,8 @@ from berg_agents.core import (
     AbstractAgent,
     AgentResult,
     Harness,
-    LearningGate,
     RiskLevel,
+    RouterStats,
     TaskComplexity,
     TaskContext,
 )
@@ -52,8 +52,8 @@ __all__ = [
     "AgentResult",
     "BergAgentsApp",
     "Harness",
-    "LearningGate",
     "RiskLevel",
+    "RouterStats",
     "TaskComplexity",
     "TaskContext",
     "get_app"]

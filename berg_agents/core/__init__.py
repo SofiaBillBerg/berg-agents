@@ -27,13 +27,13 @@ from berg_agents.core.interface import (
     TaskComplexity,
     TaskContext,
 )
-from berg_agents.core.learning_gate import LearningGate
+from berg_agents.core.router_stats import RouterStats
 
 __all__ = [
     "AbstractAgent",
     "AgentResult",
     "Harness",
-    "LearningGate",
     "RiskLevel",
+    "RouterStats",
     "TaskComplexity",
     "TaskContext"]

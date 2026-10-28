@@ -24,12 +24,12 @@ The spec is framework-free and can be used with any provider that supports tool 
 while the registry allows for easy management and filtering of tools.
 :mod:`berg_agents.tools`.  The goal of this module is to give BergAgents a
 typed tool contract that any provider can consume (OpenAI function calling,
-Anthropic tool use, MCP wire) and that any agent can filte
+Anthropic tool use, MCP wire) and that any agent can implement (native Python, MCP server, etc.).
 
 The key idea: a tool is just a *spec* (name, description, JSON-Schema
 parameters, an executable) plus a *registry* that lets the agent select
 tools by tag, by glob, or by per-model exclusion patterns.  The spec is
-deliberately small and serialisable so it can ride the wire as a tool-use
+deliberately small and serializable so it can ride the wire as a tool-use
 schema or be persisted to MemPalace.
 """
 
@@ -39,18 +39,20 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 import fnmatch
 import inspect
+import logging
 from typing import Any, get_args, get_origin
 
 from berg_agents.capabilities.base import RiskClass  # canonical risk vocabulary
 from pydantic import BaseModel, Field, create_model
 
+logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-#: Name fragments that suggest a tool only reads, never mutates state.
-#: Mirrors ``_READ_ONLY_HINTS`` in :mod:`berg_agents.capabilities.tool_adapter`
-#: so a native spec infers the same risk class as the MCP adapter.
+# Name fragments that suggest a tool only reads, never mutates state.
+# Mirrors ``_READ_ONLY_HINTS`` in :mod:`berg_agents.capabilities.tool_adapter` # TODO: This file is removed so the reference is no longer valid.
+# so a native spec infers the same risk class as the MCP adapter.
 _READ_ONLY_HINTS: tuple[str, ...] = (
     "read",
     "search",
@@ -113,7 +115,7 @@ class ToolSpec:
         schema).
     :param execute: Callable implementing the tool.  Receives keyword
         arguments matching ``params`` and returns any value the
-        provider can serialise.
+        provider can serialize.
     :param tags: Optional labels for grouping (``"fs"``, ``"read"``,
         ``"mcp"``, ...).
     :param risk_class: Optional explicit risk class.  When ``None`` the
@@ -220,7 +222,7 @@ def infer_risk_class(name: str) -> RiskClass:
     """Infer a tool's risk class from its name.
 
     Tools whose names contain read-only hints map to ``"low"``; everything
-    else defaults to ``"medium"``.  :func:`tool_adapter._infer_risk_class`
+    else defaults to ``"medium"``.  :func:tool_adapter._infer_risk_class # TODO: This function reference a file that is deleted.
     builds on this by adding MCP-server-based classification (sensitive
     servers map to ``"high"``, read-only servers to ``"low"``).
 
@@ -313,7 +315,9 @@ def _resolve_annotation(
 
     try:
         hints = _typing.get_type_hints(func, include_extras=False)
-    except Exception:
+    except Exception as exc:
+        # Defensive: get_type_hints can fail if the function is in a module that is not fully imported or has other issues. In that case, we fall back to the original annotation.
+        logger.exception(f"Error resolving annotation for {name}: {exc}")
         return annotation
     return hints.get(name, annotation)
 
@@ -329,7 +333,7 @@ def _param_from_signature(
     """Build a :class:`ToolParam` from a function-signature entry.
 
     :param name: Parameter name.
-    :param annotation: Python annotation (may be a string when
+    :param annotation: Python annotation (can be a string when
         ``from __future__ import annotations`` is in effect).
     :param default: Default value or :data:`inspect.Parameter.empty`.
     :param docstring_param_desc: Description pulled from the function's

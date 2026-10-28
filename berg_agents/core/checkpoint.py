@@ -26,8 +26,7 @@ or a human-in-the-loop pause.
 Design goals
 ------------
 1. **Framework agnostic.** The BergAgents runtime
-   must not silently pull in framework code.  The grep gate in
-   ``tests/test_core_checkpoint.py`` enforces this.
+   must not silently pull in framework code.
 2. **Pure data on disk.** A snapshot is a JSON-serializable ``dict`` -
    no Python objects, no class references, no class-bound methods.  The
    loop is responsible for producing it (it can copy any tool
@@ -40,8 +39,8 @@ Design goals
    :class:`Checkpointer` protocol.
 4. **Thread-safe.** Multiple threads may call ``put`` / ``get`` on the
    same backend at once.  The in-memory backend uses a
-   :class:`threading.RLock`; the file backend uses a per-thread
-   :class:`threading.Lock` map to serialize the disk write.
+   :class:`threading._RLock`; the file backend uses a per-thread
+   :class:`threading.lock` map to serialize the disk write.
 5. **Generator-friendly.** ``list()`` yields thread ids in lexicographic
    order; ``get()`` returns ``None`` when the thread has no snapshot.
 

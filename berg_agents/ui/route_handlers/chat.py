@@ -27,10 +27,11 @@ from __future__ import annotations
 import asyncio
 from functools import cached_property
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from berg_agents.agents.chat_agent import build_chat_agent
 from berg_agents.core.harness import Harness
+from berg_agents.core.turn import record_turn_outcome
 from berg_agents.ui.sessions import SessionManager
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
@@ -54,12 +55,12 @@ class BergVercelAIAdapter(VercelAIAdapter):
     The stock adapter maps each answered approval to a bare ``True`` or
     ``False``. That discards the arguments the user edited in the UI
     before approving. This subclass instead maps an *approved* call to
-    :class:`ToolApproved` carrying the part's ``input`` as
+    :class:`pydantic_ai.ToolApproved` carrying the part's ``input`` as
     ``override_args``: the part's input is the original call's args
     when untouched (a no-op override) and the user's edited args when
     they revised them, so edits reach the actual tool execution.
 
-    Denials keep the stock behaviour (``False``, or
+    Denials keep the stock behavior (``False``, or
     ``ToolDenied(message=...)`` when the user gave a reason).
     """
 
@@ -101,7 +102,7 @@ async def _dispatch_chat_with_retry(
     request: Request,
     *,
     agent: Any,
-    sdk_version: int,
+    sdk_version: Literal[5, 6, 7],
     output_type: Any,
     session_id: str | None,
     conversation: Any,
@@ -123,8 +124,7 @@ async def _dispatch_chat_with_retry(
                 sdk_version=sdk_version,
                 output_type=output_type,
                 conversation_id=(
-                    session_id
-                    or getattr(conversation, "conversation_id", None)
+                    session_id or getattr(conversation, "conversation_id", None)
                 ),
                 usage=getattr(conversation, "usage", None),
                 on_complete=save_turn,
@@ -303,28 +303,29 @@ def register_chat_routes(
         # it explicitly.)
 
         # Learning: chat is the main surface, so its turns feed the same
-        # outcome store as harness tasks - otherwise learning never fires.
+        # outcome store as harness tasks - otherwise router
+        # stats never fires.
         def _record_chat_outcome(success: bool) -> None:
             try:
                 harness = request.app.state.harness
-                if harness is None or not harness.learning_enabled:
+                if harness is None:
                     return
-                harness.learning_gate.record(
-                    {
-                        "task_type": "chat",
-                        "complexity": "standard",
-                        "description": "chat turn"},
-                    {"success": success, "inference_attempted": True},
+                record_turn_outcome(
+                    harness,
+                    task_type="chat",
+                    complexity="standard",
+                    description="chat turn",
+                    inference_attempted=True,
                     model_used=model_id or sessions.active_model or "unknown",
                     success=success,
                 )
             except Exception as exc:
-                logger.warning("learning record skipped: %s", exc)
+                logger.warning(f"router stats record skipped: {exc}")
 
         def _log_run_cancelled(run_cancelled: object) -> None:
             # Fired when a client stop/disconnect cancels the run, so
             # the "Stop" button is observable server-side.
-            logger.info("chat run cancelled: %s", run_cancelled)
+            logger.info(f"chat run canceled: {run_cancelled}")
 
         async def _save_turn(result: Any) -> None:
             # on_complete receives the AgentRunResult: persist both the
@@ -353,7 +354,7 @@ def register_chat_routes(
                         payload.decode("utf-8"),
                     )
             except Exception as exc:
-                logger.warning("Session save skipped: %s", exc)
+                logger.warning(f"Session save skipped: {exc}")
 
         # Proxy hiccups (observed via omniroute) can return an
         # entirely empty SSE stream; pydantic-ai surfaces that as
