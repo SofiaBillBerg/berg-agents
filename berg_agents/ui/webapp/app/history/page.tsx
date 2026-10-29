@@ -23,7 +23,7 @@
  *
  * Server sessions first (SQLite, shared across browsers via
  * /api/sessions with full-text search), local snapshots as fallback
- * (this browser only). Restoring parks the current chat, stages the
+ * Restoring adopts the session project-wide, so other windows converge.
  * transcript as live, and returns to `/`.
  */
 
@@ -35,11 +35,6 @@ import {Button, Card, Chip} from "@heroui/react";
 import {API_BASE} from "@/envConfig";
 import {SESSION_ID_KEY} from "@/harness/useAISDKChat";
 
-import {
-    type ChatSnapshot,
-    readSnapshots,
-    restoreSnapshotToLive,
-    writeSnapshots} from "../components/ConversationHistory.tsx";
 import {Navbar} from "../components/Navbar.tsx";
 
 interface ServerSession {
@@ -53,29 +48,15 @@ interface ServerSession {
     outcome: string;
 }
 
-/**
- * Count user turns in a local snapshot for the list subtitle.
- *
- * @param snapshot - Snapshot to inspect.
- * @returns Number of user-role messages.
- */
-function userTurns(snapshot: ChatSnapshot): number {
-    if (!Array.isArray(snapshot.messages)) return 0;
-    return snapshot.messages.filter(
-        (m) =>
-            typeof m === "object" &&
-            m !== null &&
-            (m as { role?: unknown }).role === "user",
-    ).length;
-}
-
-/** HistoryPage - server sessions + local snapshots, searchable. */
+/** HistoryPage - server-side sessions, searchable. */
 export default function HistoryPage() {
     const router = useRouter();
     const [serverSessions, setServerSessions] = useState<ServerSession[] | null>(
         null,
     );
-    const [localSessions, setLocalSessions] = useState<ChatSnapshot[]>([]);
+    const [restoredMessages, setRestoredMessages] = useState<unknown[] | null>(
+        null,
+    );
     const [query, setQuery] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -108,21 +89,6 @@ export default function HistoryPage() {
         };
     }, [query]);
 
-    useEffect(() => {
-        const reread = () => setLocalSessions(readSnapshots());
-        reread();
-        // NOTE: Same cross-tab staleness as the chat widget — re-read when
-        // another tab writes snapshots.
-        window.addEventListener("storage", reread);
-        return () => window.removeEventListener("storage", reread);
-    }, []);
-
-    const localResults = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        if (!q) return localSessions;
-        return localSessions.filter((s) => `${s.title}`.toLowerCase().includes(q));
-    }, [localSessions, query]);
-
     const refreshServer = async () => {
         try {
             const resp = await fetch(
@@ -142,7 +108,9 @@ export default function HistoryPage() {
         );
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
-        restoreSnapshotToLive(Array.isArray(data.messages) ? data.messages : []);
+        setRestoredMessages(
+            Array.isArray(data.messages) ? data.messages : [],
+        );
         try {
             localStorage.setItem(SESSION_ID_KEY, session.id);
         } catch {
@@ -155,6 +123,8 @@ export default function HistoryPage() {
             body: JSON.stringify({id: session.id})}).catch(() => undefined);
         router.push("/");
     };
+
+    void restoredMessages;
 
     const removeServer = async (id: string) => {
         await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(id)}`, {
@@ -178,17 +148,6 @@ export default function HistoryPage() {
         }
     };
 
-    const removeLocal = (id: string) => {
-        const next = localSessions.filter((s) => s.id !== id);
-        setLocalSessions(next);
-        writeSnapshots(next);
-    };
-
-    const restoreLocal = (session: ChatSnapshot) => {
-        restoreSnapshotToLive(session.messages);
-        router.push("/");
-    };
-
     return (
         <>
             <Navbar/>
@@ -196,12 +155,14 @@ export default function HistoryPage() {
                 <div className="mx-auto w-full max-w-6xl p-4">
                     <h1 className="text-2xl font-bold mb-4">History</h1>
                     <p className="text-sm text-muted-foreground mb-4">
-                        Server sessions work in any browser; this browser&apos;s snapshots
-                        are local only. Restoring parks the current chat first, so nothing
-                        is lost.
+                        Sessions are saved server-side, so they are the same in every
+                        browser. Each one is also written to a durable JSONL transcript
+                        on disk, so history survives the database.
                     </p>
                     <input
                         aria-label="Search conversations"
+                        name="session-search"
+                        id="session-search"
                         className="mb-3 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search titles, subtitles, transcripts…"
@@ -306,41 +267,7 @@ export default function HistoryPage() {
                         ))}
                     </div>
 
-                    <h2 className="mb-2 text-sm font-semibold">
-                        This browser ({localResults.length})
-                    </h2>
-                    <div className="flex flex-col gap-2">
-                        {localResults.map((s) => (
-                            <Card key={s.id} variant="default">
-                                <Card.Content className="flex items-center gap-2 p-2">
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium">{s.title}</p>
-                                        <p className="text-[11px] text-muted-foreground">
-                                            {new Date(s.timestamp).toLocaleString()} · {userTurns(s)}{" "}
-                                            user turn
-                                            {userTurns(s) === 1 ? "" : "s"}
-                                        </p>
-                                    </div>
-                                    <Button
-                                        aria-label={`Restore ${s.title}`}
-                                        size="sm"
-                                        variant="primary"
-                                        onPress={() => restoreLocal(s)}
-                                    >
-                                        Restore
-                                    </Button>
-                                    <Button
-                                        aria-label={`Delete ${s.title}`}
-                                        size="sm"
-                                        variant="secondary"
-                                        onPress={() => removeLocal(s.id)}
-                                    >
-                                        🗑
-                                    </Button>
-                                </Card.Content>
-                            </Card>
-                        ))}
-                    </div>
+
                 </div>
             </div>
         </>

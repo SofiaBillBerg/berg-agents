@@ -40,19 +40,16 @@ import {useChat} from "@ai-sdk/react";
 import {API_BASE} from "@/envConfig";
 
 /** localStorage key for the live conversation (shared with History). */
-export const CHAT_MESSAGES_KEY = "berg_chat_messages";
 
 /** localStorage key for the active server-side session id. */
 export const SESSION_ID_KEY = "berg_session_id";
 
 /** Max messages persisted (keeps quota usage bounded). */
-const MAX_PERSISTED_MESSAGES = 200;
 
 /** Max chars kept per tool input/output in storage (display caps lower). */
 const MAX_STORED_PART_CHARS = 2000;
 
 /** Soft budget for the whole persisted payload (well under quota). */
-const MAX_STORED_JSON_CHARS = 700_000;
 
 /**
  * Slim a UIMessage list for localStorage: tool inputs/outputs are
@@ -63,30 +60,6 @@ const MAX_STORED_JSON_CHARS = 700_000;
  * @param msgs - Raw UI messages.
  * @returns JSON-safe slimmed copies.
  */
-export function slimUIMessagesForPersist(msgs: unknown[]): unknown[] {
-    const trim = (value: unknown): unknown => {
-        if (typeof value === "string" && value.length > MAX_STORED_PART_CHARS) {
-            return `${value.slice(0, MAX_STORED_PART_CHARS)}\n… (stored truncated)`;
-        }
-        return value;
-    };
-    return msgs.map((m) => {
-        if (typeof m !== "object" || m === null) return m;
-        const msg = m as { parts?: unknown };
-        if (!Array.isArray(msg.parts)) return m;
-        return {
-            ...msg,
-            parts: msg.parts.map((p) => {
-                if (typeof p !== "object" || p === null) return p;
-                const part = p as { input?: unknown; output?: unknown };
-                const next: Record<string, unknown> = {...part};
-                if ("input" in next) next.input = trim(next.input);
-                if ("output" in next) next.output = trim(next.output);
-                return next;
-            })};
-    });
-}
-
 /**
  * Serialize messages to a quota-safe JSON string: slim first, then
  * drop oldest messages until under budget. Deterministic — the newest
@@ -95,22 +68,6 @@ export function slimUIMessagesForPersist(msgs: unknown[]): unknown[] {
  * @param msgs - Raw UI messages (newest last).
  * @returns JSON string, or null when nothing serializable remains.
  */
-export function serializeForPersist(msgs: unknown[]): string | null {
-    let slim = slimUIMessagesForPersist(
-        msgs.slice(-MAX_PERSISTED_MESSAGES),
-    ) as unknown[];
-    try {
-        let json = JSON.stringify(slim);
-        while (json.length > MAX_STORED_JSON_CHARS && slim.length > 1) {
-            slim = slim.slice(Math.ceil(slim.length / 2));
-            json = JSON.stringify(slim);
-        }
-        return json;
-    } catch {
-        return null;
-    }
-}
-
 export interface ChatMessage {
     id: string;
     role: "user" | "assistant" | "system";
@@ -692,14 +649,9 @@ export function useAISDKChat(): UseAISDKChatReturn {
 
     const clearMessages = () => {
         setUIMessages([]);
-        try {
-            localStorage.removeItem(CHAT_MESSAGES_KEY);
-        } catch {
-            // Private-mode storage may throw - in-memory state still clears.
-        }
     };
 
-    // Restore a snapshot (e.g. from ConversationHistory) into the live chat.
+    // Restore server-session messages into the live chat.
     // Stored snapshots predate this load, so no paused run can be live.
     // Duplicate message ids (e.g. one request dumped to two UI messages)
     // are suffixed — React keys must be unique and ids are otherwise opaque.
@@ -755,7 +707,6 @@ export function useAISDKChat(): UseAISDKChatReturn {
         try {
             if (typeof data.id === "string") {
                 localStorage.setItem(SESSION_ID_KEY, data.id);
-                localStorage.removeItem(CHAT_MESSAGES_KEY);
             }
         } catch {
             // Private mode - chat still works in memory.
@@ -772,23 +723,6 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // below). Rendered as an Alert by App — never smuggled into the
     // message list, so it can never poison a future send.
     const [systemNotice, setSystemNotice] = useState<string | null>(null);
-
-    // Persist the live conversation so tab switches and reloads keep it.
-    // Settled turns only: mid-stream states (half-written tool parts)
-    // are never stored, so storage always holds a clean turn boundary.
-    // Slimmed + budgeted (see serializeForPersist), so a big transcript
-    // shrinks deterministically instead of failing quota and silently
-    // keeping stale state behind.
-    useEffect(() => {
-        if (!restoredRef.current) return;
-        if (status === "streaming" || status === "submitted") return;
-        try {
-            const json = serializeForPersist(uiMessages as unknown as unknown[]);
-            if (json !== null) localStorage.setItem(CHAT_MESSAGES_KEY, json);
-        } catch {
-            // Private mode - chat still works in memory.
-        }
-    }, [uiMessages, status]);
 
     // Failed-send recovery: the backend is stateless, so any approval
     // parts pending when a send errors belong to a run that can never
@@ -843,6 +777,39 @@ export function useAISDKChat(): UseAISDKChatReturn {
                 : `A tool run failed (${String(error).slice(0, 200)}). Its pending approvals were auto-rejected so the conversation can continue — ask the model to retry.`,
         );
     }, [error, uiMessages, status]);
+
+    // The backend refines a generated title once the first real user
+    // message arrives (a greeting leaves it as "#N · date"), so the
+    // header must re-read it after a settled turn. Without this the
+    // title stays whatever it was at create time.
+    useEffect(() => {
+        if (!sessionId) return;
+        if (isStreaming) return;
+        let cancelled = false;
+        const reverifyTitle = async () => {
+            try {
+                const resp = await fetch(
+                    `${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}`,
+                );
+                if (!resp.ok || cancelled) return;
+                const data = await resp.json();
+                if (
+                    !cancelled &&
+                    data.session &&
+                    typeof data.session.title === "string" &&
+                    data.session.title !== sessionTitle
+                ) {
+                    setSessionTitle(data.session.title);
+                }
+            } catch {
+                // Backend unreachable - the existing title stands.
+            }
+        };
+        void reverifyTitle();
+        return () => {
+            cancelled = true;
+        };
+    }, [sessionId, sessionTitle, isStreaming]);
 
     // Restore the persisted conversation once, after mount. Server
     // first (shared across browsers), localStorage as offline fallback.
@@ -906,19 +873,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
             } finally {
                 if (!cancelled) restoredRef.current = true;
             }
-            // Local fallback (offline, or unknown server session).
-            try {
-                const raw = localStorage.getItem(CHAT_MESSAGES_KEY);
-                if (!raw) return;
-                const parsed: unknown = JSON.parse(raw);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    setUIMessages(
-                        sanitizeHistory(parsed, false) as unknown as UIMessage[],
-                    );
-                }
-            } catch {
-                // Corrupt storage - start with an empty conversation.
-            }
+            // No local copy: the server session is the only source.
         };
         void restore();
         return () => {

@@ -31,9 +31,12 @@ no per-project copy. Each session records the ``workspace``
 (project display name) it belongs to, and the seq in a default title
 is counted within that workspace.
 
-Session identity is a stable id (client thread id or minted uuid):
-titles default to ``<project> #<seq> · <date>`` with the first user
-message as subtitle, and renames are explicit user titles.
+Session identity is a stable id (client thread id or minted uuid) that
+never changes — a session resumed days later keeps its id. Only the
+*title* evolves: ``<project> #<seq> · <date>`` at creation, refined to
+``<project> #<seq> · <date> · <intent>`` once the first real user
+message lands, so a session resumed across days still reads naturally.
+Renames are explicit user titles and always win.
 """
 
 from __future__ import annotations
@@ -280,6 +283,128 @@ def coerce_session_id(raw: Any) -> str:
     return uuid4().hex
 
 
+#: Utterances that say nothing about intent — never used as a slug.
+_GREETINGS = frozenset({
+    "hi",
+    "hii",
+    "hiii",
+    "hiya",
+    "hey",
+    "heyy",
+    "hello",
+    "helloo",
+    "yo",
+    "sup",
+    "test",
+    "testing",
+    "ok",
+    "okay",
+    "yes",
+    "no",
+    "thanks",
+    "thank you",
+    "please",
+    "?"})
+
+#: Words that carry no topic and only pad a slug.
+_FILLER = frozenset({
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "but",
+    "if",
+    "then",
+    "else",
+    "please",
+    "can",
+    "you",
+    "your",
+    "could",
+    "would",
+    "should",
+    "just",
+    "with",
+    "for",
+    "from",
+    "that",
+    "this",
+    "these",
+    "those",
+    "it",
+    "its",
+    "of",
+    "to",
+    "in",
+    "on",
+    "at",
+    "by",
+    "as",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "do",
+    "does",
+    "did",
+    "i",
+    "me",
+    "my",
+    "mine",
+    "we",
+    "us",
+    "our",
+    "let's",
+    "lets",
+    "want",
+    "need",
+    "like",
+    "some",
+    "any",
+    "all",
+    "not"})
+
+
+def intent_slug(text: str, *, max_words: int = 4, max_chars: int = 40) -> str:
+    """A short readable slug from the first meaningful user message.
+
+    Greetings ("hi", "hello", "test") are skipped — a session's title
+    should say what the session is *about*, which "hi" never does.
+    Filler words are dropped so the slug is the topic, not the phrasing.
+
+    :param text: First user text (as recorded in a subtitle).
+    :param max_words: Maximum words to keep.
+    :param max_chars: Maximum slug length after joining.
+    :return: Slug such as ``transcript autosave``; empty when nothing
+        meaningful remains (a pure greeting, or no text).
+    """
+    candidate = (text or "").strip().lower()
+    if not candidate:
+        return ""
+    # Words first, so a greeting can be recognised even when filler
+    # follows it ("hi there", "hello again").
+    words = re.findall(r"[a-z0-9]+", candidate)
+    if not words:
+        return ""
+    # Leading greeting + filler carry no intent: drop the leading run of
+    # them so the slug starts at the first real content word.
+    while words and words[0] in _GREETINGS:
+        words = words[1:]
+        # Then drop any filler immediately following the greeting.
+        while words and words[0] in _FILLER:
+            words = words[1:]
+    if not words:
+        return ""
+    kept = [w for w in words if w not in _FILLER and len(w) > 1][:max_words]
+    slug = " ".join(kept).strip()
+    if len(slug) > max_chars:
+        slug = slug[:max_chars].rsplit(" ", 1)[0].strip()
+    return slug
+
+
 def first_user_text(ui_messages: Any) -> str:
     """First user text in a Vercel AI message list (for subtitles)."""
     if not isinstance(ui_messages, list):
@@ -296,6 +421,51 @@ def first_user_text(ui_messages: Any) -> str:
             ):
                 return part["text"].strip()[:80]
     return ""
+
+
+async def refine_session_title(
+    store: Any,
+    session_id: str,
+    subtitle: str,
+    workspace: str,
+) -> str | None:
+    """Append an intent slug to a generated title, once, after creation.
+
+    Called after ``ensure_session`` with the first user text in hand:
+    the session is created with no text yet, so ``#N · date`` is all it
+    can honestly carry at that point. This refines it in place, without
+    touching the id, and never overwrites a title the user renamed.
+
+    :param store: Conversation store.
+    :param session_id: Session to refine.
+    :param subtitle: First user text (the intent source).
+    :param workspace: Project display name (guard for the right session).
+    :return: The new title, or None when nothing needed refining.
+    """
+    slug = intent_slug(subtitle)
+    if not slug:
+        return None
+    try:
+        saved = await store.get(conversation_id=session_id)
+    except LookupError:
+        return None
+    summary = saved.summary
+    if summary.workspace != workspace:
+        return None
+    # A renamed title is the user's; never overwrite it.
+    if not summary.title.startswith(f"{workspace} #"):
+        return None
+    if f"· {slug}" in summary.title:
+        return None  # Already refined with this intent.
+    new_title = f"{summary.title} · {slug}"
+    try:
+        await store.name(
+            source=summary, title=new_title, subtitle=summary.subtitle
+        )
+    except Exception as exc:
+        logger.warning("Session title refine skipped: %s", exc, exc_info=True)
+        return None
+    return new_title
 
 
 async def ensure_session(

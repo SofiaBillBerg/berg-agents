@@ -38,6 +38,7 @@ import type {ToolResult} from "./components/ChatTranscript";
 import React, {useCallback, useEffect, useRef, useState} from "react";
 import {Alert, Button, Card, Toast, toast} from "@heroui/react";
 import {API_BASE} from "@/envConfig";
+import {useRouter} from "next/navigation";
 import {buildExportMarkdown} from "@/utils/utils";
 
 import InputBar from "./components/InputBar.tsx";
@@ -50,7 +51,6 @@ import ChatTranscript, {CHAT_SCROLL_ID} from "./components/ChatTranscript.tsx";
 import {PluginUISurface} from "./plugins/PluginUISurface.tsx";
 import {PluginCatalog} from "./components/PluginCatalog.tsx";
 import Navbar from "./components/Navbar.tsx";
-import {ConversationHistory, snapshotLiveChat} from "./components/ConversationHistory";
 
 /*
  * Error boundary for lazy-loaded components.
@@ -237,6 +237,7 @@ function ApprovalItem({
  * Main chat UI - receives state from useAISDKChat and renders the interface.
  */
 function ChatContent() {
+    const router = useRouter();
     const aiChat = useAISDKChat();
     const {
         messages,
@@ -327,9 +328,6 @@ function ChatContent() {
     // -------------------------------------------------------------------------
     // Sessions + conversation navigation
     // -------------------------------------------------------------------------
-    /** Show/hide the saved-sessions panel (resumable chats). */
-    const [showHistory, setShowHistory] = useState(false);
-
     /** Show/hide the inline Details & Activity panel. */
     const [showDetails, setShowDetails] = useState(false);
 
@@ -471,8 +469,6 @@ function ChatContent() {
     /** Park the live chat as a resumable session, then start fresh. */
     const startNewChat = () => {
         stop();
-        snapshotLiveChat();
-        setShowHistory(false);
         // NOTE: Server session first (numbered title); local clear only
         // when the backend is unreachable.
         void newServerChat().catch(() => clearMessages());
@@ -813,12 +809,12 @@ function ChatContent() {
             </span>
           </span>
                     <Button
-                        aria-label={showHistory ? "Hide sessions" : "Show sessions"}
+                        aria-label="Open sessions (server-side history)"
                         size="sm"
                         variant="secondary"
-                        onPress={() => setShowHistory((prev) => !prev)}
+                        onPress={() => router.push("/history")}
                     >
-                        🕘 {showHistory ? "Hide sessions" : "Sessions"}
+                        🕘 Sessions
                     </Button>
                     <Button
                         aria-label="Start a new chat (current chat is saved as a session)"
@@ -930,13 +926,6 @@ function ChatContent() {
           </span>
                 </div>
 
-                {/* Saved sessions - resumable chats. Restoring parks the live
-            chat as a session first, so nothing is ever lost. */}
-                {showHistory && (
-                    <div className="mb-2 max-h-48 overflow-y-auto">
-                        <ConversationHistory onSelect={(msgs) => restoreMessages(msgs)}/>
-                    </div>
-                )}
 
                 {/* Activity details - one inline toggle line (no card chrome),
             so it costs almost no vertical space when collapsed. */}

@@ -193,6 +193,20 @@ async def _track_chat_session(
             resolve_project(root_dir),
             model=model_id or sessions.active_model,
         )
+        # Refine the generated title with the intent once the first user
+        # text is in hand: the session is created before any message
+        # exists, so `#N · date` is all it can carry at that point. The
+        # id never changes — a session resumed days later keeps it, and
+        # a title the user renamed is left alone.
+        raw_messages = (
+            body.get("messages") if isinstance(body, dict) else None
+        )
+        await session_store.refine_session_title(
+            store,
+            session_id,
+            session_store.first_user_text(raw_messages),
+            session_store.project_name(root_dir),
+        )
     except Exception as exc:
         logger.warning("Session tracking skipped: %s", exc, exc_info=True)
         session_id = None
