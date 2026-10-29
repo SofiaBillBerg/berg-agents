@@ -190,6 +190,67 @@ def _dump_messages(messages: Any) -> list[tuple[str | None, dict[str, Any]]]:
     return out
 
 
+def _message_signature(payload: dict[str, Any]) -> str:
+    """Stable identity for one serialized message.
+
+    Content-based, not positional: the SQLite store normalizes messages
+    (it merges a request-only block into its neighbour), so its order and
+    count differ from ``AgentRunResult.all_messages()``. Comparing counts
+    therefore drifts and drops the newest user prompt — comparing content
+    does not.
+
+    :param payload: Serialized ``ModelMessage`` dict.
+    :return: Hex digest identifying this message's content.
+    """
+    import hashlib
+
+    blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha1(blob.encode("utf-8")).hexdigest()
+
+
+def append_new_messages(
+    session_id: str,
+    project: ProjectRef,
+    messages: Any,
+) -> int:
+    """Append only messages the transcript does not already hold.
+
+    Deduplicates on :func:`_message_signature`, so re-running a turn,
+    a turn whose history was rewritten by compaction, or the store's own
+    normalization never duplicates a line. Memory snapshots repeat
+    verbatim every turn and are correctly skipped as already-present.
+
+    :param session_id: Stable session identifier.
+    :param project: Resolved project.
+    :param messages: Iterable of pydantic-ai ``ModelMessage`` objects.
+    :return: Number of message lines written.
+    """
+    existing = {
+        _message_signature(m)
+        for m in read_transcript(session_id, project)["messages"]
+        if isinstance(m, dict)
+    }
+    path = ensure_transcript(session_id, project)
+    sent_at = datetime.now(UTC).isoformat()
+    written = 0
+    for kind, payload in _dump_messages(messages):
+        signature = _message_signature(payload)
+        if signature in existing:
+            continue
+        existing.add(signature)
+        if _append_line(
+            path,
+            {
+                "type": "message",
+                "index": written,
+                "role": kind or "unknown",
+                "sent_at": sent_at,
+                "message": payload},
+        ):
+            written += 1
+    return written
+
+
 def append_messages(
     session_id: str,
     project: ProjectRef,

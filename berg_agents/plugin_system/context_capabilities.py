@@ -74,6 +74,131 @@ _DEFAULT_FALLBACK_WINDOW = 32_000
 #: Fraction of the context window at which escalation kicks in.
 _TARGET_FRACTION = 0.8
 
+#: Defaults for the decision-model (judge) config block. The env var
+#: NAMES are the only hardcoded thing here — every value comes from
+#: ``.berg-agents/bergagents.jsonc`` (Sofia's rule: config is the only
+#: source), and this block is what makes the block optional.
+_DECISION_DEFAULTS = {
+    "name": "default",
+    "base_url_env": "TYPESAFE_BASE_URL",
+    "api_key_env": "TYPESAFE_API_KEY"}
+
+
+def _decision_config() -> dict[str, Any]:
+    """The ``decision_model`` block, defaults applied.
+
+    :return: Mapping with ``name``, ``base_url_env`` and ``api_key_env``.
+    """
+    cfg: dict[str, Any] = dict(_DECISION_DEFAULTS)
+    try:
+        from berg_agents.config.settings import get_settings
+
+        block = get_settings().model_dump().get("decision_model")
+        if isinstance(block, dict):
+            for key in ("name", "base_url_env", "api_key_env"):
+                value = block.get(key)
+                if isinstance(value, str) and value.strip():
+                    cfg[key] = value.strip()
+    except Exception as exc:  # Defensive: compaction must never break.
+        logger.debug("decision_model config unreadable: %s", exc)
+    return cfg
+
+
+def _decision_api_origin(raw_url: str) -> str:
+    """Origin of a decision API URL.
+
+    ``SystemOneProvider`` appends ``/v1/systemone`` itself, so a config
+    value that already carries the full path (Unsloth's Decision API
+    does) must be reduced to its origin or the provider would request
+    ``.../v1/systemone/v1/systemone``. A value that is already an origin
+    is returned unchanged.
+
+    :param raw_url: Configured API URL.
+    :return: ``scheme://host[:port]``.
+    """
+    from urllib.parse import urlsplit
+
+    parts = urlsplit((raw_url or "").strip())
+    if not parts.scheme or not parts.netloc:
+        return (raw_url or "").strip().rstrip("/")
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+def _relevance_tier() -> list[Any]:
+    """The ``RelevanceCompaction`` tier, or [] when no judge is configured.
+
+    Judged compaction sits between the cheap no-LLM tiers and the
+    expensive summarization: it keeps the steps the current task still
+    needs verbatim instead of flattening everything into one summary.
+    Needs a decision model, so it is simply absent when none is
+    configured rather than failing the whole compaction chain.
+
+    :return: A one-element list of the tier, or an empty list.
+    """
+    decision_model = build_decision_model()
+    if decision_model is None:
+        return []
+    try:
+        from pydantic_ai_harness.compaction import RelevanceCompaction
+
+        return [
+            RelevanceCompaction(
+                decision_model,
+                max_fraction=_TARGET_FRACTION,
+                fallback_context_window=_DEFAULT_FALLBACK_WINDOW,
+                # Reduce rather than summarize when the judge is the only
+                # entropy-free tool available; the SummarizingCompaction
+                # tier above still runs afterwards if more is needed.
+                target_fraction=_TARGET_FRACTION / 2,
+            )
+        ]
+    except Exception as exc:
+        logger.warning(
+            "RelevanceCompaction tier unavailable: %s", exc, exc_info=True
+        )
+        return []
+
+
+def build_decision_model() -> Any | None:
+    """Build the decision-model judge, or None when it is not configured.
+
+    Laya (Unsloth's Decision API) and Ollama's local decision models are
+    reached through pydantic-ai's ``SystemOneModel`` — no adapter code,
+    because pydantic-ai already speaks the API. The URL, key and model
+    name all come from config/env, never from code.
+
+    :return: A ``SystemOneModel``, or None when no URL is configured.
+    """
+    import os
+
+    cfg = _decision_config()
+    raw_url = (os.environ.get(cfg["base_url_env"]) or "").strip()
+    if not raw_url:
+        logger.debug(
+            "No decision model configured (%s unset); the relevance "
+            "tier is skipped.",
+            cfg["base_url_env"],
+        )
+        return None
+    try:
+        from pydantic_ai.models.system_one import SystemOneModel
+        from pydantic_ai.providers.system_one import SystemOneProvider
+
+        provider = SystemOneProvider(
+            base_url=_decision_api_origin(raw_url),
+            api_key=(os.environ.get(cfg["api_key_env"]) or "").strip() or None,
+        )
+        return SystemOneModel(cfg["name"], provider=provider)
+    except Exception as exc:
+        logger.warning(
+            "Decision model unavailable (%s=%s): %s",
+            cfg["base_url_env"],
+            cfg["name"],
+            exc,
+            exc_info=True,
+        )
+        return None
+
 
 def _config_dir(root_dir: str | Path | None = None) -> Path:
     """Resolved config directory for this project.
@@ -204,6 +329,7 @@ def build_compaction_capabilities() -> list[Any]:
                             DeduplicateFileReads(file_key=_workspace_file_key),
                             ClearToolResults(max_tokens=1, keep_pairs=3),
                             ClampOversizedMessages(max_part_tokens=40_000),
+                            *(_relevance_tier() or []),
                             SummarizingCompaction(
                                 # Inherits the running agent's model; reached
                                 # only when cheaper tiers fall short.

@@ -32,10 +32,9 @@ from typing import Any, Literal
 from berg_agents.agents.chat_agent import build_chat_agent
 from berg_agents.core.harness import Harness
 from berg_agents.core.turn import record_turn_outcome
-from berg_agents.ui import projects, transcripts
 from berg_agents.ui.projects import resolve_project
 from berg_agents.ui.sessions import SessionManager
-from berg_agents.ui.transcripts import append_messages, ensure_transcript
+from berg_agents.ui.transcripts import append_new_messages, ensure_transcript
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic_ai import DeferredToolRequests, DeferredToolResults
@@ -145,15 +144,6 @@ async def _dispatch_chat_with_retry(
             )
             await asyncio.sleep(2)
     raise AssertionError("unreachable")  # pragma: no cover
-
-
-def transcript_message_count(root_dir: str, session_id: str) -> int:
-    """Messages already in the JSONL transcript (the append cursor)."""
-    return len(
-        transcripts.read_transcript(
-            session_id, projects.resolve_project(root_dir)
-        )["messages"]
-    )
 
 
 async def _track_chat_session(
@@ -379,13 +369,15 @@ def register_chat_routes(
                 store = session_store.get_store(root)
                 messages = result.all_messages()
                 await session_store.record_turn(store, session_id, messages)
-                # Append the same messages to the durable JSONL
-                # transcript, so a transcript survives the database.
-                append_messages(
-                    session_id,
-                    resolve_project(root),
-                    messages,
-                    start_index=transcript_message_count(root, session_id),
+                # Append the NEW messages to the durable JSONL transcript,
+                # deduplicated by content: the SQLite store normalizes
+                # messages (merging a request-only block into its
+                # neighbour), so its order and count differ from
+                # `all_messages()` and any count-based slice drops the
+                # newest user prompt. `append_new_messages` compares
+                # content instead, which is stable across both.
+                append_new_messages(
+                    session_id, resolve_project(root), messages
                 )
                 conversation_obj = getattr(result, "conversation", None)
                 if conversation_obj is not None:
