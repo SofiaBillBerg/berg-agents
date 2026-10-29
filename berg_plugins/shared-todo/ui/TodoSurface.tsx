@@ -600,7 +600,9 @@ export function TodoSurface({
         <div className="mt-1 flex flex-col gap-1 border-t border-border pt-2">
           <input
             aria-label="New todo title"
-            className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+            name="new-todo-title"
+            id="new-todo-title"
+className="rounded-md border border-border bg-background px-2 py-1 text-sm"
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") void createTodo();
@@ -610,7 +612,9 @@ export function TodoSurface({
           />
           <textarea
             aria-label="New todo description"
-            className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+            name="new-todo-description"
+            id="new-todo-description"
+className="rounded-md border border-border bg-background px-2 py-1 text-sm"
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Description (optional)"
             rows={view === "canvas" ? 3 : 1}

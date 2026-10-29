@@ -188,6 +188,8 @@ export function SharedContextEditor() {
                     </Button>
                     <input
                         aria-label="Why (what/why discipline)"
+                        name="shared-context-why"
+                        id="shared-context-why"
                         className="flex-1 min-w-[12rem] rounded-md border border-border bg-background px-2 py-1 text-sm"
                         placeholder="why (the what/why discipline)"
                         value={why}

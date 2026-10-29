@@ -78,6 +78,8 @@ export default function AgentSelector() {
     return (
         <select
             aria-label="Active agent"
+            name="active-agent"
+            id="active-agent"
             className="rounded-md border border-border bg-background px-2 py-1 text-sm"
             value={active ?? ""}
             onChange={(e) => onChange(e.target.value)}

@@ -77,7 +77,7 @@ website:
       contents:
         - text: "Adding a Custom Agent"
           href: docs/tutorials/quickstart_agents.qmd
-        - text: "Multi-step Harness Workflow"
+        - text: "Multistep Harness Workflow"
           href: docs/tutorials/harness_workflow.qmd
         - text: "Adding an MCP Server"
           href: docs/tutorials/mcp_integration.qmd
