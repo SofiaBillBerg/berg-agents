@@ -555,6 +555,8 @@ export function TodoSurface({
                 <div className="mt-1 flex gap-1">
                   <input
                     aria-label={`New subtask for ${todo.title}`}
+                    name={`new-subtask-${todo.id}`}
+                    id={`new-subtask-${todo.id}`}
                     className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs"
                     onChange={(e) =>
                       setSubDrafts((prev) => ({
@@ -602,7 +604,7 @@ export function TodoSurface({
             aria-label="New todo title"
             name="new-todo-title"
             id="new-todo-title"
-className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+            className="rounded-md border border-border bg-background px-2 py-1 text-sm"
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") void createTodo();
@@ -614,7 +616,7 @@ className="rounded-md border border-border bg-background px-2 py-1 text-sm"
             aria-label="New todo description"
             name="new-todo-description"
             id="new-todo-description"
-className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+            className="rounded-md border border-border bg-background px-2 py-1 text-sm"
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Description (optional)"
             rows={view === "canvas" ? 3 : 1}
