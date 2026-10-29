@@ -7,7 +7,8 @@ format: html
 # Shared-ToDo Pilot Plugin
 
 `shared-todo` (`berg-plugin-shared-todo`) is the pilot plugin: it
-installs and runs without touching `berg-agents` source. It covers
+installs and runs without touching `berg-agents` source.
+It covers
 discovery, config, tools, generic tool dispatch, UI mounting, and
 cross-tab sync, so a second plugin can follow the same shape.
 
@@ -124,7 +125,7 @@ a restart; the sidebar surface refreshes on `refreshKey` bumps.
 
 1. `cd berg_plugins/shared-todo && bun run build:ui`
 2. Confirm output lands at `ui/dist/todo-surface.js` (git-ignored build
-   artifact — rebuild it with `bun run build:ui` on a fresh checkout).
+   artifact --- rebuild it with `bun run build:ui` on a fresh checkout).
 3. Start / restart the server.
 4. `GET /api/plugins` --- expect `berg-plugin-shared-todo`, 10 tools,
    `ui.entry_built: true`.

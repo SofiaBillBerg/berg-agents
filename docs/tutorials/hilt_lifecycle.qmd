@@ -6,11 +6,15 @@ format: html
 
 # Tutorial - Human-in-the-Loop (HITL) Lifecycle
 
-BergAgents pauses before running anything risky. This tutorial shows when a pause happens, how to answer it in both surfaces, and how to tune it. Code: `berg_agents/core/hitl.py` (`HitlRequest`, `HitlDecision`), tool risk classes in `berg_agents/agents/factory.py`.
+BergAgents pauses before running anything risky.
+This tutorial shows when a pause happens, how to answer it in both surfaces, and how to tune it.
+Code: `berg_agents/core/hitl.py` (`HitlRequest`, `HitlDecision`), tool risk classes in `berg_agents/agents/factory.py`.
 
 ## 1. When does a pause happen?
 
-Each tool carries a `risk_class`. **Low-risk** tools (`list_files`, `read_file`, `search_code`, `plan_task`) run unattended. **High-risk** tools (`bash`, `edit_file`, `patch_file`, `write_file`, `implement_task`, sensitive MCP tools) pause for approval.
+Each tool carries a `risk_class`.
+**Low-risk** tools (`list_files`, `read_file`, `search_code`, `plan_task`) run unattended.
+**High-risk** tools (`bash`, `edit_file`, `patch_file`, `write_file`, `implement_task`, sensitive MCP tools) pause for approval.
 
 `hitl_rules` in `bergagents.jsonc` names which families fall where:
 
@@ -25,7 +29,7 @@ Each tool carries a `risk_class`. **Low-risk** tools (`list_files`, `read_file`,
 }
 ```
 
-Read-only (`read_only=True`) or shell-disabled (`allow_shell=False`) deployments withhold mutating tools at registration — there is nothing to approve because the tools are absent from the schema.
+Read-only (`read_only=True`) or shell-disabled (`allow_shell=False`) deployments withhold mutating tools at registration --- there is nothing to approve because the tools are absent from the schema.
 
 ## 2. Answering a pause (TUI)
 
@@ -39,11 +43,11 @@ Approval re-executes with `hitl_decision: approve` in metadata; anything else fa
 
 The HITL surface shows the tool name plus its arguments with three actions:
 
-| Action | Effect |
-|---|---|
-| Approve | Runs with the given arguments. |
-| Reject | Cancels the task. |
-| Edit | Rewrites the arguments inline before the tool runs. |
+  | Action  | Effect                                              |
+  | ------- | --------------------------------------------------- |
+  | Approve | Runs with the given arguments.                      |
+  | Reject  | Cancels the task.                                   |
+  | Edit    | Rewrites the arguments inline before the tool runs. |
 
 ## 4. Recovery behavior
 

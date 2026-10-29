@@ -2,7 +2,7 @@
 SHELL := $(SHELL)
 .SHELLFLAGS := -c
 
-# Makefile for the project, providing targets for installing dependencies and building the UI and uv plugin.
+# Makefile for the project, providing targets for installing dependencies and building the Shared ToDo plugin package for Berg-Agents thourgh bun and uv.
 
 # .PHONY: bun-install-plugin build-ui-plugin eslint-fix-plugin uv-format-plugin uv-install-plugin uv-build-plugin uv-lock-plugin
 # .default-goal := help
@@ -26,7 +26,7 @@ tsc-lint-plugin: ## Use bun to lint the UI
 
 uv-format-plugin: ## Use uv to format the plugin code
 	@echo "Formatting the plugin code with uv"
-	@uv format --ty-version latest
+	@.venv/bin/uv check --fix
 
 uv-install-plugin: ## Install uv dependencies for the plugin
 	@echo "Installing the project package and uv dependencies"
@@ -35,21 +35,12 @@ uv-install-plugin: ## Install uv dependencies for the plugin
 
 uv-build-plugin: uv-install-plugin ## Use uv to build the plugin
 	@echo "Build the package with uv"
-	@uv build
+	@.venv/bin/uv build
 
 uv-lock-plugin: ## Use uv to lock the dependencies and generate a requirements.txt file
 	@echo "Locking the dependencies with uv and generating requirements.txt"
-	@uv lock
-	@uv export --format requirements.txt --output-file requirements.txt -q
-
-make-install-run: ## Run bash script install_and_run.sh to build and start Berg-Agents web-ui
-	@echo "Running install_and_run.sh script to build and start Berg-Agents web-ui"
-	@bash install_and_run.sh
-
-stop-berg-agents: ## Stop the Berg-Agents web-ui on what ever port it is running on
-	@echo "Stopping the Berg-Agents web-ui"
-	# Find the port
-	@PORT=$(shell lsof -i :3000 -t) && if [ -n "$$PORT" ]; then kill -9 $$PORT; echo "Stopped Berg-Agents web-ui on port 3000"; else echo "No process found on port 3000"; fi
+	@.venv/bin/uv lock
+	@.venv/bin/uv export --format requirements.txt --output-file requirements.txt -q
 
 
 .PHONY: help

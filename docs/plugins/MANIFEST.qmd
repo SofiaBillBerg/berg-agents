@@ -191,7 +191,8 @@ lifecycle:
 - [ ] `lifecycle` reflects the right startup posture (`auto_enable`, `deferred`, `priority`)
 
 The listing is fully data-driven: `app/plugins/registry.tsx` keeps no
-plugin list. The host discovers surfaces from `GET /api/plugins` and
+plugin list.
+The host discovers surfaces from `GET /api/plugins` and
 runtime-imports whatever `ui.entry_url` the manifest declares, so a new
 plugin needs no host edit at all --- drop the package in, build its
 bundle, and it appears.

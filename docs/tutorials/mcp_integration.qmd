@@ -6,7 +6,9 @@ format: html
 
 # Tutorial - Adding an MCP Server
 
-MCP servers give the agent external tools over stdio or HTTP. Servers are declared as a JSON **list** in the file pointed at by `BERG_AGENT_MCP_SERVERS` (default `{config}/mcp.json`). Secrets stay in `.env` as `${env:VAR}` references.
+MCP servers give the agent external tools over stdio or HTTP.
+Servers are declared as a JSON **list** in the file pointed at by `BERG_AGENT_MCP_SERVERS` (default `{config}/mcp.json`).
+Secrets stay in `.env` as `${env:VAR}` references.
 
 ## 1. Declare the server
 
@@ -34,11 +36,13 @@ export BERG_AGENT_MCP_SERVERS=/path/to/mcp.json
 python -m berg_agents --web --port 8001
 ```
 
-Or set it permanently in `.env`. A server list that fails to parse degrades gracefully — the app starts, the failure is logged.
+Or set it permanently in `.env`.
+A server list that fails to parse degrades gracefully --- the app starts, the failure is logged.
 
 ## 3. Use an MCP tool
 
-MCP tools join the normal tool loop, so the agent calls them like any other tool. From the chat box you can also invoke any tool synchronously:
+MCP tools join the normal tool loop, so the agent calls them like any other tool.
+From the chat box you can also invoke any tool synchronously:
 
 ```bash
 curl -X POST http://127.0.0.1:8001/api/tool/execute \
@@ -51,14 +55,15 @@ From the web UI: the Plugins panel lists each server as `berg-plugin-mcp-*` with
 ## 4. Approval and toggles
 
 - **Sensitive** servers (`github`, `memory` by convention) pause for HITL approval on every run; **read-only** ones (`context7`, `docs`, `reference`) run without interruption.
-- `POST /api/plugins/{id}/enable` and `.../disable` toggle a server at runtime; the change applies on the next chat turn. Config `enabled` is only the startup default — runtime state is authoritative afterwards.
+- `POST /api/plugins/{id}/enable` and `.../disable` toggle a server at runtime; the change applies on the next chat turn.
+  Config `enabled` is only the startup default --- runtime state is authoritative afterwards.
 - Check `/mcps` (TUI/web) or `GET /api/plugins` for live server state.
 
 ## 5. Tips and gotchas
 
-| Issue | Guidance |
-|---|---|
-| Tool name collision | The `{server}__` prefix keeps names unique; two servers must not share a `name`. |
-| Timeouts | Long-running stdio servers can stall startup; prefer servers that stay resident or respond fast. |
-| Secrets in git | Never commit tokens — only `${env:VAR}` placeholders go in `mcp.json`. |
-| Debugging | Read the backend logs; full MCP errors stay server-side while summaries surface in the UI. |
+  | Issue               | Guidance                                                                                         |
+  | ---                 | ---                                                                                              |
+  | Tool name collision | The `{server}__` prefix keeps names unique; two servers must not share a `name`.                 |
+  | Timeouts            | Long-running stdio servers can stall startup; prefer servers that stay resident or respond fast. |
+  | Secrets in git      | Never commit tokens — only `${env:VAR}` placeholders go in `mcp.json`.                           |
+  | Debugging           | Read the backend logs; full MCP errors stay server-side while summaries surface in the UI.       |

@@ -28,12 +28,12 @@ model that just saved a fact does not need to re-read the file to see it.
 Only the main notebook is injected that way: other memory files appear
 by name only, referenced through it.
 
-| File on disk | Purpose |
-|---|---|
-| `{config}/memory/MEMORY.md` | The auto-injected notebook. Plain Markdown. |
-| `{config}/memory/<topic>.md` | Append-on-topic files. Read only on request. |
-| `{config}/memory.db` | SQLite fallback store when file-backed mode is unavailable. |
-| `{config}/runs.db` | Paired with `StepPersistence` (see below). |
+  | File on disk                 | Purpose                                                     |
+  | ---                          | ---                                                         |
+  | `{config}/memory/MEMORY.md`  | The auto-injected notebook. Plain Markdown.                 |
+  | `{config}/memory/<topic>.md` | Append-on-topic files. Read only on request.                |
+  | `{config}/memory.db`         | SQLite fallback store when file-backed mode is unavailable. |
+  | `{config}/runs.db`           | Paired with `StepPersistence` (see below).                  |
 
 Where `{config}` is the resolved config directory (`.berg-config` /
 `.berg-agents` / `~/.berg-agents`; see `CONFIGURATION.qmd`).
@@ -126,7 +126,8 @@ extending the capability list.
   gives the model keyword recall across those snapshots, including turns
   that compaction has dropped.
 
-Together these give the model a useful "what did we do earlier?" path
+Together these give the model a useful "what did we do earlier?"
+path
 that does not depend on the raw context window.
 
 ## Conversation (chat session) persistence

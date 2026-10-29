@@ -6,7 +6,8 @@ format: html
 
 # Tutorial - Multi-step Harness Workflow
 
-An end-to-end example that runs one task through the harness (Guardian → Planner → Implementation → Curator) from the TUI and from Python. There are no per-stage CLI flags — staging happens through the `plan_task` / `implement_task` tools and the `task_type` argument.
+An end-to-end example that runs one task through the harness (Guardian → Planner → Implementation → Curator) from the TUI and from Python.
+There are no per-stage CLI flags --- staging happens through the `plan_task` / `implement_task` tools and the `task_type` argument.
 
 ## 1. Scenario
 
@@ -22,7 +23,8 @@ python -m berg_agents --tui
 harness> /harness Refactor auth module to add rate limiting and tests
 ```
 
-Bare text works too (it runs as a `generic` task). `/agents` lists the registered subagents; `/stats` shows learning metrics afterwards.
+Bare text works too (it runs as a `generic` task).
+`/agents` lists the registered subagents; `/stats` shows learning metrics afterwards.
 
 ## 3. Stage it explicitly with plan / implement
 
@@ -34,7 +36,8 @@ harness> plan the rate-limit refactor as numbered steps, don't implement yet
 harness> implement the approved plan
 ```
 
-Under the hood these are the `plan_task` (low-risk, runs unattended) and `implement_task` (high-risk, pauses for HITL approval) workspace tools. `implement_task` only runs against a plan you have seen — approve it in the HITL prompt (TUI) or the Approve / Reject / Edit surface (web).
+Under the hood these are the `plan_task` (low-risk, runs unattended) and `implement_task` (high-risk, pauses for HITL approval) workspace tools.
+`implement_task` only runs against a plan you have seen --- approve it in the HITL prompt (TUI) or the Approve / Reject / Edit surface (web).
 
 ## 4. Run the same workflow from Python
 
@@ -49,16 +52,17 @@ result = app.execute(
 print(result)
 ```
 
-The returned dict contains the selected agent, the model used, and any HITL decision if a pause occurred. `app.get_router_stats()` returns success rates and model-tier stats.
+The returned dict contains the selected agent, the model used, and any HITL decision if a pause occurred.
+`app.get_router_stats()` returns success rates and model-tier stats.
 
 ## 5. Inspect the result
 
-- **TUI** — `/history` shows the task transcript; `/stats` shows learning metrics.
-- **Web UI** — `http://127.0.0.1:8001` shows the same lifecycle panels; session search and restore live at `/history`.
-- **API** — `GET /api/learning-stats` aggregates outcomes; per-thread SSE streams carry the typed loop events.
+- **TUI** --- `/history` shows the task transcript; `/stats` shows learning metrics.
+- **Web UI** --- `http://127.0.0.1:8001` shows the same lifecycle panels; session search and restore live at `/history`.
+- **API** --- `GET /api/learning-stats` aggregates outcomes; per-thread SSE streams carry the typed loop events.
 
 ## 6. Tweaking the workflow
 
-- **Complexity routing** — `task_type` plus the `model_routing` block in `bergagents.jsonc` picks the model tier; per-agent preferences live under the `agents` key.
-- **Approval posture** — `hitl_rules` in config names which tool families auto-run, notify, or ask first; `read_only` / `allow_shell` deployment flags withhold mutating tools entirely.
-- **Custom subagents** — register your own agent (see the *Adding a Custom Agent* tutorial); the harness routes to it by `can_handle` confidence.
+- **Complexity routing** --- `task_type` plus the `model_routing` block in `bergagents.jsonc` picks the model tier; per-agent preferences live under the `agents` key.
+- **Approval posture** --- `hitl_rules` in config names which tool families auto-run, notify, or ask first; `read_only` / `allow_shell` deployment flags withhold mutating tools entirely.
+- **Custom subagents** --- register your own agent (see the *Adding a Custom Agent* tutorial); the harness routes to it by `can_handle` confidence.

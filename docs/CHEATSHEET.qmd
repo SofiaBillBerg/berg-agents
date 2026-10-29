@@ -7,7 +7,8 @@ format: html
 # BergAgents Cheat Sheet
 
 The most-used commands, endpoints, environment keys, plugin identity,
-and data locations. Background reading:
+and data locations.
+Background reading:
 [Configuration](CONFIGURATION.qmd), [Tools](TOOLS.qmd),
 [Memory & Compaction](MEMORY.qmd), and
 [Plugin UI](plugins/PLUGIN-UI.qmd).
@@ -129,18 +130,20 @@ For authoritative, generated docs: open the served FastAPI open API at
 ### Per-plugin settings
 
 Plugin config lives at `{config}/.{slug}/config.yaml` (for example
-`{config}/.shared_todo/config.yaml`). The slug strips the `berg-plugin-`
+`{config}/.shared_todo/config.yaml`).
+The slug strips the `berg-plugin-`
 prefix and turns hyphens into underscores (`berg-plugin-shared-todo` →
-`shared_todo`). Settings load with manifest schema defaults; adapter
+`shared_todo`).
+Settings load with manifest schema defaults; adapter
 identity fields persist with `persist=True` so they survive restarts.
 
 ## Plugin identities
 
-| Plugin id | Package | Tools | UI |
-|---|---|---|---|
-| `berg-plugin-shared-todo` | `berg_plugins/shared-todo` | 10 (including the `list_todo_items` helper) | side panel, label "📋 Todos" |
-| `berg-plugin-skill-*` | skill dirs from `BERG_AGENT_SKILLS` | deferred (guidance only) | none |
-| `berg-plugin-mcp-*` | servers from `mcp.json` | contributed by the MCP server | none (status badge) |
+  | Plugin id                 | Package                             | Tools                                       | UI                           |
+  | ---                       | ---                                 | ---                                         | ---                          |
+  | `berg-plugin-shared-todo` | `berg_plugins/shared-todo`          | 10 (including the `list_todo_items` helper) | side panel, label "📋 Todos" |
+  | `berg-plugin-skill-*`     | skill dirs from `BERG_AGENT_SKILLS` | deferred (guidance only)                    | none                         |
+  | `berg-plugin-mcp-*`       | servers from `mcp.json`             | contributed by the MCP server               | none (status badge)          |
 
 Plugin bundles are served at `/berg-plugins/<plugin-dir>/...` with
 `Cache-Control: no-cache`, so rebuilds show on next navigation.
@@ -164,7 +167,8 @@ sharedtodos/                      # your todo lists (user data, do not touch)
 berg_plugins/<plugin>/            # plugin sources + built UI bundles
 ```
 
-Do not delete or rename these by hand. Uninstalling a plugin leaves its
+Do not delete or rename these by hand.
+Uninstalling a plugin leaves its
 `{config}/.{slug}` folder behind; archive or remove it yourself.
 
 ## Build/dev quick keys

@@ -6,7 +6,8 @@ format: html
 
 # Tutorial - Calling Tools Directly
 
-Every tool the agent can call is also callable by you: synchronously through `POST /api/tool/execute`, by slash-command in the chat box, or from Python through the app. Plugin tools go through the generic dispatch endpoint instead.
+Every tool the agent can call is also callable by you: synchronously through `POST /api/tool/execute`, by slash-command in the chat box, or from Python through the app.
+Plugin tools go through the generic dispatch endpoint instead.
 
 ## 1. Synchronous tool execution (REST)
 
@@ -17,13 +18,15 @@ curl -X POST http://127.0.0.1:8001/api/tool/execute \
 ```
 
 - `args` may be an object or a bare string (a string is treated as `file_path`).
-- The response carries tool name, string output, and status. Failures arrive as `status: "error"` output — never tracebacks.
+- The response carries tool name, string output, and status.
+  Failures arrive as `status: "error"` output --- never tracebacks.
 - `run_task` is special-cased: it launches a full harness task instead of a workspace tool.
 - Tool names and risk classes: `GET /api/tools`.
 
 ## 2. Slash-commands in chat
 
-Typing `/read_file README.md` in the TUI or web chat calls the same endpoint. `/tools` lists what is available; `/stats` aggregates outcomes afterwards (`GET /api/learning-stats` is the same data over HTTP).
+Typing `/read_file README.md` in the TUI or web chat calls the same endpoint.
+`/tools` lists what is available; `/stats` aggregates outcomes afterwards (`GET /api/learning-stats` is the same data over HTTP).
 
 ## 3. Plugin tools (generic dispatch)
 
@@ -32,7 +35,8 @@ curl -X POST http://127.0.0.1:8001/api/plugins/berg-plugin-shared-todo/tools/lis
   -H 'Content-Type: application/json' -d '{}'
 ```
 
-The backend validates the plugin exists and is enabled, matches the tool by advertised name or function `__name__`, runs it with the project as cwd, and JSON-encodes non-string returns. Unknown plugin or tool returns 404.
+The backend validates the plugin exists and is enabled, matches the tool by advertised name or function `__name__`, runs it with the project as cwd, and JSON-encodes non-string returns.
+Unknown plugin or tool returns 404.
 
 ## 4. From Python
 
@@ -44,13 +48,14 @@ result = app.execute("Summarize README.md", task_type="generic")
 print(result)
 ```
 
-`execute` runs the full harness loop (Guardian → Planner → Implementation → Curator) including tool calls and HITL pauses. For single synchronous tool runs outside chat, use the REST endpoint above.
+`execute` runs the full harness loop (Guardian → Planner → Implementation → Curator) including tool calls and HITL pauses.
+For single synchronous tool runs outside chat, use the REST endpoint above.
 
 ## 5. Checklist for multi-tool work
 
-| Practice | Why |
-|---|---|
-| Plan before implementing (`plan_task`, then `implement_task`) | Keeps multi-step work reviewable; implementation is approval-gated. |
-| Validate before mutating | High-risk tools pause — have the arguments right before approving. |
-| Watch output length | Session persistence is budgeted (bounded parts, newest survives); write long results to a file instead of the transcript. |
-| Read-only first | Explore with `list_files` / `read_file` / `search_code` before touching anything. |
+  | Practice                                                      | Why                                                                                                                       |
+  | ---                                                           | ---                                                                                                                       |
+  | Plan before implementing (`plan_task`, then `implement_task`) | Keeps multi-step work reviewable; implementation is approval-gated.                                                       |
+  | Validate before mutating                                      | High-risk tools pause — have the arguments right before approving.                                                        |
+  | Watch output length                                           | Session persistence is budgeted (bounded parts, newest survives); write long results to a file instead of the transcript. |
+  | Read-only first                                               | Explore with `list_files` / `read_file` / `search_code` before touching anything.                                         |

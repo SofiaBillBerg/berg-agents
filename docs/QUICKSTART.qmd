@@ -181,7 +181,7 @@ the created app for background use.
   | Variable                         | What it does                                                   |
   | ---                              | ---                                                            |
   | `BERG_AGENTS_CONFIG_DIR`         | Override config directory (highest precedence)                 |
-  | `BERG_AGENT_*`                   | Overrides for any typed setting (provider, MCP path, skills) |
+  | `BERG_AGENT_*`                   | Overrides for any typed setting (provider, MCP path, skills)   |
   | `BERG_AGENT_WEB_SEARCH_BACKENDS` | Which web backends are used (list, JSON)                       |
   | `BERG_AGENT_SKILLS`              | JSON array of skill directories                                |
   | `BERG_AGENT_PLUGINS`             | JSON array of plugin directory paths                           |
@@ -193,7 +193,8 @@ the created app for background use.
 
 ## 9. Path gotchas (observed)
 
-- Never wipe `.berg-agents/` (or `.berg-config`). It holds config,
+- Never wipe `.berg-agents/` (or `.berg-config`).
+  It holds config,
   sessions, and memory.
 - Never delete inside `.berg-agents/memory/` or `sharedtodos/` by hand
   as cleanup; those are your data.

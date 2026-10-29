@@ -186,15 +186,16 @@ the cross-origin loop instead needs `NEXT_PUBLIC_API_BASE_URL`.
 ### Next.js hydration errors / 404s on `_next`
 
 Run the production build (`npm run build` in `berg_agents/ui/webapp`)
-and typecheck separately (`tsc --noEmit --skipLibCheck`). Production
+and typecheck separately (`tsc --noEmit --skipLibCheck`).
+Production
 serves the API and the static export from one origin, so `/api/*` 404s
-after a fresh build mean the export is stale or missing — rebuild.
+after a fresh build mean the export is stale or missing --- rebuild.
 
 ### The dev server cannot reach the backend
 
 The frontend dev loop is cross-origin: start it with
 `NEXT_PUBLIC_API_BASE_URL=http://localhost:8001` and keep both ends on
-the expected ports (backend 8001, dev 3000–3001 — the backend only
+the expected ports (backend 8001, dev 3000--3001 --- the backend only
 allows CORS from `localhost`/`127.0.0.1` on those two ports).
 
 ## Safety, approvals and sandboxing
@@ -202,24 +203,25 @@ allows CORS from `localhost`/`127.0.0.1` on those two ports).
 ### Why do high-risk tools pause for approval?
 
 `risk_class=high` tools (`bash`, `edit_file`, `patch_file`, `write_file`,
-`implement_task`) pause for approval — a prompt in the TUI, an
+`implement_task`) pause for approval --- a prompt in the TUI, an
 Approve / Reject / Edit card in the web UI.
 Low-risk (`list_files`, `read_file`, `search_code`,
 `plan_task`) run immediately.
 
 Read-only deployments withhold mutating tools at registration when
-`read_only=True` (and `bash` when `allow_shell=False`) — the tools are
+`read_only=True` (and `bash` when `allow_shell=False`) --- the tools are
 absent from the schema, so there is nothing to approve.
 
 ### Are path escapes possible from `read_file`?
 
-No — paths are normalized in `berg_agents/tools/_io.py`: `..`, `~`, and
+No --- paths are normalized in `berg_agents/tools/_io.py`: `..`, `~`, and
 absolute paths outside the root are rejected, including for `bash`.
 
 ### Is `bash` sandboxed in any way?
 
 The working directory is the workspace root, and each call has a bounded
-timeout (30s default). There is no container isolation — grant shell
+timeout (30s default).
+There is no container isolation --- grant shell
 only to trusted setups, or run with `allow_shell=False`.
 
 ### Do risky secrets ever enter git?
@@ -233,7 +235,8 @@ Never in source: keys come from environment variables, `.env`, or
 ### How do sessions stay synced across tabs?
 
 The server owns `active_session` (per project); fresh tabs and windows
-adopt it instead of minting new sessions. The chat widget and the
+adopt it instead of minting new sessions.
+The chat widget and the
 `/history` page re-read on storage events so tabs agree, and HTML is
 served with `Cache-Control: no-cache` so a tab never runs a stale app
 shell beside fresh pages.
@@ -311,13 +314,15 @@ runtime (`/api/plugins`), else a delete/reload bug is in play.
 ### Tests never touch live providers
 
 Tests are mocked and offline (`ALLOW_MODEL_REQUESTS=False` in
-`tests/conftest.py` is never bypassed). Never launch MCP stdio servers or
+`tests/conftest.py` is never bypassed).
+Never launch MCP stdio servers or
 call real models from a test.
 
 ### SQLite connections are per-operation
 
 Stores accessed from `asyncio.to_thread` must open a short-lived
-connection per operation. A cached connection fails when the thread pool
+connection per operation.
+A cached connection fails when the thread pool
 schedules the next call on another worker (sqlite3 thread affinity).
 The session store already works this way; follow the same pattern in any
 new store.
@@ -327,7 +332,8 @@ new store.
 ### The render complains about a missing file or stale output
 
 Each `.qmd` is one page; `README.md` at the repo root is generated from
-`docs/index.qmd` — never edit it by hand. Keep file names and case
+`docs/index.qmd` --- never edit it by hand.
+Keep file names and case
 consistent with the links in `_quarto.yml`, and re-run `quarto render`
 after moving pages.
 

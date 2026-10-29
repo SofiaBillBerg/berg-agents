@@ -6,8 +6,10 @@ format: html
 
 # Contributing
 
-Thanks for helping out. Bug fixes, features, plugin work, and docs
-improvements are all welcome. This page covers the setup and the few
+Thanks for helping out.
+Bug fixes, features, plugin work, and docs
+improvements are all welcome.
+This page covers the setup and the few
 conventions that make changes easy to review.
 
 ## Getting started
@@ -18,7 +20,8 @@ source .venv/bin/activate
 uv pip install -e .
 ```
 
-Python 3.12+ and `uv` are the baseline. Node 24+ or Bun is needed for
+Python 3.12+ and `uv` are the baseline.
+Node 24+ or Bun is needed for
 the web UI and plugin bundles.
 
 ## Build the front-end
@@ -41,45 +44,54 @@ npm run build:ui
 
 ## Making changes
 
-- Keep a pull request to one change. Small PRs get reviewed faster.
-- `ruff check .` and `ruff format --check .` should pass. Public
+- Keep a pull request to one change.
+  Small PRs get reviewed faster.
+- `ruff check .` and `ruff format --check .` should pass.
+  Public
   functions, classes, and methods get docstrings.
-- Tests run offline with mocks (`pytest -q`). `ALLOW_MODEL_REQUESTS`
-  stays `False` in `tests/conftest.py` — no live models in tests.
-- Update the docs when you change something user-facing. Docs are
+- Tests run offline with mocks (`pytest -q`).
+  `ALLOW_MODEL_REQUESTS`
+  stays `False` in `tests/conftest.py` --- no live models in tests.
+- Update the docs when you change something user-facing.
+  Docs are
   Quarto `.qmd` files under `docs/`; the root `README.md` is generated
   from `docs/index.qmd`, so edit the `.qmd` and never `README.md`.
 
 ## Where things live
 
-| Area | Location |
-| --- | --- |
-| Harness and agents | `berg_agents/agents/` |
-| Tool specs | `berg_agents/agents/factory.py` |
-| Web API and TUI | `berg_agents/ui/` |
-| Web front-end | `berg_agents/ui/webapp/app/` |
-| Plugin system | `berg_agents/plugin_system/` |
-| Providers | `berg_agents/providers/` |
-| Config | `berg_agents/config/` |
-| Plugins | `berg_plugins/<plugin-id>/` |
-| Docs | `docs/` (Quarto `.qmd`) |
+  | Area               | Location                        |
+  | ------------------ | ------------------------------- |
+  | Harness and agents | `berg_agents/agents/`           |
+  | Tool specs         | `berg_agents/agents/factory.py` |
+  | Web API and TUI    | `berg_agents/ui/`               |
+  | Web front-end      | `berg_agents/ui/webapp/app/`    |
+  | Plugin system      | `berg_agents/plugin_system/`    |
+  | Providers          | `berg_agents/providers/`        |
+  | Config             | `berg_agents/config/`           |
+  | Plugins            | `berg_plugins/<plugin-id>/`     |
+  | Docs               | `docs/` (Quarto `.qmd`)         |
 
 ## A few things worth knowing
 
 - Config resolves through one function,
-  `berg_agents/config/paths.py::resolve_config_dir`. Use it instead of
+  `berg_agents/config/paths.py::resolve_config_dir`.
+  Use it instead of
   hardcoding a directory name.
 - Models carry their own provider, `baseURL`, and `apiKey` in the
-  `providers` block of `bergagents.jsonc`. There is no global provider
+  `providers` block of `bergagents.jsonc`.
+  There is no global provider
   flag.
 - Plugins ship a built JS bundle; the host mounts it at runtime and
-  never imports plugin source. See
+  never imports plugin source.
+  See
   [`plugins/PLUGIN-UI.qmd`](plugins/PLUGIN-UI.qmd) and
   [`plugins/MANIFEST.qmd`](plugins/MANIFEST.qmd).
 - Memory lives at `{config}/memory/MEMORY.md` and is injected into every
-  request. Compaction is registered before the memory capability — that
+  request.
+  Compaction is registered before the memory capability --- that
   order matters.
-- The session store opens a SQLite connection per operation. Caching a
+- The session store opens a SQLite connection per operation.
+  Caching a
   connection across threads breaks under `asyncio.to_thread`.
 
 ## Pull requests

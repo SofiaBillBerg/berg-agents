@@ -94,8 +94,8 @@ See [CONFIGURATION](../docs/CONFIGURATION.qmd) for the full reference.
 
 ## Documentation
 
-  | Page                                   | Description                                   |
-  | ---                                    | ---                                           |
+  | Page                                           | Description                                   |
+  | ---                                            | ---                                           |
   | [QUICKSTART](../docs/QUICKSTART.qmd)           | Installation and first run                    |
   | [USAGE](../docs/USAGE.qmd)                     | TUI, Python API, and web workflows            |
   | [API](../docs/API.qmd)                         | Module map for the codebase                   |
@@ -125,4 +125,4 @@ Note: git remote operations always need explicit approval.
 
 ## License
 
-**Version**: 0.2.0 | **License**: GNU Affero General Public License v3
+**Version**: 0.2.0 \| **License**: GNU Affero General Public License v3

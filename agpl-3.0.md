@@ -226,7 +226,7 @@ terms of section 4, provided that you also meet all of these
 conditions:
 
 - a) The work must carry prominent notices stating that you modified
-  it, and giving a relevant date.
+     it, and giving a relevant date.
 - b\) The work must carry prominent notices stating that it is
   released under this License and any conditions added under
   section 7.
@@ -265,9 +265,9 @@ Corresponding Source under the terms of this License, in one of these
 ways:
 
 - a) Convey the object code in, or embodied in, a physical product (including a physical distribution medium),
-  accompanied by the
-  Corresponding Source fixed on a durable physical medium
-  customarily used for software interchange.
+     accompanied by the
+     Corresponding Source fixed on a durable physical medium
+     customarily used for software interchange.
 - b\) Convey the object code in, or embodied in, a physical product (including a physical distribution medium),
   accompanied by a
   written offer, valid for at least three years and valid for as
@@ -377,7 +377,8 @@ this License without regard to the additional permissions.
 
 When you convey a copy of a covered work, you may at your option
 remove any additional permissions from that copy, or from any part of
-it. (Additional permissions may be written to require their own
+it.
+(Additional permissions may be written to require their own
 removal in certain cases when you modify the work.)
 You may place
 additional permissions on material, added by you to a covered work,
@@ -388,7 +389,7 @@ add to a covered work, you may (if authorized by the copyright holders
 of that material) supplement the terms of this License with terms:
 
 - a) Disclaiming warranty or limiting liability differently from the
-  terms of sections 15 and 16 of this License; or
+     terms of sections 15 and 16 of this License; or
 - b\) Requiring preservation of specified reasonable legal notices or
   author attributions in that material or in the Appropriate Legal
   Notices displayed by works containing it; or
