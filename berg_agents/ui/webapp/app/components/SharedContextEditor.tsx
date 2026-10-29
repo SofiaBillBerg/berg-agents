@@ -22,7 +22,7 @@
  * Reads and writes the .berg-agents/context/*.md files through
  * /api/context/shared, so the human edits the SAME files the agent reads
  * every turn (and can contribute to via its tools). This is the
- * collaboration surface for the context, with each section's what/why
+ * collaboration surface for the context, with each section what/why
  * history shown beside it. CodeMirror gives real Markdown editing.
  */
 

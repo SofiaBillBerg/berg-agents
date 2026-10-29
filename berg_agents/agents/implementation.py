@@ -691,6 +691,7 @@ except Exception as exc:
     )
     from berg_agents.providers.registry import first_declared_model
 
+    # noinspection PyGlobalVariableRedeclarationInNotebook
     implementation_agent = build_implementation_agent(
         model_id=first_declared_model()
     )

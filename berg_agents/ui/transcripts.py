@@ -190,21 +190,50 @@ def _dump_messages(messages: Any) -> list[tuple[str | None, dict[str, Any]]]:
     return out
 
 
-def _message_signature(payload: dict[str, Any]) -> str:
-    """Stable identity for one serialized message.
+#: Message fields that identify a run rather than a message. They change
+#: on every ``all_messages()`` call, so including them in a signature makes
+#: the same message look new each turn and duplicates the transcript.
+_VOLATILE_FIELDS = frozenset({
+    "run_id",
+    "timestamp",
+    "conversation_id",
+    "state",
+    "metadata",
+    "history_digest",
+    "provider_response_id",
+    "provider_details",
+    "provider_name",
+    "provider_url",
+    "usage",
+    "failed_attempts",
+    "workspace_ref",
+    "canonical_system",
+    "finish_reason",
+    "model_name"})
 
-    Content-based, not positional: the SQLite store normalizes messages
-    (it merges a request-only block into its neighbour), so its order and
-    count differ from ``AgentRunResult.all_messages()``. Comparing counts
-    therefore drifts and drops the newest user prompt — comparing content
-    does not.
+
+def _stable_signature(payload: dict[str, Any]) -> str:
+    """Hash a message by its identity, not by the run that produced it.
+
+    ``dump_python`` fills in ``run_id`` / ``timestamp`` / ``conversation_id``
+    per run, so hashing the whole payload marks the *same* message as new
+    on every turn. Only ``kind``, ``parts`` and ``instructions`` say what a
+    message actually is, so only those are hashed.
 
     :param payload: Serialized ``ModelMessage`` dict.
-    :return: Hex digest identifying this message's content.
+    :return: Hex digest of the stable identity.
     """
     import hashlib
 
-    blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    stable = {
+        key: value
+        for key, value in payload.items()
+        if key not in _VOLATILE_FIELDS
+    }
+    # default=str: dump_python leaves datetimes inside `parts`.
+    blob = json.dumps(
+        stable, sort_keys=True, ensure_ascii=False, default=str
+    )
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()
 
 
@@ -215,34 +244,37 @@ def append_new_messages(
 ) -> int:
     """Append only messages the transcript does not already hold.
 
-    Deduplicates on :func:`_message_signature`, so re-running a turn,
-    a turn whose history was rewritten by compaction, or the store's own
-    normalization never duplicates a line. Memory snapshots repeat
-    verbatim every turn and are correctly skipped as already-present.
+    Deduplicates on :func:`_stable_signature`, so a turn's re-dump of the
+    same history (new run ids, same content) appends nothing and the
+    newest user prompt is never dropped. Memory snapshots repeat verbatim
+    each turn and are correctly skipped as already-present.
 
     :param session_id: Stable session identifier.
     :param project: Resolved project.
     :param messages: Iterable of pydantic-ai ``ModelMessage`` objects.
     :return: Number of message lines written.
     """
-    existing = {
-        _message_signature(m)
-        for m in read_transcript(session_id, project)["messages"]
+    transcript = read_transcript(session_id, project)
+    seen = {
+        _stable_signature(m)
+        for m in transcript["messages"]
         if isinstance(m, dict)
     }
+    # Continue the running index rather than restarting per call.
+    next_index = len(transcript["messages"])
     path = ensure_transcript(session_id, project)
     sent_at = datetime.now(UTC).isoformat()
     written = 0
     for kind, payload in _dump_messages(messages):
-        signature = _message_signature(payload)
-        if signature in existing:
+        signature = _stable_signature(payload)
+        if signature in seen:
             continue
-        existing.add(signature)
+        seen.add(signature)
         if _append_line(
             path,
             {
                 "type": "message",
-                "index": written,
+                "index": next_index + written,
                 "role": kind or "unknown",
                 "sent_at": sent_at,
                 "message": payload},
