@@ -19,7 +19,6 @@ project_utils/check_config.py
 /.jbeval/
 project_utils/git_config.sh
 project_utils/setup-local-filter.sh
-/project_utils/setup-local-filter.sh
 project_utils/crlf_to_lf.sh
 **/*.bk
 **/*.bak
@@ -122,3 +121,5 @@ entities.json
 /feat_dev/test_standalone_todos/
 /.berg-agents/active_session
 /.envrc
+/.editorconfig
+/**/*.lock

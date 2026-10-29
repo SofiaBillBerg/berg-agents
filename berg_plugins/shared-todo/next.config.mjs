@@ -18,53 +18,53 @@ const LINKED_INTO_HOST = process.env.BERG_PLUGIN_LINKED_INTO_HOST === "1";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // NOTE: never `output: "export"`. The plugin UI is a component the
-  // host renders, and this app's own build exists only for dev/HMR.
-  distDir: "./dist",
-  reactStrictMode: false,
-  turbopack: {
-    // Keeps Next from walking up to a parent package.json for root.
-    root: import.meta.dirname,
-    resolveAlias: {}},
-  allowedDevOrigins: ["localhost", "127.0.0.1"],
-  compiler: {
-    styledJsx: true,
-    styledComponents: {
-      ssr: true,
-      fileName: true,
-      minify: true,
-      transpileTemplateLiterals: true,
-      namespace: "berg-plugin-shared-todo",
-      cssProp: true}},
+    // NOTE: never `output: "export"`. The plugin UI is a component the
+    // host renders, and this app's own build exists only for dev/HMR.
+    distDir: "./dist",
+    reactStrictMode: false,
+    turbopack: {
+        // Keeps Next from walking up to a parent package.json for root.
+        root: import.meta.dirname,
+        resolveAlias: {}},
+    allowedDevOrigins: ["localhost", "127.0.0.1"],
+    compiler: {
+        styledJsx: true,
+        styledComponents: {
+            ssr: true,
+            fileName: true,
+            minify: true,
+            transpileTemplateLiterals: true,
+            namespace: "berg-plugin-shared-todo",
+            cssProp: true}},
 
-  webpack: (config, {dev, isServer}) => {
-    // Production optimizations (non-dev, client-side).
-    if (!dev && !isServer) {
-      config.optimization = {
-        ...config.optimization,
-        usedExports: true,
-        sideEffects: false};
-    }
+    webpack: (config, {dev, isServer}) => {
+        // Production optimizations (non-dev, client-side).
+        if (!dev && !isServer) {
+            config.optimization = {
+                ...config.optimization,
+                usedExports: true,
+                sideEffects: false};
+        }
 
-    // Ignore node: protocol imports for browser compatibility.
-    config.resolve = {
-      ...config.resolve,
-      alias: {
-        ...config.resolve.alias,
-        "node:events": "events",
-        "node:stream": "stream"}};
+        // Ignore node: protocol imports for browser compatibility.
+        config.resolve = {
+            ...config.resolve,
+            alias: {
+                ...config.resolve.alias,
+                "node:events": "events",
+                "node:stream": "stream"}};
 
-    return config;
-  },
+        return config;
+    },
 
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "*.heroui.com"},
-      {
-        protocol: "http",
-        hostname: "localhost"}]}};
+    images: {
+        remotePatterns: [
+            {
+                protocol: "https",
+                hostname: "*.heroui.com"},
+            {
+                protocol: "http",
+                hostname: "localhost"}]}};
 
 // `output: "export"` is deliberately never set — see the header note.
 export default nextConfig;
