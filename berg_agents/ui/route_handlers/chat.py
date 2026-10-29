@@ -369,15 +369,17 @@ def register_chat_routes(
                 store = session_store.get_store(root)
                 messages = result.all_messages()
                 await session_store.record_turn(store, session_id, messages)
-                # Append the NEW messages to the durable JSONL transcript,
-                # deduplicated by content: the SQLite store normalizes
-                # messages (merging a request-only block into its
-                # neighbour), so its order and count differ from
-                # `all_messages()` and any count-based slice drops the
-                # newest user prompt. `append_new_messages` compares
-                # content instead, which is stable across both.
+                # The durable JSONL log takes only what THIS run produced.
+                # `all_messages()` re-sends the whole conversation every
+                # turn (the model needs the history), so appending it grew
+                # the transcript quadratically and stored each turn's
+                # copy of every earlier turn. `new_messages()` is exactly
+                # the turn's own messages — the input history and older
+                # runs are excluded — which is what an append-only log
+                # wants. `append_new_messages` still dedupes, because the
+                # memory snapshot legitimately reappears each turn.
                 append_new_messages(
-                    session_id, resolve_project(root), messages
+                    session_id, resolve_project(root), result.new_messages()
                 )
                 conversation_obj = getattr(result, "conversation", None)
                 if conversation_obj is not None:
