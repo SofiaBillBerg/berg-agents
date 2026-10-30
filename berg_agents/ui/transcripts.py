@@ -231,9 +231,7 @@ def _stable_signature(payload: dict[str, Any]) -> str:
         if key not in _VOLATILE_FIELDS
     }
     # default=str: dump_python leaves datetimes inside `parts`.
-    blob = json.dumps(
-        stable, sort_keys=True, ensure_ascii=False, default=str
-    )
+    blob = json.dumps(stable, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()
 
 

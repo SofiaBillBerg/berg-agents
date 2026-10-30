@@ -47,7 +47,6 @@ Webapp - in `styles.css` replace the current `var(--color-*)` block with:
 CLI/server:
 
 ```python
-from berg_agents.ui.theme.tokens.colors import BG, PRIMARY_GRADIENT
 ```
 
 ## Syncing to docs

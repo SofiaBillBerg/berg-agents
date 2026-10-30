@@ -4,49 +4,57 @@
 
 knitr::opts_chunk\$set( collapse = TRUE, comment = “\#\>” )
 
-    # berg_agents
+````
+# berg_agents
 
-    <!-- badges: start -->
+<!-- badges: start -->
 
-    > BergAgents --- a local, LLM-driven coding assistant with a **framework-agnostic core** and provider-centric configuration.
-    > A multi-agent system built on Pydantic AI: Guardian, Planner, Implementation, Curator and Learning agents run a harness-based execution model with human-in-the-loop approval gates.
-    > Any OpenAI-compatible provider works with zero code changes, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
+> BergAgents --- a local, LLM-driven coding assistant with a **framework-agnostic core** and provider-centric configuration.
+> A multi-agent system built on Pydantic AI: Guardian, Planner, Implementation, Curator and Learning agents run a harness-based execution model with human-in-the-loop approval gates.
+> Any OpenAI-compatible provider works with zero code changes, surfaced through an interactive TUI and a Next.js + FastAPI web UI that share the same commands and task lifecycle.
 
-    <!-- badges: end -->
+<!-- badges: end -->
 
-    ![Berg-Agents Overview](docs/visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
+![Berg-Agents Overview](docs/visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
 
-    ## Quick Start
+## Quick Start
 
-    ```bash
-    # Install dependencies (uv is recommended)
-    uv venv .venv
-    source .venv/bin/activate
-    uv pip install -e .
+```bash
+# Install dependencies (uv is recommended)
+uv venv .venv
+source .venv/bin/activate
+uv pip install -e .
 
-    # Interactive terminal UI
-    python -m berg_agents --tui
+# Interactive terminal UI
+python -m berg_agents --tui
 
-    # Web UI (default: http://127.0.0.1:8001)
-    python -m berg_agents --web
+# Web UI (default: http://127.0.0.1:8001)
+python -m berg_agents --web
+````
 
 Full walkthrough: [QUICKSTART].
 
 ## What it is
 
 - **Harness engine** — Guardian (risk gate) → Planner (breakdown) →
-  Implementation (edits) → Curator (review), plus Learning stats. See
+  Implementation (edits) → Curator (review), plus Learning stats.
+  See
   [USAGE].
 - **Provider-centric config** — each model carries its own provider,
-  `baseURL` and `apiKey`. No global provider flag. See [CONFIGURATION].
+  `baseURL` and `apiKey`.
+  No global provider flag.
+  See [CONFIGURATION].
 - **Real plugin system** — discovery, capabilities, generic tool
-  dispatch, and plugin-owned UI bundles. Pilot: shared-todo. See
+  dispatch, and plugin-owned UI bundles.
+  Pilot: shared-todo.
+  See
   [Shared-ToDo] and [Plugin UI].
 - **Memory that persists** — a `MEMORY.md` notebook injected every
-  request, tiered compaction, step persistence with keyword recall. See
+  request, tiered compaction, step persistence with keyword recall.
+  See
   [MEMORY].
 
-``` jsonc
+```jsonc
 // {config}/bergagents.jsonc — providers, harness, routing, plugins
 {
   "providers": {
@@ -66,17 +74,17 @@ The config directory resolves via `BERG_AGENTS_CONFIG_DIR` →
 
 ## Configuration
 
-``` bash
+```bash
 {config}/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
 .env                        # secrets referenced as `${env:VAR_NAME}`
 ```
 
-| Layer | Source |
-|----|----|
-| Config file | `{config}/bergagents.jsonc` — `providers` block plus `harness` / `model_routing` / `hitl_rules` / `plugins` / `agents` |
-| Secrets | `.env` file, referenced with `${env:VAR_NAME}` |
-| Overrides | `BERG_AGENT_*` environment variables |
-| External tools | `{config}/mcp.json` for MCP server configuration |
+  | Layer          | Source                                                                                                                 |
+  | -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+  | Config file    | `{config}/bergagents.jsonc` — `providers` block plus `harness` / `model_routing` / `hitl_rules` / `plugins` / `agents` |
+  | Secrets        | `.env` file, referenced with `${env:VAR_NAME}`                                                                         |
+  | Overrides      | `BERG_AGENT_*` environment variables                                                                                   |
+  | External tools | `{config}/mcp.json` for MCP server configuration                                                                       |
 
 See [CONFIGURATION] for the full reference.
 
@@ -88,21 +96,21 @@ title="Berg Agents Config Modules" alt="Berg-Agents Config" />
 
 ## Documentation
 
-| Page                   | Description                                   |
-|------------------------|-----------------------------------------------|
-| [QUICKSTART]           | Installation and first run                    |
-| [USAGE]                | TUI, Python API, and web workflows            |
-| [API]                  | Module map for the codebase                   |
-| [TOOLS]                | Tool catalog with signatures and risk classes |
-| [CONFIGURATION]        | Provider-centric config, `.env`, and env vars |
-| [MEMORY]               | Memory, compaction, and persistence           |
-| [PLUGIN-UI][Plugin UI] | Runtime plugin UI bridge                      |
-| [SHARED-TODO]          | Plugin pilot walkthrough                      |
-| [MANIFEST]             | Plugin manifest reference                     |
-| [CHEATSHEET]           | Commands, endpoints, and env keys             |
-| [CONTRIBUTING]         | Guidelines for contributing                   |
-| [FAQ]                  | Common questions and troubleshooting          |
-| [CHANGELOG]            | Versioned change tracking                     |
+  | Page                   | Description                                   |
+  | ---------------------- | --------------------------------------------- |
+  | [QUICKSTART]           | Installation and first run                    |
+  | [USAGE]                | TUI, Python API, and web workflows            |
+  | [API]                  | Module map for the codebase                   |
+  | [TOOLS]                | Tool catalog with signatures and risk classes |
+  | [CONFIGURATION]        | Provider-centric config, `.env`, and env vars |
+  | [MEMORY]               | Memory, compaction, and persistence           |
+  | [PLUGIN-UI][Plugin UI] | Runtime plugin UI bridge                      |
+  | [SHARED-TODO]          | Plugin pilot walkthrough                      |
+  | [MANIFEST]             | Plugin manifest reference                     |
+  | [CHEATSHEET]           | Commands, endpoints, and env keys             |
+  | [CONTRIBUTING]         | Guidelines for contributing                   |
+  | [FAQ]                  | Common questions and troubleshooting          |
+  | [CHANGELOG]            | Versioned change tracking                     |
 
 ## Getting Help
 
@@ -115,7 +123,8 @@ title="Berg Agents Config Modules" alt="Berg-Agents Config" />
 ## Contributing
 
 Please read our [CONTRIBUTING] guide for architecture rules, coding
-standards, testing, and the submission process. Note: git remote
+standards, testing, and the submission process.
+Note: git remote
 operations always need explicit approval.
 
 ## License

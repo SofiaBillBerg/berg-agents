@@ -193,7 +193,6 @@ class Harness:
         :return: Completed result dict when the bypass applies,
             else None to continue normal routing.
         """
-
         # Mutating work is NOT this method's job: leave it to
         # execute_task's plan-then-gate, which is the one path that
         # honours a recorded approval (``hitl_decision`` approve/edit).
