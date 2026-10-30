@@ -43,7 +43,15 @@ _latest: dict[str, dict[str, Any]] = {}
 
 
 def record(session_id: str | None, event: Any) -> None:
-    """Store the latest context-usage reading for a session.
+    """Store a context-usage reading for a session.
+
+    Reported values are **per request**, not cumulative: a fresh run's
+    first requests have no usage anchor, so they report only the new
+    suffix and the number can fall mid-session. Since the question the
+    gauge answers is "how close am I to the limit?", the high-water mark
+    is kept and shown; a per-request reading would under-report and
+    mislead. Compaction is a separate event, so a mark that stays flat
+    still reflects reality.
 
     Failure-isolated: a gauge must never break a chat turn.
 
@@ -65,7 +73,14 @@ def record(session_id: str | None, event: Any) -> None:
         logger.debug("context usage reading skipped: %s", exc)
         return
     with _lock:
-        _latest[session_id] = reading
+        previous = _latest.get(session_id)
+        # Keep the larger "used" reading as the high-water mark.
+        _latest[session_id] = (
+            reading
+            if previous is None
+            or reading["used_tokens"] >= previous["used_tokens"]
+            else previous
+        )
 
 
 def latest(session_id: str | None) -> dict[str, Any] | None:

@@ -24,8 +24,7 @@
  *
  * The backend (/api/chat/stream) uses pydantic_ai's VercelAIAdapter to emit
  * native Vercel AI protocol SSE. The frontend uses useChat from
- * @ai-sdk/react to consume it. No custom EventEmitter, no MockHarness,
- * no RealHarness wrapper - pure AI SDK v7.
+ * @ai-sdk/react to consume it.
  */
 
 import type {AgentInfo} from "@/harness/webhook";

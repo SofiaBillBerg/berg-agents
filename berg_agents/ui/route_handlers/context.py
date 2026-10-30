@@ -18,7 +18,7 @@
 """Context endpoints.
 
 Extracted from ``create_router`` — one concern per module. Covers the
-config-driven context catalog (memory/skills/MCP) and the human-owned
+config-driven context catalog (memory/skills/MCP) and the shared
 Shared Context API that backs the in-app editor.
 """
 
@@ -93,7 +93,7 @@ def register_context_routes(
 
     @router.get("/api/context/shared")
     async def shared_context_catalog() -> dict[str, Any]:
-        """Catalog of the human-owned Shared Context for the in-app editor.
+        """Catalog of the shared context for the in-app editor.
 
         :return: Dict with ``scopes`` (global/project -> path), per-section
             content presence, and recent journal history.

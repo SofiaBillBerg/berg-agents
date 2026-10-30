@@ -77,9 +77,7 @@ def _planning_capability(root_dir: str, session_id: str | None) -> Any:
 
     def _resolve(ctx: Any) -> Any:
         # Imported per call so a relocated store is picked up per run.
-        return SqlitePlanStore(
-            database=str(database), session=session_id
-        )
+        return SqlitePlanStore(database=str(database), session=session_id)
 
     return Planning(store_resolver=_resolve)
 
@@ -157,7 +155,7 @@ def build_chat_agent(
             f"{persona}\n\n{system_prompt}" if system_prompt else persona
         )
 
-    # Shared Context: the human-owned foundation this agent leverages.
+    # Shared Context: the shared foundation this agent leverages.
     # Rendered fresh per request (this builder runs per /api/chat/stream),
     # project scope shadowing global. The block below is the read path;
     # the two tools are the contribute path (author + why recorded).
@@ -168,18 +166,19 @@ def build_chat_agent(
             "\n\n# Shared context (shared knowledge with the user; project "
             "shadows global)\n"
             f"{rendered_context}\n\n"
-            "This is your shared working context with the user - plain files "
-            "you BOTH read and contribute to. Read it first; it holds "
-            "preferences, knowledge, research, work-notes, task-state, files, "
-            "notes and router_stats. Keep it current: use "
+            "This is shared working context, kept as plain files that both "
+            "you and the user read and contribute to. Read it first; it "
+            "holds preferences, knowledge, research, work-notes, task-state, "
+            "files, notes and learnings. Keep it current: use "
             "write_shared_context / append_shared_context to record durable "
-            "facts, preferences, knowledge, research findings, work notes, and "
-            "what/why router_stats (always say why). When you learn something "
-            "durable, write it here instead of re-researching it later."
+            "facts, preferences, knowledge, research findings, work notes, "
+            "and what/why learnings (always say why). When something durable "
+            "turns out to be true, write it here instead of establishing "
+            "it again later."
         )
 
     def write_shared_context(section: str, content: str, why: str) -> str:
-        """Overwrite a human-owned shared-context section (project scope).
+        """Overwrite a shared-context section (project scope).
 
         Args:
             section: One of preferences, project, task-state, files, notes, router_stats.
@@ -198,7 +197,7 @@ def build_chat_agent(
         return f"{verb} shared context '{section}' (project scope)."
 
     def append_shared_context(section: str, text: str, why: str) -> str:
-        """Append a line to a human-owned shared-context section (project scope).
+        """Append a line to a shared-context section (project scope).
 
         Args:
             section: One of preferences, project, task-state, files, notes, router_stats.

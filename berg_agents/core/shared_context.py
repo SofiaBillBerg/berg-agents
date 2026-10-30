@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
-"""Shared Context foundation: human-owned, evolving, with history, scoped.
+"""Shared Context foundation: evolving, with history, scoped.
 
 This is the persistent foundation that individual sessions (and agents)
 leverage; a session is not the shared context, it is a transient instance

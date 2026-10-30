@@ -21,7 +21,7 @@ Phase 2 of the Session/Turn model. Centralizes the two things every
 inference entry point (``execute_task``, ``chat_stream``, the generic
 loop) was re-implementing on its own:
 
-  * reading the human-owned Shared Context (rendered into the prompt)
+  * reading the shared context (rendered into the prompt)
   * recording the outcome once (Router Stats ) with a trace slot
 
 The inference *mechanism* itself is unchanged — the streaming
