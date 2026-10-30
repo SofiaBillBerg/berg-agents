@@ -52,9 +52,7 @@ DEFAULT_CONFIG_PATH = (
     if CONFIG_PATH_ENV
     else PROJECT_ROOT / ".berg-agents" / ".shared_todo" / "config.yaml"
 )
-REQUIRED_ENV = {
-    "SH_TODO_ENABLED": bool,
-    "SH_TODO_LOG_LEVEL": str}
+REQUIRED_ENV = {"SH_TODO_ENABLED": bool, "SH_TODO_LOG_LEVEL": str}
 
 
 def load_user_config() -> dict:

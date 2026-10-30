@@ -1,4 +1,6 @@
 
+/**/.venv/
+/project_utils/*.zip
 **/*.db
 /notes/sofias_notes.md
 /berg_plugins/plugin_dev/

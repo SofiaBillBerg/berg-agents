@@ -167,8 +167,7 @@ def create_todo(
 
 
 def list_todo_items(
-    status: str | None = None,
-    todo_path: str = "./sharedtodos/",
+    status: str | None = None, todo_path: str = "./sharedtodos/"
 ) -> list[dict[str, str]]:
     """List todo items as structured data (for API/UI surfaces).
 
@@ -294,10 +293,9 @@ def list_todos(
     output = f"## Todos ({len(todos)} items)\n\n"
 
     for todo in todos:
-        status_emoji = {
-            "todo": "📝",
-            "in_progress": "🔄",
-            "done": "✅"}.get(todo["status"], "❓")
+        status_emoji = {"todo": "📝", "in_progress": "🔄", "done": "✅"}.get(
+            todo["status"], "❓"
+        )
 
         output += f"{status_emoji} **{todo['title']}** ({todo['status']})\n"
         output += f"   ID: `{todo['id']}`\n"
@@ -444,11 +442,7 @@ def complete_todo(
     Returns:
         Success message
     """
-    return update_todo(
-        todo_id=todo_id,
-        status="done",
-        todo_path=todo_path,
-    )
+    return update_todo(todo_id=todo_id, status="done", todo_path=todo_path)
 
 
 def _load_subtasks(
