@@ -455,7 +455,8 @@ def build_planner_agent(
 #: or LLM call happens until the agent is run.
 #:
 #: No model name is hardcoded here: the config is the only source
-#: (Sofia's rule). When resolution fails the tier default is dropped
+#: (config is the only source of model names). When resolution fails
+#: the tier default is dropped
 #: in favour of the first model the registry declares (``None``), and
 #: the failure is logged loudly so a typo in ``model_routing`` is
 #: visible instead of silently substituting some other model.

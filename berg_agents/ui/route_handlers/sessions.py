@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from berg_agents.ui import projects, transcripts
+from berg_agents.ui import context_usage, projects, transcripts
 from berg_agents.ui.schemas import SessionCreateRequest, SessionRenameRequest
 from berg_agents.ui.sessions import SessionManager
 from fastapi import APIRouter, HTTPException
@@ -89,6 +89,38 @@ def register_session_routes(
         return {
             "id": session_store.get_active_session(sessions._harness_root_dir())
         }
+
+    @router.get("/api/context/usage")
+    async def get_context_usage(
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Live context-window usage for a session (the compaction gauge).
+
+        Answers the question "how full is my context, and is compaction
+        coming?" — which the user otherwise only discovers when their
+        history is suddenly shorter. ``ReportContextUsage`` emits the
+        reading; this serves the latest one.
+
+        :param session_id: Session to report on; defaults to the active
+            session when omitted.
+        :return: Dict with the reading, or ``{"usage": null}`` when this
+            session has not made a model request yet.
+        """
+        from berg_agents.ui import context_usage, session_store
+
+        target = session_id or session_store.get_active_session(
+            sessions._harness_root_dir()
+        )
+        usage = context_usage.latest(target)
+        return {
+            "session_id": target,
+            "usage": {
+                **usage,
+                # A session id alone is not usage: report the session's
+                # model so the gauge can name what it is measuring.
+                "model": sessions.active_model}
+            if usage
+            else None}
 
     @router.post("/api/sessions/current")
     async def set_current_session(request: dict[str, Any]) -> dict[str, Any]:
@@ -242,4 +274,7 @@ def register_session_routes(
             session_id,
             projects.resolve_project(sessions._harness_root_dir()),
         )
+        # And the gauge's last reading goes with it, so a reused id
+        # cannot inherit a stale number.
+        context_usage.forget(session_id)
         return {"ok": True}

@@ -66,18 +66,63 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-#: Context window assumed when the model's real one cannot be resolved
-#: (a local endpoint the pricing registry does not know). Local GGUF
-#: models are commonly 32K, and compacting too late fails the request.
-_DEFAULT_FALLBACK_WINDOW = 32_000
+#: pydantic-ai-harness's own fallback when the model's real window
+#: cannot be resolved and config does not override it.
+_HARNESS_DEFAULT_WINDOW = 200_000
+
+#: Config key holding the context-window fallback. The configured
+#: runtimes (ollama num_ctx, unsloth's own window) are the authority, so
+#: the number belongs in config: a magic constant here would silently
+#: disagree with the deployment.
+_CONTEXT_WINDOW_KEY = "context_window"
+
+
+def _configured_fallback() -> int:
+    """The context-window fallback to hand to compaction capabilities.
+
+    Config owns the number: ``context_window.fallback`` from
+    ``.berg-agents/bergagents.jsonc``. When it is absent the harness's
+    own conservative default applies, and the gauge reports
+    ``resolved: false`` — the number is a guess and says so.
+    """
+    configured = _fallback_context_window()
+    # No config? Let pydantic-ai-harness apply its own documented
+    # default rather than a number invented here in code.
+    return configured or _HARNESS_DEFAULT_WINDOW
+
+
+def _fallback_context_window() -> int | None:
+    """Configured context-window fallback, or None to use the harness default.
+
+    Reads ``context_window.fallback`` from ``.berg-agents/bergagents.jsonc``.
+    When it is absent the capability's own default applies and the gauge
+    reports ``resolved: false`` — the number is a guess and says so.
+    """
+    try:
+        from berg_agents.config.settings import get_settings
+
+        block = get_settings().model_dump().get(_CONTEXT_WINDOW_KEY)
+        if isinstance(block, dict):
+            raw = block.get("fallback")
+            if isinstance(raw, int) and raw > 0:
+                return raw
+            # Accept a numeric string too, so config stays forgiving.
+            if isinstance(raw, str) and raw.strip().isdigit():
+                value = int(raw.strip())
+                if value > 0:
+                    return value
+    except Exception as exc:  # Defensive: compaction must never break.
+        logger.debug("context_window config unreadable: %s", exc)
+    return None
+
 
 #: Fraction of the context window at which escalation kicks in.
 _TARGET_FRACTION = 0.8
 
-#: Defaults for the decision-model (judge) config block. The env var
-#: NAMES are the only hardcoded thing here — every value comes from
-#: ``.berg-agents/bergagents.jsonc`` (Sofia's rule: config is the only
-#: source), and this block is what makes the block optional.
+#: Defaults for the decision-model (judge) config block. Env var NAMES
+#: are the only literal here — every value comes from
+#: ``.berg-agents/bergagents.jsonc``; this block exists so the config
+#: block itself stays optional.
 _DECISION_DEFAULTS = {
     "name": "default",
     "base_url_env": "TYPESAFE_BASE_URL",
@@ -145,7 +190,7 @@ def _relevance_tier() -> list[Any]:
             RelevanceCompaction(
                 decision_model,
                 max_fraction=_TARGET_FRACTION,
-                fallback_context_window=_DEFAULT_FALLBACK_WINDOW,
+                fallback_context_window=_configured_fallback(),
                 # Reduce rather than summarize when the judge is the only
                 # entropy-free tool available; the SummarizingCompaction
                 # tier above still runs afterwards if more is needed.
@@ -342,7 +387,7 @@ def build_compaction_capabilities() -> list[Any]:
                         # and a 1M one alike. The fallback covers local
                         # endpoints the pricing registry does not know.
                         target_fraction=_TARGET_FRACTION,
-                        fallback_context_window=_DEFAULT_FALLBACK_WINDOW,
+                        fallback_context_window=_configured_fallback(),
                     ),
                     # Emergency last resort: trim to the newest turns with
                     # no model call, so an errored summarization degrades to
@@ -358,7 +403,7 @@ def build_compaction_capabilities() -> list[Any]:
                 # Trigger at the same fraction the tiers target; resolved
                 # against the model's window with the same local fallback.
                 max_fraction=_TARGET_FRACTION,
-                fallback_context_window=_DEFAULT_FALLBACK_WINDOW,
+                fallback_context_window=_configured_fallback(),
             )
         )
         # Observes the compacted request, so register it after the
@@ -368,7 +413,11 @@ def build_compaction_capabilities() -> list[Any]:
         # wrap up gracefully; it never compacts, so it cannot
         # double-compact with the tiered chain.
         capabilities.extend([
-            ReportContextUsage(),
+            # fallback_context_window: a local endpoint the pricing
+            # registry does not know would otherwise report a 0-token
+            # window and the gauge could never show a percentage. Our
+            # documented local ceiling is the honest stand-in.
+            ReportContextUsage(fallback_context_window=_configured_fallback()),
             WarnNearLimits(max_context_fraction=0.9)])
     except Exception as exc:
         logger.warning("Compaction capabilities unavailable: %s", exc)

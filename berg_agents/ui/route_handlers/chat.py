@@ -188,9 +188,7 @@ async def _track_chat_session(
         # exists, so `#N · date` is all it can carry at that point. The
         # id never changes — a session resumed days later keeps it, and
         # a title the user renamed is left alone.
-        raw_messages = (
-            body.get("messages") if isinstance(body, dict) else None
-        )
+        raw_messages = body.get("messages") if isinstance(body, dict) else None
         await session_store.refine_session_title(
             store,
             session_id,
@@ -232,6 +230,40 @@ def _chat_error_hint(text: str) -> str:
     if "401" in lowered or "auth" in lowered:
         return " Check the provider API key for this model."
     return ""
+
+
+def _track_context_usage(agent: Any, session_id: str | None) -> None:
+    """Report the chat agent's context usage into the gauge holder.
+
+    ``ReportContextUsage`` already emits ``ContextUsageEvent`` on every
+    model request; without a subscriber nothing read it, so the user
+    could not see the context filling or compaction arriving. This is
+    that subscriber. Failure-isolated: the gauge must never break chat.
+
+    :param agent: The chat agent (carries the capability's event bus).
+    :param session_id: Session the readings are attributed to.
+    """
+    if not session_id:
+        return
+    try:
+        from berg_agents.ui import context_usage
+        from pydantic_ai_harness.compaction import ContextUsageEvent
+
+        def _on_usage(ctx: Any, event: Any) -> None:
+            # pydantic-ai delivers more than ContextUsageEvent to a
+            # handler registered by type (PartStartEvent and friends
+            # arrive too), so filter on the fields we actually read
+            # rather than trusting the subscription's type.
+            if not hasattr(event, "used_tokens"):
+                return
+            context_usage.record(session_id, event)
+
+        # NOTE: handler FIRST. `on_event(event_type, handler)` registers
+        # the handler as an extra *event type* and silently fires never —
+        # which is exactly what happened before this was caught.
+        agent.on_event(_on_usage, ContextUsageEvent)
+    except Exception as exc:
+        logger.warning(f"Context usage gauge unavailable: {exc}")
 
 
 def register_chat_routes(
@@ -313,6 +345,7 @@ def register_chat_routes(
             # in one turn is still there in the next.
             session_id=session_id,
         )
+        _track_context_usage(agent, session_id)
 
         # sdk_version=6 enables tool-approval streaming (human-in-the-loop).
         # BergVercelAIAdapter.dispatch_request handles all SSE encoding

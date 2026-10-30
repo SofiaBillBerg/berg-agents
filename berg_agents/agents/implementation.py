@@ -675,7 +675,8 @@ def build_implementation_agent(
 # to the first declared provider model. No network/LLM calls are made.
 #
 # No model name is hardcoded here: the config is the only source
-# (Sofia's rule). Naming a "rescue" model in code silently substituted
+# (config is the only source of model names). Naming a "rescue" model
+# in code silently substituted
 # a different model whenever the config named an undeclared one, which
 # hid a typo instead of reporting it.
 try:

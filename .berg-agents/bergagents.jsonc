@@ -61,54 +61,40 @@
       "options": {
         "baseURL": "${env:BERG_AGENT_UNSLOTH_BASE_URL}",
         "apiKey": "${env:BERG_AGENT_UNSLOTH_API_KEY}",
-        "timeout": 120000
-      },
+        "timeout": 120000},
       "models": {
         "mradermacher/Muse-Glimmer-30B-Hermes-Agentic-i1-GGUF:Q4_K_M": {
-          "name": "mradermacher/Muse-Glimmer-30B-Hermes-Agentic-i1-GGUF:Q4_K_M"
-        },
+          "name": "mradermacher/Muse-Glimmer-30B-Hermes-Agentic-i1-GGUF:Q4_K_M"},
         "unsloth/Qwen-AgentWorld-35B-A3B-GGUF:UD-IQ3_XXS": {
-          "name": "unsloth/Qwen-AgentWorld-35B-A3B-GGUF:UD-IQ3_XXS"
-        }
+          "name": "unsloth/Qwen-AgentWorld-35B-A3B-GGUF:UD-IQ3_XXS"},
         //        "unsloth/Jan-nano-128k-GGUF:Q8_0S": {
         //          "name": "unsloth/Jan-nano-128k-GGUF:Q8_0"
         //        },
         //        "unsloth/LFM2.5-8B-A1B-GGUF:UD-IQ4_NL": {
         //          "name": "unsloth/LFM2.5-8B-A1B-GGUF:UD-IQ4_NL"
         //        }
-      }
-    },
+      }},
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "http://localhost:11434/v1",
         "timeout": 120000,
-        "apiKey": "${env:BERG_AGENT_OLLAMA_API_KEY}"
-      },
-      "models": {     
+        "apiKey": "${env:BERG_AGENT_OLLAMA_API_KEY}"},
+      "models": {
         "gemma3:12b": {
-          "name": "gemma3:12b"
-        },    
+          "name": "gemma3:12b"},
         "bonsai-2:9b": {
-          "name": "bonsai-2:9b"
-        },
+          "name": "bonsai-2:9b"},
         "ornith:9b-q4_K_M": {
-          "name": "ornith:9b-q4_K_M"
-        },
+          "name": "ornith:9b-q4_K_M"},
         "hf.co/IsValorum/Qwen3.8-27B-VAL-APEX-I-MiniPlus-V3-GGUF": {
-          "name": "hf.co/IsValorum/Qwen3.8-27B-VAL-APEX-I-MiniPlus-V3-GGUF"
-        },
+          "name": "hf.co/IsValorum/Qwen3.8-27B-VAL-APEX-I-MiniPlus-V3-GGUF"},
         "hf.co/JackAgentLead/Jack-3.8-27B-Coder-16GB-VRAM:latest": {
-          "name": "Jack-3.8-27B-Coder"
-        },
+          "name": "Jack-3.8-27B-Coder"},
         "gemma4:cloud": {
-          "name": "gemma4:cloud"
-        },
+          "name": "gemma4:cloud"},
         "nemotron-3-nano:30b-cloud": {
-          "name": "nemotron-3-nano:30b-cloud"
-        }
-      }
-    },
+          "name": "nemotron-3-nano:30b-cloud"}}},
     "omniroute-anthropic": {
       "name": "omniroute-anthropic",
       "options": {
@@ -118,48 +104,40 @@
         //# API flavor: "anthropic-messages" builds a native AnthropicModel
         //# against baseURL as-is. Without it, the OpenAI client appends
         //# "/chat/completions" and the endpoint 404s.
-        "api": "anthropic-messages"
-      },
+        "api": "anthropic-messages"},
       "models": {
         "ac-com/logfare/auto": {
-          "name": "ac-com/logfare/auto"
-        }
-      }
-    },
+          "name": "ac-com/logfare/auto"}}},
     "omniroute": {
       "name": "omniroute",
       "npm": "@ai-sdk/openai-compatible",
       "options": {
         "baseURL": "${env:BERG_AGENT_OMNIROUTE_BASE_URL}",
         "apiKey": "${env:BERG_AGENT_OMNIROUTE_API_KEY}",
-        "timeout": 120000
-      },
+        "timeout": 120000},
       "models": {
         "free-stack-route": {
-          "name": "free-stack-route"
-        },
+          "name": "free-stack-route"},
         "sofia/free-routing": {
-          "name": "sofia/free-routing"
-        },
+          "name": "sofia/free-routing"},
         "auto/best-free": {
-          "name": "auto/best-free"
-        },
+          "name": "auto/best-free"},
         "logfare/logfare/auto": {
-          "name": "logfare/logfare/auto"
-        },
+          "name": "logfare/logfare/auto"},
         "llmkiwi/auto": {
-          "name": "llmkiwi/auto"
-        },
+          "name": "llmkiwi/auto"},
         "base-free-stack": {
-          "name": "base-free-stack"
-        },
+          "name": "base-free-stack"},
         "auto/free-combo": {
-          "name": "auto/free-combo"
-        }
-      }
-    }
-  },
+          "name": "auto/free-combo"}}}},
   "defaultModel": "bonsai-2:9b",
+  //# Context window used when the model's real window cannot be resolved
+  //# (a local endpoint the pricing registry does not know). Drives the
+  //# chat header gauge and the compaction trigger. Your ollama is
+  //# configured for 100 000, and unsloth's models are configured inside
+  //# unsloth, so the fallback only covers what resolution misses.
+  "context_window": {
+    "fallback": 100000},
   //# MCP server secrets (git-ignored; referenced as ${VAR} in .mcp.json)
   //# "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_PERSONAL_ACCESS_TOKEN}",
   "CONTEXT7_API_KEY": "${env:CONTEXT7_API_KEY}",
@@ -170,82 +148,50 @@
   // Harness as host (framework-agnostic core)
   "harness": {
     "enable_learning": true,
-    "enable_hitl": true
-  },
+    "enable_hitl": true},
   // Model routing: one model list per complexity level (single axis)
   "model_routing": {
     "models": {
       "trivial": {
-        "models": [
-          "bonsai-2:9b"
-        ],
-        "max_tokens": 16000
-      },
+        "models": ["bonsai-2:9b"],
+        "max_tokens": 16000},
       "standard": {
-        "models": [
-          "gemma3:12b"
-        ],
-        "max_tokens": 90000
-      },
+        "models": ["gemma3:12b"],
+        "max_tokens": 90000},
       "complex": {
-        "models": [
-          "nemotron-3-nano:30b-cloud"
-        ],
-        "max_tokens": 230000
-      },
+        "models": ["nemotron-3-nano:30b-cloud"],
+        "max_tokens": 230000},
       "critical": {
-        "models": [
-          "nemotron-3-nano:30b-cloud"
-        ],
-        "max_tokens": 230000
-      }
-    }
-  },
+        "models": ["nemotron-3-nano:30b-cloud"],
+        "max_tokens": 230000}}},
   // HITL rules: Guardian decides when to ask human
   "hitl_rules": {
-    "auto_execute": [
-      "read_file",
-      "list_files",
-      "search_code"
-    ],
+    "auto_execute": ["read_file", "list_files", "search_code"],
     "notify_after": [
       "edit_file",
       "new_file",
       "generate_test",
       "refactor",
-      "delete_file"
-    ],
+      "delete_file"],
     "ask_before": [
       "delete_file",
       "execute_command",
       "refactor",
       "edit_file",
-      "new_file"
-    ],
-    "human_leads": [
-      "security_change",
-      "production_deploy",
-      "data_migration"
-    ]
-  },
+      "new_file"],
+    "human_leads": ["security_change", "production_deploy", "data_migration"]},
   // Agent overrides (optional)
   "agents": {
     "guardian": {
-      "preferred_complexity": "standard"
-    },
+      "preferred_complexity": "standard"},
     "planner": {
-      "preferred_complexity": "complex"
-    },
+      "preferred_complexity": "complex"},
     "implementation": {
-      "preferred_complexity": "standard"
-    },
+      "preferred_complexity": "standard"},
     "curator": {
-      "preferred_complexity": "trivial"
-    },
+      "preferred_complexity": "trivial"},
     "learning": {
-      "preferred_complexity": "standard"
-    }
-  }
+      "preferred_complexity": "standard"}},
   //# ---------------------------------------------------------------------------
   //# PRESETS (config-driven toolsets/capabilities - optional, all additive).
   //# Uncomment and adapt. Schema: berg_agents/capabilities/specs.py.

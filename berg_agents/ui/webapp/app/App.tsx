@@ -42,6 +42,7 @@ import {useRouter} from "next/navigation";
 import {buildExportMarkdown} from "@/utils/utils";
 
 import InputBar from "./components/InputBar.tsx";
+import ContextGauge from "./components/ContextGauge.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
 import AgentPanel from "./components/AgentPanel.tsx";
@@ -808,6 +809,10 @@ function ChatContent() {
               {statusInfo.label}
             </span>
           </span>
+                    <ContextGauge
+                        sessionId={aiChat.sessionId ?? null}
+                        streaming={aiChat.isStreaming ?? false}
+                    />
                     <Button
                         aria-label="Open sessions (server-side history)"
                         size="sm"
