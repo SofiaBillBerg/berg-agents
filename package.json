@@ -7,15 +7,15 @@
     "lint-staged": "^17.6.0",
     "lint-staged.sh": "^0.6.9",
     "mermaid-formatter": "^0.3.0",
-    "prettier": "^3.9.6"
+    "prettier": "^3.9.10"
   },
   "dependencies": {
-    "@a2a-js/sdk": "^1.1.0",
-    "@ai-sdk/react": "^4.0.143",
-    "@heroui/react": "^3.2.6",
+    "@a2a-js/sdk": "^1.3.0",
+    "@ai-sdk/react": "^4.0.160",
+    "@heroui/react": "^3.2.7",
     "agentstack-sdk": "^0.7.1",
-    "ai": "^7.0.140",
-    "next": "16.3.6",
+    "ai": "^7.0.156",
+    "next": "16.5.0-canary.14",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "^4.6.7"

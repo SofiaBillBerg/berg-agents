@@ -18,8 +18,8 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-root = ""
-module-name = ["src"]
-namespace = true
+module-name = ["plugin_system"]
+namespace = false
 source-exclude = ["**/*.bin", ".*/*", "**/dist",
     "**/build", "**/_build", ".venv", "**/node_modules",
     "**/archive", "**/*cache*", "**/support-libs", "**/.next/**",
