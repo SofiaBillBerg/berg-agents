@@ -124,6 +124,17 @@ def register_tool_routes(
                 "description": str(args.get("description", "")),
                 "task_type": str(args.get("task_type", "generic")),
                 "metadata": {}}
+            # NOTE: HITL resume fields. When the frontend approves/rejects/
+            # edits a gated plan, it re-invokes run_task with these so the
+            # orchestrator skips the gate (or records the rejection) instead
+            # of re-planning. task_id pins the resumed run to the same id.
+            if "task_id" in args:
+                task["task_id"] = str(args.get("task_id"))
+            metadata = task["metadata"]
+            if "hitl_decision" in args:
+                metadata["hitl_decision"] = str(args.get("hitl_decision"))
+            if "edited_action" in args:
+                metadata["edited_action"] = args.get("edited_action")
             if not task["description"]:
                 return ToolExecuteResponse(
                     tool=name,
