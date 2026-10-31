@@ -424,10 +424,7 @@ def first_user_text(ui_messages: Any) -> str:
 
 
 async def refine_session_title(
-    store: Any,
-    session_id: str,
-    subtitle: str,
-    workspace: str,
+    store: Any, session_id: str, subtitle: str, workspace: str
 ) -> str | None:
     """Append an intent slug to a generated title, once, after creation.
 
@@ -541,3 +538,107 @@ async def record_turn(store: Any, session_id: str, messages: Any) -> Any | None:
             except LookupError:
                 return None
     return None
+
+
+async def compact_session(
+    store: Any, session_id: str, *, model: str, focus: str | None = None
+) -> dict[str, Any]:
+    """Compact one session's stored history in place.
+
+    The backend is stateless and the client re-sends the whole
+    transcript every turn, so shrinking the *stored* messages is what
+    actually carries: the adapter rebuilds context from the messages
+    this writes, not from a Conversation object. The caller must then
+    make the client reload the session, or the next turn re-sends the
+    long version and the compaction is undone.
+
+    :param store: Conversation store holding the session.
+    :param session_id: Session to compact.
+    :param model: Model id whose context window and tokenizer the
+        strategy resolves against.
+    :param focus: Optional instruction steering the summarizer.
+    :return: Dict with ``before``/``after`` message counts and the
+        compacted ``summary`` (None when there was nothing to do).
+    :raises LookupError: When the session does not exist.
+    """
+    from pydantic_ai_harness.step_persistence.conversations import (
+        ConversationConflict,
+    )
+
+    saved = await store.get(conversation_id=session_id)  # LookupError → 404
+    messages = list(saved.messages)
+    if not messages:
+        return {"before": 0, "after": 0, "summary": saved.summary}
+
+    from berg_agents.plugin_system.context_capabilities import build_compaction
+    from pydantic_ai_harness.compaction import compact_now
+
+    strategy = build_compaction()
+    if strategy is None:
+        raise RuntimeError("compaction strategy unavailable")
+    tokens_before = _estimate_tokens(messages, model)
+    compacted = await compact_now(strategy, messages, model=model, focus=focus)
+    if list(compacted) == messages:
+        # The strategy declined (history already under target): report
+        # honestly rather than claiming a compaction that did nothing.
+        return {
+            "before": len(messages),
+            "after": len(messages),
+            "summary": saved.summary,
+            "tokens_before": tokens_before,
+            "tokens_after": tokens_before}
+
+    for _ in range(2):
+        try:
+            await store.save(summary=saved.summary, messages=compacted)
+            break
+        except ConversationConflict:
+            logger.warning("Compact write conflict, retrying: %s", session_id)
+            try:
+                saved = await store.get(conversation_id=session_id)
+            except LookupError:
+                return {"before": len(messages), "after": len(messages)}
+    else:  # pragma: no cover - conflict twice is a busy writer
+        logger.warning("Compact gave up after conflict: %s", session_id)
+        return {"before": len(messages), "after": len(messages)}
+
+    # `store.save` returns the summary, not the stored record, so read
+    # the persisted messages back rather than trusting a local value.
+    after = len(list((await store.get(conversation_id=session_id)).messages))
+    tokens_after = _estimate_tokens(compacted, model)
+    logger.info(
+        "Session %s compacted %d → %d messages (~%s → ~%s tokens)",
+        session_id,
+        len(messages),
+        after,
+        tokens_before,
+        tokens_after,
+    )
+    return {
+        "before": len(messages),
+        "after": after,
+        "summary": saved.summary,
+        "tokens_before": tokens_before,
+        "tokens_after": tokens_after}
+
+
+def _estimate_tokens(messages: Any, model: str = "") -> int:
+    """Rough token estimate for a message list (~4 chars per token).
+
+    Deliberately approximate: it exists so a compaction can report
+    how much it saved, not to gate one. The strategy's own trigger
+    is the authority on whether compaction was needed.
+    """
+    total = 0
+    for message in messages:
+        parts = getattr(message, "parts", None) or []
+        for part in parts:
+            content = getattr(part, "content", None)
+            if isinstance(content, str):
+                total += len(content)
+            elif content is not None:
+                total += len(str(content))
+            args = getattr(part, "args", None)
+            if args:
+                total += len(str(args))
+    return total // 4

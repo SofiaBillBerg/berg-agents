@@ -119,6 +119,16 @@ def _fallback_context_window() -> int | None:
 #: Fraction of the context window at which escalation kicks in.
 _TARGET_FRACTION = 0.8
 
+#: A model-requested compaction is refused below this many tokens: it
+#: would reclaim too little to be worth a summary call. Kept per config
+#: (see `compaction.request`) so it is not a magic number in code.
+_COMPACT_MIN_TOKENS = 20_000
+
+#: Model-requested compactions allowed per run. The model tends to ask
+#: right after a big phase, and a second bounded ask is reasonable; more
+#: is a runaway.
+_COMPACT_MAX_PER_RUN = 2
+
 #: Defaults for the decision-model (judge) config block. Env var NAMES
 #: are the only literal here — every value comes from
 #: ``.berg-agents/bergagents.jsonc``; this block exists so the config
@@ -317,6 +327,30 @@ def _workspace_file_key(call: Any) -> str | None:
         return None
 
 
+def build_compaction() -> Any:
+    """Build the one compaction strategy, shared by every caller.
+
+    ``/compact`` drives this through ``compact_now`` while the chat agent
+    registers it as a capability. Sharing it is deliberate: a second
+    definition would make the interactive command and the automatic path
+    disagree about what compaction means, which is the duplication this
+    project does not do.
+
+    Reuses :func:`build_compaction_capabilities` so there is exactly one
+    definition of the strategy.
+
+    :return: A ``FallbackCompaction`` (or a passthrough when
+        unavailable — see the wrapped builder), or None if the tiers
+        cannot be built at all.
+    """
+    for capability in build_compaction_capabilities():
+        # The strategy is the FallbackCompaction instance; the reporting
+        # capabilities that come after it are not strategies.
+        if hasattr(capability, "fallback_chain"):
+            return capability
+    return None
+
+
 def build_compaction_capabilities() -> list[Any]:
     """Build tiered compaction plus usage reporting (never raises).
 
@@ -352,6 +386,7 @@ def build_compaction_capabilities() -> list[Any]:
         from pydantic_ai_harness.compaction import (
             ClampOversizedMessages,
             ClearToolResults,
+            CompactOnRequest,
             DeduplicateFileReads,
             FallbackCompaction,
             ReportContextUsage,
@@ -366,9 +401,8 @@ def build_compaction_capabilities() -> list[Any]:
         # ModelAPIError (the summary request is still too large, or a
         # FallbackModel is exhausted), the deterministic no-LLM
         # SlidingWindowCompaction trims instead of failing the request.
-        capabilities.append(
-            FallbackCompaction(
-                fallback_chain=[
+        compaction = FallbackCompaction(
+            fallback_chain=[
                     TieredCompaction(
                         tiers=[
                             DeduplicateFileReads(file_key=_workspace_file_key),
@@ -396,27 +430,33 @@ def build_compaction_capabilities() -> list[Any]:
                     # here — as a chain strategy its `before_model_request`
                     # never fires, and `compact()` trims to keep_messages.
                     SlidingWindowCompaction(
-                        max_messages=1,
-                        keep_messages=20,
-                        receipts=True,
+                        max_messages=1, keep_messages=20, receipts=True
                     )],
                 # Trigger at the same fraction the tiers target; resolved
                 # against the model's window with the same local fallback.
-                max_fraction=_TARGET_FRACTION,
-                fallback_context_window=_configured_fallback(),
-            )
+            max_fraction=_TARGET_FRACTION,
+            fallback_context_window=_configured_fallback(),
         )
-        # Observes the compacted request, so register it after the
-        # compaction capability (a monitor registered before one sees
-        # what triggered it rather than the corrected history).
+
+        # Ordering is load-bearing:
+        #   1. the automatic compaction strategy,
+        #   2. CompactOnRequest, registered AFTER it (required) and given
+        #      the SAME strategy so the model's request and the automatic
+        #      trigger cannot disagree about what compaction means,
+        #   3. the monitors, which must see the already-compacted request.
+        # fallback_context_window on the monitor: a local endpoint the
+        # pricing registry does not know would otherwise report a 0-token
+        # window and the gauge could never show a percentage.
         # WarnNearLimits warns the model as the window fills so it can
         # wrap up gracefully; it never compacts, so it cannot
-        # double-compact with the tiered chain.
+        # double-compact with the strategy above.
         capabilities.extend([
-            # fallback_context_window: a local endpoint the pricing
-            # registry does not know would otherwise report a 0-token
-            # window and the gauge could never show a percentage. Our
-            # documented local ceiling is the honest stand-in.
+            compaction,
+            CompactOnRequest(
+                compaction,
+                min_tokens=_COMPACT_MIN_TOKENS,
+                max_per_run=_COMPACT_MAX_PER_RUN,
+            ),
             ReportContextUsage(fallback_context_window=_configured_fallback()),
             WarnNearLimits(max_context_fraction=0.9)])
     except Exception as exc:
@@ -535,9 +575,7 @@ def build_persistence_capabilities(
     return capabilities
 
 
-def build_context_capabilities(
-    root_dir: str | Path | None = None,
-) -> list[Any]:
+def build_context_capabilities(root_dir: str | Path | None = None) -> list[Any]:
     """All context capabilities for the chat agent (never raises).
 
     Order is load-bearing: compaction first (it rewrites history

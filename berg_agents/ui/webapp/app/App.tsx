@@ -619,6 +619,45 @@ function ChatContent() {
             }
 
             // -----------------------------------------------------------------
+            // /compact [optional focus] — shrink this session's history.
+            // The client owns the transcript (every turn re-sends it), so
+            // compaction has to end in a reload or the next turn undoes it.
+            // -----------------------------------------------------------------
+            if (cmdLower === "compact") {
+                const session = aiChat.sessionId;
+                if (!session) {
+                    return {handled: true, card: "No session to compact yet."};
+                }
+                try {
+                    const res = await fetch(
+                        `${API_BASE}/api/sessions/${encodeURIComponent(session)}/compact`,
+                        {
+                            method: "POST",
+                            headers: {"Content-Type": "application/json"},
+                            body: JSON.stringify({focus: args || null})},
+                    );
+                    if (!res.ok) {
+                        const err = await res.text();
+                        return {handled: true, card: `❌ /compact failed: ${err}`};
+                    }
+                    const data = await res.json();
+                    // Reload from the server so the client's copy matches
+                    // what was just stored. Without this the next turn
+                    // re-sends the full history and undoes the compaction.
+                    await aiChat.openSession(session);
+                    const saved = data.tokens_before && data.tokens_after
+                        ? `\n~${Math.round(data.tokens_before / 1000)}k → ~${Math.round(data.tokens_after / 1000)}k tokens`
+                        : "";
+                    return {
+                        handled: true,
+                        card: `/compact\n${data.before} → ${data.after} messages${saved}`};
+                } catch (e) {
+                    console.error(e);
+                    return {handled: true, card: `❌ /compact failed: ${e}`};
+                }
+            }
+
+            // -----------------------------------------------------------------
             // Local UI commands - these do NOT hit the backend.
             // -----------------------------------------------------------------
             if (cmdLower === "help") {

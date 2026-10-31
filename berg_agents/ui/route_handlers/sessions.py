@@ -23,12 +23,15 @@ chat sessions: list, create, current, get (restore), rename, delete.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from berg_agents.ui import context_usage, projects, transcripts
 from berg_agents.ui.schemas import SessionCreateRequest, SessionRenameRequest
 from berg_agents.ui.sessions import SessionManager
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger(__name__)
 
 
 def _unique_ui_message_id(msg: Any, role: str, index: int) -> str:

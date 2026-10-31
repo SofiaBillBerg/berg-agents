@@ -71,6 +71,16 @@ class ToolExecuteResponse(BaseModel):
     status: str = "ok"
 
 
+class SessionCompactRequest(BaseModel):
+    """Request to compact one session's history (the /compact command).
+
+    ``focus`` is optional: the model decides what still matters, and the
+    user's instruction steers that judgement when given.
+    """
+
+    focus: str | None = None
+
+
 class SessionCreateRequest(BaseModel):
     """Request to create a server-side chat session."""
 

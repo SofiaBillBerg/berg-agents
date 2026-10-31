@@ -32,6 +32,7 @@ from typing import Any
 from berg_agents.core.harness import Harness
 from berg_agents.ui.route_handlers.agents import register_agent_routes
 from berg_agents.ui.route_handlers.chat import register_chat_routes
+from berg_agents.ui.route_handlers.compaction import register_compaction_routes
 from berg_agents.ui.route_handlers.context import register_context_routes
 from berg_agents.ui.route_handlers.plugins import register_plugin_routes
 from berg_agents.ui.route_handlers.providers import register_provider_routes
@@ -64,6 +65,7 @@ def create_router(
 
     register_agent_routes(router, harness=harness, sessions=sessions)
     register_chat_routes(router, harness=harness, sessions=sessions)
+    register_compaction_routes(router, sessions=sessions)
     register_context_routes(router, sessions=sessions)
     register_router_stats_routes(router, harness=harness)
     register_plugin_routes(router, sessions=sessions)

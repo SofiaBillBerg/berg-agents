@@ -361,11 +361,21 @@ function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
                         (part as { output?: unknown }).output === undefined
                     ) {
                         // Answered but never executed: re-ask instead of replaying.
+                        // `approval` must stay a real object: the AI SDK's
+                        // addToolApprovalResponse reads `part.approval.id` with no
+                        // optional chaining, so an undefined approval there throws
+                        // on the next approve click and wedges the run.
                         return [
                             {
                                 ...part,
                                 state: "approval-requested",
-                                approval: undefined}];
+                                approval: {
+                                    ...(typeof part.approval === "object" &&
+                                    part.approval !== null
+                                        ? part.approval
+                                        : {}),
+                                    approved: undefined,
+                                    reason: undefined}}];
                     }
                     if (
                         !preserveLatest &&
@@ -493,7 +503,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
                     args = "";
                 }
             }
-            if (!pendingApprovals.some((a) => a.id === approvalId)) {
+            if (!pendingApprovals.some((a) => a?.id === approvalId)) {
                 pendingApprovals.push({id: approvalId, toolName, args});
             }
         }
@@ -510,12 +520,12 @@ export function useAISDKChat(): UseAISDKChatReturn {
         const msg = uiMessages[i];
         if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
         for (const part of msg.parts) {
+            // A part can be a hole (undefined) after the SDK rewrites
+            // the array mid-stream; every field read below is guarded so a
+            // sparse entry can never throw inside the render pass.
             const p = part as unknown as Record<string, unknown>;
-            if (
-                typeof p !== "object" ||
-                p === null ||
-                (p.state !== "approval-requested" && p.state !== "approval-responded")
-            ) {
+            if (typeof p !== "object" || p === null) continue;
+            if (p.state !== "approval-requested" && p.state !== "approval-responded") {
                 continue;
             }
             const approval = p.approval as
@@ -537,7 +547,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
             const decided = p.state === "approval-responded";
             const reason =
                 typeof approval?.reason === "string" ? approval.reason : undefined;
-            if (!approvalBatch.some((a) => a.id === approvalId)) {
+            if (!approvalBatch.some((a) => a?.id === approvalId)) {
                 approvalBatch.push({id: approvalId, toolName, args, decided, reason});
             }
         }
@@ -560,7 +570,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
 
     // Answer EVERY pending approval at once (batch convenience).
     const respondToAllApprovals = async (approved: boolean, reason?: string) => {
-        const ids = pendingApprovals.map((a) => a.id);
+        const ids = pendingApprovals.map((a) => a?.id).filter(Boolean);
         for (const id of ids) {
             await addToolApprovalResponse({id, approved, reason});
         }
