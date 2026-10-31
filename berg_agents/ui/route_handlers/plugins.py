@@ -56,10 +56,7 @@ async def _run_plugin_tool(
     :return: The tool's return value (usually a string).
     :raises KeyError: When the plugin or tool is unknown.
     """
-    from plugin_system.chat_integration import (
-        get_chat_plugin_tools,
-        get_plugin_manager,
-    )
+    from plugin_system import get_chat_plugin_tools, get_plugin_manager
     from plugin_system.lifecycle.lifecycle_states import PluginState
 
     # Ensure the manager is warm (idempotent, cheap after first call).

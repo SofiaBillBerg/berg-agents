@@ -47,8 +47,6 @@ from berg_agents.agents.implementation import (
 )
 from berg_agents.agents.planner import Planner, build_plan, estimate_complexity
 from berg_agents.capabilities.registry import ToolCatalog
-
-# Imported helpers (split modules)
 from berg_agents.core.harness._inference import (
     _await_inference,
     _files_changed_from_run,
@@ -70,6 +68,9 @@ from berg_agents.core.harness._routing import (
     _review_gate_result,
     _task_plans_mutation,
 )
+
+# Imported helpers (split modules)
+from berg_agents.core.hitl import HITL_APPROVAL_DECISIONS
 from berg_agents.core.interface import TaskComplexity
 from berg_agents.core.router_stats import RouterStats
 from berg_agents.core.turn import record_turn_outcome, run_turn
@@ -77,6 +78,47 @@ from berg_agents.providers.registry import resolve_model
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 logger = logging.getLogger(__name__)
+
+
+def _fallback_planned_actions(
+    description: str, task_type: str, complexity: Any
+) -> list[dict[str, Any]]:
+    """Derive a planned-action list from the deterministic Planner.
+
+    Single source of planning structure: when the LLM planning path is
+    unavailable (no inference or a failure), fall back to the deterministic
+    ``build_plan`` decomposition instead of a second, hand-written
+    placeholder. Keeps the HITL card populated with real subtasks and
+    gives one consistent return shape (list, never a bare dict).
+
+    :param description: Task description.
+    :param task_type: Task type label.
+    :param complexity: Routed complexity (enum or value accepted).
+    :return: Non-empty list of ``{"action", "args"}`` dicts.
+    """
+    try:
+        plan = build_plan(description, task_type, complexity)
+    except Exception as exc:  # Defensive: planning must not break a turn.
+        logger.debug("build_plan fallback failed: %s", exc)
+        plan = {}
+    actions: list[dict[str, Any]] = []
+    subtasks = plan.get("subtasks") if isinstance(plan, dict) else None
+    for sub in subtasks or []:
+        if not isinstance(sub, dict):
+            continue
+        sub_desc = str(sub.get("description") or description)
+        actions.append({
+            "action": str(sub.get("task_type") or task_type),
+            "args": {"description": sub_desc, "summary": sub_desc[:200]}})
+    if not actions:
+        actions = [
+            {
+                "action": task_type,
+                "args": {
+                    "description": description,
+                    "summary": "planned: " + description[:200]}}
+        ]
+    return actions
 
 
 class Harness:
@@ -323,7 +365,7 @@ class Harness:
         # resumes carry identical inputs, so the gate must
         # not fire again on them. "edit" counts as approval
         # (the human edited the arguments, then approved).
-        approved = metadata.get("hitl_decision") in {"approve", "edit"}
+        approved = metadata.get("hitl_decision") in HITL_APPROVAL_DECISIONS
         resolved_id = (
             task_id or str(task.get("task_id", "") or "") or self._new_id()
         )
@@ -571,18 +613,12 @@ class Harness:
             "args": {...}}, ...]``, or None when planning failed.
         """
         if not self._wants_inference(metadata):
-            # Fallback when inference disabled: return concrete planned actions so HITL shows real steps (fix: was dict, needs list)
-            return (
-                [
-                    {
-                        "action": task_type,
-                        "args": {
-                            "description": description,
-                            "summary": "planned: " + description[:200],
-                            "file": "summary.md"}}
-                ],
-                None,
-            )
+            # Fallback when inference disabled: derive planned actions from
+            # the deterministic Planner (single planning source) instead of
+            # a second, hand-written placeholder.
+            return _fallback_planned_actions(
+                description, task_type, complexity
+            ), None
         requested = _requested_model_id(metadata)
         try:
             agent = build_implementation_agent(
@@ -609,16 +645,11 @@ class Harness:
         except Exception as exc:
             logger.warning(
                 "Mutation planning inference failed; "
-                "falling back to placeholder actions: %s",
+                "falling back to Planner-derived actions: %s",
                 exc,
             )
             return (
-                {
-                    "status": "needs_human_review",
-                    "action": task_type,
-                    "args": {
-                        "description": description,
-                        "summary": "planned: " + description[:200]}},
+                _fallback_planned_actions(description, task_type, complexity),
                 None,
             )
         new_messages = getattr(run_result, "new_messages", None)

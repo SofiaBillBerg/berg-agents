@@ -58,6 +58,12 @@ from typing import Any, Literal
 #: ``reject`` ignore it.
 HitlAction = Literal["approve", "reject", "edit"]
 
+#: Decisions that count as "approved" (the human accepted the action).
+#: ``approve`` and ``edit`` both resume execution; ``reject`` does not.
+#: Shared vocabulary for the orchestrator gate AND the chat approval
+#: batch, so both layers reason about the same decision set.
+HITL_APPROVAL_DECISIONS: frozenset[str] = frozenset({"approve", "edit"})
+
 #: Mutating built-ins get a full HITL pause.
 DEFAULT_INTERRUPT_TOOLS: frozenset[str] = frozenset({
     "edit_file",
@@ -249,6 +255,7 @@ def apply_decision(
 
 __all__ = [
     "DEFAULT_INTERRUPT_TOOLS",
+    "HITL_APPROVAL_DECISIONS",
     "HitlAction",
     "HitlDecision",
     "HitlRequest",
