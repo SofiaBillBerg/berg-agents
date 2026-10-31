@@ -34,9 +34,7 @@ async def test_discovery():
 
     try:
         # Import just the discovery module
-        from berg_agents.plugin_system.discovery.discovery_process import (
-            PluginDiscovery,
-        )
+        from plugin_system.discovery.discovery_process import PluginDiscovery
 
         logger.info("Creating PluginDiscovery...")
         discovery = PluginDiscovery()

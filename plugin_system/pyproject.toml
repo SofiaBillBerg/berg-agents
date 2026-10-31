@@ -1,0 +1,27 @@
+[project]
+name = "plugin-system"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Sofia Billger Bergström", email = "sofia.billger@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+#plugin-system = "plugin_system:src"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = ["src"]
+namespace = true
+source-exclude = ["**/*.bin", ".*/*", "**/dist",
+    "**/build", "**/_build", ".venv", "**/node_modules",
+    "**/archive", "**/*cache*", "**/support-libs", "**/.next/**",
+    "**/.ipynb_checkpoints/**", "tmp/**", "feat_dev/**", "berg_plugins/**",
+    "suggestions/**", "_site/**", "**/.*/**"]

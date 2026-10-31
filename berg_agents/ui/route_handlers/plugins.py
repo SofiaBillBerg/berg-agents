@@ -56,16 +56,18 @@ async def _run_plugin_tool(
     :return: The tool's return value (usually a string).
     :raises KeyError: When the plugin or tool is unknown.
     """
-    from plugin_system import get_chat_plugin_tools
+    from plugin_system.chat_integration import (
+        get_chat_plugin_tools,
+        get_plugin_manager,
+    )
     from plugin_system.lifecycle.lifecycle_states import PluginState
 
     # Ensure the manager is warm (idempotent, cheap after first call).
     await get_chat_plugin_tools()
-    from plugin_system import _CACHE
-
-    manager = _CACHE.get("manager")
-    if manager is None:
-        raise KeyError(f"Plugin system unavailable: {plugin_id}")
+    try:
+        manager = get_plugin_manager()
+    except RuntimeError as exc:
+        raise KeyError(f"Plugin system unavailable: {exc}") from None
     entry = manager.registry.get(plugin_id)
     if entry is None or entry.state == PluginState.DISCOVERED:
         raise KeyError(f"Unknown plugin: {plugin_id}")

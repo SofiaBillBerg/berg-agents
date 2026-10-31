@@ -151,6 +151,10 @@ extra-index-url = [
     "https://download.pytorch.org/whl/cu130"] # This will add the PyTorch index as an additional source for packages, which can help ensure that you have access to the latest versions of PyTorch and related packages.
 index-strategy = "unsafe-best-match"
 
+[tool.uv.workspace]
+members = [
+    "plugin_system"]
+
 
 [tool.uv]
 index-strategy = "unsafe-best-match"

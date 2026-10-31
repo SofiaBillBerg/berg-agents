@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from berg_agents.plugin_system.plugin_manager import PluginManager
+from plugin_system import PluginManager
 
 
 # Add parent directory to path for imports
