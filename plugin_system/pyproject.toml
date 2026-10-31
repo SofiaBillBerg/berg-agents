@@ -18,10 +18,10 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-root = ""
-module-name = ["plugin_system"]
+module-name = "plugin_system"
 namespace = false
 source-exclude = ["**/*.bin", ".*/*", "**/dist",
     "**/build", "**/_build", ".venv", "**/node_modules",
     "**/archive", "**/*cache*", "**/support-libs", "**/.next/**",
     "**/.ipynb_checkpoints/**", "tmp/**", "feat_dev/**", "berg_plugins/**",
-    "suggestions/**", "_site/**", "**/.*/**"]
+    "suggestions/**", "_site/**"]

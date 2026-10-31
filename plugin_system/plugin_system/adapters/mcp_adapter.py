@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 #: Entry point shared by every MCP plugin (the server key travels via
 #: per-plugin settings, see register_mcp_plugins).
-ENTRY_POINT = "berg_agents.plugin_system.adapters.mcp_adapter:MCPPluginAdapter"
+ENTRY_POINT = "plugin_system.adapters.mcp_adapter:MCPPluginAdapter"
 
 
 def mcp_plugin_id(server_name: str) -> str:
@@ -198,8 +198,9 @@ async def register_mcp_plugins(manager: Any) -> list[str]:
     """
     # NOTE: Same config reader as the chat toolsets — adapter and chat
     # can never disagree about which servers exist.
-    from berg_agents.capabilities.mcp_toolsets import _load_config
     from plugin_system.exceptions import PluginError
+
+    from berg_agents.capabilities.mcp_toolsets import _load_config
 
     registered: list[str] = []
     for server_name, entry in _load_config().items():

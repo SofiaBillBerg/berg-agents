@@ -41,7 +41,7 @@ if __TYPE_CHECKING:
     from plugin_system.plugin_manager import PluginManager
 
 # Checkout root of the plugin packages (this file is
-# berg_agents/plugin_system/chat_integration.py → up three).
+# plugin_system/plugin_system/chat_integration.py → up two).
 _PLUGINS_ROOT = Path(__file__).resolve().parents[2] / "berg_plugins"
 
 # NOTE: Module-level cache — plugin discovery/loading runs once per
@@ -94,10 +94,11 @@ async def get_chat_plugin_tools() -> list[Any]:
             # NOTE: Migration-guide Phase 1 — repo skills join the
             # registry as adapter plugins (same lifecycle, no rewrites).
             try:
-                from berg_agents.config.settings import get_settings
                 from plugin_system.adapters.skill_adapter import (
                     register_skill_plugins,
                 )
+
+                from berg_agents.config.settings import get_settings
 
                 skill_settings = get_settings()
                 await register_skill_plugins(manager, skill_settings.skills)

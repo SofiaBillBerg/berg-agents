@@ -45,9 +45,7 @@ logger = logging.getLogger(__name__)
 
 #: Entry point shared by every skill plugin (the skill file itself
 #: travels via per-plugin settings, see register_skill_plugins).
-ENTRY_POINT = (
-    "berg_agents.plugin_system.adapters.skill_adapter:SkillPluginAdapter"
-)
+ENTRY_POINT = "plugin_system.adapters.skill_adapter:SkillPluginAdapter"
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
@@ -171,8 +169,9 @@ async def register_skill_plugins(
     :param root_dir: Workspace root for relative path resolution.
     :return: Registered plugin ids.
     """
-    from berg_agents.capabilities.skills import list_skills
     from plugin_system.exceptions import PluginError
+
+    from berg_agents.capabilities.skills import list_skills
 
     if not skill_paths:
         return []

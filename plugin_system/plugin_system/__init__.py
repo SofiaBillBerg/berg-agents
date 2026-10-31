@@ -20,6 +20,21 @@
 """Berg Agents plugin system public surface."""
 
 # NOTE: Explicit re-exports (no `from package import *` self-import).
+# NOTE: The host (berg_agents) imports these by name from the package
+# root — the chat seam (`get_chat_plugin_tools` / `list_chat_plugins` /
+# `set_plugin_enabled` / `get_chat_plugin_state`) plus `plugin_slug`.
+# They are re-exported here so there is ONE import path
+# (`from plugin_system import ...`) instead of callers reaching into
+# individual submodules — two ways to fetch the same symbol is a
+# near-duplicate variant.
+from plugin_system.chat_integration import (
+    get_chat_plugin_state,
+    get_chat_plugin_tools,
+    get_plugin_manager,
+    list_chat_plugins,
+    set_plugin_enabled,
+)
+from plugin_system.config.config_manager import plugin_slug
 from plugin_system.lifecycle.bergplugin import BergPlugin
 from plugin_system.plugin_context import PluginContext
 from plugin_system.plugin_contract import (
@@ -43,4 +58,10 @@ __all__ = [
     "PluginManager",
     "ProviderCapability",
     "SkillCapability",
-    "ToolCapability"]
+    "ToolCapability",
+    "get_chat_plugin_state",
+    "get_chat_plugin_tools",
+    "get_plugin_manager",
+    "list_chat_plugins",
+    "plugin_slug",
+    "set_plugin_enabled"]

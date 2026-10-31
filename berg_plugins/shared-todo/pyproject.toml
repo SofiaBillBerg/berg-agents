@@ -57,7 +57,7 @@ module-root = ""
 module-name = ["shared_todo"]
 namespace = true
 source-exclude = ["**/*.bin", ".*/*", "**/dist", "**/build", "**/_build", ".venv", "**/node_modules", "**/archive", "**/*cache*", "**/support-libs", "**/.next/**", "**/.ipynb_checkpoints/**",  "tmp/**", "feat_dev/**", "berg_plugins/**",
-"suggestions/**", "_site/**", "**/.*/**"]
+"suggestions/**", "_site/**"]
 
 [tool.uv.sources]
 # berg-agents = { path = "/home/sofiabillberg/code-projects/berg-agents/dist/berg_agents-0.1.0.tar.gz" }
