@@ -178,15 +178,9 @@ BACKENDS: dict[str, WebBackend] = {
         fetch=_ollama_fetch,
     ),
     "duckduckgo": WebBackend(
-        name="duckduckgo",
-        key_var=None,
-        search=_duckduckgo_search,
+        name="duckduckgo", key_var=None, search=_duckduckgo_search
     ),
-    "direct": WebBackend(
-        name="direct",
-        key_var=None,
-        fetch=_direct_fetch,
-    )}
+    "direct": WebBackend(name="direct", key_var=None, fetch=_direct_fetch)}
 
 DEFAULT_BACKEND_ORDER = ["ollama", "duckduckgo", "direct"]
 

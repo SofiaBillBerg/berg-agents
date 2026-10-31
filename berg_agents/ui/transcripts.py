@@ -183,9 +183,7 @@ def _dump_messages(messages: Any) -> list[tuple[str | None, dict[str, Any]]]:
             out.append((str(getattr(item, "kind", None)), one[0]))
         except Exception as exc:
             logger.warning(
-                "Transcript message skipped (%s): %s",
-                type(item).__name__,
-                exc,
+                "Transcript message skipped (%s): %s", type(item).__name__, exc
             )
     return out
 
@@ -236,9 +234,7 @@ def _stable_signature(payload: dict[str, Any]) -> str:
 
 
 def append_new_messages(
-    session_id: str,
-    project: ProjectRef,
-    messages: Any,
+    session_id: str, project: ProjectRef, messages: Any
 ) -> int:
     """Append only messages the transcript does not already hold.
 
@@ -282,11 +278,7 @@ def append_new_messages(
 
 
 def append_messages(
-    session_id: str,
-    project: ProjectRef,
-    messages: Any,
-    *,
-    start_index: int = 0,
+    session_id: str, project: ProjectRef, messages: Any, *, start_index: int = 0
 ) -> int:
     """Append one JSONL line per message; return how many landed.
 
@@ -316,10 +308,7 @@ def append_messages(
 
 
 def append_event(
-    session_id: str,
-    project: ProjectRef,
-    event: str,
-    **fields: Any,
+    session_id: str, project: ProjectRef, event: str, **fields: Any
 ) -> bool:
     """Append a non-message event line (e.g. a HITL decision).
 

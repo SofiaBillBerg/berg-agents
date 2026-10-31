@@ -81,9 +81,7 @@ DECISION_TARGET = "decisions/decisions-log.md"
 KNOWLEDGE_TARGET = "context/technical-domain.md"
 
 
-def should_run_curator(
-    metadata: dict[str, Any] | None,
-) -> bool:
+def should_run_curator(metadata: dict[str, Any] | None) -> bool:
     """Gate the curator step on ``files_changed`` metadata.
 
     The curator runs only when the task metadata carries a
@@ -133,9 +131,7 @@ def curation_confidence(task: dict[str, Any]) -> float:
 
 
 def determine_actions(
-    task: dict[str, Any],
-    metadata: dict[str, Any],
-    complexity: str = "standard",
+    task: dict[str, Any], metadata: dict[str, Any], complexity: str = "standard"
 ) -> list[dict[str, Any]]:
     """Derive curation actions from task metadata.
 
@@ -195,9 +191,7 @@ def determine_actions(
     return actions
 
 
-def build_update_plan(
-    actions: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
+def build_update_plan(actions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Order curation actions into numbered update steps.
 
     Group order is stable: docs, then patterns, then
@@ -261,8 +255,7 @@ def build_update_plan(
 
 
 def curate_task(
-    task: dict[str, Any],
-    metadata: dict[str, Any] | None,
+    task: dict[str, Any], metadata: dict[str, Any] | None
 ) -> dict[str, Any]:
     """Run the files_changed-gated curation step (harness entry).
 

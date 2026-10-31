@@ -152,8 +152,7 @@ def load(path: str, table: str, limit: int = 500) -> list[dict[str, Any]]:
         con = sqlite3.connect(path)
         cur = con.cursor()
         for (data,) in cur.execute(
-            f"SELECT data FROM {table} ORDER BY id DESC LIMIT ?",
-            (limit,),
+            f"SELECT data FROM {table} ORDER BY id DESC LIMIT ?", (limit,)
         ):
             try:
                 parsed = json.loads(data)

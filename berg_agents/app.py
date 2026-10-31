@@ -116,9 +116,7 @@ def _apply_global_settings(
         logger.debug("Global settings unavailable: %s", exc)
 
 
-def _guardian_gate_kwargs(
-    hitl_rules: dict[str, Any] | None,
-) -> dict[str, Any]:
+def _guardian_gate_kwargs(hitl_rules: dict[str, Any] | None) -> dict[str, Any]:
     """Build GuardianDeps kwargs from known HITL gate lists.
 
     Only known gate lists override the GuardianDeps defaults;

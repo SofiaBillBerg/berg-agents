@@ -24,7 +24,7 @@ plan notes; versions are repository-wide, not subsystem-specific.
 
 ### Added
 
-- **Plugin system** (`berg_agents/plugin_system/`) with discovery,
+- **Plugin system** (`../plugin_system`) with discovery,
   config-driven settings, capabilities registry, chat integration,
   adapter bridging for skills (19) and MCP servers (7), and generic
   tool dispatch.

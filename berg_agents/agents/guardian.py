@@ -147,10 +147,7 @@ class GuardianDecision(BaseModel):
     task_type: str = PydField(description="Task type that was assessed.")
 
 
-def assess_risk(
-    description: str,
-    task_type: str = "generic",
-) -> RiskLevel:
+def assess_risk(description: str, task_type: str = "generic") -> RiskLevel:
     """Assess the risk level of a task (pure function).
 
     Matches the task text against the high/medium risk
@@ -298,11 +295,7 @@ def guard_review(
     # Deterministic path: no model call, fully testable.
     risk = assess_risk(description, task_type)
     needs_review, reasons = decide_hitl(
-        task_type,
-        level,
-        risk,
-        confidence,
-        deps,
+        task_type, level, risk, confidence, deps
     )
     return GuardianDecision(
         needs_human_review=needs_review,
@@ -329,8 +322,7 @@ _GUARDIAN_INSTRUCTIONS = (
 
 
 def build_guardian_agent(
-    model_id: str | None = None,
-    cfg: dict[str, Any] | None = None,
+    model_id: str | None = None, cfg: dict[str, Any] | None = None
 ) -> Agent[GuardianDeps, GuardianDecision]:
     """Build the Guardian Pydantic AI agent.
 
@@ -382,10 +374,7 @@ def build_guardian_agent(
         return assess_risk(description, task_type).value
 
     @agent.tool
-    def check_hitl_policy(
-        ctx: RunContext[GuardianDeps],
-        task_type: str,
-    ) -> str:
+    def check_hitl_policy(ctx: RunContext[GuardianDeps], task_type: str) -> str:
         """Report the HITL policy gate for a task type.
 
         Args:

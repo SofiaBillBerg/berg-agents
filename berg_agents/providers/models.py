@@ -57,8 +57,7 @@ __all__ = ["resolve_model_instance", "resolve_model_string"]
 
 
 def resolve_model_string(
-    model_id: str | None = None,
-    cfg: dict[str, Any] | None = None,
+    model_id: str | None = None, cfg: dict[str, Any] | None = None
 ) -> str:
     """Resolve a model id into a ``provider:model`` string.
 
@@ -136,8 +135,7 @@ def resolve_model_string(
 
 
 def resolve_model_instance(
-    model_id: str | None = None,
-    cfg: dict[str, Any] | None = None,
+    model_id: str | None = None, cfg: dict[str, Any] | None = None
 ) -> OpenAIChatModel:
     """Build an explicit OpenAI-compatible model from configuration files.
 
@@ -244,8 +242,7 @@ def resolve_model_instance(
                 root = root[: -len(suffix)] or "/"
                 break
         return AnthropicModel(  # type: ignore[return-value]
-            name,
-            provider=AnthropicProvider(base_url=root, api_key=api_key),
+            name, provider=AnthropicProvider(base_url=root, api_key=api_key)
         )
     if base_url.rstrip("/").endswith("/messages"):
         raise ValueError(
@@ -255,6 +252,5 @@ def resolve_model_instance(
             "letting the OpenAI client append /chat/completions to it."
         )
     return OpenAIChatModel(
-        name,
-        provider=OpenAIProvider(base_url=base_url, api_key=api_key),
+        name, provider=OpenAIProvider(base_url=base_url, api_key=api_key)
     )

@@ -11,7 +11,7 @@ sessions, how it keeps the context window within budget, and where that
 state lives on disk.
 
 All of it is wired automatically through `build_chat_agent` in
-`berg_agents/plugin_system/context_capabilities.py` --- no extra setup is
+`../berg_agents/capabilities/context_capabilities.py` --- no extra setup is
 required.
 The four capabilities are registered in a specific order; see
 **Registration order**.

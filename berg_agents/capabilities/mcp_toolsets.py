@@ -134,9 +134,7 @@ def list_servers() -> list[dict[str, Any]]:
     :return: List of ``{"name", "enabled"}`` dicts.
     """
     return [
-        {
-            "name": name,
-            "enabled": entry.get("enabled", True) is not False}
+        {"name": name, "enabled": entry.get("enabled", True) is not False}
         for name, entry in _load_config().items()
         if isinstance(entry, dict)
     ]

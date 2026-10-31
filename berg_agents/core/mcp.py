@@ -170,11 +170,7 @@ class McpError(RuntimeError):
     """
 
     def __init__(
-        self,
-        message: str,
-        *,
-        code: int | None = None,
-        data: Any = None,
+        self, message: str, *, code: int | None = None, data: Any = None
     ) -> None:
         """Store *message* and the optional JSON-RPC ``code`` / ``data``."""
         super().__init__(message)
@@ -196,9 +192,7 @@ class McpTransport(Protocol):
     """
 
     def request(
-        self,
-        method: str,
-        params: Mapping[str, Any] | None,
+        self, method: str, params: Mapping[str, Any] | None
     ) -> Mapping[str, Any]:
         """Send one JSON-RPC request and return the JSON-RPC response.
 
@@ -292,9 +286,7 @@ class StdioMcpTransport:
             self.logger.debug("mcp stderr drainer exited: %s", exc)
 
     def request(
-        self,
-        method: str,
-        params: Mapping[str, Any] | None,
+        self, method: str, params: Mapping[str, Any] | None
     ) -> Mapping[str, Any]:
         """Send a JSON-RPC request and return the response.
 
@@ -369,9 +361,7 @@ class StdioMcpTransport:
                 err.get("message") if isinstance(err, Mapping) else str(err)
             )
             raise McpError(
-                f"MCP error ({code}): {message}",
-                code=code,
-                data=data,
+                f"MCP error ({code}): {message}", code=code, data=data
             )
         return payload
 
@@ -446,16 +436,12 @@ class HttpMcpTransport:
             self.sse_queue = queue.Queue()
         if self.listen_url is not None:
             self._listen_thread = threading.Thread(
-                target=self._sse_listen,
-                name="mcp-http-sse",
-                daemon=True,
+                target=self._sse_listen, name="mcp-http-sse", daemon=True
             )
             self._listen_thread.start()
 
     def request(
-        self,
-        method: str,
-        params: Mapping[str, Any] | None,
+        self, method: str, params: Mapping[str, Any] | None
     ) -> Mapping[str, Any]:
         """Send a JSON-RPC request and return the response.
 
@@ -478,10 +464,7 @@ class HttpMcpTransport:
         headers = {"Content-Type": "application/json"}
         headers.update(self.headers)
         req = urllib_request.Request(  # ruff: ignore[suspicious-url-open-usage]
-            self.endpoint,
-            data=body,
-            headers=headers,
-            method="POST",
+            self.endpoint, data=body, headers=headers, method="POST"
         )
         try:
             with urllib_request.urlopen(req, timeout=self.timeout_s) as resp:  # ruff: ignore[suspicious-url-open-usage]
@@ -607,9 +590,7 @@ class HttpMcpTransport:
                 err.get("message") if isinstance(err, Mapping) else str(err)
             )
             raise McpError(
-                f"MCP error ({code}): {message}",
-                code=code,
-                data=data,
+                f"MCP error ({code}): {message}", code=code, data=data
             )
         return payload
 
@@ -759,8 +740,7 @@ class McpClient:
 
         def _execute(**kwargs: Any) -> Any:
             response = self.config.transport.request(
-                "tools/call",
-                {"name": original_name, "arguments": dict(kwargs)},
+                "tools/call", {"name": original_name, "arguments": dict(kwargs)}
             )
             result = response.get("result", {})
             if isinstance(result, Mapping):
@@ -936,13 +916,11 @@ def load_mcp_server_configs(
         transport: McpTransport
         if entry.get("type") == "stdio":
             transport = StdioMcpTransport(
-                command=entry.get("command", []),
-                env=entry.get("env"),
+                command=entry.get("command", []), env=entry.get("env")
             )
         else:
             transport = HttpMcpTransport(
-                endpoint=entry.get("url", ""),
-                headers=entry.get("headers"),
+                endpoint=entry.get("url", ""), headers=entry.get("headers")
             )
         configs.append(
             McpServerConfig(

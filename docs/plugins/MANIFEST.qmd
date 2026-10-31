@@ -7,7 +7,7 @@ format: html
 # Plugin Manifest Reference
 
 Every plugin is a directory containing a `plugin.yaml` manifest, an importable Python entry point, and optionally a built UI bundle.
-This page documents each manifest section, the validation rules enforced by `berg_agents/plugin_system/plugin_schema.py` (`PluginManifest`), and how the host turns the manifest into runtime behavior.
+This page documents each manifest section, the validation rules enforced by `../../plugin_system` (`PluginManifest`), and how the host turns the manifest into runtime behavior.
 Shared-todo (`berg_plugins/shared-todo/plugin.yaml`) is the conformance example throughout.
 
 ## Minimal manifest

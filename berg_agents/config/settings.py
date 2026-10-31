@@ -637,9 +637,7 @@ class Settings(BaseSettings):
             # Log at WARNING rather than raising: a bad path should not
             # prevent the server from starting (Requirement 6.4).
             logging.getLogger(__name__).warning(
-                "checkpoint_dir %r is not accessible: %s",
-                str(expanded),
-                exc,
+                "checkpoint_dir %r is not accessible: %s", str(expanded), exc
             )
         return self
 

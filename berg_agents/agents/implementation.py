@@ -146,8 +146,7 @@ class PlanStep(BaseModel):
 
 
 def resolve_implementation_model(
-    complexity: str = "standard",
-    cfg: dict[str, Any] | None = None,
+    complexity: str = "standard", cfg: dict[str, Any] | None = None
 ) -> str:
     """Resolve the ``provider:model`` string for a complexity level.
 
@@ -326,9 +325,7 @@ def build_implementation_agent(
 
     @agent.tool
     def task_confidence(
-        ctx: RunContext[ImplementationDeps],
-        task_type: str,
-        description: str,
+        ctx: RunContext[ImplementationDeps], task_type: str, description: str
     ) -> str:
         """Score how confidently this agent handles a task.
 
@@ -346,10 +343,7 @@ def build_implementation_agent(
         return str(estimate_confidence(task_type, description))
 
     @agent.tool
-    def read_file(
-        ctx: RunContext[ImplementationDeps],
-        file_path: str,
-    ) -> str:
+    def read_file(ctx: RunContext[ImplementationDeps], file_path: str) -> str:
         """Read a file from the workspace.
 
         Returns a helpful message instead of raising when the
@@ -387,8 +381,7 @@ def build_implementation_agent(
 
     @agent.tool
     def list_files(
-        ctx: RunContext[ImplementationDeps],
-        file_path: str = ".",
+        ctx: RunContext[ImplementationDeps], file_path: str = "."
     ) -> str:
         """List files and subdirectories in a workspace directory.
 
@@ -432,9 +425,7 @@ def build_implementation_agent(
 
     @agent.tool
     def bash(
-        ctx: RunContext[ImplementationDeps],
-        command: str,
-        timeout: int = 30,
+        ctx: RunContext[ImplementationDeps], command: str, timeout: int = 30
     ) -> str:
         """Run a shell command in the workspace root.
 
@@ -487,9 +478,7 @@ def build_implementation_agent(
 
     @agent.tool
     def search_code(
-        ctx: RunContext[ImplementationDeps],
-        pattern: str,
-        directory: str = ".",
+        ctx: RunContext[ImplementationDeps], pattern: str, directory: str = "."
     ) -> str:
         """Search file contents under a workspace directory.
 
@@ -572,9 +561,7 @@ def build_implementation_agent(
 
         @agent.tool
         def write_file(
-            ctx: RunContext[ImplementationDeps],
-            file_path: str,
-            content: str,
+            ctx: RunContext[ImplementationDeps], file_path: str, content: str
         ) -> str:
             """Create or overwrite a file in the workspace.
 
@@ -592,9 +579,7 @@ def build_implementation_agent(
 
         @agent.tool
         def edit_file(
-            ctx: RunContext[ImplementationDeps],
-            file_path: str,
-            content: str,
+            ctx: RunContext[ImplementationDeps], file_path: str, content: str
         ) -> str:
             """Replace the contents of an existing file in the workspace.
 

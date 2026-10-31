@@ -338,9 +338,7 @@ def _review_gate_result(
         )
         return None
     logger.info(
-        "Task %s gated for human review: %s",
-        resolved_id,
-        verdict.reasons,
+        "Task %s gated for human review: %s", resolved_id, verdict.reasons
     )
     # Structured actions for the HITL card: prefer the model's
     # concrete pre-planned actions (real paths), else fall back

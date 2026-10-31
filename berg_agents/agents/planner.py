@@ -476,9 +476,7 @@ except Exception as exc:
 
 @planner_agent.tool
 def decompose_task(
-    ctx: RunContext[PlannerDeps],
-    description: str,
-    task_type: str = "generic",
+    ctx: RunContext[PlannerDeps], description: str, task_type: str = "generic"
 ) -> str:
     """Decompose a task into an ordered JSON plan.
 
@@ -498,9 +496,7 @@ def decompose_task(
 
 @planner_agent.tool
 def estimate_task_complexity(
-    ctx: RunContext[PlannerDeps],
-    description: str,
-    task_type: str = "generic",
+    ctx: RunContext[PlannerDeps], description: str, task_type: str = "generic"
 ) -> str:
     """Grade a task's complexity level.
 
@@ -563,10 +559,7 @@ class Planner(AbstractAgent):
     # Instance method required by the AbstractAgent contract.
     # ruff: ignore[no-self-use]
     def execute(
-        self,
-        task: dict[str, Any],
-        context: TaskContext,
-        model: Any = None,
+        self, task: dict[str, Any], context: TaskContext, model: Any = None
     ) -> AgentResult:
         """Break down the task into ordered subtasks.
 

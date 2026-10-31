@@ -81,9 +81,7 @@ async def _lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     Failure-isolated: plugin errors only log, the server always starts.
     """
     try:
-        from berg_agents.plugin_system.chat_integration import (
-            get_chat_plugin_tools,
-        )
+        from plugin_system import get_chat_plugin_tools
 
         tools = await get_chat_plugin_tools()
         logger.info("Plugin tools warmed: %d tools", len(tools))
@@ -246,9 +244,7 @@ def create_app(
             if route_path in {"/index", "/404", "/_not-found"}:
                 continue
 
-            def _serve_page(
-                _path: Path = page_file,
-            ) -> FileResponse:
+            def _serve_page(_path: Path = page_file) -> FileResponse:
                 return FileResponse(_path, media_type="text/html")
 
             app.api_route(

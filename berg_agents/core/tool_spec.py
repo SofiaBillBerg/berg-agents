@@ -584,8 +584,7 @@ def effective_risk_class(tool: ToolSpec) -> RiskClass:
 
 
 def filter_specs_by_model(
-    tools: Iterable[ToolSpec],
-    model_id: str,
+    tools: Iterable[ToolSpec], model_id: str
 ) -> list[ToolSpec]:
     """Filter specs by the model's ``excluded_tools`` patterns.
 

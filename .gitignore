@@ -1,5 +1,6 @@
 
-/**/.venv/
+
+**/.venv
 /project_utils/*.zip
 **/*.db
 /notes/sofias_notes.md

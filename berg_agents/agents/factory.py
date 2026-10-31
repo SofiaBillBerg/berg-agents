@@ -38,11 +38,7 @@ from berg_agents.core.loop import BergLoop
 from berg_agents.core.tool_spec import ToolRegistry, ToolSpec, make_tool_spec
 from berg_agents.tools._io import _atomic_write, _normalize_target
 
-__all__ = [
-    "DEFAULT_SYSTEM_PROMPT",
-    "build_agent",
-    "build_loop",
-    "create_tools"]
+__all__ = ["DEFAULT_SYSTEM_PROMPT", "build_agent", "build_loop", "create_tools"]
 
 
 def _resolve_root(root_dir: str | Path) -> Path:
@@ -52,7 +48,7 @@ def _resolve_root(root_dir: str | Path) -> Path:
 # -- file tool impls (pure functions, wrapped via make_tool_spec) ----------
 
 
-def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
+def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[complex-structure]
     """Return the default tool set as ToolSpecs.
 
     Wraps file ops with *root_dir* captured via closure so the model only
@@ -221,6 +217,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:
         try:
             proc = subprocess.run(
                 command,
+                check=False,
                 shell=True,
                 executable="/bin/bash",
                 cwd=root,

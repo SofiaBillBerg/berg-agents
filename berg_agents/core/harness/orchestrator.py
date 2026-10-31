@@ -282,9 +282,7 @@ class Harness:
         return result
 
     def execute_task(
-        self,
-        task: dict[str, Any],
-        task_id: str | None = None,
+        self, task: dict[str, Any], task_id: str | None = None
     ) -> dict[str, Any]:
         """Run one task through guardian to router_agent.
 
@@ -336,11 +334,7 @@ class Harness:
         impl_score = estimate_confidence(task_type, description)
         confidence = max(planner_score, impl_score)
         verdict = guard_review(
-            description,
-            task_type,
-            complexity,
-            confidence,
-            self._gates,
+            description, task_type, complexity, confidence, self._gates
         )
         # Mutating tool calls always pause for approval; see
         # _apply_mutation_guard for the exact rules.
@@ -802,9 +796,7 @@ class Harness:
 
     @staticmethod
     def _select_agent(
-        task: dict[str, Any],
-        planner_score: float,
-        impl_score: float,
+        task: dict[str, Any], planner_score: float, impl_score: float
     ) -> str:
         """Pick the executor from confidence scores.
 

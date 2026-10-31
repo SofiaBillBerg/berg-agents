@@ -35,9 +35,7 @@ from fastapi import APIRouter
 
 
 def register_provider_routes(
-    router: APIRouter,
-    sessions: SessionManager,
-    providers: list[dict[str, Any]],
+    router: APIRouter, sessions: SessionManager, providers: list[dict[str, Any]]
 ) -> None:
     """Register provider listing and selection endpoints.
 

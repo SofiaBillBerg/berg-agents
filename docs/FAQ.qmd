@@ -34,7 +34,7 @@ Earlier guidance said "read a listed file with read_memory" and didn't
 state that `MEMORY.md` is already in context.
 That has now been fixed
 (`guidance` override in
-`berg_agents/plugin_system/context_capabilities.py`): `MEMORY.md`
+`../berg_agents/capabilities/context_capabilities.py`): `MEMORY.md`
 content is present and refreshed right after a write.
 If your older
 snapshot still uses the stale guidance, rebuild / restart the app.

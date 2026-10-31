@@ -570,7 +570,7 @@ async def compact_session(
     if not messages:
         return {"before": 0, "after": 0, "summary": saved.summary}
 
-    from berg_agents.plugin_system.context_capabilities import build_compaction
+    from berg_agents.capabilities.context_capabilities import build_compaction
     from pydantic_ai_harness.compaction import compact_now
 
     strategy = build_compaction()

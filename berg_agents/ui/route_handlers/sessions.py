@@ -177,9 +177,7 @@ def register_session_routes(
         )
         if request and request.title and request.title.strip():
             await store.name(
-                source=summary,
-                title=request.title.strip()[:80],
-                manual=True,
+                source=summary, title=request.title.strip()[:80], manual=True
             )
             summary = (await store.get(conversation_id=session_id)).summary
         session_store.set_active_session(root, session_id)
@@ -240,9 +238,7 @@ def register_session_routes(
                 status_code=404, detail=f"Unknown session '{session_id}'."
             ) from None
         await store.name(
-            source=saved.summary,
-            title=request.title.strip()[:80],
-            manual=True,
+            source=saved.summary, title=request.title.strip()[:80], manual=True
         )
         updated = await store.get(conversation_id=session_id)
         return session_store.summary_to_dict(updated.summary)
@@ -274,8 +270,7 @@ def register_session_routes(
         # The durable JSONL transcript goes with the session: deleting
         # one and leaving the other would be a two-copies problem.
         transcripts.delete_transcript(
-            session_id,
-            projects.resolve_project(sessions._harness_root_dir()),
+            session_id, projects.resolve_project(sessions._harness_root_dir())
         )
         # And the gauge's last reading goes with it, so a reused id
         # cannot inherit a stale number.

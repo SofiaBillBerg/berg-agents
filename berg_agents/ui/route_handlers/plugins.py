@@ -39,10 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 async def _run_plugin_tool(
-    plugin_id: str,
-    tool_name: str,
-    args: dict[str, Any],
-    root_dir: str,
+    plugin_id: str, tool_name: str, args: dict[str, Any], root_dir: str
 ) -> Any:
     """Run a loaded plugin's tool by name (no todo/shared-todo naming).
 
@@ -59,12 +56,12 @@ async def _run_plugin_tool(
     :return: The tool's return value (usually a string).
     :raises KeyError: When the plugin or tool is unknown.
     """
-    from berg_agents.plugin_system.chat_integration import get_chat_plugin_tools
-    from berg_agents.plugin_system.lifecycle.lifecycle_states import PluginState
+    from plugin_system import get_chat_plugin_tools
+    from plugin_system.lifecycle.lifecycle_states import PluginState
 
     # Ensure the manager is warm (idempotent, cheap after first call).
     await get_chat_plugin_tools()
-    from berg_agents.plugin_system.chat_integration import _CACHE
+    from plugin_system import _CACHE
 
     manager = _CACHE.get("manager")
     if manager is None:
@@ -112,15 +109,13 @@ def register_plugin_routes(
 
         :return: Dict with ``plugins`` descriptors.
         """
-        from berg_agents.plugin_system.chat_integration import list_chat_plugins
+        from plugin_system import list_chat_plugins
 
         return {"plugins": await list_chat_plugins()}
 
     @router.post("/api/plugins/{plugin_id}/tools/{tool_name}")
     async def run_plugin_tool(
-        plugin_id: str,
-        tool_name: str,
-        body: dict[str, Any] | None = None,
+        plugin_id: str, tool_name: str, body: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Run a loaded plugin's tool by name (generic, plugin-agnostic).
 
@@ -178,9 +173,7 @@ def register_plugin_routes(
         :return: Dict with the plugin ``id`` and new ``state``.
         :raises HTTPException: 404 for unknown plugin ids.
         """
-        from berg_agents.plugin_system.chat_integration import (
-            set_plugin_enabled,
-        )
+        from plugin_system import set_plugin_enabled
 
         state = await set_plugin_enabled(plugin_id, enabled=True)
         if state is None:
@@ -200,9 +193,7 @@ def register_plugin_routes(
         :return: Dict with the plugin ``id`` and new ``state``.
         :raises HTTPException: 404 for unknown plugin ids.
         """
-        from berg_agents.plugin_system.chat_integration import (
-            set_plugin_enabled,
-        )
+        from plugin_system import set_plugin_enabled
 
         state = await set_plugin_enabled(plugin_id, enabled=False)
         if state is None:

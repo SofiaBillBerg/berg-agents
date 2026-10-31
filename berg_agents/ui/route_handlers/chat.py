@@ -139,8 +139,7 @@ async def _dispatch_chat_with_retry(
                 logger.exception("chat stream empty twice - giving up")
                 raise
             logger.warning(
-                "chat stream ended empty (attempt %s/2) - retrying",
-                attempt,
+                "chat stream ended empty (attempt %s/2) - retrying", attempt
             )
             await asyncio.sleep(2)
     raise AssertionError("unreachable")  # pragma: no cover
@@ -277,9 +276,7 @@ def register_chat_routes(
     """
 
     @router.post("/api/chat/stream")
-    async def chat_stream(
-        request: Request,
-    ) -> Response:
+    async def chat_stream(request: Request) -> Response:
         """Agentic streaming chat - native Vercel AI protocol via pydantic_ai.
 
         Uses :class:`~pydantic_ai.ui.vercel_ai.VercelAIAdapter` to handle all
@@ -302,9 +299,7 @@ def register_chat_routes(
             and ``accept`` header to pick the protocol and parse messages.
         :return: StreamingResponse with SSE chunks in Vercel AI protocol.
         """
-        from berg_agents.plugin_system.chat_integration import (
-            get_chat_plugin_state,
-        )
+        from plugin_system import get_chat_plugin_state
 
         # Model override via query param (the body is consumed by the adapter).
         model_id = (

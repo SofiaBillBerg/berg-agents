@@ -113,6 +113,6 @@ def plugin_config_dir(plugin_id: str, root: Path | None = None) -> Path:
         :param root: Project root; defaults to this checkout.
     :return: The plugin's directory (may not exist yet).
     """
-    from berg_agents.plugin_system.config.config_manager import plugin_slug
+    from plugin_system import plugin_slug
 
     return resolve_config_dir(root) / f".{plugin_slug(plugin_id)}"

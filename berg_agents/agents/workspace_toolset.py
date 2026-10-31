@@ -127,8 +127,7 @@ class WorkspaceToolset(WrapperToolset[None]):
         for spec in create_tools(root_dir):
             if spec.execute is None:
                 logger.warning(
-                    "ToolSpec '%s' has no execute callable; skipping",
-                    spec.name,
+                    "ToolSpec '%s' has no execute callable; skipping", spec.name
                 )
                 continue
             risk = spec.risk_class or "medium"
@@ -190,11 +189,7 @@ class WorkspaceToolset(WrapperToolset[None]):
         return _WORKSPACE_INSTRUCTIONS
 
     async def call_tool(
-        self,
-        name: str,
-        tool_args: dict[str, Any],
-        ctx: Any,
-        tool: Any,
+        self, name: str, tool_args: dict[str, Any], ctx: Any, tool: Any
     ) -> Any:
         """Audit-log every invocation, then delegate to the toolset.
 

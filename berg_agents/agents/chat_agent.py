@@ -116,6 +116,9 @@ def build_chat_agent(
     :return: A configured ``Agent`` ready for ``VercelAIAdapter``.
     """
     from berg_agents.agents.workspace_toolset import WorkspaceToolset
+    from berg_agents.capabilities.context_capabilities import (
+        build_context_capabilities,
+    )
     from berg_agents.capabilities.mcp_toolsets import build_mcp_toolsets
     from berg_agents.capabilities.skills import load_skill_capabilities
     from berg_agents.capabilities.web_backends import (
@@ -124,9 +127,6 @@ def build_chat_agent(
     )
     from berg_agents.config.settings import get_settings
     from berg_agents.core.shared_context import SECTIONS, SharedContext
-    from berg_agents.plugin_system.context_capabilities import (
-        build_context_capabilities,
-    )
     from berg_agents.providers.models import resolve_model_instance
     from pydantic_ai import Agent
     from pydantic_ai.capabilities import WebFetch, WebSearch
@@ -218,10 +218,7 @@ def build_chat_agent(
     shared_context_tools = [write_shared_context, append_shared_context]
 
     # Shared workspace root for file tools and subagent delegates.
-    toolset = WorkspaceToolset(
-        root_dir,
-        allow_shell=_shell_allowed(),
-    )
+    toolset = WorkspaceToolset(root_dir, allow_shell=_shell_allowed())
 
     agent = Agent(
         model,

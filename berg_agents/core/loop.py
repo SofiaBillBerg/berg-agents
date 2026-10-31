@@ -352,11 +352,11 @@ class BergLoop:
         """Store constructor args and validate."""
         if not hasattr(adapter, "chat") or not callable(adapter.chat):
             raise TypeError(
-                f"adapter must expose .chat(...), got {type(adapter).__name__}",
+                f"adapter must expose .chat(...), got {type(adapter).__name__}"
             )
         if not isinstance(tool_registry, ToolRegistry):
             raise TypeError(
-                f"tool_registry must be a ToolRegistry, got {type(tool_registry).__name__}",
+                f"tool_registry must be a ToolRegistry, got {type(tool_registry).__name__}"
             )
         if max_steps < 1:
             raise ValueError(f"max_steps must be >= 1, got {max_steps}")
@@ -375,7 +375,7 @@ class BergLoop:
         # fall back to default_interrupt_on(registry).
         if interrupt_on is None:
             self._interrupt: dict[str, bool] = default_interrupt_on(
-                dict(self._registry._tools.items()),
+                dict(self._registry._tools.items())
             )
         else:
             self._interrupt = dict(interrupt_on)
@@ -398,10 +398,8 @@ class BergLoop:
         """
         self._cancel_flags[thread_id] = reason
 
-    def run(
-        self,
-        thread_id: str,
-        input_messages: Sequence[Mapping[str, Any]],
+    def run(  # ruff: ignore[complex-structure]
+        self, thread_id: str, input_messages: Sequence[Mapping[str, Any]]
     ) -> Generator[
         RunStarted
         | RunCancelled
@@ -498,9 +496,7 @@ class BergLoop:
                     name = tc["name"]
                     args = tc["args"]
                     yield ToolCallRequest(
-                        call_id=call_id,
-                        tool_name=name,
-                        tool_args=args,
+                        call_id=call_id, tool_name=name, tool_args=args
                     )
 
                     if self._interrupt.get(name, False):
@@ -626,9 +622,7 @@ class BergLoop:
             )
 
     def resume(
-        self,
-        thread_id: str,
-        decision: HitlDecision,
+        self, thread_id: str, decision: HitlDecision
     ) -> Generator[LoopEvent, Any, None]:
         """Continue a paused thread after a :class:`HitlDecision`.
 
@@ -643,7 +637,7 @@ class BergLoop:
             raise ValueError("thread_id must be a non-empty string")
         if not isinstance(decision, HitlDecision):
             raise TypeError(
-                f"decision must be a HitlDecision, got {type(decision).__name__}",
+                f"decision must be a HitlDecision, got {type(decision).__name__}"
             )
 
         snapshot = self._load_snapshot(thread_id)
@@ -687,7 +681,7 @@ class BergLoop:
             messages.append(
                 _tool_error_message(
                     pending.tool_call_id, pending.tool_name, "rejected by human"
-                ),
+                )
             )
             yield ToolError(
                 call_id=pending.tool_call_id,
@@ -697,19 +691,13 @@ class BergLoop:
             # Resume the main loop with the cleared pending_hitl.
             self._cancel_flags.pop(thread_id, None)
             yield from self._continue_cycle(
-                thread_id,
-                messages,
-                steps,
-                tool_call_count,
+                thread_id, messages, steps, tool_call_count
             )
             return
 
         # Approve or edit: execute the tool, then continue.
         yield from self._execute_tool(
-            pending.tool_call_id,
-            pending.tool_name,
-            final_args,
-            messages,
+            pending.tool_call_id, pending.tool_name, final_args, messages
         )
         tool_call_count += 1
         # Clear the pending_hitl in the snapshot.
@@ -721,10 +709,7 @@ class BergLoop:
             pending_hitl=None,
         )
         yield from self._continue_cycle(
-            thread_id,
-            messages,
-            steps,
-            tool_call_count,
+            thread_id, messages, steps, tool_call_count
         )
 
     # -- Internal helpers --------------------------------------------------
@@ -931,9 +916,7 @@ class BergLoop:
             yield ToolError(call_id=call_id, tool_name=name, error=err)
             return None
         duration_ms = int((time.monotonic() - start) * 1000)
-        messages.append(
-            _tool_result_message(call_id, name, output),
-        )
+        messages.append(_tool_result_message(call_id, name, output))
         yield ToolEnd(
             call_id=call_id,
             tool_name=name,
@@ -1047,7 +1030,7 @@ def _extract_assistant_message(response: Any) -> dict[str, Any]:
     """
     if not isinstance(response, Mapping):
         raise TypeError(
-            f"adapter response must be a Mapping, got {type(response).__name__}",
+            f"adapter response must be a Mapping, got {type(response).__name__}"
         )
     choices = response.get("choices")
     if not isinstance(choices, list) or not choices:
@@ -1110,19 +1093,15 @@ def _extract_tool_calls(message: Mapping[str, Any]) -> list[dict[str, Any]]:
             if not isinstance(block, Mapping):
                 continue
             if block.get("type") == "tool_use":
-                out.append(
-                    {
-                        "id": str(block.get("id") or uuid.uuid4()),
-                        "name": str(block.get("name") or ""),
-                        "args": dict(block.get("input") or {})},
-                )
+                out.append({
+                    "id": str(block.get("id") or uuid.uuid4()),
+                    "name": str(block.get("name") or ""),
+                    "args": dict(block.get("input") or {})})
     return out
 
 
 def _tool_result_message(
-    call_id: str,
-    name: str,
-    output: Any,
+    call_id: str, name: str, output: Any
 ) -> dict[str, Any]:
     """Build a ``tool`` role message that feeds the result back to the model.
 
@@ -1140,11 +1119,7 @@ def _tool_result_message(
         "content": output}
 
 
-def _tool_error_message(
-    call_id: str,
-    name: str,
-    error: str,
-) -> dict[str, Any]:
+def _tool_error_message(call_id: str, name: str, error: str) -> dict[str, Any]:
     """Same as :func:`_tool_result_message` but for an error string.
 
     :param call_id: The tool call ID.

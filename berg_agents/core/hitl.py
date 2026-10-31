@@ -59,9 +59,11 @@ from typing import Any, Literal
 HitlAction = Literal["approve", "reject", "edit"]
 
 #: Mutating built-ins get a full HITL pause.
-DEFAULT_INTERRUPT_TOOLS: frozenset[str] = frozenset(
-    {"edit_file", "write_file", "delete", "execute"},
-)
+DEFAULT_INTERRUPT_TOOLS: frozenset[str] = frozenset({
+    "edit_file",
+    "write_file",
+    "delete",
+    "execute"})
 
 
 # noinspection unresolved-references
@@ -99,7 +101,7 @@ class HitlRequest:
         """
         if not isinstance(self.tool_args, Mapping):
             raise TypeError(
-                f"tool_args must be a Mapping, got {type(self.tool_args).__name__}",
+                f"tool_args must be a Mapping, got {type(self.tool_args).__name__}"
             )
         if not self.allowed_decisions:
             raise ValueError("allowed_decisions must be a non-empty tuple")
@@ -107,7 +109,7 @@ class HitlRequest:
         for action in self.allowed_decisions:
             if action not in valid_actions:
                 raise ValueError(
-                    f"allowed_decisions contains unknown action {action!r}",
+                    f"allowed_decisions contains unknown action {action!r}"
                 )
 
 
@@ -132,12 +134,10 @@ class HitlDecision:
         valid_actions = frozenset(("approve", "reject", "edit"))
         if self.action not in valid_actions:
             raise ValueError(
-                f"action must be one of ('approve','reject','edit'), got {self.action!r}",
+                f"action must be one of ('approve','reject','edit'), got {self.action!r}"
             )
         if self.action == "edit" and self.edited_args is None:
-            raise ValueError(
-                "edited_args is required when action == 'edit'",
-            )
+            raise ValueError("edited_args is required when action == 'edit'")
 
 
 # ---------------------------------------------------------------------------
@@ -167,11 +167,11 @@ def is_valid_decision(request: HitlRequest, decision: HitlDecision) -> bool:
     """
     if not isinstance(request, HitlRequest):
         raise TypeError(
-            f"request must be a HitlRequest, got {type(request).__name__}",
+            f"request must be a HitlRequest, got {type(request).__name__}"
         )
     if not isinstance(decision, HitlDecision):
         raise TypeError(
-            f"decision must be a HitlDecision, got {type(decision).__name__}",
+            f"decision must be a HitlDecision, got {type(decision).__name__}"
         )
     if decision.tool_call_id != request.tool_call_id:
         return False
@@ -179,9 +179,7 @@ def is_valid_decision(request: HitlRequest, decision: HitlDecision) -> bool:
 
 
 # noinspection unresolved-references
-def default_interrupt_on(
-    tools: Mapping[str, Any],
-) -> dict[str, bool]:
+def default_interrupt_on(tools: Mapping[str, Any]) -> dict[str, bool]:
     """Compute the default ``interrupt_on`` policy for a tool registry.
 
     The returned dict maps tool-name → ``True`` (pause before this
@@ -201,9 +199,7 @@ def default_interrupt_on(
     :return: ``{tool_name: bool}`` for every tool in *tools*.
     """
     if not isinstance(tools, Mapping):
-        raise TypeError(
-            f"tools must be a Mapping, got {type(tools).__name__}",
-        )
+        raise TypeError(f"tools must be a Mapping, got {type(tools).__name__}")
     policy: dict[str, bool] = {}
     for name in tools:
         policy[name] = name in DEFAULT_INTERRUPT_TOOLS
@@ -212,8 +208,7 @@ def default_interrupt_on(
 
 # noinspection unresolved-references
 def apply_decision(
-    request: HitlRequest,
-    decision: HitlDecision,
+    request: HitlRequest, decision: HitlDecision
 ) -> Mapping[str, Any] | None:
     """Resolve a paused request to the args the loop should use.
 
@@ -239,11 +234,11 @@ def apply_decision(
     """
     if not isinstance(request, HitlRequest):
         raise TypeError(
-            f"request must be a HitlRequest, got {type(request).__name__}",
+            f"request must be a HitlRequest, got {type(request).__name__}"
         )
     if not isinstance(decision, HitlDecision):
         raise TypeError(
-            f"decision must be a HitlDecision, got {type(decision).__name__}",
+            f"decision must be a HitlDecision, got {type(decision).__name__}"
         )
     if decision.action == "approve":
         return dict(request.tool_args)

@@ -145,9 +145,7 @@ def _collect_candidates(path: Path) -> list[Path]:
 
 
 def list_skills(
-    skill_paths: list[str | list[str]] | None,
-    *,
-    root_dir: str | Path = ".",
+    skill_paths: list[str | list[str]] | None, *, root_dir: str | Path = "."
 ) -> list[dict[str, Any]]:
     """List available skills without building capabilities.
 
@@ -196,9 +194,7 @@ def list_skills(
 
 
 def load_skill_capabilities(
-    skill_paths: list[str | list[str]] | None,
-    *,
-    root_dir: str | Path = ".",
+    skill_paths: list[str | list[str]] | None, *, root_dir: str | Path = "."
 ) -> list[Any]:
     """Build one deferred capability per ``SKILL.md`` found.
 
