@@ -8,37 +8,39 @@ SHELL := $(SHELL)
 # .default-goal := help
 
 
-bun-install-plugin: ## Install bun dependencies plugin app
-	@echo "Installing bun dependencies"
+
+
+bun-install-shared-todo-plugin: ## Install bun dependencies for shared-todo plugin app
+	@echo "Installing bun dependencies for shared-todo plugin app"
 	@bun install
 
-build-ui-plugin: bun-install-plugin ## Use bun to build the UI
-	@echo "Building UI"
+build-ui-shared-todo-plugin: bun-install-shared-todo-plugin ## Use bun to build the UI for the shared-todo plugin app
+	@echo "Building UI for the shared-todo plugin app"
 	@bun run build:ui
 
-tsc-lint-plugin: ## Use bun to lint the UI
-	@echo "Linting UI"
+tsc-lint-shared-todo-plugin: ## Use bun to lint the UI for the shared-todo plugin app
+	@echo "Linting UI for the shared-todo plugin app"
 	@bun run tsc --noEmit --skipLibCheck
 
 #eslint-fix-plugin: ## Use bun to fix eslint issues in the UI
 #	@echo "Fixing eslint issues in the UI"
 #	@bunx eslint --fix
 
-uv-format-plugin: ## Use uv to format the plugin code
-	@echo "Formatting the plugin code with uv"
+uv-format-shared-todo-plugin: ## Use uv to format the shared-todo plugin app
+	@echo "Formatting the shared-todo plugin app with uv"
 	@.venv/bin/uv check --fix
 
-uv-install-plugin: ## Install uv dependencies for the plugin
-	@echo "Installing the project package and uv dependencies"
+uv-install-shared-todo-plugin: ## Install uv dependencies for the shared-todo plugin app
+	@echo "Installing the shared-todo plugin app and uv dependencies"
 	@uv pip install -e .
 
 
-uv-build-plugin: uv-install-plugin ## Use uv to build the plugin
-	@echo "Build the package with uv"
+uv-build-shared-todo-plugin: uv-install-shared-todo-plugin ## Use uv to build the shared-todo plugin app
+	@echo "Building the shared-todo plugin app with uv"
 	@.venv/bin/uv build
 
-uv-lock-plugin: ## Use uv to lock the dependencies and generate a requirements.txt file
-	@echo "Locking the dependencies with uv and generating requirements.txt"
+uv-lock-shared-todo-plugin: ## Use uv to lock the dependencies and generate a requirements.txt file
+	@echo "Locking the shared todo app's dependencies with uv and generating requirements.txt"
 	@.venv/bin/uv lock
 	@.venv/bin/uv export --format requirements.txt --output-file requirements.txt -q
 
