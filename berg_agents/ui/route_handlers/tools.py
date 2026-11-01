@@ -36,6 +36,51 @@ from fastapi import APIRouter, HTTPException
 logger = logging.getLogger(__name__)
 
 
+async def _run_task_tool(harness: Harness, args: dict[str, Any]) -> ToolExecuteResponse:
+    """Run one task through the harness and return its tool response.
+
+    Carries the HITL resume fields (task_id, hitl_decision, edited_action)
+    through to ``execute_task`` so an approval resume reaches the
+    orchestrator. Isolated helper so ``register_tool_routes`` stays
+    under the complexity threshold.
+
+    :param harness: Shared harness.
+    :param args: Tool arguments.
+    :return: Tool response with the JSON-encoded result.
+    """
+    task: dict[str, Any] = {
+        "description": str(args.get("description", "")),
+        "task_type": str(args.get("task_type", "generic")),
+        "metadata": {}}
+    if "task_id" in args:
+        task["task_id"] = str(args.get("task_id"))
+    metadata = task["metadata"]
+    if "hitl_decision" in args:
+        metadata["hitl_decision"] = str(args.get("hitl_decision"))
+    if "edited_action" in args:
+        metadata["edited_action"] = args.get("edited_action")
+    if not task["description"]:
+        return ToolExecuteResponse(
+            tool="run_task",
+            output="Missing 'description': tell me what to do, "
+            'e.g. /run_task {"description": "summarize README"}.',
+            status="error",
+        )
+    result = await asyncio.to_thread(
+        harness.execute_task, task, task_id=f"tool-{id(task)}"
+    )
+    if isinstance(result, str):
+        output = result
+    else:
+        import json as _json
+
+        try:
+            output = _json.dumps(result, indent=2, default=str)
+        except (TypeError, ValueError):
+            output = str(result)
+    return ToolExecuteResponse(tool="run_task", output=output)
+
+
 def register_tool_routes(
     router: APIRouter, *, harness: Harness, sessions: SessionManager
 ) -> None:
@@ -120,41 +165,7 @@ def register_tool_routes(
             args = {}
 
         if name == "run_task":
-            task: dict[str, Any] = {
-                "description": str(args.get("description", "")),
-                "task_type": str(args.get("task_type", "generic")),
-                "metadata": {}}
-            # NOTE: HITL resume fields. When the frontend approves/rejects/
-            # edits a gated plan, it re-invokes run_task with these so the
-            # orchestrator skips the gate (or records the rejection) instead
-            # of re-planning. task_id pins the resumed run to the same id.
-            if "task_id" in args:
-                task["task_id"] = str(args.get("task_id"))
-            metadata = task["metadata"]
-            if "hitl_decision" in args:
-                metadata["hitl_decision"] = str(args.get("hitl_decision"))
-            if "edited_action" in args:
-                metadata["edited_action"] = args.get("edited_action")
-            if not task["description"]:
-                return ToolExecuteResponse(
-                    tool=name,
-                    output="Missing 'description': tell me what to do, "
-                    'e.g. /run_task {"description": "summarize README"}.',
-                    status="error",
-                )
-            result = await asyncio.to_thread(
-                harness.execute_task, task, task_id=f"tool-{id(task)}"
-            )
-            if isinstance(result, str):
-                output = result
-            else:
-                import json as _json
-
-                try:
-                    output = _json.dumps(result, indent=2, default=str)
-                except (TypeError, ValueError):
-                    output = str(result)
-            return ToolExecuteResponse(tool=name, output=output)
+            return await _run_task_tool(harness, args)
 
         specs = {
             spec.name: spec

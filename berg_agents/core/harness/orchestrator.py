@@ -323,35 +323,23 @@ class Harness:
             )
         return result
 
-    def execute_task(
+    def plan_task(
         self, task: dict[str, Any], task_id: str | None = None
     ) -> dict[str, Any]:
-        """Run one task through guardian to router_agent.
+        """Plan a task without executing it.
 
-        The guardian gate returns early on review; planning
-        runs for complex/critical tasks only; curation runs
-        when ``files_changed`` metadata is present; router stats
-        records the outcome when enabled. A ``hitl_decision``
-        of ``approve`` in ``metadata`` marks a human-approved
-        resume: the verdict is still computed for risk
-        reporting, but its early-return gate is skipped so
-        identical inputs cannot re-gate. A low-confidence-only
-        verdict is likewise bypassed when the planned tools
-        are all read-only, so conversation proceeds while
-        mutating tool calls still pause.
+        Runs the guardian gate, complexity routing, deterministic
+        planning, and the plan-then-gate step. Performs NO inference, so
+        callers can inspect/approve the plan first. Returns either a
+        gated result (``{"gated": True, "gate_result": ...}``) that the
+        caller must approve before anything runs, or an execution bundle
+        (``{"gated": False, ...}``) carrying everything
+        :meth:`execute_task` needs to run inference.
 
-        :param task: Mapping with ``description``, ``task_type``,
-                and optional ``metadata`` keys.
+        :param task: Mapping with ``description``, ``task_type``, and
+            optional ``metadata`` keys.
         :param task_id: Caller thread id; generated when None.
-
-        :return: Result dict with ``status`` ``completed`` or
-            ``needs_human_review`` plus stage outputs.
-            ``model`` names the actually-run model: the
-            ``model_run.model_id`` when task metadata carries
-            an explicit ``requested_model`` override, else
-            the complexity default. Under an override the
-            complexity default is kept beside it as
-            ``complexity_model`` so both labels stay explainable.
+        :return: Plan result dict (gated or execution bundle).
         """
         description = str(task.get("description", ""))
         task_type = str(
@@ -384,7 +372,8 @@ class Harness:
         # Chat bypass: when no mutating tools are planned and
         # inference is enabled, skip guardian/planner/
         # implementation routing and run the model directly
-        # (see _chat_bypass_result).
+        # (see _chat_bypass_result). This already executes, so
+        # flag it as bypassed for the caller to return verbatim.
         bypassed = self._chat_bypass_result(
             task=task,
             task_type=task_type,
@@ -398,7 +387,7 @@ class Harness:
             impl_score=impl_score,
         )
         if bypassed is not None:
-            return bypassed
+            return {"gated": False, "bypassed": bypassed}
         # Plan-then-gate: before pausing a mutating task for
         # human review, ask the model (read-only, nothing is
         # executed) to declare the concrete actions it intends -
@@ -433,17 +422,13 @@ class Harness:
             action_requests=planned_actions,
         )
         if gated is not None:
-            return gated
+            return {"gated": True, "gate_result": gated}
         # Planning is reserved for work that needs it;
         # trivial/standard tasks skip straight to routing.
         plan: dict[str, Any] | None = None
         if complexity in {TaskComplexity.COMPLEX, TaskComplexity.CRITICAL}:
             plan = build_plan(description, task_type, complexity)
-        # Ensure a planned task carries concrete steps. The guard used
-        # to be glued onto the end of this comment, so `plan["steps"]`
-        # ran unconditionally and crashed on any trivial/standard task
-        # (plan is None there) — only the broken bypass return above
-        # kept it from being reached.
+        # Ensure a planned task carries concrete steps.
         if plan is not None and not plan.get("steps"):
             plan["steps"] = [
                 step.model_dump() for step in plan_steps_for(task_type)
@@ -458,29 +443,80 @@ class Harness:
         implementation = {
             "steps": steps,
             "tools": ToolCatalog.tools_for(task_type)}
-        # Synchronous model inference. The gate path returned
-        # above, so reaching here means completed-or-failed,
-        # never a re-gate: approved resumes and ungated runs
-        # alike infer whenever this instance allows it.
-        inference_attempted = self._wants_inference(metadata)
-        # Truthful result label: the complexity default stands
-        # until an explicit override proves another model
-        # ran (see the ``model_run`` reconciliation below).
-        requested_override: str | None = None
-        effective_model = model
-        # Bound for the no-inference path below: curation reads
-        # model_run for observed files, and an empty run means
-        # no observed files rather than an unbound name.
+        return {
+            "gated": False,
+            "bypassed": None,
+            "resolved_id": resolved_id,
+            "description": description,
+            "task_type": task_type,
+            "complexity": complexity,
+            "metadata": metadata,
+            "verdict": verdict,
+            "confidence": confidence,
+            "planner_score": planner_score,
+            "impl_score": impl_score,
+            "planned_actions": planned_actions,
+            "plan_messages": plan_messages,
+            "plan": plan,
+            "model": model,
+            "selected": selected,
+            "steps": steps,
+            "implementation": implementation,
+            "inference_attempted": self._wants_inference(metadata)}
+
+    def execute_plan(
+        self, plan: dict[str, Any], task_id: str | None = None
+    ) -> dict[str, Any]:
+        """Execute an approved plan.
+
+        Runs inference + tools for a plan produced by :meth:`plan_task`.
+        Assumes the plan is already approved (or never needed approval);
+        performs no gating. Used by ``execute_task`` and by callers that
+        approve a plan out-of-band (e.g. the chat approval flow).
+
+        :param plan: Execution bundle from :meth:`plan_task`.
+        :param task_id: Optional caller thread id (ignored; the plan
+            already carries ``resolved_id``).
+        :return: Completed result dict.
+        """
+        # Unpack the execution bundle.
+        resolved_id = plan["resolved_id"]
+        description = plan["description"]
+        task_type = plan["task_type"]
+        complexity = plan["complexity"]
+        metadata = plan["metadata"]
+        verdict = plan["verdict"]
+        confidence = plan["confidence"]
+        plan_messages = plan["plan_messages"]
+        # Human edit on a gated plan (Z2): captured for the trace and
+        # injected into the inference prompt so the model sees it.
+        edited_action = metadata.get("edited_action")
+        plan_obj = plan["plan"]
+        model = plan["model"]
+        selected = plan["selected"]
+        steps = plan["steps"]
+        implementation = plan["implementation"]
+        inference_attempted = plan["inference_attempted"]
+        answer = None
         model_run: dict[str, Any] = {}
         turn: Any = None
+        requested_override: str | None = None
         if inference_attempted:
+            # On an edited resume, surface the human's edit to the model.
+            inference_description = description
+            if edited_action is not None:
+                inference_description = (
+                    description
+                    + "\n\nHuman edited the planned action: "
+                    + str(edited_action)
+                )
             try:
                 turn = run_turn(
                     self,
-                    description=description,
+                    description=inference_description,
                     task_type=task_type,
                     complexity=complexity,
-                    plan=plan,
+                    plan=plan_obj,
                     steps=steps,
                     metadata=metadata,
                     message_history=plan_messages,
@@ -494,8 +530,6 @@ class Harness:
                 implementation["answer"] = answer
                 implementation["model_run"] = model_run
                 requested_override = _requested_model_id(metadata)
-                if requested_override is not None:
-                    effective_model = str(model_run.get("model_id") or model)
             except _ModelUnavailableError as exc:
                 return _failed_result(
                     resolved_id=resolved_id,
@@ -510,10 +544,8 @@ class Harness:
                         if self._enable_router_stats
                         else None
                     ),
+                    edited_action=edited_action,
                 )
-        # Reconcile happens inside the inference block above;
-        # nothing else to do here.
-
         # Deterministic offline fallback (no phrase
         # matching): with inference disabled the model
         # never ran, so chat-mode tasks would complete
@@ -527,7 +559,9 @@ class Harness:
                 "generate a live answer. Enable inference "
                 "or set run_model for a live answer."
             )
-        # Curator self-gates on files_changed metadata.
+        # Reconcile happens inside the inference block above;
+        # nothing else to do here.
+
         curation = curate_task(
             {
                 "task_type": task_type,
@@ -545,11 +579,12 @@ class Harness:
             "risk_level": verdict.risk_level,
             "confidence": confidence,
             "selected_agent": selected,
-            "model": effective_model,
-            "plan": plan,
+            "model": model_run.get("model_id", model),
+            "plan": plan_obj,
             "implementation": implementation,
             "curation": curation,
-            "inference_attempted": inference_attempted}
+            "inference_attempted": inference_attempted,
+            "edited_action": edited_action}
         if requested_override is not None:
             # Routing label kept beside the truthful one:
             # what complexity routing chose before the
@@ -564,10 +599,35 @@ class Harness:
                 complexity=complexity.value,
                 description=description,
                 inference_attempted=inference_attempted,
-                model_used=effective_model,
+                model_used=model_run.get("model_id", model)
+                if model_run
+                else model,
                 success=True,
             )
         return result
+
+    def execute_task(
+        self, task: dict[str, Any], task_id: str | None = None
+    ) -> dict[str, Any]:
+        """Run one task: plan, then execute if not gated.
+
+        Plans first (see :meth:`plan_task`); if the plan is gated the
+        gate result is returned verbatim (no inference, no execution).
+        Otherwise :meth:`execute_plan` runs inference + tools and the
+        completed result is returned.
+
+        :param task: Mapping with ``description``, ``task_type``, and
+            optional ``metadata`` keys.
+        :param task_id: Caller thread id; generated when None.
+        :return: Result dict with ``status`` ``completed`` or
+            ``needs_human_review`` plus stage outputs.
+        """
+        plan = self.plan_task(task, task_id)
+        if plan.get("bypassed") is not None:
+            return plan["bypassed"]
+        if plan["gated"]:
+            return plan["gate_result"]
+        return self.execute_plan(plan, task_id)
 
     def _wants_inference(self, metadata: dict[str, Any]) -> bool:
         """Decide whether this run performs model inference.

@@ -56,7 +56,7 @@ entry_point: "shared_todo.shared_todo:SharedToDoPlugin"
 ```
 
 `module.path:ClassName`.
-The class must be a real `BergPlugin` subclass imported from `berg_agents.plugin_system` --- local stubs fail validation at load.
+The class must be a real `BergPlugin` subclass imported from `plugin_system` --- local stubs fail validation at load.
 The module is imported from the plugin's own package (installed via the `berg-plugins` entry-point group in its `pyproject.toml`, or found on the plugin search path), never from host code.
 
 ## 4. Requirements and dependencies (optional)

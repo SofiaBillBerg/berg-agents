@@ -194,13 +194,6 @@ def _decompose_refactor() -> list[Subtask]:
             task_type="edit_file",
             complexity=TaskComplexity.COMPLEX,
             dependencies=["2"],
-        ),
-        Subtask(
-            id="4",
-            description="Run tests to verify refactoring correctness",
-            task_type="generate_test",
-            complexity=TaskComplexity.STANDARD,
-            dependencies=["3"],
         )]
 
 
@@ -223,13 +216,6 @@ def _decompose_implement() -> list[Subtask]:
             task_type="new_file",
             complexity=TaskComplexity.COMPLEX,
             dependencies=["1"],
-        ),
-        Subtask(
-            id="3",
-            description="Add tests for new functionality",
-            task_type="generate_test",
-            complexity=TaskComplexity.STANDARD,
-            dependencies=["2"],
         )]
 
 
@@ -250,35 +236,6 @@ def _decompose_fix() -> list[Subtask]:
             id="2",
             description="Implement the fix",
             task_type="edit_file",
-            complexity=TaskComplexity.STANDARD,
-            dependencies=["1"],
-        ),
-        Subtask(
-            id="3",
-            description="Add regression test",
-            task_type="generate_test",
-            complexity=TaskComplexity.STANDARD,
-            dependencies=["2"],
-        )]
-
-
-def _decompose_test() -> list[Subtask]:
-    """Build the identify-paths-generate-tests template.
-
-    :return: Ordered list of subtasks for test-generation work.
-    """
-    # Two ordered steps for test-generation work.
-    return [
-        Subtask(
-            id="1",
-            description="Identify code paths to test",
-            task_type="read_file",
-            complexity=TaskComplexity.TRIVIAL,
-        ),
-        Subtask(
-            id="2",
-            description="Generate test cases",
-            task_type="generate_test",
             complexity=TaskComplexity.STANDARD,
             dependencies=["1"],
         )]
@@ -304,8 +261,6 @@ def decompose(description: str, task_type: str = "generic") -> list[Subtask]:
         return _decompose_implement()
     if "fix" in lowered or "bug" in lowered:
         return _decompose_fix()
-    if "test" in lowered:
-        return _decompose_test()
     return [Subtask.simple("1", description, task_type)]
 
 

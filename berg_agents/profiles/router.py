@@ -77,7 +77,6 @@ def excluded_tools_for_model(model_id: str) -> list[str]:
         "ollama":
           excluded_tools:
             - "mcp_*"            # no MCP servers for local models by default
-            - generate_test
 
     :param model_id: Model identifier as declared in the providers block.
     :return: List of exclusion patterns (maybe empty).

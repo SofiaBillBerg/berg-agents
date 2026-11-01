@@ -83,7 +83,6 @@ EXECUTABLE_TASK_TYPES: frozenset[str] = frozenset({
     "new_file",
     "read_file",
     "delete_file",
-    "generate_test",
     "format_code",
     "execute_command",
     "refactor",
@@ -104,12 +103,7 @@ _PLAN_STEPS: dict[str, list[dict[str, str]]] = {
     "delete_file": [
         {"action": "confirm", "description": "Confirm safe deletion"},
         {"action": "backup_check", "description": "Check dependencies"},
-        {"action": "delete", "description": "Delete the file"}],
-    "generate_test": [
-        {"action": "read_source", "description": "Read source code"},
-        {"action": "analyze_coverage", "description": "Find gaps"},
-        {"action": "generate", "description": "Generate test cases"},
-        {"action": "write_test", "description": "Write test file"}]}
+        {"action": "delete", "description": "Delete the file"}]}
 
 # Fallback plan for task types without a dedicated template.
 _GENERIC_PLAN: list[dict[str, str]] = [

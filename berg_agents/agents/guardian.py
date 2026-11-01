@@ -98,7 +98,7 @@ MEDIUM_RISK_PATTERNS: list[str] = [
 # source of truth; these are import-safe fallbacks so the
 # pure decision functions never need file access).
 AUTO_EXECUTE: list[str] = ["read_file", "list_files", "search_code"]
-NOTIFY_AFTER: list[str] = ["edit_file", "new_file", "generate_test"]
+NOTIFY_AFTER: list[str] = ["edit_file", "new_file"]
 ASK_BEFORE: list[str] = ["delete_file", "execute_command", "refactor"]
 HUMAN_LEADS: list[str] = [
     "security_change",

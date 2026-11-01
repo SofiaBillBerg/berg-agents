@@ -169,6 +169,7 @@ def _failed_result(
     model: str,
     error: str,
     router_stats: RouterStats | None,
+    edited_action: Any = None,
 ) -> dict[str, Any]:
     """Build the model-unavailable failure result.
 
@@ -194,7 +195,8 @@ def _failed_result(
         "risk_level": verdict.risk_level,
         "model": model,
         "error": error,
-        "inference_attempted": True}
+        "inference_attempted": True,
+        "edited_action": edited_action}
     if router_stats is not None:
         failed["router_stats"] = router_stats.record(
             {

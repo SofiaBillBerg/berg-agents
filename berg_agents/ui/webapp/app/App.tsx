@@ -1051,23 +1051,27 @@ function ChatContent() {
             let the user approve/reject/edit; the decision re-invokes
             run_task with hitl_decision. */}
         {pendingGate && (
-          <Card className="mb-1.5 shrink-0 border-warning" variant="default">
+          <Card
+            className="mb-1.5 shrink-0 border-warning bg-surface-soft"
+            variant="default"
+          >
             <Card.Header>
-              <Card.Title>⏸️ Approval needed (run_task)</Card.Title>
+              <Card.Title>📋 Plan review (run_task)</Card.Title>
               <Card.Description>
-                The orchestrator planned {pendingGate.plannedActions.length}{" "}
-                action
-                {pendingGate.plannedActions.length > 1 ? "s" : ""}. Nothing
-                executes until you decide.
+                The orchestrator planned {pendingGate.plannedActions.length} action
+                {pendingGate.plannedActions.length > 1 ? "s" : ""}. Review the
+                whole plan before anything runs.
               </Card.Description>
             </Card.Header>
-            <Card.Content className="flex flex-col gap-1.5">
+            <Card.Content className="flex flex-col gap-2">
               {pendingGate.plannedActions.map((a, i) => (
                 <div
                   key={i}
-                  className="flex flex-col gap-1 rounded-md border border-border p-1.5"
+                  className="flex flex-col gap-1 rounded-md border border-border bg-surface p-2"
                 >
-                  <div className="font-mono text-sm">🔧 {a.action}</div>
+                  <div className="font-mono text-sm font-semibold">
+                    {i + 1}. {a.action}
+                  </div>
                   {a.args && Object.keys(a.args).length > 0 && (
                     <pre className="font-mono bg-surface-soft p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap">
                       {JSON.stringify(a.args, null, 2)}
@@ -1075,7 +1079,7 @@ function ChatContent() {
                   )}
                 </div>
               ))}
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 flex-wrap pt-1">
                 <Button
                   size="sm"
                   variant="primary"
@@ -1100,10 +1104,41 @@ function ChatContent() {
                 <Button
                   size="sm"
                   variant="secondary"
+                  onPress={async () => {
+                    const edited = window.prompt(
+                      "Edit planned action args (JSON):",
+                      JSON.stringify(pendingGate.plannedActions, null, 2),
+                    );
+                    if (edited === null) return;
+                    let parsed: unknown = edited;
+                    try {
+                      parsed = JSON.parse(edited);
+                    } catch {
+                      /* keep raw text */
+                    }
+                    try {
+                      await fetch(`${API_BASE}/api/tool/execute`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          tool: "run_task",
+                          args: {
+                            ...pendingGate.taskArgs,
+                            task_id: pendingGate.taskId,
+                            hitl_decision: "edit",
+                            edited_action: parsed}})});
+                    } finally {
+                      setPendingGate(null);
+                    }
+                  }}
+                >
+                  ✏️ Edit & run
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onPress={() => {
-                    // Reject: do not re-run. The orchestrator's gate
-                    // stays closed and the task does not execute. Only
-                    // "approve"/"edit" resume execution.
+                    // Reject: do not re-run.
                     setPendingGate(null);
                   }}
                 >

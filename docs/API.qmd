@@ -80,7 +80,7 @@ Guardian (risk gate), Planner (breakdown), Implementation (edits), Curator (revi
   | `berg_agents.agents.factory`     | `create_tools`, `build_loop`, `build_agent`                                                                          | Workspace tool specs plus loop/agent builders                                              |
   | `berg_agents.providers.registry` | `load_providers`, `resolve_model`, `list_models`                                                                     | Provider-centric model resolution                                                          |
   | `berg_agents.profiles.router`    | `excluded_tools_for_model`, `filter_tools_by_exclusions`                                                             | Per-model prompt suffixes and tool visibility                                              |
-  | `berg_agents.plugin_system`      | `PluginManager`, `BergPlugin`, chat integration (`get_chat_plugin_tools`, `set_plugin_enabled`, `list_chat_plugins`) | Discovery, capabilities, per-turn chat tools, enable/disable                               |
+  | `plugin_system`                  | `PluginManager`, `BergPlugin`, chat integration (`get_chat_plugin_tools`, `set_plugin_enabled`, `list_chat_plugins`) | Discovery, capabilities, per-turn chat tools, enable/disable                               |
   | `berg_agents.ui.session_store`   | Session CRUD plus `active_session` pointer                                                                           | SQLite conversation persistence and tab convergence                                        |
 
 ### Typical usage snippets
