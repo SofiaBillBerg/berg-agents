@@ -25,6 +25,11 @@ wheels = [
 ]
 
 [[package]]
+name = "berg-agents"
+version = "0.1.0"
+source = { directory = "/home/sofiabillberg/code-projects/berg-agents" }
+
+[[package]]
 name = "berg-plugin-shared-todo"
 version = "0.0.1"
 source = { editable = "." }
@@ -42,6 +47,7 @@ dev = [
     { name = "uv" },
 ]
 plugin-deps = [
+    { name = "berg-agents" },
     { name = "dotenv" },
     { name = "httpx" },
     { name = "pydantic-settings" },

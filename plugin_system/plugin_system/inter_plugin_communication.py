@@ -112,6 +112,11 @@ class PubSubChannel:
     """Pub-sub channel for topic-based messaging."""
 
     def __init__(self, event_bus: EventBus, channel: str) -> None:
+        """Initialize the PubSub Channel class.
+
+        :param event_bus:
+        :param channel:
+        """
         self.event_bus = event_bus
         self.channel = channel
 
@@ -156,6 +161,7 @@ class EventAggregator:
     """Aggregate multiple events into one."""
 
     def __init__(self, event_bus: EventBus) -> None:
+        """Initialize EventAggregator class."""
         self.event_bus = event_bus
 
     async def aggregate(

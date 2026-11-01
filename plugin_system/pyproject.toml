@@ -6,8 +6,9 @@ readme = "README.md"
 authors = [
     { name = "Sofia Billger Bergström", email = "sofia.billger@gmail.com" }
 ]
-requires-python = ">=3.14"
-dependencies = []
+requires-python = ">=3.12"
+dependencies = [
+    "berg-agents"]
 
 [project.scripts]
 #plugin-system = "plugin_system:src"
@@ -25,3 +26,6 @@ source-exclude = ["**/*.bin", ".*/*", "**/dist",
     "**/archive", "**/*cache*", "**/support-libs", "**/.next/**",
     "**/.ipynb_checkpoints/**", "tmp/**", "feat_dev/**", "berg_plugins/**",
     "suggestions/**", "_site/**"]
+
+[tool.uv.sources]
+berg-agents = { workspace = true }

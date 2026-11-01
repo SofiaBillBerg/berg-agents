@@ -20,10 +20,11 @@
 import importlib
 from pathlib import Path
 
-from jsonschema import ValidationError as JsonValidationError
-from jsonschema import validate
 from plugin_system.exceptions import ManifestError
 from plugin_system.plugin_schema import PluginManifest
+
+from jsonschema import ValidationError as JsonValidationError
+from jsonschema import validate
 from pydantic import ValidationError as PydanticValidationError
 import yaml
 

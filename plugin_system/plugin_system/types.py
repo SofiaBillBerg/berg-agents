@@ -66,22 +66,22 @@ class SimplePluginContext:
 class BergPlugin:
     """Base interface for all berg_agents plugins."""
 
-    async def on_load(self, context) -> None:
+    async def on_load(self, context: SimplePluginContext) -> None:
         """Called when plugin is loaded."""
 
-    async def on_enable(self, context) -> None:
+    async def on_enable(self, context: SimplePluginContext) -> None:
         """Called when plugin is enabled."""
 
-    async def on_disable(self, context) -> None:
+    async def on_disable(self, context: SimplePluginContext) -> None:
         """Called when plugin is disabled."""
 
-    async def on_unload(self, context) -> None:
+    async def on_unload(self, context: SimplePluginContext) -> None:
         """Called when plugin is unloaded."""
 
-    def get_capabilities(self) -> list[Any]:
+    def get_capabilities(self) -> list[Any]:  # ruff: ignore[no-self-use]
         """Return plugin capabilities (tools, agents, etc.)."""
         return []
 
-    def get_settings_schema(self) -> dict[str, Any] | None:
+    def get_settings_schema(self) -> dict[str, Any] | None:  # ruff: ignore[no-self-use]
         """Return JSON schema for plugin settings."""
         return None

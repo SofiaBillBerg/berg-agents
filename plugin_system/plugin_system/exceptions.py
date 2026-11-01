@@ -60,6 +60,7 @@ class PluginError(Exception):
     """Custom exception for plugin errors."""
 
     def __init__(self, message: str) -> None:
+        """Initialize PluginError with a message."""
         super().__init__(message)
         self.message = message
 
@@ -86,6 +87,7 @@ class PermissionDeniedError(Exception):
     def __init__(
         self, message: str, plugin_id: str = "", resource: str = ""
     ) -> None:
+        """Initialize PermissionDeniedError with a message, plugin ID, and resource."""
         super().__init__(message)
         self.message = message
         self.plugin_id = plugin_id

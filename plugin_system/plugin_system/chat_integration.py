@@ -20,7 +20,7 @@
 """Chat integration for the plugin system.
 
 Loads enabled plugin tools once per server process and hands them to
-the streaming chat agent (:func:`build_chat_agent`). Everything here
+the streaming chat agent (:func:`berg_agents.agents.chat_agent.build_chat_agent`). Everything here
 is failure-isolated: a broken plugin directory must never take down
 the chat endpoint — it only logs and yields no tools.
 """
@@ -157,7 +157,7 @@ def get_plugin_manager() -> PluginManager:
     or read registry state, and reaching into ``_CACHE`` for it made
     them depend on a private name. This is the public seam for that.
 
-    :return: The shared :class:`PluginManager`.
+    :return: The shared :class:`plugin_system.plugin_manager.PluginManager`.
     :raises RuntimeError: When the manager has not been warmed yet
         (call :func:`get_chat_plugin_tools` first, which is what
         ``chat_stream`` and the tools endpoint already do).

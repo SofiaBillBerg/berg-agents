@@ -7,8 +7,7 @@ requires-python = ">=3.12"
 license = "AGPL-3.0-only"
 license-files = ["LICENSE", "agpl-3.0.txt"]
 authors = [{ name = "Sofia Billger Bergström" }]
-classifiers = [
-    "Development Status :: 3 - Alpha",
+classifiers = ["Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.14",
@@ -26,25 +25,22 @@ build-backend = "uv_build"
 module-root = ""
 module-name = ["berg_agents"]
 source-exclude = ["**/*.bin", ".*/*", "**/dist", "**/build", "**/_build", ".venv", "**/node_modules", "**/archive", "**/*cache*", "**/support-libs", "**/.next/**", "**/.ipynb_checkpoints/**", "berg_agent_outputs/**", "_extensions/**", "notes/**", "scripts/**", "project_utils/**", "tmp/**", "feat_dev/**", "berg_plugins/**",
-"suggestions/**", "_site/**", "**/.*/**"]
+    "suggestions/**", "_site/**", "**/.*/**"]
 
 #namespace = true
 
 
 [dependency-groups]
-default-base = [
-    { include-group = "agent-deps" },
+default-base = [{ include-group = "agent-deps" },
     { include-group = "dev" },
     { include-group = "docs" },
     { include-group = "tests" }]
-notebooks = [
-    "ipykernel>=7.3.0",
+notebooks = [ "ipykernel>=7.3.0",
     "jupyterlab>=4.6.3",
     "matplotlib-inline>=0.2.2",
     "nbformat>=5.11.1",
     "notebook>=7.6.2"]
-agent-deps = [
-    "cryptography>=50.0.2",
+agent-deps = [ "cryptography>=50.0.2",
     "jsonschema>=4.26.0",
     "python-dotenv>=1.2.3",
     "pyyaml>=6.0.3",
@@ -74,9 +70,8 @@ agent-deps = [
     "pydantic-ai-harness[acp,code-mode]>=0.63.0",
     "pydantic-ai-slim[duckduckgo,web-fetch]>=2.63.0",
     "chromadb>=1.5.9"]
-docs = [ "pydoctor>=25.10.1", "quarto>=0.1.0" ]
-dev = [
-    "black>=24.3.0",
+docs = ["pydoctor>=25.10.1", "quarto>=0.1.0"]
+dev = ["black>=24.3.0",
     "flake8>=7.3.0",
     "httpx2>=2.9.1",
     "isort>=5.13.2",
@@ -93,8 +88,7 @@ dev = [
     "pytype>=2024.10.11",
     "pyanalyze>=0.13.1",
     "types-pyyaml>=6.0.12.20260906"]
-tests = [
-    "coverage>=7.16.0",
+tests = [ "coverage>=7.16.0",
     "hypothesis>=6.165.10",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
@@ -102,8 +96,7 @@ tests = [
     "pytest-mock>=3.15.1",
     "pytest-twisted>=1.14.3",
     "twisted>=26.4.0"]
-plugin-deps = [
-    "plugin-system"]
+plugin-deps = ["plugin-system"]
 
 [optional-dependencies]
 dev-usage = ["berg-plugin-shared-todo"]
@@ -123,11 +116,9 @@ cudf-cu13 = { index = "nvidia" }
 cutensor-cu13 = { index = "nvidia" }
 nvidia-nccl-cu13 = { index = "nvidia" }
 rmm-cu13 = { index = "nvidia" }
-torch = [
-    { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+torch = [{ index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
     { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }]
-torchvision = [
-    { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
     { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }]
 berg-plugin-shared-todo = { path = "berg_plugins/shared_todo/dist/berg_plugin_shared_todo-0.0.1.tar.gz" }
 plugin-system = { workspace = true }
@@ -150,13 +141,13 @@ default = true
 name = "default"
 
 [tool.uv.pip]
-extra-index-url = [
-    "https://download.pytorch.org/whl/cu130"] # This will add the PyTorch index as an additional source for packages, which can help ensure that you have access to the latest versions of PyTorch and related packages.
+extra-index-url = ["https://download.pytorch.org/whl/cu130"] # This will add the PyTorch index as an additional source for packages, which can help ensure that you have access to the latest versions of PyTorch and related packages.
 index-strategy = "unsafe-best-match"
 
 [tool.uv.workspace]
 members = [
-    "plugin_system"]
+    "plugin_system",
+    "."]
 
 
 [tool.uv]
@@ -178,8 +169,7 @@ fixable = ["ALL"]
 unfixable = []
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))"
-extend-fixable = [
-    "I",
+extend-fixable = ["I",
     "B",
     "E",
     "doc-line-too-long",
@@ -187,8 +177,7 @@ extend-fixable = [
     "PTH",
     "D"]
 
-ignore = [
-    "line-too-long",
+ignore = ["line-too-long",
     "unused-noqa",
     "blind-except",
     "non-imperative-mood",
@@ -199,8 +188,7 @@ ignore = [
 # This will ignore the RUF100 error to enable the noga rule for Ruff.
 preview = true
 future-annotations = true
-extend-select = [
-    "E",
+extend-select = ["E",
     "F",
     "W",
     "C90",
@@ -221,8 +209,7 @@ extend-select = [
     "A",
     "FBT"]
 task-tags = ["TODO", "FIX", "BUG", "CHECK", "CONTROL"]
-extend-ignore = [
-    "too-many-blank-lines", # Blank-line count is the formatter's job; E303 fights `ruff format` under preview.
+extend-ignore = ["too-many-blank-lines", # Blank-line count is the formatter's job; E303 fights `ruff format` under preview.
     "boolean-default-value-positional-argument",
     "boolean-type-hint-positional-argument",
     "too-many-arguments",
@@ -239,8 +226,7 @@ detect-same-package = true # This will allow isort to detect when imports are fr
 # which needs 2 blanks; 2 breaks imports->assignment/comment which needs 1) -
 # measured 2026-09-06 (2 vs 84 I001s). Leaving it unset lets both tools agree.
 force-sort-within-sections = true # This will force isort to sort imports within each section (standard library, third-party, and local).
-section-order = [
-    "future",
+section-order = ["future",
     "standard-library",
     "first-party",
     "local-folder",
@@ -255,8 +241,7 @@ float_to_top = true # This will move imports that are only used in type annotati
 honor_noqa = true # This will allow isort to respect `# noqa` comments that are used to ignore specific linting errors.
 profile = "attrs" # This will set the isort profile to "attrs", which will configure isort to format imports in a way that is compatible with the Black code formatter.
 remove_redundant_aliases = true # This will remove redundant aliases from imports (e.g., `import numpy as np` when `np` is not used in the code).
-skip_glob = [
-    "_build",
+skip_glob = ["_build",
     "_extensions",
     ".*/",
     ".venv",
@@ -282,8 +267,7 @@ skip-magic-trailing-comma = true
 
 [tool.ruff]
 src = ["berg_agents"]
-extend-exclude = [
-    "_build",
+extend-exclude = ["_build",
     ".venv",
     "*cache*",
     "**/archive",
@@ -299,20 +283,17 @@ line-length = 80
 
 
 [tool.ruff.lint.per-file-ignores]
-"*.ipynb" = [
-    "unused-import",
+"*.ipynb" = ["unused-import",
     "undefined-local-with-import-star",
     "line-too-long",
-    "T20"] 
+    "T20"]
 # Ignore unused imports and wildcard imports in Jupyter notebooks.
-"*test*.py" = [
-    "assert",
+"*test*.py" = ["assert",
     "magic-value-comparison",
     "ARG",
     "implicit-namespace-package",
     "no-self-use"]
-"project_utils/*.py" = [
-    "unused-import",
+"project_utils/*.py" = ["unused-import",
     "non-pep604-annotation-union",
     "non-pep604-annotation-optional",
     "non-pep585-annotation",
@@ -376,8 +357,7 @@ builtin = ["clear", "rare", "informal", "usage", "code", "names"]
 enable-colors = true
 write-changes = true
 count = true
-ignore-words-list = [
-    "mlflow",
+ignore-words-list = ["mlflow",
     "bertopic",
     "ctm",
     "artifacts",
@@ -412,8 +392,7 @@ search-path = ["./stubs", "berg_agents/"]
 python-interpreter-path = ".venv/bin/python"
 # pyrefly mis-detects Pydantic v2 models and requires `model_config` as a
 # constructor argument; this only affects FileObject (a @dataclass) here.
-project-excludes = [
-    "**/.[!/.]*",
+project-excludes = ["**/.[!/.]*",
     "**/archive",
     "_extensions",
     ".*/",
@@ -461,8 +440,7 @@ import_paths = ["berg_agents/", "stubs/", ".venv/"]
 
 [tool.pytype]
 # Space-separated list of files or directories to exclude.
-exclude = [
-    "**/__pycache__",
+exclude = ["**/__pycache__",
     "**/build",
     "**/dist",
     ".venv",
@@ -526,8 +504,7 @@ god_file_max_top_level_definitions = 50
 duplicate_strings = 20
 model = "omniroute/free"
 base_url = "http://localhost:20128/v1"
-exclude = [
-    "**/.*",
+exclude = ["**/.*",
     "notes",
     "berg_agents.egg-info",
     "**/*cache*",
