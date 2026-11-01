@@ -206,7 +206,7 @@ def render_result(
             )
         )
         return
-    if status == "needs_human_review":
+    if status == "needs_approval":
         reasons = result.get("review_reasons", [])
         body = (
             "\n".join(f"* {reason}" for reason in reasons) or "review requested"
@@ -350,7 +350,7 @@ def run_harness_task(
         render_result(failed, console)
         return failed
 
-    if result.get("status") != "needs_human_review":
+    if result.get("status") != "needs_approval":
         render_result(result, console)
         return result
 

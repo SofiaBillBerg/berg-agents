@@ -67,6 +67,7 @@ from berg_agents.core.harness._routing import (
     _failed_result,
     _review_gate_result,
     _task_plans_mutation,
+    _tool_is_mutating,
 )
 
 # Imported helpers (split modules)
@@ -79,46 +80,6 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 logger = logging.getLogger(__name__)
 
-
-def _fallback_planned_actions(
-    description: str, task_type: str, complexity: Any
-) -> list[dict[str, Any]]:
-    """Derive a planned-action list from the deterministic Planner.
-
-    Single source of planning structure: when the LLM planning path is
-    unavailable (no inference or a failure), fall back to the deterministic
-    ``build_plan`` decomposition instead of a second, hand-written
-    placeholder. Keeps the HITL card populated with real subtasks and
-    gives one consistent return shape (list, never a bare dict).
-
-    :param description: Task description.
-    :param task_type: Task type label.
-    :param complexity: Routed complexity (enum or value accepted).
-    :return: Non-empty list of ``{"action", "args"}`` dicts.
-    """
-    try:
-        plan = build_plan(description, task_type, complexity)
-    except Exception as exc:  # Defensive: planning must not break a turn.
-        logger.debug("build_plan fallback failed: %s", exc)
-        plan = {}
-    actions: list[dict[str, Any]] = []
-    subtasks = plan.get("subtasks") if isinstance(plan, dict) else None
-    for sub in subtasks or []:
-        if not isinstance(sub, dict):
-            continue
-        sub_desc = str(sub.get("description") or description)
-        actions.append({
-            "action": str(sub.get("task_type") or task_type),
-            "args": {"description": sub_desc, "summary": sub_desc[:200]}})
-    if not actions:
-        actions = [
-            {
-                "action": task_type,
-                "args": {
-                    "description": description,
-                    "summary": "planned: " + description[:200]}}
-        ]
-    return actions
 
 
 class Harness:
@@ -409,6 +370,31 @@ class Harness:
                 metadata=metadata,
                 message_history=None,
             )
+        # Deterministic decomposition (guidance for the caller). Kept
+        # separate from the concrete actions: the plan is decomposable
+        # work the executor should reason about, not executable calls.
+        plan_steps: list[dict[str, Any]] = []
+        if complexity in {TaskComplexity.COMPLEX, TaskComplexity.CRITICAL}:
+            try:
+                built = build_plan(description, task_type, complexity)
+            except Exception as exc:  # Defensive.
+                logger.debug("build_plan for gate failed: %s", exc)
+                built = {}
+            subtasks = (
+                built.get("subtasks") if isinstance(built, dict) else None
+            )
+            plan_steps = [s for s in (subtasks or []) if isinstance(s, dict)]
+        # Concrete mutating tool calls the caller can execute one by one.
+        # When the read-only planning inference produced none (no
+        # inference, or it failed), fall back to the mutating tools the
+        # task implies so the executor still has real calls to approve.
+        action_requests = planned_actions
+        if not action_requests:
+            action_requests = [
+                {"action": tool, "args": {"description": description[:200]}}
+                for tool in ToolCatalog.tools_for(task_type, description)
+                if _tool_is_mutating(tool)
+            ]
         # Early return: a human must review before anything
         # else runs (see _review_gate_result); approved resumes
         # and read-only low-confidence verdicts proceed.
@@ -419,7 +405,8 @@ class Harness:
             resolved_id=resolved_id,
             confidence=confidence,
             approved=approved,
-            action_requests=planned_actions,
+            action_requests=action_requests,
+            plan_steps=plan_steps,
         )
         if gated is not None:
             return {"gated": True, "gate_result": gated}
@@ -673,12 +660,10 @@ class Harness:
             "args": {...}}, ...]``, or None when planning failed.
         """
         if not self._wants_inference(metadata):
-            # Fallback when inference disabled: derive planned actions from
-            # the deterministic Planner (single planning source) instead of
-            # a second, hand-written placeholder.
-            return _fallback_planned_actions(
-                description, task_type, complexity
-            ), None
+            # No concrete planned actions without inference; the caller
+            # falls back to the mutating ToolCatalog tools plus the
+            # deterministic plan_steps for guidance.
+            return None, None
         requested = _requested_model_id(metadata)
         try:
             agent = build_implementation_agent(
@@ -705,13 +690,10 @@ class Harness:
         except Exception as exc:
             logger.warning(
                 "Mutation planning inference failed; "
-                "falling back to Planner-derived actions: %s",
+                "returning no concrete actions: %s",
                 exc,
             )
-            return (
-                _fallback_planned_actions(description, task_type, complexity),
-                None,
-            )
+            return None, None
         new_messages = getattr(run_result, "new_messages", None)
         plan_messages = new_messages() if callable(new_messages) else None
         return _extract_planned_actions(

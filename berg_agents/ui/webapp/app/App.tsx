@@ -184,7 +184,8 @@ function ChatContent() {
   const [toolResults, setToolResults] = useState<ToolResult[]>([]);
 
   // Orchestrator HITL gate surfaced in the UI: when run_task returns
-  // status "needs_human_review" with planned_actions, we show an approval
+  // status "needs_approval" with action_requests/plan_steps, we show a
+  // plan-review approval
   // card (reusing ApprovalItem) instead of a plain tool result. Approve/
   // reject/edit re-invoke run_task with hitl_decision. Phase 1 of
   // unifying the two approval systems (chat batch + orchestrator gate).
@@ -192,6 +193,7 @@ function ChatContent() {
     taskArgs: Record<string, unknown>;
     taskId: string;
     plannedActions: Array<{ action: string; args: Record<string, unknown> }>;
+    planSteps: Array<{ description: string; taskType: string }>;
   } | null>(null);
 
   // Session-scoped opt-in: when on, mutating tool calls / gated plans are
@@ -487,16 +489,15 @@ function ChatContent() {
               /* keep raw string */
             }
           }
-          // Orchestrator HITL gate: a mutating task pauses and returns
-          // planned actions. Surface them as an approval card instead of
-          // a plain tool result (Phase 1 of unifying the two approval
-          // systems). The user approves/rejects/edits, then we re-invoke
-          // run_task with hitl_decision.
+          // Orchestrator plan review: a mutating task returns a plan
+          // (concrete action_requests + abstract plan_steps) instead of
+          // executing. Surface it as a plan-approval card; the user
+          // approves/rejects/edits, then we re-invoke run_task.
           if (
             parsed &&
-            parsed.status === "needs_human_review" &&
-            Array.isArray(parsed.action_requests) &&
-            parsed.action_requests.length > 0
+            parsed.status === "needs_approval" &&
+            (Array.isArray(parsed.action_requests) ||
+              Array.isArray(parsed.plan_steps))
           ) {
             // Session-scoped opt-in: auto-approve without pausing.
             if (autoApproveEdits) {
@@ -518,13 +519,22 @@ function ChatContent() {
             setPendingGate({
               taskArgs,
               taskId: String(parsed.task_id ?? ""),
-              plannedActions: parsed.action_requests.map((a: any) => ({
+              plannedActions: (Array.isArray(parsed.action_requests)
+                ? parsed.action_requests
+                : []
+              ).map((a: any) => ({
                 action: String(a?.action ?? a?.tool ?? "action"),
                 args:
-                  typeof a?.args === "object" && a?.args !== null ? a.args : {}}))});
+                  typeof a?.args === "object" && a?.args !== null ? a.args : {}})),
+              planSteps: (Array.isArray(parsed.plan_steps)
+                ? parsed.plan_steps
+                : []
+              ).map((s: any) => ({
+                description: String(s?.description ?? ""),
+                taskType: String(s?.task_type ?? "")}))});
             return {
               handled: true,
-              card: "⏸️ Approval needed — see card below"};
+              card: "⏸️ Plan review — see card below"};
           }
           return { handled: true, card: `✅ ${tool.name} via run_task` };
         } catch (e) {
@@ -1058,9 +1068,13 @@ function ChatContent() {
             <Card.Header>
               <Card.Title>📋 Plan review (run_task)</Card.Title>
               <Card.Description>
-                The orchestrator planned {pendingGate.plannedActions.length} action
-                {pendingGate.plannedActions.length > 1 ? "s" : ""}. Review the
-                whole plan before anything runs.
+                The orchestrator planned {pendingGate.plannedActions.length}{" "}
+                concrete action
+                {pendingGate.plannedActions.length === 1 ? "" : "s"}
+                {pendingGate.planSteps.length > 0
+                  ? ` across ${pendingGate.planSteps.length} step${pendingGate.planSteps.length === 1 ? "" : "s"}`
+                  : ""}
+                . Review the whole plan before anything runs.
               </Card.Description>
             </Card.Header>
             <Card.Content className="flex flex-col gap-2">
@@ -1079,6 +1093,21 @@ function ChatContent() {
                   )}
                 </div>
               ))}
+              {pendingGate.planSteps.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <div className="text-xs text-muted-foreground">
+                    Planned steps (guidance):
+                  </div>
+                  <ol className="text-xs list-decimal ml-4 flex flex-col gap-0.5">
+                    {pendingGate.planSteps.map((s, i) => (
+                      <li key={i}>
+                        {s.taskType ? `${s.taskType}: ` : ""}
+                        {s.description}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
               <div className="flex gap-2 flex-wrap pt-1">
                 <Button
                   size="sm"

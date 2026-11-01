@@ -300,6 +300,7 @@ def _review_gate_result(
     confidence: float,
     approved: bool,
     action_requests: list[dict[str, Any]] | None = None,
+    plan_steps: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """Apply the human-review gate.
 
@@ -352,12 +353,16 @@ def _review_gate_result(
             for tool in tools
         ]
     return {
-        "status": "needs_human_review",
+        "status": "needs_approval",
         "task_id": resolved_id,
         "task_type": task_type,
         "complexity": verdict.complexity,
         "risk_level": verdict.risk_level,
         "review_reasons": list(verdict.reasons),
         "confidence": confidence,
-        "action_requests": action_requests,
+        # Concrete mutating tool calls the caller can execute one by one
+        # through the chat approval batch.
+        "action_requests": action_requests or [],
+        # Abstract decomposition (guidance), not executable actions.
+        "plan_steps": plan_steps or [],
         "inference_attempted": False}

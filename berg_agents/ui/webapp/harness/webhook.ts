@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,7 +19,6 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-
 /*
  * Type definitions for the harness backend API contract.
  *
@@ -31,53 +30,53 @@
 
 /** Agent info returned by /api/agents */
 export interface AgentInfo {
-    name: string;
-    model: string;
-    description?: string;
-    preferred_complexity?: string;
-    capabilities?: string[];
+  name: string;
+  model: string;
+  description?: string;
+  preferred_complexity?: string;
+  capabilities?: string[];
 }
 
 /** HITL request details from the backend */
 export interface HitlRequest {
-    task_id: string;
+  task_id: string;
+  description: string;
+  review_reasons: string[];
+  risk_level: "low" | "medium" | "high";
+  complexity: {
+    value: "simple" | "standard" | "complex";
     description: string;
-    review_reasons: string[];
-    risk_level: "low" | "medium" | "high";
-    complexity: {
-        value: "simple" | "standard" | "complex";
-        description: string;
-    };
+  };
 }
 
 /** Task result from the backend */
 export interface TaskResult {
-    status: "completed" | "failed" | "needs_human_review";
-    task_id: string;
-    complexity: {
-        value: "simple" | "standard" | "complex";
-        description: string;
+  status: "completed" | "failed" | "needs_approval";
+  task_id: string;
+  complexity: {
+    value: "simple" | "standard" | "complex";
+    description: string;
+  };
+  implementation: {
+    answer: string;
+    model_run?: {
+      files_changed?: Array<Record<string, unknown>>;
     };
-    implementation: {
-        answer: string;
-        model_run?: {
-            files_changed?: Array<Record<string, unknown>>;
-        };
-    };
-    plan?: unknown[];
-    curation?: { status: string };
-    subagents?: string[];
-    background_tasks?: string[];
+  };
+  plan?: unknown[];
+  curation?: { status: string };
+  subagents?: string[];
+  background_tasks?: string[];
 }
 
 /** Simple harness event (backward compat for event logging) */
 export interface HarnessEvent {
-    type: string;
-    data?: unknown;
+  type: string;
+  data?: unknown;
 }
 
 /** HITL decision input */
 export type HitlDecisionInput =
-    | string
-    | { decision: "approve" | "reject" | "edit"; edited_action?: unknown }
-    | Array<{ decision: "approve" | "reject" | "edit"; edited_action?: unknown }>;
+  | string
+  | { decision: "approve" | "reject" | "edit"; edited_action?: unknown }
+  | Array<{ decision: "approve" | "reject" | "edit"; edited_action?: unknown }>;
