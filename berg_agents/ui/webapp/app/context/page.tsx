@@ -28,15 +28,17 @@
 
 "use client";
 
+import type {PluginInfo} from "../components/PluginCatalog.tsx";
+
 import {useEffect, useState} from "react";
 import {Card, Chip, Spinner} from "@heroui/react";
 
-import {API_BASE} from "@/envConfig";
 
 import {RouterStatsPanel} from "../components/RouterStatsPanel.tsx";
 import {SharedContextEditor} from "../components/SharedContextEditor.tsx";
 import {Navbar} from "../components/Navbar.tsx";
-import type {PluginInfo} from "../components/PluginCatalog.tsx";
+
+import {API_BASE} from "@/envConfig";
 
 interface MemoryEntry {
     path: string;
@@ -217,8 +219,8 @@ export default function ContextPage() {
                                             )}
                                             {data.memory.map((m) => (
                                                 <div
-                                                    className="flex items-center gap-2 text-sm"
                                                     key={m.path}
+                                                    className="flex items-center gap-2 text-sm"
                                                 >
                                                     <span className="font-mono truncate">{m.path}</span>
                                                     <Chip
@@ -260,15 +262,15 @@ export default function ContextPage() {
                                                 );
                                                 return (
                                                     <Chip
-                                                        color={runtimeOff ? "default" : "success"}
                                                         key={s.name}
+                                                        color={runtimeOff ? "default" : "success"}
                                                         size="sm"
-                                                        variant="soft"
                                                         title={
                                                             plugin
                                                                 ? `${plugin.state}${sensitive ? " · tools need approval" : ""}`
                                                                 : "plugin system unavailable"
                                                         }
+                                                        variant="soft"
                                                     >
                                                         {s.name}
                                                         {runtimeOff ? " (off)" : ""}
@@ -296,7 +298,7 @@ export default function ContextPage() {
                                         {data.skills.map((s) => {
                                             const plugin = skills.get(skillKey(s.name));
                                             return (
-                                                <div className="text-sm" key={s.name}>
+                                                <div key={s.name} className="text-sm">
                           <span className="font-mono font-semibold">
                             {s.name}
                           </span>
@@ -334,7 +336,7 @@ export default function ContextPage() {
                                         </Card.Header>
                                         <Card.Content className="flex flex-col gap-2">
                                             {toolPlugins.map((p) => (
-                                                <div className="text-sm" key={p.id}>
+                                                <div key={p.id} className="text-sm">
                                                     <span className="font-semibold">{p.name}</span>{" "}
                                                     <Chip size="sm" variant="soft">
                                                         v{p.version}

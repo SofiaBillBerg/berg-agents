@@ -188,17 +188,17 @@ export function SharedContextEditor() {
                     </Button>
                     <input
                         aria-label="Why (what/why discipline)"
-                        name="shared-context-why"
-                        id="shared-context-why"
                         className="flex-1 min-w-[12rem] rounded-md border border-border bg-background px-2 py-1 text-sm"
+                        id="shared-context-why"
+                        name="shared-context-why"
                         placeholder="why (the what/why discipline)"
                         value={why}
                         onChange={(e) => setWhy(e.target.value)}
                     />
                     <Button
+                        isDisabled={!dirty}
                         size="sm"
                         variant="primary"
-                        isDisabled={!dirty}
                         onPress={() => void save("write")}
                     >
                         Save
@@ -219,12 +219,12 @@ export function SharedContextEditor() {
                     <p className="text-sm text-muted-foreground">Loading…</p>
                 ) : (
                     <CodeMirror
-                        value={content}
+                        basicSetup={{lineNumbers: false}}
+                        extensions={[markdown()]}
                         height="320px"
                         theme={theme}
-                        extensions={[markdown()]}
+                        value={content}
                         onChange={(value) => setContent(value)}
-                        basicSetup={{lineNumbers: false}}
                     />
                 )}
 

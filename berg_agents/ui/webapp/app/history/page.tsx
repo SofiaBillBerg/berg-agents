@@ -29,13 +29,15 @@
 
 "use client";
 
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useState} from "react";
 import {useRouter} from "next/navigation";
 import {Button, Card, Chip} from "@heroui/react";
+
+import {Navbar} from "../components/Navbar.tsx";
+
 import {API_BASE} from "@/envConfig";
 import {SESSION_ID_KEY} from "@/harness/useAISDKChat";
 
-import {Navbar} from "../components/Navbar.tsx";
 
 interface ServerSession {
     id: string;
@@ -161,12 +163,12 @@ export default function HistoryPage() {
                     </p>
                     <input
                         aria-label="Search conversations"
-                        name="session-search"
-                        id="session-search"
                         className="mb-3 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-                        onChange={(e) => setQuery(e.target.value)}
+                        id="session-search"
+                        name="session-search"
                         placeholder="Search titles, subtitles, transcripts…"
                         value={query}
+                        onChange={(e) => setQuery(e.target.value)}
                     />
                     {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
 
@@ -205,12 +207,12 @@ export default function HistoryPage() {
                                             <input
                                                 aria-label="Session title"
                                                 className="w-full rounded-md border border-border bg-background px-1 py-0.5 text-sm"
+                                                value={draftTitle}
                                                 onChange={(e) => setDraftTitle(e.target.value)}
                                                 onKeyDown={(e) => {
                                                     if (e.key === "Enter") void renameServer(s.id);
                                                     if (e.key === "Escape") setRenamingId(null);
                                                 }}
-                                                value={draftTitle}
                                             />
                                         ) : (
                                             <p className="truncate text-sm font-medium">{s.title}</p>

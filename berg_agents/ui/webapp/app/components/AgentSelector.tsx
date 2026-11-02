@@ -78,16 +78,16 @@ export default function AgentSelector() {
     return (
         <select
             aria-label="Active agent"
-            name="active-agent"
-            id="active-agent"
             className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-            value={active ?? ""}
-            onChange={(e) => onChange(e.target.value)}
+            id="active-agent"
+            name="active-agent"
             title={
                 active
                     ? `Active agent: ${active} - next message routes to it`
                     : "Default chat agent"
             }
+            value={active ?? ""}
+            onChange={(e) => onChange(e.target.value)}
         >
             <option value="">Default chat agent</option>
             {agents.map((a) => (

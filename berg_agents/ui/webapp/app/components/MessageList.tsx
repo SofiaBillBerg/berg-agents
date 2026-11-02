@@ -22,9 +22,10 @@
 import {useEffect, useState} from "react";
 import {Surface} from "@heroui/react";
 
-import {API_BASE} from "@/envConfig";
 import {MarkdownRenderer} from "./MarkdownRenderer.tsx";
 import {ToolCard} from "./ToolCard.tsx";
+
+import {API_BASE} from "@/envConfig";
 
 /** Plugin tool names, supplied by the backend (see usePluginSurfaceTools). */
 const PLUGIN_SURFACE_TOOLS = new Set<string>();
@@ -129,8 +130,8 @@ function ToolCallGroup({
                         : `Expand ${calls.length} tool calls`
                 }
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                onClick={() => setOpen((prev) => !prev)}
                 type="button"
+                onClick={() => setOpen((prev) => !prev)}
             >
                 <span aria-hidden>{open ? "▾" : "▸"}</span>
                 <span className="font-mono">
@@ -146,11 +147,11 @@ function ToolCallGroup({
                     {calls.map((call, callIdx) => (
                         <ToolCard
                             key={`tool-${callIdx}-${call.tool}`}
-                            tool={call.tool}
+                            expanded={false}
                             input={call.input}
                             output={call.output}
-                            expanded={false}
                             state={call.state}
+                            tool={call.tool}
                         />
                     ))}
                 </div>

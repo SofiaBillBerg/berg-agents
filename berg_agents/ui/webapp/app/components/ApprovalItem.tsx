@@ -1,8 +1,8 @@
-import { useState } from "react";
+import type { PendingApproval } from "@/harness";
 
+import { useState } from "react";
 import { Button } from "@heroui/react";
 
-import type { PendingApproval } from "@/harness";
 
 /**
  * One paused tool call inside an approval batch. Each item gets its
@@ -68,9 +68,9 @@ export function ApprovalItem({
           />
           <div className="flex gap-2">
             <Button
+              isDisabled={isStreaming}
               size="sm"
               variant="primary"
-              isDisabled={isStreaming}
               onPress={saveEdit}
             >
               💾 Save args
@@ -97,9 +97,9 @@ export function ApprovalItem({
           {approval.decided ? (
             <div className="flex gap-2">
               <Button
+                isDisabled={isStreaming}
                 size="sm"
                 variant="secondary"
-                isDisabled={isStreaming}
                 onPress={() => onRevert(approval.id)}
               >
                 ↩️ Undo decision
@@ -108,25 +108,25 @@ export function ApprovalItem({
           ) : (
             <div className="flex gap-2 flex-wrap">
               <Button
+                isDisabled={isStreaming}
                 size="sm"
                 variant="primary"
-                isDisabled={isStreaming}
                 onPress={() => onApprove(approval.id)}
               >
                 ✅ Approve
               </Button>
               <Button
+                isDisabled={isStreaming}
                 size="sm"
                 variant="secondary"
-                isDisabled={isStreaming}
                 onPress={() => onReject(approval.id)}
               >
                 ❌ Reject
               </Button>
               <Button
+                isDisabled={isStreaming}
                 size="sm"
                 variant="secondary"
-                isDisabled={isStreaming}
                 onPress={() => setEditing(true)}
               >
                 ✏️ Edit args
