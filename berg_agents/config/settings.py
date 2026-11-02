@@ -574,6 +574,15 @@ class Settings(BaseSettings):
     #: ``BERG_AGENT_RUNAWAY_TOOL_CALL_LIMIT`` / ``runawayToolCallLimit``.
     runaway_tool_call_limit: int = 30
 
+    #: Wall-clock ceiling for ONE agent run, in minutes. The run is owned by
+    #: the session and keeps going after the browser's request ends, so an
+    #: unresponsive provider or a shell command that never exits would
+    #: otherwise keep running with nothing to stop it. On expiry the run
+    #: PAUSES for HITL approval (the same card as the runaway guard) rather
+    #: than being cancelled, so no work is lost. Maps to
+    #: ``BERG_AGENT_RUN_MAX_DURATION_MINUTES`` / ``runMaxDurationMinutes``.
+    run_max_duration_minutes: int = 30
+
     #: --- BergAgents Harness (multi-agent engine) ---------------------------
     #: Central configuration for the framework-agnostic harness.
     #: Maps to ``harness`` in bergagents.jsonc.
