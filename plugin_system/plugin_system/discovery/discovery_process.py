@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from plugin_system.discovery.plugin_metadata import PluginMetadata
+
 import yaml
 
 logger = logging.getLogger(__name__)

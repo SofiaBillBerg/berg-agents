@@ -59,7 +59,7 @@ def _plugin_search_paths() -> list[Path]:
 
     :return: Existing directories to scan for ``plugin.yaml`` files.
     """
-    # NOTE: This file lives at berg_agents/plugin_system/, so the
+    # NOTE: This file lives at plugin_system_/plugin_system/, so the
     # repo checkout root is two parents up.
     repo_root = Path(__file__).resolve().parents[2]
     candidates = [repo_root / "berg_plugins"]

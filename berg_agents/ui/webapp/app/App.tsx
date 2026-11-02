@@ -183,19 +183,6 @@ function ChatContent() {
   // -------------------------------------------------------------------------
   const [toolResults, setToolResults] = useState<ToolResult[]>([]);
 
-  // Orchestrator HITL gate surfaced in the UI: when run_task returns
-  // status "needs_approval" with action_requests/plan_steps, we show a
-  // plan-review approval
-  // card (reusing ApprovalItem) instead of a plain tool result. Approve/
-  // reject/edit re-invoke run_task with hitl_decision. Phase 1 of
-  // unifying the two approval systems (chat batch + orchestrator gate).
-  const [pendingGate, setPendingGate] = useState<{
-    taskArgs: Record<string, unknown>;
-    taskId: string;
-    plannedActions: Array<{ action: string; args: Record<string, unknown> }>;
-    planSteps: Array<{ description: string; taskType: string }>;
-  } | null>(null);
-
   // Session-scoped opt-in: when on, mutating tool calls / gated plans are
   // auto-approved without pausing. Per-tool approval stays the default;
   // this is a convenience for users who want to be lazy. Persisted so it
@@ -446,6 +433,26 @@ function ChatContent() {
       const args = rest.join(" ");
 
       // -----------------------------------------------------------------
+      // Plan / implement: these run inside a chat turn through the chat
+      // agent's own plan_task / implement_task tools, so their mutating
+      // steps flow through the SAME approval batch as every other tool
+      // call. One approval system, no separate orchestrator gate.
+      // -----------------------------------------------------------------
+      if (cmdLower === "plan" || cmdLower === "implement") {
+        const prompt =
+          cmdLower === "plan"
+            ? `Plan this task and return a numbered step plan: ${args}`
+            : `Implement this task: ${args}`;
+        try {
+          await sendMessage(prompt);
+          return { handled: true, card: "" };
+        } catch (e) {
+          console.error(e);
+          return { handled: true, card: `❌ ${cmdLower} failed` };
+        }
+      }
+
+      // -----------------------------------------------------------------
       // Backend-backed tool commands - these hit /api/tool/execute.
       // -----------------------------------------------------------------
       const tool = backendTools.find((t) => t.name.toLowerCase() === cmdLower);
@@ -467,76 +474,17 @@ function ChatContent() {
         }
       }
       if (tool && tool.source === "delegate") {
-        // plan_task / implement_task only run inside a chat turn, so
-        // route them through the harness pipeline instead of direct
-        // execution: /plan becomes a planning task, /implement runs
-        // the full pipeline on the description.
-        const taskArgs = {
-          description: args || tool.name,
-          task_type: tool.name === "plan_task" ? "plan" : "generic"};
+        // Z3 unification: /plan and /implement run inside a chat turn
+        // through the chat agent's own plan_task/implement_task tools,
+        // so their mutating steps flow through the SAME approval batch
+        // as every other tool call. No second orchestrator gate.
+        const prompt =
+          tool.name === "plan_task"
+            ? `Plan this task and return a numbered step plan: ${args || tool.name}`
+            : `Implement this task: ${args || tool.name}`;
         try {
-          const resp = await fetch(`${API_BASE}/api/tool/execute`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tool: "run_task", args: taskArgs })});
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const data = await resp.json();
-          let parsed: any = data?.output;
-          if (typeof parsed === "string") {
-            try {
-              parsed = JSON.parse(parsed);
-            } catch {
-              /* keep raw string */
-            }
-          }
-          // Orchestrator plan review: a mutating task returns a plan
-          // (concrete action_requests + abstract plan_steps) instead of
-          // executing. Surface it as a plan-approval card; the user
-          // approves/rejects/edits, then we re-invoke run_task.
-          if (
-            parsed &&
-            parsed.status === "needs_approval" &&
-            (Array.isArray(parsed.action_requests) ||
-              Array.isArray(parsed.plan_steps))
-          ) {
-            // Session-scoped opt-in: auto-approve without pausing.
-            if (autoApproveEdits) {
-              try {
-                await fetch(`${API_BASE}/api/tool/execute`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    tool: "run_task",
-                    args: {
-                      ...taskArgs,
-                      task_id: String(parsed.task_id ?? ""),
-                      hitl_decision: "approve"}})});
-              } catch (e) {
-                console.error(e);
-              }
-              return { handled: true, card: "✅ Auto-approved & ran" };
-            }
-            setPendingGate({
-              taskArgs,
-              taskId: String(parsed.task_id ?? ""),
-              plannedActions: (Array.isArray(parsed.action_requests)
-                ? parsed.action_requests
-                : []
-              ).map((a: any) => ({
-                action: String(a?.action ?? a?.tool ?? "action"),
-                args:
-                  typeof a?.args === "object" && a?.args !== null ? a.args : {}})),
-              planSteps: (Array.isArray(parsed.plan_steps)
-                ? parsed.plan_steps
-                : []
-              ).map((s: any) => ({
-                description: String(s?.description ?? ""),
-                taskType: String(s?.task_type ?? "")}))});
-            return {
-              handled: true,
-              card: "⏸️ Plan review — see card below"};
-          }
-          return { handled: true, card: `✅ ${tool.name} via run_task` };
+          await sendMessage(prompt);
+          return { handled: true, card: "" };
         } catch (e) {
           console.error(e);
           return { handled: true, card: `❌ ${tool.name} failed` };
@@ -1060,123 +1008,6 @@ function ChatContent() {
             needs_human_review with planned actions, show them here and
             let the user approve/reject/edit; the decision re-invokes
             run_task with hitl_decision. */}
-        {pendingGate && (
-          <Card
-            className="mb-1.5 shrink-0 border-warning bg-surface-soft"
-            variant="default"
-          >
-            <Card.Header>
-              <Card.Title>📋 Plan review (run_task)</Card.Title>
-              <Card.Description>
-                The orchestrator planned {pendingGate.plannedActions.length}{" "}
-                concrete action
-                {pendingGate.plannedActions.length === 1 ? "" : "s"}
-                {pendingGate.planSteps.length > 0
-                  ? ` across ${pendingGate.planSteps.length} step${pendingGate.planSteps.length === 1 ? "" : "s"}`
-                  : ""}
-                . Review the whole plan before anything runs.
-              </Card.Description>
-            </Card.Header>
-            <Card.Content className="flex flex-col gap-2">
-              {pendingGate.plannedActions.map((a, i) => (
-                <div
-                  key={i}
-                  className="flex flex-col gap-1 rounded-md border border-border bg-surface p-2"
-                >
-                  <div className="font-mono text-sm font-semibold">
-                    {i + 1}. {a.action}
-                  </div>
-                  {a.args && Object.keys(a.args).length > 0 && (
-                    <pre className="font-mono bg-surface-soft p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap">
-                      {JSON.stringify(a.args, null, 2)}
-                    </pre>
-                  )}
-                </div>
-              ))}
-              {pendingGate.planSteps.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  <div className="text-xs text-muted-foreground">
-                    Planned steps (guidance):
-                  </div>
-                  <ol className="text-xs list-decimal ml-4 flex flex-col gap-0.5">
-                    {pendingGate.planSteps.map((s, i) => (
-                      <li key={i}>
-                        {s.taskType ? `${s.taskType}: ` : ""}
-                        {s.description}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-              <div className="flex gap-2 flex-wrap pt-1">
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onPress={async () => {
-                    try {
-                      await fetch(`${API_BASE}/api/tool/execute`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          tool: "run_task",
-                          args: {
-                            ...pendingGate.taskArgs,
-                            task_id: pendingGate.taskId,
-                            hitl_decision: "approve"}})});
-                    } finally {
-                      setPendingGate(null);
-                    }
-                  }}
-                >
-                  ✅ Approve & run
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onPress={async () => {
-                    const edited = window.prompt(
-                      "Edit planned action args (JSON):",
-                      JSON.stringify(pendingGate.plannedActions, null, 2),
-                    );
-                    if (edited === null) return;
-                    let parsed: unknown = edited;
-                    try {
-                      parsed = JSON.parse(edited);
-                    } catch {
-                      /* keep raw text */
-                    }
-                    try {
-                      await fetch(`${API_BASE}/api/tool/execute`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          tool: "run_task",
-                          args: {
-                            ...pendingGate.taskArgs,
-                            task_id: pendingGate.taskId,
-                            hitl_decision: "edit",
-                            edited_action: parsed}})});
-                    } finally {
-                      setPendingGate(null);
-                    }
-                  }}
-                >
-                  ✏️ Edit & run
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onPress={() => {
-                    // Reject: do not re-run.
-                    setPendingGate(null);
-                  }}
-                >
-                  ❌ Reject
-                </Button>
-              </div>
-            </Card.Content>
-          </Card>
-        )}
 
         {/* System recovery notice - a failed send auto-rejected its
             orphaned approvals (see the hook). Visible, dismissible,

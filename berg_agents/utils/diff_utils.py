@@ -24,12 +24,15 @@ from __future__ import annotations
 import difflib
 from pathlib import Path
 
+from deprecated import deprecated
 
+
+@deprecated("This module is deprecated and will be removed in a future version.")
 def generate_diff(
-    old_content: str,
-    new_content: str,
-    from_file: str = "original",
-    to_file: str = "modified",
+        old_content: str,
+        new_content: str,
+        from_file: str = "original",
+        to_file: str = "modified",
 ) -> str:
     """Generate a unified diff between two strings.
 
@@ -49,8 +52,11 @@ def generate_diff(
     return "".join(diff)
 
 
+@deprecated(
+    "This module is deprecated and will be removed in a future version."
+)
 def preview_file_edit(
-    file_path: str | Path, new_content: str, create_if_missing: bool = False
+        file_path: str | Path, new_content: str, create_if_missing: bool = False
 ) -> tuple[str, bool]:
     """Generate a preview of file changes without modifying the file.
 
@@ -79,6 +85,9 @@ def preview_file_edit(
     return diff, file_exists
 
 
+@deprecated(
+    "This module is deprecated and will be removed in a future version."
+)
 def apply_edit(file_path: str | Path, content: str) -> None:
     """Apply changes to a file.
 

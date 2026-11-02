@@ -412,7 +412,7 @@ def build_planner_agent(
 #: No model name is hardcoded here: the config is the only source
 #: (config is the only source of model names). When resolution fails
 #: the tier default is dropped
-#: in favour of the first model the registry declares (``None``), and
+#: in favor of the first model the registry declares (``None``), and
 #: the failure is logged loudly so a typo in ``model_routing`` is
 #: visible instead of silently substituting some other model.
 try:

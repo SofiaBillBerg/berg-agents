@@ -24,7 +24,7 @@ reload the session afterwards — otherwise the next turn re-sends the long
 version and the compaction is undone.
 
 The strategy is shared with the live path by design
-(:func:`~berg_agents.plugin_system.context_capabilities.build_compaction`),
+(:func:`~berg_agents.capabilites.context_capabilities.build_compaction`),
 so the interactive command and automatic compaction can never disagree
 about what compaction means.
 """

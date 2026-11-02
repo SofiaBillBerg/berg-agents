@@ -45,10 +45,24 @@ from pydantic_ai.ui.vercel_ai.request_types import (
     ToolApprovalResponded,
     ToolApprovalRespondedPart,
 )
+from pydantic_ai.usage import UsageLimits
 
 logger = logging.getLogger(__name__)
 
 _MAX_EMPTY_STREAM_ATTEMPTS = 2
+
+#: Usage limits for a chat run - no model-request cap.
+#:
+#: pydantic-ai defaults to ``UsageLimits(request_limit=50)``, capping the
+#: model responses committed by a single run. A chat session is not a single
+#: run: it is a long-running, resumable conversation, and
+#: :mod:`berg_agents.ui.session_store` carries the conversation's accumulated
+#: usage back into every turn. The default therefore bounds the whole
+#: *conversation* at 50 model requests.
+#:
+#: Runaway protection is a HITL request through the approval batch, not a
+#: hard error mid-turn, so the request cap is disabled here.
+_CHAT_USAGE_LIMITS = UsageLimits(request_limit=None)
 
 
 class BergVercelAIAdapter(VercelAIAdapter):
@@ -128,6 +142,9 @@ async def _dispatch_chat_with_retry(
                 conversation_id=(
                     session_id or getattr(conversation, "conversation_id", None)
                 ),
+                # No conversation-lifetime request cap - see
+                # _CHAT_USAGE_LIMITS.
+                usage_limits=_CHAT_USAGE_LIMITS,
                 usage=getattr(conversation, "usage", None),
                 on_complete=save_turn,
                 on_cancel=log_cancelled,

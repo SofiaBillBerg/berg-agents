@@ -40,7 +40,7 @@ const POLL_MS = 4000;
  * backend serves the latest reading. Without this the user only learned
  * the context was full when compaction silently shortened their history.
  *
- * Tone is driven by the fraction (matching the project's status colours)
+ * Tone is driven by the fraction (matching the project's status colors)
  * and `~` marks an unresolved window — the harness's fallback rather than
  * the model's real one, so the number is a good guess and says so.
  */

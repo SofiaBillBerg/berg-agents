@@ -21,12 +21,10 @@ Tool functions for Shared ToDo plugin.
 These functions are exposed to the AI agent for todo list management.
 """
 
-import logging
-
 from datetime import datetime
+import logging
 from pathlib import Path
 from typing import Annotated, Any
-
 
 logger = logging.getLogger(__name__)
 

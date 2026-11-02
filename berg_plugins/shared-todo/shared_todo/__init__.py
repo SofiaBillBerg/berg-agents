@@ -17,7 +17,6 @@ from shared_todo.shared_todo_distribution import (
 )
 from shared_todo.shared_todo_user_cfg import validate_user_config
 
-
 # ----------------------------------------------------------------------
 __all__ = [
     "SharedToDoPlugin",

@@ -35,6 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from berg_agents.exceptions import CodeAgentError
+from deprecated import deprecated
 
 __all__ = ["FileObject", "_atomic_write", "create_from_template"]
 
@@ -55,7 +56,7 @@ class FileObject:
 
 
 def _normalize_target(
-    target: str | Path, root: str | Path | None = None
+        target: str | Path, root: str | Path | None = None
 ) -> Path:
     """Rebase a write target so it stays safely inside the project root.
 
@@ -100,11 +101,11 @@ def _normalize_target(
 
 
 def _atomic_write(
-    target: Path | str,
-    content: str,
-    *,
-    mode: str = "w",
-    encoding: str = "utf-8",
+        target: Path | str,
+        content: str,
+        *,
+        mode: str = "w",
+        encoding: str = "utf-8",
 ) -> Path:
     """Write *content* to *target* atomically.
 
@@ -134,11 +135,12 @@ def _atomic_write(
         raise CodeAgentError(f"Failed to write file {target!s}: {exc}") from exc
 
 
+@deprecated("This function is deprecated and will be removed in a future version.")
 def create_from_template(
-    template_root_dir: Path,
-    dest_root_dir: Path,
-    *,
-    replace_vars: dict | None = None,
+        template_root_dir: Path,
+        dest_root_dir: Path,
+        *,
+        replace_vars: dict | None = None,
 ) -> Path:
     """Create *dest_path* by copying *template_path*.
 

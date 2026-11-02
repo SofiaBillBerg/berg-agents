@@ -29,8 +29,6 @@ import logging
 from pathlib import Path
 from typing import Any, Literal
 
-from berg_agents.capabilities.base import RISK_HIGH, RiskClass
-import httpx
 from plugin_system.exceptions import PermissionDeniedError
 from plugin_system.permissions import HITLManager, HITLRequest
 from plugin_system.permissions.permissions import (
@@ -38,6 +36,9 @@ from plugin_system.permissions.permissions import (
     PermissionChecker,
 )
 from plugin_system.permissions.sandbox import SandboxLevel
+
+from berg_agents.capabilities.base import RISK_HIGH, RiskClass
+import httpx
 
 logger = logging.getLogger(__name__)
 

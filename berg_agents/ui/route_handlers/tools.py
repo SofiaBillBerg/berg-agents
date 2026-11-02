@@ -36,13 +36,15 @@ from fastapi import APIRouter, HTTPException
 logger = logging.getLogger(__name__)
 
 
-async def _run_task_tool(harness: Harness, args: dict[str, Any]) -> ToolExecuteResponse:
+async def _run_task_tool(
+    harness: Harness, args: dict[str, Any]
+) -> ToolExecuteResponse:
     """Run one task through the harness and return its tool response.
 
-    Carries the HITL resume fields (task_id, hitl_decision, edited_action)
-    through to ``execute_task`` so an approval resume reaches the
-    orchestrator. Isolated helper so ``register_tool_routes`` stays
-    under the complexity threshold.
+    Isolated helper so ``register_tool_routes`` stays under the complexity
+    threshold. A gated (mutating) task returns the plan for approval
+    instead of executing; approval happens in the chat approval flow,
+    not through a re-invoke on this endpoint.
 
     :param harness: Shared harness.
     :param args: Tool arguments.
@@ -52,13 +54,6 @@ async def _run_task_tool(harness: Harness, args: dict[str, Any]) -> ToolExecuteR
         "description": str(args.get("description", "")),
         "task_type": str(args.get("task_type", "generic")),
         "metadata": {}}
-    if "task_id" in args:
-        task["task_id"] = str(args.get("task_id"))
-    metadata = task["metadata"]
-    if "hitl_decision" in args:
-        metadata["hitl_decision"] = str(args.get("hitl_decision"))
-    if "edited_action" in args:
-        metadata["edited_action"] = args.get("edited_action")
     if not task["description"]:
         return ToolExecuteResponse(
             tool="run_task",
@@ -97,10 +92,10 @@ def register_tool_routes(
 
         Workspace file tools (name + one-line description) plus the
         harness entry points. ``plan_task`` / ``implement_task`` are
-        marked ``delegated``: they run inside the chat turn, so the
-        web UI routes ``/plan`` / ``/implement`` through ``run_task``
-        instead of executing them directly. MCP *servers* are listed
-        separately - their live tool names need a running session.
+        marked ``delegated``: they run inside the chat turn as chat
+        tools, so the web UI routes ``/plan`` / ``/implement`` as chat
+        messages instead of executing them directly. MCP *servers* are
+        listed separately - their live tool names need a running session.
 
         :return: Dict with ``tools`` and ``mcp_servers`` lists.
         """
@@ -126,14 +121,13 @@ def register_tool_routes(
                 "name": "plan_task",
                 "description": (
                     "Decompose a task into an ordered step plan. "
-                    "Runs in chat; the UI routes /plan through run_task."
+                    "Runs inside a chat turn."
                 ),
                 "source": "delegate"},
             {
                 "name": "implement_task",
                 "description": (
-                    "Execute an approved step plan. Runs in chat; "
-                    "the UI routes /implement through run_task."
+                    "Execute an approved step plan. Runs inside a chat turn."
                 ),
                 "source": "delegate"}])
         return {"tools": tools, "mcp_servers": list_servers()}

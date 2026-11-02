@@ -312,10 +312,7 @@ def resolve_model(
         )
 
     #: No explicit id -> the configured ``defaultModel`` is the default.
-    # That is a deliberate config choice, whereas "first declared" is
-    # merely file order: a setup listing a large provider first would
-    # silently hand back that large model (observed: the 30B unsloth
-    # model for a ``None`` guardian/planner lookup). Fall back to the
+    # Fall back to the
     # first declared id only when ``defaultModel`` is unset or the
     # provider block it names is gone.
     for (pname, mid), kwargs in table.items():

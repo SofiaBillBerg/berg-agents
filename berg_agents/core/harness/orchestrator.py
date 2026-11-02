@@ -81,7 +81,6 @@ from pydantic_ai.exceptions import UnexpectedModelBehavior
 logger = logging.getLogger(__name__)
 
 
-
 class Harness:
     """Deterministic orchestration engine over agent modules.
 

@@ -7,7 +7,6 @@ from shared_todo import (
     validate_user_config,
 )
 
-
 # 1️ Validate a minimal config
 cfg = validate_shared_todo_config({
     "plugin_id": "shared_todo",
