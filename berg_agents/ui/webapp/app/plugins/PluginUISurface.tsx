@@ -31,10 +31,11 @@
 
 "use client";
 
+import type {PluginSurfaceProps} from "./registry.tsx";
+
 import {useEffect, useState} from "react";
 import {Card, Spinner} from "@heroui/react";
 
-import type {PluginSurfaceProps} from "./registry.tsx";
 import {loadPluginSurface} from "./registry.tsx";
 
 export interface PluginUISurfaceProps extends PluginSurfaceProps {

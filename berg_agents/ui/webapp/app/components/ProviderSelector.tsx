@@ -20,10 +20,12 @@
  */
 
 import type {ActiveProviderState, ProviderItem} from "../actions/providers";
-import {getProviderData, switchProvider} from "../actions/providers";
+
 
 import {useCallback, useEffect, useState} from "react";
 import {Alert, ListBox, Select, Spinner} from "@heroui/react";
+
+import {getProviderData, switchProvider} from "../actions/providers";
 
 export interface ProviderSelectorProps {
     activeProvider?: ActiveProviderState | null;

@@ -29,10 +29,8 @@
     "@uiw/react-codemirror": "^4.25.12",
     "ai": "^7.0.157",
     "ai-elements": "^1.9.1",
-    "babel": "^6.23.0",
     "clsx": "2.1.1",
     "eslint-config": "^0.3.0",
-    "eslint-config-next": "^16.4.3",
     "eslint-plugin-react-hooks": "^7.1.1",
     "esversion": "^0.1.0",
     "highlight.js": "^11.12.0",
@@ -51,6 +49,10 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@babel/cli": "^8.1.0",
+    "@babel/core": "^8.1.0",
+    "@babel/preset-env": "^8.0.7",
+    "@babel/preset-typescript": "^8.0.7",
     "@eslint/compat": "2.1.1",
     "@eslint/eslintrc": "^3.3.7",
     "@eslint/js": "^10.0.1",
@@ -62,9 +64,11 @@
     "@types/react-dom": "^19.3.0",
     "@typescript-eslint/eslint-plugin": "8.72.1",
     "@typescript-eslint/parser": "8.72.1",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
+    "eslint-config-next": "^16.4.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "2.32.0",
+    "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-node": "11.1.0",
     "eslint-plugin-prettier": "^5.5.7",
@@ -76,7 +80,8 @@
     "stylelint": "^17.16.0",
     "stylelint-config-standard": "^40.0.0",
     "tailwind-variants": "4.0.0",
-    "typescript": "7.0.2"
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.72.1"
   },
   "allowScripts": {
     "esbuild@0.21.5": true

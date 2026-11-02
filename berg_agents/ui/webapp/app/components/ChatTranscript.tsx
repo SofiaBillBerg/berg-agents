@@ -81,8 +81,8 @@ export function ChatTranscript({
                 <Card.Content className="p-1.5 min-h-0 flex-1 flex flex-col">
                     <div
                         ref={scrollRef}
-                        id={CHAT_SCROLL_ID}
                         className="conversation-container"
+                        id={CHAT_SCROLL_ID}
                     >
                         <MessageList history={transcript}/>
 

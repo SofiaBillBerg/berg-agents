@@ -20,12 +20,14 @@
  */
 
 import {ComponentPreview, Previews} from "@react-buddy/ide-toolbox";
-import {PaletteTree} from "./palette";
+
 import App from "../app/App.tsx";
 import InputBar from "../app/components/InputBar.tsx";
 import MarkdownRenderer from "../app/components/MarkdownRenderer.tsx";
 import MessageList from "../app/components/MessageList.tsx";
 import ProviderSelector from "../app/components/ProviderSelector.tsx";
+
+import {PaletteTree} from "./palette";
 
 const ComponentPreviews = () => {
     return (

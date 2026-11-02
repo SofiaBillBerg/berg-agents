@@ -89,8 +89,8 @@ export const ToolCard = ({
                 <button
                     aria-label={open ? `Hide ${tool} details` : `Show ${tool} details`}
                     className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
-                    onClick={toggle}
                     type="button"
+                    onClick={toggle}
                 >
                     {open ? "Hide" : "Show"}
                 </button>
@@ -98,8 +98,8 @@ export const ToolCard = ({
                     <button
                         aria-label={`Copy ${tool} output`}
                         className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
-                        onClick={copy}
                         type="button"
+                        onClick={copy}
                     >
                         {copied ? "Copied!" : "Copy"}
                     </button>

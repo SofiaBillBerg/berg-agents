@@ -30,10 +30,11 @@
 import {useEffect, useState} from "react";
 import {Card, Spinner} from "@heroui/react";
 
-import {API_BASE} from "@/envConfig";
 
 import {RouterStatsPanel} from "../components/RouterStatsPanel.tsx";
 import {Navbar} from "../components/Navbar.tsx";
+
+import {API_BASE} from "@/envConfig";
 
 /**
  * StatsPage - client component that fetches and displays router statistics.

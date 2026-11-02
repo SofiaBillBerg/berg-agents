@@ -22,8 +22,8 @@
 "use client";
 
 import {useCallback, useEffect, useState} from "react";
-
 import {Button, Card, Chip} from "@heroui/react";
+
 import {API_BASE} from "@/envConfig";
 
 export interface PluginCapabilityInfo {
@@ -186,9 +186,9 @@ export function PluginCatalog({
                                         v{plugin.version}
                                     </Chip>
                                     <Chip
+                                        color={plugin.state === "enabled" ? "success" : "default"}
                                         size="sm"
                                         variant="soft"
-                                        color={plugin.state === "enabled" ? "success" : "default"}
                                     >
                                         {plugin.state}
                                     </Chip>

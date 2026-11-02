@@ -31,10 +31,11 @@ import type {AgentInfo} from "@/harness/webhook";
 import {useEffect, useState} from "react";
 import {Card, Spinner} from "@heroui/react";
 
-import {API_BASE} from "@/envConfig";
 
 import {AgentPanel} from "../components/AgentPanel.tsx";
 import {Navbar} from "../components/Navbar.tsx";
+
+import {API_BASE} from "@/envConfig";
 
 /** localStorage key for the selected (active) agent — behavior TBD. */
 const SELECTED_AGENT_KEY = "berg-selected-agent";

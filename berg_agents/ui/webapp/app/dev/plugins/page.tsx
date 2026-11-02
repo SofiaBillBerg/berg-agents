@@ -42,10 +42,11 @@
 import {useCallback, useEffect, useState} from "react";
 import {Button, Card, Chip, Spinner} from "@heroui/react";
 
-import {API_BASE} from "@/envConfig";
 import {installBergRuntime} from "../../runtime/berg-runtime.ts";
 import {PluginUISurface} from "../../plugins/PluginUISurface.tsx";
 import {Navbar} from "../../components/Navbar.tsx";
+
+import {API_BASE} from "@/envConfig";
 
 /** `ui:` block a plugin's manifest declares, as served by /api/plugins. */
 interface PluginUiDeclaration {
@@ -294,9 +295,9 @@ export default function PluginDevPage() {
                                                 >
                                                     <PluginUISurface
                                                         pluginId={selected.id}
+                                                        refreshKey={refreshKey}
                                                         ui={selected.ui as Record<string, unknown>}
                                                         view={view}
-                                                        refreshKey={refreshKey}
                                                     />
                                                 </div>
                                             ) : (
@@ -349,8 +350,8 @@ export default function PluginDevPage() {
                                                         Arguments (JSON kwargs)
                                                     </label>
                                                     <textarea
-                                                        id="dev-plugin-tool-args"
                                                         className="input-bar-textarea"
+                                                        id="dev-plugin-tool-args"
                                                         rows={3}
                                                         spellCheck={false}
                                                         value={argsText}
@@ -358,8 +359,8 @@ export default function PluginDevPage() {
                                                     />
                                                     <div>
                                                         <Button
-                                                            variant="primary"
                                                             isDisabled={!tool || running}
+                                                            variant="primary"
                                                             onPress={() =>
                                                                 tool && void runTool(selected, tool)
                                                             }
@@ -399,9 +400,9 @@ export default function PluginDevPage() {
                         </span>
                                                 <span className="flex-1"/>
                                                 <Button
+                                                    isDisabled={toggling}
                                                     size="sm"
                                                     variant="secondary"
-                                                    isDisabled={toggling}
                                                     onPress={() => void togglePlugin(selected)}
                                                 >
                                                     {selected.state === "enabled" ? "Disable" : "Enable"}
