@@ -28,18 +28,16 @@
  */
 
 import type { AgentInfo } from "@/harness/webhook";
-import { useAISDKChat } from "@/harness";
 import type { Command } from "./components/SlashCommandAutocomplete";
-import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
 import type { ToolResult } from "./components/ChatTranscript";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, Toast, toast } from "@heroui/react";
-import { API_BASE } from "@/envConfig";
 import { useRouter } from "next/navigation";
-import { buildExportMarkdown } from "@/utils/utils";
 
+import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
 import InputBar from "./components/InputBar.tsx";
+import SteeringStrip from "./components/SteeringStrip.tsx";
 import ContextGauge from "./components/ContextGauge.tsx";
 import ApprovalItem from "./components/ApprovalItem";
 import ThemeToggle from "./components/ThemeToggle.tsx";
@@ -52,6 +50,10 @@ import ChatTranscript, {
 import { PluginUISurface } from "./plugins/PluginUISurface.tsx";
 import { PluginCatalog } from "./components/PluginCatalog.tsx";
 import Navbar from "./components/Navbar.tsx";
+
+import { buildExportMarkdown } from "@/utils/utils";
+import { API_BASE } from "@/envConfig";
+import { useAISDKChat } from "@/harness";
 
 /*
  * Error boundary for lazy-loaded components.
@@ -118,6 +120,7 @@ function ChatContent() {
     clearMessages,
     restoreMessages,
     interruptWith,
+    pendingSteering,
     approvalBatch,
     respondToApproval,
     respondToAllApprovals,
@@ -851,10 +854,10 @@ function ChatContent() {
           <span className="flex-1" />
           <ThemeToggle />
           <Button
+            aria-label="Auto-approve edits in this session"
             size="sm"
             variant={autoApproveEdits ? "primary" : "secondary"}
             onPress={toggleAutoApproveEdits}
-            aria-label="Auto-approve edits in this session"
           >
             {autoApproveEdits ? "⚡ Auto-approve ON" : "⚡ Auto-approve OFF"}
           </Button>
@@ -906,8 +909,8 @@ function ChatContent() {
           <button
             aria-label={showDetails ? "Hide details" : "Show details"}
             className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-            onClick={() => setShowDetails((prev) => !prev)}
             type="button"
+            onClick={() => setShowDetails((prev) => !prev)}
           >
             {showDetails ? "▾" : "▸"} Details & Activity
           </button>
@@ -959,6 +962,7 @@ function ChatContent() {
                   approval={approval}
                   isStreaming={isStreaming}
                   onApprove={(id) => respondToApproval(id, true)}
+                  onEdit={editApprovalArgs}
                   onReject={(id) =>
                     respondToApproval(
                       id,
@@ -969,23 +973,22 @@ function ChatContent() {
                         "Continue without it or ask what to do instead.",
                     )
                   }
-                  onEdit={editApprovalArgs}
                   onRevert={revertApproval}
                 />
               ))}
               <div className="flex gap-2">
                 <Button
+                  isDisabled={isStreaming}
                   size="sm"
                   variant="primary"
-                  isDisabled={isStreaming}
                   onPress={() => void respondToAllApprovals(true)}
                 >
                   ✅ Approve & run all
                 </Button>
                 <Button
+                  isDisabled={isStreaming}
                   size="sm"
                   variant="secondary"
-                  isDisabled={isStreaming}
                   onPress={() =>
                     void respondToAllApprovals(
                       false,
@@ -1082,6 +1085,8 @@ function ChatContent() {
               className={`w-1 shrink-0 cursor-col-resize rounded bg-border transition-colors hover:bg-primary ${
                 sideDragging ? "bg-primary" : ""
               }`}
+              role="separator"
+              tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === "ArrowLeft")
                   setSideWidth((w) =>
@@ -1091,18 +1096,11 @@ function ChatContent() {
                   setSideWidth((w) => Math.max(280, w - 24));
               }}
               onPointerDown={startSideDrag}
-              role="separator"
-              tabIndex={0}
             />
             {sidePluginId && activeSurface ? (
               <PluginUISurface
-                className={pluginView === "canvas" ? "flex-1" : "shrink-0"}
                 key={sidePluginId}
-                onClose={() => setSidePluginId(null)}
-                onCount={setPluginCount}
-                onToggleView={() =>
-                  setPluginView((v) => (v === "panel" ? "canvas" : "panel"))
-                }
+                className={pluginView === "canvas" ? "flex-1" : "shrink-0"}
                 pluginId={sidePluginId}
                 refreshKey={pluginRefreshKey}
                 style={
@@ -1110,12 +1108,17 @@ function ChatContent() {
                 }
                 ui={activeSurface.ui}
                 view={pluginView}
+                onClose={() => setSidePluginId(null)}
+                onCount={setPluginCount}
+                onToggleView={() =>
+                  setPluginView((v) => (v === "panel" ? "canvas" : "panel"))
+                }
               />
             ) : (
               <PluginCatalog
                 className="shrink-0"
-                onClose={() => setShowCatalog(false)}
                 style={{ width: sideWidth }}
+                onClose={() => setShowCatalog(false)}
               />
             )}
           </div>
@@ -1132,13 +1135,17 @@ function ChatContent() {
             tall transcript can never squeeze it out of view (the
             actual cause of the previous "cropped" input). */}
         <div className="shrink-0 rounded-lg bg-background/95 backdrop-blur">
+          {/* Steering strip sits above the input: these are the messages
+              the agent has not read yet. They move into the transcript the
+              moment the model receives them - never shown in both places. */}
+          <SteeringStrip messages={pendingSteering} />
           <InputBar
             input={input}
             placeholder="Type a message... (e.g. 'hello' or 'write a Python script')"
             setInput={setInput}
+            streaming={isStreaming}
             onKeyDown={onKeyDown}
             onSend={handleSendWrapper}
-            streaming={isStreaming}
             onStop={isStreaming ? stop : undefined}
           />
         </div>

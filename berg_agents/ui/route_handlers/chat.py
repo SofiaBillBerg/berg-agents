@@ -335,18 +335,29 @@ async def _start_run(
             runtime.generation = generation
 
         # An approval resume carries no user text: the model continues from
-        # the deferred batch. Anything else is a fresh turn.
+        # the deferred batch. Anything else is a fresh turn with a prompt.
         approvals = _approvals_from_body(body)
         prompt = None if approvals is not None else _latest_user_content(body)
+
+        # A resume continues from the client's own message list: that is where
+        # the paused tool call lives (the run's history holds only what the
+        # model already saw), and it is what the approval ids point into. A
+        # fresh turn uses the session's conversation, so usage and the
+        # conversation id carry across turns.
+        start_args: dict[str, Any] = (
+            {"message_history": _history_from_body(body)}
+            if approvals is not None
+            else {"conversation": conversation}
+        )
 
         def _request() -> Any:
             """Create the graph run inside the run's own task."""
             return agent.iter(
                 prompt,
-                conversation=conversation,
                 output_type=[str, DeferredToolRequests],
                 usage_limits=_CHAT_USAGE_LIMITS,
                 deferred_tool_results=approvals,
+                **start_args,
             )
 
         live = LiveRun(
@@ -360,6 +371,19 @@ async def _start_run(
             runtime.run = live
         live.start()
         return live
+
+
+def _run_status(registry: Any, session_id: str | None) -> dict[str, Any]:
+    """Describe the session's current run, or ``None`` when it has none.
+
+    :param registry: The process-wide ``RunRegistry``.
+    :param session_id: Session to describe.
+    :return: Run status dict, or ``{"live": False}`` when idle.
+    """
+    runtime = registry.get(session_id) if session_id else None
+    if runtime is None or runtime.run is None:
+        return {"live": False, "generation": 0, "steering": [], "outcome": None}
+    return runtime.run.status()
 
 
 def _follow_response(run: Any) -> Response:
@@ -427,6 +451,24 @@ def _latest_user_content(body: bytes) -> str | list[dict[str, Any]] | None:
         ]
         return texts[0] if len(parts) == 1 and texts else parts
     return None
+
+
+def _history_from_body(body: bytes) -> list[Any] | None:
+    """Load the model history a resume continues from, out of the request body.
+
+    The paused tool call lives in the client's message list - the model's own
+    history only holds what it already saw - so a resume is built from the
+    body, the same way the adapter's own dispatch built it.
+
+    :param body: Raw request body (Vercel AI protocol).
+    :return: The model messages, or ``None`` when the body cannot be read.
+    """
+    try:
+        adapter = BergVercelAIAdapter.build_run_input(body)
+        return BergVercelAIAdapter(agent=None, run_input=adapter).messages
+    except Exception as exc:
+        logger.warning("resume history skipped: %s", exc)
+        return None
 
 
 def _approvals_from_body(body: bytes) -> DeferredToolResults | None:
@@ -757,7 +799,7 @@ def register_chat_routes(
         if run is not None:
             return _follow_response(run)
 
-        live = _start_run(
+        live = await _start_run(
             registry,
             session_id=session_id,
             body=body,
@@ -766,3 +808,66 @@ def register_chat_routes(
             on_finish=_on_run_finish,
         )
         return _follow_response(live)
+
+    @router.get("/api/chat/stream")
+    async def chat_follow(request: Request) -> Response:
+        """Follow the session's live run without sending anything.
+
+        This is how a reload, a tab switch or a second browser rejoins a run
+        that is still going: the run replays its journal from the start, so
+        the client rebuilds the same turn instead of joining mid-message.
+
+        A finished run is not followed - the transcript is the record then,
+        and the client reloads it from ``/api/sessions/{id}``.
+
+        :param request: FastAPI request (``?session=`` names the session).
+        :return: SSE stream, or 409 when there is no live run to follow.
+        """
+        from fastapi import HTTPException
+
+        session_id = request.query_params.get("session")
+        run = (
+            request.app.state.run_registry.live_run(session_id)
+            if session_id
+            else None
+        )
+        if run is None:
+            raise HTTPException(status_code=409, detail="no live run")
+        return _follow_response(run)
+
+    @router.post("/api/chat/stop")
+    async def chat_stop(request: Request) -> dict[str, Any]:
+        """Stop the session's live run - the explicit interruption.
+
+        This is the only thing that cancels a run. Closing a stream, reloading
+        a page or switching tabs does not: those are readers leaving. What the
+        run already completed stays in history and is saved, and the human
+        gets control back (the runaway guard restarts).
+
+        :param request: FastAPI request (``?session=`` names the session).
+        :return: Whether a run was stopped.
+        """
+        session_id = request.query_params.get("session")
+        run = (
+            request.app.state.run_registry.live_run(session_id)
+            if session_id
+            else None
+        )
+        if run is None:
+            return {"stopped": False}
+        await run.cancel("stopped by user")
+        return {"stopped": True}
+
+    @router.get("/api/chat/status")
+    async def chat_status(request: Request) -> dict[str, Any]:
+        """Report the session's run state, including unread steering.
+
+        The browser uses this on mount so the steering strip means the same
+        thing after a reload: "the agent has not read this yet".
+
+        :param request: FastAPI request (``?session=`` names the session).
+        :return: Run status.
+        """
+        return _run_status(
+            request.app.state.run_registry, request.query_params.get("session")
+        )

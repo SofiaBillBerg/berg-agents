@@ -31,10 +31,10 @@
  */
 
 import type {TextUIPart, UIMessage} from "ai";
-import {DefaultChatTransport} from "ai";
 import type {SetStateAction} from "react";
-import {useEffect, useRef, useState} from "react";
 
+import {DefaultChatTransport} from "ai";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {useChat} from "@ai-sdk/react";
 
 import {API_BASE} from "@/envConfig";
@@ -166,6 +166,10 @@ export interface UseAISDKChatReturn {
     sendMessage: (content: string) => Promise<void>;
     /** Stop the current response, then send (mid-stream steering). */
     interruptWith: (content: string) => Promise<void>;
+    /** Messages the agent has not read yet (the steering strip above the
+     * input). An entry here is queued on the server's run; once the model
+     * receives it, it moves into the transcript and leaves this list. */
+    pendingSteering: string[];
     /** Replace the live conversation (history restore). */
     restoreMessages: (msgs: unknown[]) => void;
     /** Tool calls currently awaiting human approval. */
@@ -452,6 +456,13 @@ export function useAISDKChat(): UseAISDKChatReturn {
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [sessionTitle, setSessionTitle] = useState<string | null>(null);
 
+    // Callbacks that fire outside React's render (Stop) need the current
+    // session id without re-subscribing on every session switch.
+    const sessionIdRef = useRef<string | null>(null);
+    useEffect(() => {
+        sessionIdRef.current = sessionId;
+    }, [sessionId]);
+
     const {
         messages: uiMessages,
         sendMessage: sdkSendMessage,
@@ -459,7 +470,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
         error,
         setMessages: setUIMessages,
         stop,
-        addToolApprovalResponse} = useChat({
+        addToolApprovalResponse,
+        // Follow a run that is still going without sending anything: the GET
+        // stream replays the run's journal, so a reload or a second tab
+        // rebuilds the same turn.
+        resumeStream: sdkResumeStream} = useChat({
         transport: new DefaultChatTransport({
             api: `${API_BASE}/api/chat/stream`,
             // Strip stale approval answers before every send. Anything
@@ -473,7 +488,14 @@ export function useAISDKChat(): UseAISDKChatReturn {
                     messages: sanitizeHistory(messages as unknown as unknown[], true),
                     trigger,
                     messageId,
-                    sessionId}})}),
+                    sessionId}}),
+            // Where a follow request goes. The run lives on the server, so
+            // following is a plain GET at that session's stream - never a
+            // re-send of the last message.
+            prepareReconnectToStreamRequest: () => ({
+                api: `${API_BASE}/api/chat/stream?session=${encodeURIComponent(
+                    sessionIdRef.current ?? "",
+                )}`})}),
         // Resume a paused run after approvals. Per-item answers mark parts
         // one at a time; the resend fires once every pending part in the
         // paused message is answered (stepwise decisions never fire a
@@ -499,6 +521,45 @@ export function useAISDKChat(): UseAISDKChatReturn {
         }});
 
     const isStreaming = status === "streaming" || status === "submitted";
+
+    // Steering the agent has not read yet. This is the queue the transcript
+    // cannot show: a message that exists on the server's run but not in the
+    // model's view. The server owns the answer, so it is sampled rather than
+    // guessed from optimistic sends, and it is empty whenever that is true.
+    const [pendingSteering, setPendingSteering] = useState<string[]>([]);
+    useEffect(() => {
+        if (!sessionId) {
+            setPendingSteering([]);
+            return;
+        }
+        let cancelled = false;
+        const poll = async () => {
+            try {
+                const resp = await fetch(
+                    `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
+                );
+                if (!resp.ok || cancelled) return;
+                const data = (await resp.json()) as {steering?: unknown};
+                const queued = Array.isArray(data.steering)
+                    ? data.steering.filter((t): t is string => typeof t === "string")
+                    : [];
+                if (!cancelled) setPendingSteering(queued);
+            } catch {
+                // Backend unreachable - keep showing what we know.
+            }
+        };
+        void poll();
+        // Nothing to poll when no run is live; the strip is only ever
+        // non-empty inside a run.
+        if (!isStreaming) return () => {
+            cancelled = true;
+        };
+        const timer = setInterval(() => void poll(), 1200);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [sessionId, isStreaming]);
 
     // Tool calls paused for human approval (HITL). Derived from the raw
     // UI messages: any tool part in state "approval-requested".
@@ -942,6 +1003,36 @@ export function useAISDKChat(): UseAISDKChatReturn {
         };
     }, []);
 
+    // A run can outlive this tab (reload, tab switch, second browser). On
+    // mount, if the session's run is still going, follow it rather than
+    // showing an idle chat over work that is actually happening.
+    const followedRef = useRef(false);
+    useEffect(() => {
+        if (!sessionId || followedRef.current) return;
+        followedRef.current = true;
+        let cancelled = false;
+        const followIfLive = async () => {
+            try {
+                const resp = await fetch(
+                    `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
+                );
+                if (!resp.ok || cancelled) return;
+                const status = (await resp.json()) as {live?: unknown};
+                if (status.live === true && !cancelled) {
+                    // The GET stream replays the run's journal from the
+                    // start, so the turn rebuilds exactly as it happened.
+                    await sdkResumeStream();
+                }
+            } catch {
+                // Backend unreachable - nothing to follow.
+            }
+        };
+        void followIfLive();
+        return () => {
+            cancelled = true;
+        };
+    }, [sessionId, sdkSendMessage]);
+
     // handleInputChange for a textarea/input - reads e.target.value.
     const handleInputChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -971,17 +1062,33 @@ export function useAISDKChat(): UseAISDKChatReturn {
         await sdkSendMessage({text: content});
     };
 
-    // Interrupt-and-redirect: stop the in-flight response, then send.
-    // This is how the user steers mid-stream. stop() aborts the fetch;
-    // the fresh send opens its own request, so no state gets tangled.
+    // Interrupt nothing, steer instead. A message sent while the agent is
+    // working joins the run and reaches the model at its NEXT request; the
+    // in-flight tool is never aborted. The server decides which of the two
+    // this is (it owns the run), so one send path covers both cases.
     const interruptWith = async (content: string) => {
         if (!content.trim()) return;
-        stop();
         setInput("");
         setSystemNotice(null);
-        autoRejectedIds.current.clear();
         await sdkSendMessage({text: content});
     };
+
+    // Stop is an explicit act, and the run no longer belongs to this fetch:
+    // aborting the request would only stop *reading* it. So stop tells the
+    // server to end the run, then drops the local stream. Everything the run
+    // completed is kept (the server persists the turn either way).
+    const stopRun = useCallback(() => {
+        const id = sessionIdRef.current;
+        if (id) {
+            void fetch(
+                `${API_BASE}/api/chat/stop?session=${encodeURIComponent(id)}`,
+                {method: "POST"},
+            ).catch(() => {
+                // Backend unreachable: the local stop still applies.
+            });
+        }
+        stop();
+    }, [stop]);
 
     return {
         messages,
@@ -994,9 +1101,10 @@ export function useAISDKChat(): UseAISDKChatReturn {
         isConnected: true,
         setMessages,
         clearMessages,
-        stop,
+        stop: stopRun,
         sendMessage,
         interruptWith,
+        pendingSteering,
         restoreMessages,
         pendingApprovals,
         approvalBatch,

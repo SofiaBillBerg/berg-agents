@@ -34,6 +34,7 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 import contextlib
 from dataclasses import dataclass, field
+import json
 import logging
 import time
 from typing import Any, Literal
@@ -189,6 +190,23 @@ class LiveRun:
             self._finished_at if self._finished_at is not None else float("inf")
         )
 
+    def history(self) -> list[Any] | None:
+        """The turn's model history, for resuming it.
+
+        A run that paused on a deferred approval leaves its calls in history,
+        so a resume continues from here instead of re-deriving the pause.
+
+        :return: The run's ``all_messages()``, or ``None`` before it started.
+        """
+        agent_run = self._agent_run
+        return agent_run.all_messages() if agent_run is not None else None
+
+    @property
+    def paused(self) -> bool:
+        """Whether the run ended waiting for the human (approval or time)."""
+        outcome = self._outcome
+        return outcome is not None and outcome.kind == "paused"
+
     @property
     def pending_steering(self) -> list[tuple[str, str]]:
         """``(enqueue_id, text)`` pairs the model has not consumed yet.
@@ -197,6 +215,22 @@ class LiveRun:
         the agent has genuinely not read.
         """
         return list(self._pending_steering.items())
+
+    def status(self) -> dict[str, Any]:
+        """Describe the run for the UI (live state + unread steering).
+
+        Lets a reconnecting browser see the steering strip without receiving
+        any chunks: the strip must mean the same thing after a reload.
+
+        :return: JSON-serialisable run status.
+        """
+        return {
+            "live": self.live,
+            "generation": self.generation,
+            "outcome": self.outcome.kind if self.outcome else None,
+            "detail": self.outcome.detail if self.outcome else "",
+            "approvals": list(self.outcome.approvals) if self.outcome else [],
+            "steering": [text for _, text in self._pending_steering.values()]}
 
     @property
     def unread_steering(self) -> list[str]:
@@ -412,18 +446,19 @@ class LiveRun:
     def _consume_steering(self, chunk: str) -> None:
         """Drop steering entries whose text the model has now received.
 
-        Delivery is observed on the wire (the protocol reports enqueued
-        messages), so "consumed" means exactly what the transcript will show.
+        Delivery is observed on the wire: the protocol reports enqueued
+        messages keyed by the id ``run.enqueue()`` returned, so "consumed"
+        means exactly what the transcript will show - matched by id, never by
+        text, so two identical messages cannot cancel each other out.
         """
-        if "enqueued" not in chunk:
+        if not self._pending_steering or "enqueued" not in chunk:
             return
-        consumed: list[str] = []
-        for enqueue_id, text in list(self._pending_steering.items()):
-            if text and text in chunk:
-                consumed.append(text)
-                del self._pending_steering[enqueue_id]
-        if consumed and self._on_consumed is not None:
-            task = asyncio.create_task(self._on_consumed(frozenset(consumed)))
+        enqueue_id = _enqueued_chunk_id(chunk)
+        if enqueue_id is None or enqueue_id not in self._pending_steering:
+            return
+        text = self._pending_steering.pop(enqueue_id)
+        if self._on_consumed is not None:
+            task = asyncio.create_task(self._on_consumed(frozenset({text})))
             task.add_done_callback(_log_task_error)
 
     def _append_text(self, text: str) -> None:
@@ -505,6 +540,27 @@ class RunRegistry:
                 continue
             if now - run.finished_at > JOURNAL_GRACE_SECONDS:
                 runtime.run = None
+
+
+def _enqueued_chunk_id(chunk: str) -> str | None:
+    """Return the enqueue id of a ``data-enqueued-messages`` SSE frame.
+
+    The protocol keys that frame on the id ``run.enqueue()`` handed out, which
+    is what makes a queued steering message exactly traceable to its delivery.
+
+    :param chunk: One SSE frame (``data: {...}``).
+    :return: The enqueue id, or ``None`` for any other frame.
+    """
+    try:
+        payload = json.loads(chunk.removeprefix("data: ").strip())
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("type") != "data-enqueued-messages":
+        return None
+    enqueue_id = payload.get("id")
+    return enqueue_id if isinstance(enqueue_id, str) else None
 
 
 def _log_task_error(task: asyncio.Task[Any]) -> None:
