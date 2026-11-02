@@ -114,52 +114,35 @@ class BergVercelAIAdapter(VercelAIAdapter):
         return DeferredToolResults(approvals=approvals) if approvals else None
 
 
-async def _dispatch_chat_with_retry(
-    request: Request,
-    *,
-    agent: Any,
-    sdk_version: Literal[5, 6, 7],
-    output_type: Any,
-    session_id: str | None,
-    conversation: Any,
-    save_turn: Any,
-    log_cancelled: Any,
-    max_empty_attempts: int = _MAX_EMPTY_STREAM_ATTEMPTS,
-) -> Response:
-    """Run the chat adapter, retrying once on an empty SSE stream.
+async def stream_node_chunks(stream: Any, node: Any, ctx: Any) -> Any:
+    """Encode one agent-graph node's events as Vercel AI SSE chunks.
 
-    Extracted from chat_stream to keep its complexity under the
-    project's limit. The retry is safe because the empty stream
-    produced no assistant turn and executed nothing.
+    The run owns the graph (see :mod:`berg_agents.ui.run_registry`); this
+    function owns the wire format. It reuses the adapter's own event stream,
+    which keeps message identities, step boundaries and approval parts in one
+    place instead of reimplemented per node - the bytes stay identical to what
+    ``VercelAIAdapter.dispatch_request`` produced when the response *was* the
+    run.
+
+    The stream is created once per RUN, not per node: the protocol's ``start``
+    and ``finish`` frames bracket a whole turn, so a fresh encoder per node
+    would emit several starts into one message.
+
+    :param stream: The run's ``VercelAIEventStream`` (turn-long).
+    :param node: A ``ModelRequestNode`` or ``CallToolsNode`` to stream.
+    :param ctx: The run's graph context (``agent_run.ctx``).
+    :return: Async iterator of encoded ``data: {...}`` frames.
     """
-    for attempt in (1, 2):
-        try:
-            return await BergVercelAIAdapter.dispatch_request(
-                request,
-                agent=agent,
-                sdk_version=sdk_version,
-                output_type=output_type,
-                conversation_id=(
-                    session_id or getattr(conversation, "conversation_id", None)
-                ),
-                # No conversation-lifetime request cap - see
-                # _CHAT_USAGE_LIMITS.
-                usage_limits=_CHAT_USAGE_LIMITS,
-                usage=getattr(conversation, "usage", None),
-                on_complete=save_turn,
-                on_cancel=log_cancelled,
-            )
-        except UnexpectedModelBehavior as exc:
-            if "ended without content" not in str(exc):
-                raise
-            if attempt == max_empty_attempts:
-                logger.exception("chat stream empty twice - giving up")
-                raise
-            logger.warning(
-                "chat stream ended empty (attempt %s/2) - retrying", attempt
-            )
-            await asyncio.sleep(2)
-    raise AssertionError("unreachable")  # pragma: no cover
+    if type(node).__name__ not in {"ModelRequestNode", "CallToolsNode"}:
+        # Pure graph steps (user prompt, output validation) emit no protocol
+        # events; opening their stream would only produce empty steps.
+        return
+    # transform_stream owns the node's event lifecycle: it turns the response
+    # on at the first part and back off at a tool call, so a multi-step turn
+    # reads like the single stream it replaces.
+    async with node.stream(ctx) as node_stream:
+        async for chunk in stream.transform_stream(node_stream):
+            yield stream.encode_event(chunk)
 
 
 async def _track_chat_session(
