@@ -396,8 +396,22 @@ def register_chat_routes(
 
         def _log_run_cancelled(run_cancelled: object) -> None:
             # Fired when a client stop/disconnect cancels the run, so
-            # the "Stop" button is observable server-side.
+            # the "Stop" button is observable server-side. A Stop is the
+            # agent yielding control, so the runaway guard's count restarts.
             logger.info(f"chat run canceled: {run_cancelled}")
+            _reset_runaway_guard()
+
+        def _reset_runaway_guard() -> None:
+            # The guard counts tool calls since the human last had a say.
+            # It resets when the agent YIELDS control - the turn finished,
+            # the run paused for approval, or the user stopped it. It does
+            # not reset because the user typed: a message sent while the
+            # agent keeps working is steering, not an intervention.
+            if not session_id:
+                return
+            from berg_agents.ui import session_store
+
+            session_store.reset_guard_progress(session_id)
 
         async def _save_turn(result: Any) -> None:
             # on_complete receives the AgentRunResult: persist both the
@@ -436,6 +450,11 @@ def register_chat_routes(
                         session_id,
                         payload.decode("utf-8"),
                     )
+                # The run has yielded control back to the human: either the
+                # turn finished, or it paused on a deferred approval (the
+                # runaway guard's hard stop, or any requires_approval tool).
+                # Both end this stretch of unattended work.
+                _reset_runaway_guard()
             except Exception as exc:
                 logger.warning(f"Session save skipped: {exc}")
 

@@ -120,6 +120,7 @@ def build_chat_agent(
         build_context_capabilities,
     )
     from berg_agents.capabilities.mcp_toolsets import build_mcp_toolsets
+    from berg_agents.capabilities.runaway_guard import RunawayGuard
     from berg_agents.capabilities.skills import load_skill_capabilities
     from berg_agents.capabilities.web_backends import (
         make_web_fetch,
@@ -130,6 +131,7 @@ def build_chat_agent(
     from berg_agents.providers.models import resolve_model_instance
     from pydantic_ai import Agent
     from pydantic_ai.capabilities import WebFetch, WebSearch
+    from pydantic_ai_harness.ask_user import AskUser
 
     # Resolve the model from .berg-agents - resolve_model_instance reads
     # bergagents.jsonc and returns a fully-configured OpenAIChatModel.
@@ -273,7 +275,21 @@ def build_chat_agent(
                     settings.skills, root_dir=root_dir
                 )
                 if getattr(cap, "id", "") not in disabled_skills
-            ]],
+            ],
+            # Let the model ask the user a question mid-run. With no
+            # answerer the call defers, so the run pauses as a
+            # DeferredToolRequests and the answer comes back through the
+            # same approval batch as every other human decision - one
+            # HITL surface, not a second one.
+            AskUser(answerer=None),
+            # Two-stage check-in so a run cannot go on indefinitely
+            # without the user having a say: an advisory reminder at the
+            # configured limit, and a forced approval pause at twice it.
+            # The count is persisted per session (the agent is rebuilt per
+            # request) and is reset only when the agent yields control.
+            RunawayGuard(
+                limit=settings.runaway_tool_call_limit, session_id=session_id
+            )],
     )
 
     return agent

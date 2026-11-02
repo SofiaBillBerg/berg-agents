@@ -236,6 +236,123 @@ def load_conversation(session_id: str) -> Any:
         return None
 
 
+# ---------------------------------------------------------------------------
+# Runaway-guard progress (tool calls since the human last intervened)
+#
+# The guard counts tool calls the agent executes without the human getting a
+# say. The count must outlive the agent object, which is rebuilt per request,
+# so it lives here beside the conversation record. It is reset when the agent
+# *yields control* (turn finished, run paused, HITL decision, Stop) and not
+# when the user merely types while the agent is still working.
+# ---------------------------------------------------------------------------
+
+
+def _guard_connection() -> Any:
+    """Short-lived connection for runaway-guard progress rows.
+
+    Opened per operation for the same reason as
+    :func:`_conversation_connection`: the callers run under
+    ``asyncio.to_thread`` and a sqlite3 connection is thread-affine.
+
+    :return: Context manager yielding an open connection.
+    """
+    import sqlite3
+
+    database = _session_database()
+    database.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(database, timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS guard_progress ("
+        "session_id TEXT PRIMARY KEY, "
+        "tool_calls INTEGER NOT NULL DEFAULT 0, "
+        "nudged INTEGER NOT NULL DEFAULT 0, "
+        "updated_at TEXT NOT NULL)"
+    )
+    return conn
+
+
+def read_guard_progress(session_id: str) -> tuple[int, bool]:
+    """Read how far a session has run without human intervention.
+
+    :param session_id: Session identifier.
+    :return: ``(tool_calls, nudged)`` - the current count and whether the
+        advisory reminder has already fired for this stretch. ``(0, False)``
+        when the session has no row yet or the store is unreadable.
+    """
+    conn = None
+    try:
+        conn = _guard_connection()
+        row = conn.execute(
+            "SELECT tool_calls, nudged FROM guard_progress WHERE session_id=?",
+            (session_id,),
+        ).fetchone()
+        if not row:
+            return 0, False
+        return int(row[0]), bool(row[1])
+    except Exception as exc:
+        # Best-effort: a lost count only weakens the guard, never chat.
+        logger.warning("Guard progress read skipped: %s", exc, exc_info=True)
+        return 0, False
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def write_guard_progress(
+    session_id: str, *, tool_calls: int, nudged: bool
+) -> None:
+    """Persist a session's guard progress (upsert, best-effort).
+
+    :param session_id: Session identifier.
+    :param tool_calls: Tool calls executed since the human last intervened.
+    :param nudged: Whether the advisory reminder has fired for this stretch.
+    :return: None.
+    """
+    conn = None
+    try:
+        conn = _guard_connection()
+        conn.execute(
+            "INSERT INTO guard_progress "
+            "(session_id, tool_calls, nudged, updated_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(session_id) DO UPDATE SET "
+            "tool_calls=excluded.tool_calls, nudged=excluded.nudged, "
+            "updated_at=excluded.updated_at",
+            (
+                session_id,
+                tool_calls,
+                int(nudged),
+                datetime.now(UTC).isoformat(),
+            ),
+        )
+        conn.commit()
+    except Exception as exc:
+        logger.warning("Guard progress write skipped: %s", exc, exc_info=True)
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def reset_guard_progress(session_id: str) -> None:
+    """Reset a session's count - called when the agent yields control.
+
+    :param session_id: Session identifier.
+    :return: None.
+    """
+    conn = None
+    try:
+        conn = _guard_connection()
+        conn.execute(
+            "DELETE FROM guard_progress WHERE session_id=?", (session_id,)
+        )
+        conn.commit()
+    except Exception as exc:
+        logger.warning("Guard progress reset skipped: %s", exc, exc_info=True)
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 def get_store(root_dir: str | Path | None = None) -> Any:
     """Return the one global SQLite conversation store.
 

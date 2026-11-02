@@ -361,19 +361,36 @@ function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
                         (part as { output?: unknown }).output === undefined
                     ) {
                         // Answered but never executed: re-ask instead of replaying.
-                        // `approval` must stay a real object: the AI SDK's
-                        // addToolApprovalResponse reads `part.approval.id` with no
-                        // optional chaining, so an undefined approval there throws
-                        // on the next approve click and wedges the run.
+                        // `approval` must stay a real object AND carry an `id`:
+                        // the AI SDK's addToolApprovalResponse reads
+                        // `part.approval.id` with no optional chaining, so both
+                        // an undefined approval and a missing id leave an
+                        // unanswerable card that throws on the next click.
+                        // Without an id there is nothing to ask again, so the
+                        // part expires like any other dead-run approval.
+                        const previous =
+                            typeof part.approval === "object" &&
+                            part.approval !== null
+                                ? (part.approval as { id?: unknown })
+                                : undefined;
+                        const approvalId =
+                            typeof previous?.id === "string"
+                                ? previous.id
+                                : undefined;
+                        if (!approvalId) {
+                            const {approval: _dropped, ...rest} = part as Record<
+                                string,
+                                unknown
+                            >;
+                            return [{...rest, state: "output-denied"}];
+                        }
                         return [
                             {
                                 ...part,
                                 state: "approval-requested",
                                 approval: {
-                                    ...(typeof part.approval === "object" &&
-                                    part.approval !== null
-                                        ? part.approval
-                                        : {}),
+                                    ...previous,
+                                    id: approvalId,
                                     approved: undefined,
                                     reason: undefined}}];
                     }
@@ -383,11 +400,20 @@ function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
                         part.state === "approval-requested"
                     ) {
                         // Dead run (see docstring): expire instead of replaying.
+                        //
+                        // The state MUST leave "approval-requested" here. The
+                        // AI SDK's addToolApprovalResponse filters with
+                        // `state === "approval-requested" && part.approval.id`
+                        // and does not guard `approval`, so a requested part
+                        // with the approval object stripped throws on the next
+                        // approve click and wedges the run. "output-denied" is
+                        // the SDK's terminal state for a call that never got
+                        // approval, and it keeps `approval` absent on purpose.
                         const {approval: _dropped, ...rest} = part as Record<
                             string,
                             unknown
                         >;
-                        return [rest];
+                        return [{...rest, state: "output-denied"}];
                     }
                     return [{...part}];
                 })};
@@ -560,17 +586,42 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // pending part in the paused message is answered (see
     // sendAutomaticallyWhen), so partial decisions never trigger a
     // partial resume — the backend requires a complete answer set.
+    // Whether the SDK can still resolve an approval id: addToolApprovalResponse
+    // matches on a part in state "approval-requested" whose `approval.id`
+    // equals the id, and it does not guard `approval` - an id with no such
+    // part throws inside the SDK and wedges the run. Every approve path goes
+    // through this so the client never asks the SDK to resolve a ghost.
+    const approvalResolvable = (id: string) =>
+        uiMessages.some((msg) =>
+            msg.parts?.some(
+                (part) =>
+                    typeof part === "object" &&
+                    part !== null &&
+                    (part as { state?: unknown }).state === "approval-requested" &&
+                    (part as { approval?: { id?: unknown } }).approval?.id === id,
+            ),
+        );
+
     const respondToApproval = (
         id: string,
         approved: boolean,
         reason?: string,
     ) => {
+        if (!approvalResolvable(id)) {
+            console.warn(
+                `[useAISDKChat] Approval ${id} is not answerable in this message ` +
+                    `state (stale or restored run) - ignoring the click.`,
+            );
+            return;
+        }
         void addToolApprovalResponse({id, approved, reason});
     };
 
     // Answer EVERY pending approval at once (batch convenience).
     const respondToAllApprovals = async (approved: boolean, reason?: string) => {
-        const ids = pendingApprovals.map((a) => a?.id).filter(Boolean);
+        const ids = pendingApprovals
+            .map((a) => a?.id)
+            .filter((id): id is string => Boolean(id) && approvalResolvable(id));
         for (const id of ids) {
             await addToolApprovalResponse({id, approved, reason});
         }

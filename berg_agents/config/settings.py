@@ -563,6 +563,17 @@ class Settings(BaseSettings):
     #: *summarization_trigger*.  Maps to ``BERG_AGENT_SUMMARIZATION_KEEP``.
     summarization_keep: list[Any] | None = None
 
+    #: --- Runaway guard ------------------------------------------------------
+    #: How many tool calls the agent may execute in a row without the human
+    #: intervening before it is asked to check in. At this number a fixed
+    #: advisory reminder is added to the next model request; at twice this
+    #: number the run pauses with a HITL approval the human must answer.
+    #: A message the user sends while the agent is working does NOT reset the
+    #: count - only the agent yielding control does (a finished turn, a paused
+    #: run, a HITL decision or a Stop). Maps to
+    #: ``BERG_AGENT_RUNAWAY_TOOL_CALL_LIMIT`` / ``runawayToolCallLimit``.
+    runaway_tool_call_limit: int = 30
+
     #: --- BergAgents Harness (multi-agent engine) ---------------------------
     #: Central configuration for the framework-agnostic harness.
     #: Maps to ``harness`` in bergagents.jsonc.
