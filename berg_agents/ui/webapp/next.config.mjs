@@ -54,6 +54,7 @@ const nextConfig = {
     // Cache Components (Next.js 16.3+): enables Partial Prerendering (PPR)
     // In dev mode, enables PPR for selective hydration testing.
     // In production (static export), disabled since PPR is incompatible with export mode.
+  partialPrefetching: process.env.NODE_ENV !== "production",
     cacheComponents: process.env.NODE_ENV !== "production",
 
     // Webpack configuration for bundle optimization

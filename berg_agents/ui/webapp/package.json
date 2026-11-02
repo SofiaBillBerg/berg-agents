@@ -52,6 +52,8 @@
     "@babel/cli": "^8.1.0",
     "@babel/core": "^8.1.0",
     "@babel/preset-env": "^8.0.7",
+    "@babel/preset-flow": "^8.0.1",
+    "@babel/preset-react": "^8.0.1",
     "@babel/preset-typescript": "^8.0.7",
     "@eslint/compat": "2.1.1",
     "@eslint/eslintrc": "^3.3.7",
