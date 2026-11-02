@@ -15,7 +15,12 @@ classifiers = ["Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.15",
     "Operating System :: OS Independent"]
-dependencies = [] # use dependency groups
+dependencies = [
+    "authlib==1.9.2",
+    "cachetools==7.2.8",
+    "deprecated>=3.0.1",
+    "fastmcp-slim==4.2.0a1",
+    "jsonpointer==3.7"] # use dependency groups
 
 [build-system]
 requires = ["uv-build>=0.11.26,<0.22"]
@@ -40,38 +45,42 @@ notebooks = [ "ipykernel>=7.3.0",
     "matplotlib-inline>=0.2.2",
     "nbformat>=5.11.1",
     "notebook>=7.6.2"]
-agent-deps = [ "cryptography>=50.0.2",
-    "jsonschema>=4.26.0",
-    "python-dotenv>=1.2.3",
-    "pyyaml>=6.0.3",
-    "click>=8.1.7",
-    "fastapi",
-    "httpx2>=2.9.1",
-    "markdown>=3.10.3",
-    "ollama>=0.6.2",
-    "openai>=2.7.1",
-    "pandas>=2.3.3",
-    "requests>=2.34.2",
-    "rich>=13.5.2",
-    "typer>=0.9.0",
-    "uvicorn>=0.52.1",
-    "httpx>=0.28.1",
-    "autobahn>=26.7.1",
-    "pyyaml>=6.0.3",
-    "openai-agents>=0.22.0",
-    "mempalace>=3.11.0",
-    "ai>=0.5.2",
-    "a2a-sdk[all]>=0.3.21",
-    "typesafe-sdk>=0.7.4",
-    "pydantic-config>=0.4.0",
-    "pydantic-settings>=2.15.0",
-    "pydantic>=2.13.4",
-    "pydantic-ai>=2.63.0",
-    "pydantic-ai-harness[acp,code-mode]>=0.63.0",
-    "pydantic-ai-slim[duckduckgo,web-fetch]>=2.63.0",
-    "chromadb>=1.5.9"]
+agent-deps = [
+ "cryptography>=50.0.2",
+ "jsonschema>=4.26.0",
+ "python-dotenv>=1.2.3",
+ "pyyaml>=6.0.3",
+ "click>=8.1.7",
+ "fastapi",
+ "httpx2>=2.9.1",
+ "markdown>=3.10.3",
+ "ollama>=0.6.2",
+ "openai==3.42.1",
+ "pandas>=2.3.3",
+ "requests>=2.34.2",
+ "rich>=13.5.2",
+ "typer>=0.9.0",
+ "uvicorn>=0.52.1",
+ "httpx>=0.28.1",
+ "autobahn>=26.7.1",
+ "pyyaml>=6.0.3",
+ "openai-agents>=0.22.0",
+ "mempalace>=3.11.0",
+ "ai>=0.5.2",
+ "a2a-sdk[all]>=0.3.21",
+ "typesafe-sdk>=0.7.4",
+ "pydantic-config>=0.4.0",
+ "pydantic-settings>=2.15.0",
+ "pydantic>=2.13.4",
+ "pydantic-ai>=2.64.0",
+ "pydantic-ai-harness[acp,code-mode]==0.64.0",
+ "pydantic-ai-slim[duckduckgo,web-fetch]==2.64.0",
+ "chromadb>=1.5.9",
+ "agent-client-protocol>=0.11.1",
+ "prompt-toolkit>=3.0.53"]
 docs = ["pydoctor>=25.10.1", "quarto>=0.1.0"]
-dev = ["black>=24.3.0",
+dev = [
+    "black>=24.3.0",
     "flake8>=7.3.0",
     "httpx2>=2.9.1",
     "isort>=5.13.2",
@@ -87,7 +96,8 @@ dev = ["black>=24.3.0",
     "uv>=0.12.9",
     "pytype>=2024.10.11",
     "pyanalyze>=0.13.1",
-    "types-pyyaml>=6.0.12.20260906"]
+    "types-pyyaml>=6.0.12.20260906",
+    "deprecated>=3.0.1"]
 tests = [ "coverage>=7.16.0",
     "hypothesis>=6.165.10",
     "pytest>=9.1.1",
@@ -147,7 +157,8 @@ index-strategy = "unsafe-best-match"
 [tool.uv.workspace]
 members = [
     "plugin_system",
-    "."]
+    "."
+]
 
 
 [tool.uv]
@@ -155,7 +166,7 @@ index-strategy = "unsafe-best-match"
 prerelease = "if-necessary"
 no-build-isolation-package = ["flash-attn"]
 package = true
-default-groups = ["dev", "agent-deps", "tests", "docs"]
+default-groups = ["dev", "agent-deps", "tests", "docs", "plugin-deps"]
 #preview-features=["format-command", "audit-command", "check-command", "index-by-name", "tool-install-locks"]
 preview = true #["format-command", "audit-command", "check-command", "index-by-name", "tool-install-locks"]
 
@@ -253,7 +264,7 @@ skip_glob = ["_build",
     ".ipynb_checkpoints",
     "*support-libs"] # This will tell isort to skip these directories when sorting imports.
 sort_reexports = true # This will sort re-exports (e.g., `from . import module`) separately from regular imports,.
-src_paths = ["berg_agents"] # This will tell isort to treat these directories as source paths, which will affect how imports are sorted.
+src_paths = ["berg_agents", "plugin_system"] # This will tell isort to treat these directories as source paths, which will affect how imports are sorted.
 
 
 [tool.ruff.format]
@@ -266,7 +277,7 @@ indent-style = "space"
 skip-magic-trailing-comma = true
 
 [tool.ruff]
-src = ["berg_agents"]
+src = ["berg_agents", "plugin_system"]
 extend-exclude = ["_build",
     ".venv",
     "*cache*",
@@ -370,7 +381,7 @@ ignore-words-list = ["mlflow",
 "en-core-web-sm==3.8.0" = "@ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
 
 [tool.zuban]
-files = ["berg_agents/**/*.py"]
+files = ["berg_agents/**/*.py", "plugin_system/**/*.py"]
 disallow_any_generics = false
 disallow_untyped_defs = false
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
@@ -388,7 +399,7 @@ mode = "default"
 
 [tool.pyrefly]
 project-includes = ["berg_agents/"]
-search-path = ["./stubs", "berg_agents/"]
+search-path = ["./stubs", "berg_agents/", "plugin_system"]
 python-interpreter-path = ".venv/bin/python"
 # pyrefly mis-detects Pydantic v2 models and requires `model_config` as a
 # constructor argument; this only affects FileObject (a @dataclass) here.
@@ -422,16 +433,16 @@ redundant-condition = "error"
 respect-type-ignore-comments = true
 
 [tool.ty.environment]
-extra-paths = ["berg_agents/", "stubs/", ".venv/"]
+extra-paths = ["berg_agents/", "stubs/", ".venv/", "plugin_system/"]
 root = ["."]
 
 [tool.pyanalyze]
 missing_parameter_annotation = true
-paths = ["berg_agents/"]
+paths = ["berg_agents/", "plugin_system/"]
 
 suggested_parameter_type = true
 suggested_return_type = true
-import_paths = ["berg_agents/", "stubs/", ".venv/"]
+import_paths = ["berg_agents/", "stubs/", ".venv/", "plugin_system/"]
 #stub_path = "stubs/*.pyi"
 #find-unused = true
 #find-unused-attributes = true

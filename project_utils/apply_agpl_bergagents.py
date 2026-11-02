@@ -22,7 +22,6 @@
 import os
 import pathlib
 
-
 AGPL_TEXT = (
     "Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. \n"
     "The system follows a harness-based execution model with multiple specialized agents working together.\n\n"

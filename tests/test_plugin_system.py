@@ -20,19 +20,16 @@ Tests:
 """
 
 import asyncio
+from dataclasses import dataclass
 import logging
+from pathlib import Path
 import sys
 
-from dataclasses import dataclass
-from pathlib import Path
-
+from plugin_system import PluginManager
 import pytest
 
-from plugin_system import PluginManager
-
-
 # Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
 
 
 # Configure logging
@@ -129,11 +126,7 @@ async def main() -> None:
         logger.info("   ✓ SharedTodo plugin loaded")
 
         # Test tools
-        from berg_plugins.plugin_dev import (
-            complete_todo,
-            create_todo,
-            list_todos,
-        )
+        from shared_todo.tools import complete_todo, create_todo, list_todos
 
         # Create a test todo
         logger.info("\n   Creating test todo...")

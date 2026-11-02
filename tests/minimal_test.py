@@ -7,14 +7,12 @@ bypassing the circular import issues by using a simplified architecture.
 """
 
 import asyncio
+from dataclasses import dataclass
 import logging
+from pathlib import Path
 import sys
 
-from dataclasses import dataclass
-from pathlib import Path
-
 import yaml
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -158,7 +156,7 @@ async def main() -> None:
     logger.info("\n=== Testing SharedToDo Tools ===\n")
 
     # Import tools
-    from berg_plugins.plugin_dev import (
+    from shared_todo.tools import (
         complete_todo,
         create_todo,
         list_todos,

@@ -1,5 +1,5 @@
 
-
+/.pycharm_plugin
 **/.venv
 /project_utils/*.zip
 **/*.db

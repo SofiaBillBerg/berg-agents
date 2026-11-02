@@ -3,12 +3,10 @@
 
 import asyncio
 import logging
+from pathlib import Path
 import sys
 
-from pathlib import Path
-
 import pytest
-
 
 # Configure logging
 logging.basicConfig(
@@ -66,11 +64,7 @@ async def test_shared_todo_standalone() -> None:
         # Test the tools directly
         sys.path.insert(0, str(Path(__file__).parent))
 
-        from berg_plugins.plugin_dev import (
-            complete_todo,
-            create_todo,
-            list_todos,
-        )
+        from shared_todo.tools import complete_todo, create_todo, list_todos
 
         # Create a test todo
         logger.info("Creating test todo...")
