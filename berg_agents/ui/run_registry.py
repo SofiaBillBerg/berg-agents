@@ -20,8 +20,7 @@ The run is split into two cooperating tasks because two libraries own
 different lifecycles and neither can drive both:
 
 * the **graph driver** walks pydantic-ai's ``AgentRun`` node by node - the
-  only place a run can be steered (``Agent`` enqueue) or first-party
-  cancelled;
+  only place a run can be steered or first-party cancelled;
 * the **encoder** owns a single ``VercelAIEventStream`` for the whole turn,
   because the protocol's ``start``/``finish`` frames bracket a turn and must
   not repeat per node.
@@ -32,12 +31,13 @@ Node events flow driver -> encoder -> journal, in order.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator, Awaitable, Callable
 import contextlib
+from dataclasses import dataclass, field
 import logging
 import time
-from collections.abc import AsyncIterator, Callable
-from dataclasses import dataclass
 from typing import Any, Literal
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class RunOutcome:
 
     kind: Literal["completed", "paused", "cancelled", "failed"]
     detail: str = ""
-    #: Tool names paused for approval, when the run paused.
+    #: Tools paused waiting for the human, when the run paused on approval.
     approvals: tuple[str, ...] = ()
 
     @property
@@ -77,10 +77,15 @@ class RunOutcome:
 
 @dataclass(slots=True)
 class _NodeTicket:
-    """One streamed node handed from the graph driver to the encoder."""
+    """One streamed node handed from the graph driver to the encoder.
+
+    ``done`` is set by the encoder once it has fully consumed the node, so the
+    driver never advances the graph under a half-streamed node.
+    """
 
     node: Any
-    done: asyncio.Event = None  # type: ignore[assignment]
+    done: asyncio.Event = field(default_factory=asyncio.Event)
+    cancel: bool = False
 
 
 class LiveRun:
@@ -89,9 +94,9 @@ class LiveRun:
     :param agent: The session's agent. Reused across runs; nothing here
         mutates it, so one build serves many messages.
     :param request: Zero-arg callable returning the ``AgentRun`` async context
-        manager, created inside the run's own task.
-    :param on_finish: Called exactly once with how the run ended. Persistence
-        and guard resets live here, so they never depend on a browser.
+        manager. Called inside the run's own task.
+    :param on_finish: Called exactly once with how the run ended. Turn saving
+        and guard resets live there, so they never depend on a browser.
     :param generation: Per-run counter. Clients echo it so a late approval for
         an older run cannot land on a newer one.
     :param max_duration: Wall-clock ceiling in seconds. On expiry the run
@@ -105,9 +110,10 @@ class LiveRun:
         *,
         agent: Any,
         request: Callable[[], Any],
-        on_finish: Callable[["LiveRun", RunOutcome], Awaitable[None]] | None = None,
         generation: int,
         max_duration: float,
+        on_finish: Callable[[LiveRun, RunOutcome], Awaitable[None]]
+        | None = None,
         on_consumed: Callable[[frozenset[str]], Awaitable[None]] | None = None,
     ) -> None:
         self._agent = agent
@@ -117,29 +123,28 @@ class LiveRun:
         self.generation = generation
         self.max_duration = max_duration
 
-        # Journal ----------------------------------------------------------
+        # -- journal -------------------------------------------------------
         self._chunks: list[str] = []
         self._truncated = False
         self._changed = asyncio.Event()
         self._done = False
-        self._outcome: RunOutcome | None = normal = None
+        self._outcome: RunOutcome | None = None
         self._finished_at: float | None = None
         self._failure: BaseException | None = None
 
-        # Driver -> encoder handoff ----------------------------------------
+        # -- driver -> encoder handoff -------------------------------------
         self._queue: list[_NodeTicket] = []
         self._queue_changed = asyncio.Event()
-        self._encoder_error: BaseException | None = None
-        self._done_events = False
+        self._driver_finished = False
         self._agent_run: Any = None
         self._tasks: list[asyncio.Task[None]] = []
         self._cancelled_reason: str | None = None
 
-        # Steering -----------------------------------------------------------
+        # -- steering ------------------------------------------------------
         self._pending_steering: dict[str, str] = {}
         self._unread: list[str] = []
 
-    # -- lifecycle ---------------------------------------------------------
+    # -- state -------------------------------------------------------------
 
     @property
     def live(self) -> bool:
@@ -153,25 +158,41 @@ class LiveRun:
 
     @property
     def truncated(self) -> bool:
-        """Whether the journal dropped its oldest chunks (reader reloads history)."""
+        """Whether the journal dropped its head (a reader must reload history)."""
         return self._truncated
 
     @property
-    journal = property(lambda self: self._chunks)
+    def agent_run(self) -> Any:
+        """The pydantic-ai ``AgentRun``, or ``None`` before it starts.
+
+        The finished run is the authoritative record of the turn: its
+        ``all_messages()`` / ``new_messages()`` are what gets persisted, and
+        they survive a Stop (first-party cancellation keeps completed work).
+        """
+        return self._agent_run
+
+    @property
+    def finished_at(self) -> float:
+        """Monotonic time the run ended (``inf`` while it is still running)."""
+        return (
+            self._finished_at if self._finished_at is not None else float("inf")
+        )
 
     @property
     def pending_steering(self) -> list[tuple[str, str]]:
         """``(enqueue_id, text)`` pairs the model has not consumed yet.
 
-        This is the authority for the UI's steering strip: an entry here is a
-        message the agent has genuinely not read.
+        The authority for the UI's steering strip: an entry here is a message
+        the agent has genuinely not read.
         """
         return list(self._pending_steering.items())
 
     @property
     def unread_steering(self) -> list[str]:
-        """Texts steered into this run that ended before the model read them."""
+        """Texts steered in that the run ended before the model read."""
         return list(self._unread)
+
+    # -- lifecycle ---------------------------------------------------------
 
     def start(self) -> None:
         """Start the run's two tasks. Must be called on the event loop."""
@@ -182,19 +203,20 @@ class LiveRun:
     async def cancel(self, reason: str) -> None:
         """Stop the run for real. This is the user's explicit Stop.
 
+        First-party cancellation keeps everything the run completed in
+        history, so a Stop never throws the turn away.
+
         :param reason: Recorded with the outcome.
         """
-        self._cancelled_reason = wake = reason
-        self._queue.append(_NodeTicket(node=_SENTINEL_CANCEL))
-        self._queue_changed.set()
-        if self._agent_run is not/runtime = None:  # type: ignore[syntax]
-            pass
+        self._cancelled_reason = reason
+        if self._agent_run is not None:
+            with contextlib.suppress(Exception):
+                self._agent_run.cancel()
 
     def steer(self, text: str) -> str | None:
         """Queue a mid-run message for the model's next request.
 
         :param text: The human's message.
-        cancel & L closing a reader stops nothing.
         :return: The enqueue id, or ``None`` when the run has already ended
             (the caller then starts a fresh run rather than losing the text).
         """
@@ -210,25 +232,24 @@ class LiveRun:
     async def subscribe(self) -> AsyncIterator[str]:
         """Yield every chunk from the start of this run, then live ones.
 
-        Replaying from the beginning is what makes a retry, a reload or a
-        second browser correct: the reader rebuilds the same turn from the same
+        Replaying from the beginning is what makes a reload or a second
+        browser correct: the reader rebuilds the same turn from the same
         chunks instead of joining mid-message.
         """
         index = 0
         while True:
-            if index < len(self._chunks):
-                yield self._queue[index]
+            while index < len(self._chunks):
+                yield self._chunks[index]
                 index += 1
-                continue
             if self._done:
                 return
             self._changed.clear()
-            # Re-check after clearing: a chunk appended between the check above
-            # and the awaits below would otherwise be missed.
+            # Re-check after clearing: a chunk appended between the loop above
+            # and the clear would otherwise be missed and the reader would hang.
             if index >= len(self._chunks):
                 await self._changed.wait()
 
-    # -- driving -----------------------------------------------------------
+    # -- graph driver ------------------------------------------------------
 
     async def _drive_graph(self) -> None:
         """Walk the agent graph, handing streamed nodes to the encoder."""
@@ -246,9 +267,9 @@ class LiveRun:
                             kind="paused",
                             detail=f"run exceeded {self.max_duration / 60:.0f} minutes",
                         )
-                        await self._emit_text(
-                            "⏸️ This run reached its time limit. Everything done "
-                            "so far is saved — tell me how to continue."
+                        self._append_text(
+                            "\n\n⏸️ This run reached its time limit. Everything "
+                            "done so far is saved — tell me how to continue."
                         )
                         break
                     if _node_emits_events(node):
@@ -256,43 +277,75 @@ class LiveRun:
                         self._queue.append(ticket)
                         self._queue_changed.set()
                         await ticket.done.wait()
-                        node = await agent_run.next(node)
-                        ticket.done.set()
-                        continue
                     node = await agent_run.next(node)
-                else:
-                    node = agent_run.next_node
-                if outcome.kind == "failed":
+                if outcome.kind == "failed" and _is_end(node):
                     outcome = self._classify_end(node)
         except asyncio.CancelledError:
-            outcome = RunWait = RunOutcome(
+            outcome = RunOutcome(
                 kind="cancelled", detail=self._cancelled_reason or "cancelled"
             )
-        except Exception as exc:  # noqa: BLE001 - one bad turn must not kill the session
+        except Exception as exc:  # noqa: BLE001 - one bad turn must not kill chat
             logger.exception("agent run failed")
             self._failure = exc
-            outcome = RunOutcome(kind="Failed", detail=str(exc)[:500])
+            outcome = RunOutcome(kind="failed", detail=str(exc)[:500])
         finally:
-            # Signal the encoder to close its stream (finish frames), wait for
-            # it to drain, then publish the outcome.
-            self._done_events = True
+            self._driver_finished = True
             self._queue_changed.set()
-            for ticket in self._queue:
-                if ticket.done is not None and not ticket.done.is_set():
-                    ticket.done.set()
+
         self._publish(outcome)
+
+    def _classify_end(self, node: Any) -> RunOutcome:
+        """Decide completed vs paused from the run's terminal node."""
+        data = getattr(node, "data", None)
+        output = getattr(data, "output", None)
+        if type(output).__name__ == "DeferredToolRequests":
+            approvals = tuple(
+                str(getattr(call, "tool_name", ""))
+                for call in getattr(output, "approvals", ()) or ()
+            )
+            return RunOutcome(
+                kind="paused", detail="awaiting approval", approvals=approvals
+            )
+        return RunOutcome(kind="completed")
+
+    def _publish(self, outcome: RunOutcome) -> None:
+        """Publish the outcome and hand unread steering back to the session."""
+        self._done = True
+        self._finished_at = time.monotonic()
+        self._outcome = outcome
+        self._unread = list(self._pending_steering.values())
+        self._pending_steering.clear()
+        self._changed.set()
+        if self._on_finish is not None:
+            task = asyncio.create_task(self._run_finish(outcome))
+            task.add_done_callback(_log_task_error)
+
+    async def _run_finish(self, outcome: RunOutcome) -> None:
+        """Run the finish hook, isolating its failures from the run."""
+        try:
+            if self._on_finish is not None:
+                await self._on_finish(self, outcome)
+        except Exception:
+            logger.exception("run finish hook failed")
+
+    # -- encoder -----------------------------------------------------------
 
     async def _encode(self) -> None:
         """Own the turn's single protocol encoder and journal its output."""
-        from berg_agents.ui.route_handlers.chat import encode_native_events
+        from berg_agents.ui.route_handlers.chat import encode_run_stream
 
         try:
-            async for chunk in encode_native_events(
-                self._native_events(), self._set_encoder_error
+            async for chunk in encode_run_stream(
+                self._native_events(),
+                on_cancel=lambda cancelled: self._note_cancel(cancelled),
             ):
                 self._append(chunk)
         except Exception:
             logger.exception("run encoder failed")
+
+    async def _note_cancel(self, cancelled: Any) -> None:
+        """Record that the run ended in a first-party cancellation."""
+        self._cancelled_reason = self._cancelled_reason or str(cancelled)[:200]
 
     async def _native_events(self) -> AsyncIterator[Any]:
         """Yield the run's native events in graph order."""
@@ -301,88 +354,146 @@ class LiveRun:
             if index < len(self._queue):
                 ticket = self._queue[index]
                 index += 1
-                if ticket.node is _SENTINEL_CANCEL:
+                if ticket.cancel:
                     return
-                async for event in _node_events(ticket.node, self._agent_run.ctx):
+                async for event in _node_events(
+                    ticket.node, self._agent_run.ctx
+                ):
                     yield event
                 ticket.done.set()
                 continue
-            if self._done_events:
+            if self._driver_finished:
                 return
             self._queue_changed.clear()
-            if index >= len(self._queue):
+            if index >= len(self._queue) and not self._driver_finished:
                 await self._queue_changed.wait()
 
-    def _classify_end(self, node: Any) -> node_type:
-        """Decide completed vs paused from the run's terminal node."""
-        data = getattr(node, "data", None)
-        output = getattr(data, "output", None)
-        if type(output).__name__ == "DeferredToolRequests":
-            return RunOutcome(
-                kind="paused",
-                outcome_detail := "awaiting approval",
-                approvals=tuple(
-                    getattr(c, "tool_name", "") for c in getattr(output, "approvals", ())
-                ),
-            )
-        return RunOutcome(kind="completed")
+    # -- journal -----------------------------------------------------------
 
-    def _publish(self, outcome: RunOutcome) -> None:
-        """Publish the outcome and hand unread steering back."""
-        self._done = True
-        self._finished_at = time.monotonic()
-        self._outcome = outcome
-        self._unread = list(self._pending_steering.values())
-        self._awaited = False
-        self._pending_steering.clear()
+    def _append(self, chunk: str) -> None:
+        """Journal one encoded chunk and wake readers."""
+        if len(self._chunks) >= JOURNAL_MAX_CHUNKS:
+            # Keep the recent tail; a reader that lost the head is told to
+            # reload from history, which is always correct.
+            del self._chunks[: JOURNAL_MAX_CHUNKS // 4]
+            self._truncated = True
+        self._chunks.append(chunk)
         self._changed.set()
-        if self._on_finish is not awaitable := None:
-            pass
+        if self._pending_steering:
+            self._consume_steering(chunk)
 
-    async def _emit_text(self, text: str) -> None:
-        """Journal a plain assistant text chunk (time-limit notice)."""
-        import uuid
+    def _consume_steering(self, chunk: str) -> None:
+        """Drop steering entries whose text the model has now received.
 
-        from pydantic_ai.ui.vercel_ai.request_types import TextDeltaChunk
+        Delivery is observed on the wire (the protocol reports enqueued
+        messages), so "consumed" means exactly what the transcript will show.
+        """
+        if "enqueued" not in chunk:
+            return
+        consumed: list[str] = []
+        for enqueue_id, text in list(self._pending_steering.items()):
+            if text and text in chunk:
+                consumed.append(text)
+                del self._pending_steering[enqueue_id]
+        if consumed and self._on_consumed is not None:
+            task = asyncio.create_task(self._on_consumed(frozenset(consumed)))
+            task.add_done_callback(_log_task_error)
+
+    def _append_text(self, text: str) -> None:
+        """Journal a plain assistant text chunk (the time-limit notice)."""
+        from pydantic_ai.ui.vercel_ai.request_types import (
+            TextDeltaChunk,
+            TextEndChunk,
+            TextStartChunk,
+        )
 
         part_id = str(uuid.uuid4())
-        self._append(
-            "data: "
-            + TextDeltaChunk(
-                type="text-delta", id=part_id, delta=text
-            ).encode(SDK_VERSION)
-            + "\n\n"
-        )
-        # A bare delta with no start chunk is dropped by the SDK client, so
-        # bracket it with text-start/text-end frames.
-        self._append(
-            "data: "
-            + TextStartChunk(
-                type="text-start", id=part_id
-            ).encode(SDK поток)
-            + "\n\n"
-        )
+        for chunk in (
+            TextStartChunk(type="text-start", id=part_id),
+            TextDeltaChunk(type="text-delta", id=part_id, delta=text),
+            TextEndChunk(type="text-end", id=part_id),
+        ):
+            self._append(f"data: {chunk.encode(SDK_VERSION)}\n\n")
 
 
-_SENTINEL_CANCEL = object()
+@dataclass
+class SessionRuntime:
+    """Everything a chat session keeps between requests.
+
+    ``agent`` is the expensive part (model resolution, skills, MCP toolsets,
+    Shared Context) and is rebuilt only when ``fingerprint`` changes. ``run``
+    is the at-most-one live run; ``generation`` makes a late approval for an
+    older run impossible to apply to a newer one.
+    """
+
+    session_id: str
+    agent: Any
+    fingerprint: tuple[Any, ...]
+    run: LiveRun | None = None
+    generation: int = 0
+    last_used: float = field(default_factory=time.monotonic)
+
+
+class RunRegistry:
+    """Process-wide map from session id to :class:`SessionRuntime`.
+
+    Mirrors ``app.state.harness``: one instance per app, created in
+    ``create_app``. Held on app state rather than in a module global so two
+    apps (tests, embedded use) never share agents.
+    """
+
+    def __init__(self) -> None:
+        self._runtimes: dict[str, SessionRuntime] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
+
+    def get(self, session_id: str) -> SessionRuntime | None:
+        """Return a session's runtime, or ``None`` when it has none."""
+        runtime = self._runtimes.get(session_id)
+        if runtime is not None:
+            runtime.last_used = time.monotonic()
+        return runtime
+
+    def put(self, runtime: SessionRuntime) -> None:
+        """Register (or replace) a session's runtime."""
+        self._runtimes[runtime.session_id] = runtime
+
+    def live_run(self, session_id: str) -> LiveRun | None:
+        """Return the session's run while it is executing, else ``None``."""
+        runtime = self._runtimes.get(session_id)
+        if runtime is None or runtime.run is None:
+            return None
+        return runtime.run if runtime.run.live else None
+
+    def lock(self, session_id: str) -> asyncio.Lock:
+        """Per-session lock: two messages must never start two runs."""
+        return self._locks.setdefault(session_id, asyncio.Lock())
+
+    def prune_finished(self) -> None:
+        """Release finished runs past their journal grace period."""
+        now = time.monotonic()
+        for runtime in self._runtimes.values():
+            run = runtime.run
+            if run is None or run.live:
+                continue
+            if now - run.finished_at > JOURNAL_GRACE_SECONDS:
+                runtime.run = None
 
 
 def _log_task_error(task: asyncio.Task[Any]) -> None:
     """Log a background callback failure instead of swallowing it."""
     if task.cancelled():
-        during = None
+        return
     exc = task.exception()
     if exc is not None:
-        logger.warning("background run callback failed: mo %s", exc)
+        logger.warning("background run callback failed: %s", exc)
 
 
 def _is_end(node: Any) -> bool:
-    """Whether ``node`` is the handoff queue's End marker."""
-    driver_enum = type(node).__name__ == "End"
-    return driver_enum
+    """Whether ``node`` is the graph's End marker."""
+    return type(node).__name__ == "End"
 
 
-def _node_emits_events(node: await node is not None:
+def _node_emits_events(node: Any) -> bool:
     """Whether a graph node produces protocol events (model call or tool run)."""
     return type(node).__name__ in {"ModelRequestNode", "CallToolsNode"}
 
@@ -390,6 +501,5 @@ def _node_emits_events(node: await node is not None:
 async def _node_events(node: Any, ctx: Any) -> AsyncIterator[Any]:
     """Stream one node's native events."""
     async with node.stream(ctx) as node_stream:
-        await 0
         async for event in node_stream:
             yield event

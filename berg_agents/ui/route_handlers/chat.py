@@ -25,20 +25,22 @@ for native Vercel AI SSE protocol.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from functools import cached_property
 import logging
-from typing import Any, Literal
+from typing import Any
 
 from berg_agents.agents.chat_agent import build_chat_agent
+from berg_agents.config.settings import get_settings
 from berg_agents.core.harness import Harness
 from berg_agents.core.turn import record_turn_outcome
 from berg_agents.ui.projects import resolve_project
+from berg_agents.ui.run_registry import LiveRun, RunBusyError, SessionRuntime
 from berg_agents.ui.sessions import SessionManager
 from berg_agents.ui.transcripts import append_new_messages, ensure_transcript
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from pydantic_ai import DeferredToolRequests, DeferredToolResults
-from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.tools import ToolApproved, ToolDenied
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 from pydantic_ai.ui.vercel_ai.request_types import (
@@ -114,35 +116,127 @@ class BergVercelAIAdapter(VercelAIAdapter):
         return DeferredToolResults(approvals=approvals) if approvals else None
 
 
-async def stream_node_chunks(stream: Any, node: Any, ctx: Any) -> Any:
-    """Encode one agent-graph node's events as Vercel AI SSE chunks.
+async def encode_run_stream(
+    events: Any, *, on_cancel: Callable[[Any], Awaitable[None]] | None = None
+) -> Any:
+    """Encode a run's native event stream as Vercel AI SSE frames.
 
     The run owns the graph (see :mod:`berg_agents.ui.run_registry`); this
-    function owns the wire format. It reuses the adapter's own event stream,
-    which keeps message identities, step boundaries and approval parts in one
-    place instead of reimplemented per node - the bytes stay identical to what
+    function owns the wire format. It delegates to the adapter's own
+    ``run_stream``, so message identities, step boundaries, approval parts and
+    the cancellation/error close-out stay in one place. The bytes are what
     ``VercelAIAdapter.dispatch_request`` produced when the response *was* the
     run.
 
-    The stream is created once per RUN, not per node: the protocol's ``start``
-    and ``finish`` frames bracket a whole turn, so a fresh encoder per node
-    would emit several starts into one message.
+    The encoder spans the whole turn, not one node: the protocol's ``start``
+    and ``finish`` frames bracket a turn, so a per-node encoder would open the
+    message repeatedly.
 
-    :param stream: The run's ``VercelAIEventStream`` (turn-long).
-    :param node: A ``ModelRequestNode`` or ``CallToolsNode`` to stream.
-    :param ctx: The run's graph context (``agent_run.ctx``).
-    :return: Async iterator of encoded ``data: {...}`` frames.
+    :param events: Async iterator of pydantic-ai native events.
+    :param on_cancel: Notified once when the run ends in a first-party
+        cancellation, so the run can record why it stopped.
+    :return: Async iterator of ``data: {...}`` frames.
     """
-    if type(node).__name__ not in {"ModelRequestNode", "CallToolsNode"}:
-        # Pure graph steps (user prompt, output validation) emit no protocol
-        # events; opening their stream would only produce empty steps.
+    from pydantic_ai.ui.vercel_ai import VercelAIEventStream
+
+    async def _on_cancel(cancelled: Any) -> Any:
+        """Forward the first-party cancellation to the run, then yield nothing."""
+        if on_cancel is not None:
+            await on_cancel(cancelled)
         return
-    # transform_stream owns the node's event lifecycle: it turns the response
-    # on at the first part and back off at a tool call, so a multi-step turn
-    # reads like the single stream it replaces.
-    async with node.stream(ctx) as node_stream:
-        async for chunk in stream.transform_stream(node_stream):
-            yield stream.encode_event(chunk)
+        yield  # pragma: no cover - makes this an async generator
+
+    stream = VercelAIEventStream(sdk_version=6)
+    async for frame in stream.encode_stream(
+        stream.transform_stream(events, on_cancel=_on_cancel)
+    ):
+        yield frame
+
+
+async def _follow_response(run: Any) -> Response:
+    """Return the run's journal as an SSE response.
+
+    The response is a *reader*. When the browser goes away the generator is
+    closed and nothing else happens - the run keeps going, and a later
+    request replays the journal from the start.
+
+    :param run: The ``LiveRun`` to read.
+    :return: StreamingResponse in the Vercel AI SSE protocol.
+    """
+    from starlette.responses import StreamingResponse
+
+    headers = {
+        # SSE must not be buffered by a proxy: the browser sees chunks as the
+        # run produces them, not after the run ends.
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+        "x-vercel-ai-ui-message-stream": "v1"}
+    return StreamingResponse(
+        run.subscribe(), media_type="text/event-stream", headers=headers
+    )
+
+
+def _latest_user_text(body: bytes) -> str:
+    """Return the newest user text in a Vercel AI request body, or ''."""
+    content = _latest_user_content(body)
+    if not content:
+        return ""
+    return "".join(
+        part.get("text", "")
+        for part in content
+        if isinstance(part, dict) and part.get("type") == "text"
+    )
+
+
+def _latest_user_content(body: bytes) -> str | list[dict[str, Any]] | None:
+    """Return the newest user message's content in a request body.
+
+    :param body: Raw request body (Vercel AI protocol).
+    :return: Plain string for the usual single-text message, a list of
+        content parts when the message carries more than text, or ``None``
+        when the body holds no user message (an approval-only resume).
+    """
+    try:
+        import json
+
+        data = json.loads(body)
+    except Exception:
+        return None
+    messages = data.get("messages") if isinstance(data, dict) else None
+    if not isinstance(messages, list):
+        return None
+    for message in reversed(messages):
+        if not isinstance(message, dict) or message.get("role") != "user":
+            continue
+        parts = message.get("parts")
+        if not isinstance(parts, list):
+            return None
+        texts = [
+            p.get("text", "")
+            for p in parts
+            if isinstance(p, dict) and p.get("type") == "text"
+        ]
+        return texts[0] if len(parts) == 1 and texts else parts
+    return None
+
+
+def _approvals_from_body(body: bytes) -> DeferredToolResults | None:
+    """Build the resume payload from a request's answered approvals.
+
+    Uses the adapter's own parsing so approval semantics (edited args,
+    denial reasons) stay in one place. The agent is never run from here:
+    only the answered parts are read.
+
+    :param body: Raw request body (Vercel AI protocol).
+    :return: Deferred results, or ``None`` when the body carries no answers.
+    """
+    try:
+        adapter = BergVercelAIAdapter.build_run_input(body)
+        answered = BergVercelAIAdapter(agent=None, run_input=adapter)
+        return answered.deferred_tool_results
+    except Exception as exc:
+        logger.warning("approval parse skipped: %s", exc)
+        return None
 
 
 async def _track_chat_session(
@@ -275,21 +369,92 @@ def register_chat_routes(
     :param sessions: Session store (active provider/model + root dir).
     """
 
+    def _session_agent(
+        request: Request,
+        *,
+        session_id: str | None,
+        model_id: str,
+        plugin_tools: Any,
+        disabled_mcp: Any,
+        disabled_skills: Any,
+        active_agent: str | None,
+        active_agent_description: str | None,
+    ) -> Any:
+        """Return the session's agent, building it only when it must change.
+
+        Resolving a model, loading skills, connecting MCP toolsets and reading
+        Shared Context are the expensive parts of a turn, and none of them
+        depend on the message. So they happen once per session and repeat only
+        when the configuration they were built from actually changes.
+
+        :param request: The running request (carries the run registry).
+        :param session_id: Session the agent belongs to.
+        :param model_id: Active provider/model id.
+        :param plugin_tools: Plugin-contributed tools.
+        :param disabled_mcp: MCP servers the user withheld this turn.
+        :param disabled_skills: Skills the user withheld this turn.
+        :param active_agent: Persona selected via ``/api/agents/active``.
+        :param active_agent_description: That persona's description.
+        :return: The session's live agent, reused across turns.
+        """
+        registry = request.app.state.run_registry
+        fingerprint = (
+            model_id,
+            sessions._harness_root_dir(),
+            tuple(getattr(t, "name", repr(t)) for t in plugin_tools),
+            frozenset(disabled_mcp),
+            frozenset(disabled_skills),
+            active_agent,
+            active_agent_description or "",
+        )
+        runtime = registry.get(session_id) if session_id else None
+        if runtime is not None and runtime.fingerprint == fingerprint:
+            return runtime.agent
+
+        agent = build_chat_agent(
+            model_id,
+            root_dir=sessions._harness_root_dir(),
+            plugin_tools=plugin_tools,
+            disabled_mcp=disabled_mcp,
+            disabled_skills=disabled_skills,
+            active_agent=active_agent,
+            active_agent_description=active_agent_description,
+            # Scopes the plan store to this session so a plan written
+            # in one turn is still there in the next.
+            session_id=session_id,
+        )
+        _track_context_usage(agent, session_id)
+        if session_id:
+            registry.put(
+                SessionRuntime(
+                    session_id=session_id, agent=agent, fingerprint=fingerprint
+                )
+            )
+        logger.info("chat agent built for %s", session_id or "(no session)")
+        return agent
+
     @router.post("/api/chat/stream")
     async def chat_stream(request: Request) -> Response:
         """Agentic streaming chat - native Vercel AI protocol via pydantic_ai.
 
-        Uses :class:`~pydantic_ai.ui.vercel_ai.VercelAIAdapter` to handle all
-        event transformation: frontend messages → agent run input, agent
-        events → Vercel AI SSE chunks (text deltas, tool calls, tool results,
-        HITL approval requests).
+        The POST no longer *is* the run. It hands the message to the
+        session's run - starting one when idle, steering a live one - and
+        returns a subscription to that run: the same Vercel AI SSE protocol as
+        before, read from a replayable journal the run owns. Closing the
+        response stops nothing; stopping is ``POST /api/chat/stop``.
 
-        Simple messages like "hello" get a direct LLM reply - no tool calls.
-        Multi-step requests are handled through visible delegation:
-        the model plans first (``plan_task``), then implements
-        (``implement_task``) - each stage streams its own result into
-        the transcript, so progress, steering points, and approvals
-        stay visible instead of vanishing inside one opaque call.
+        Three request shapes share this one path:
+
+        * a fresh user message (session idle) - starts a new run;
+        * approval answers (the run paused on ``DeferredToolRequests``) -
+          resumes the same conversation with that batch's decisions;
+        * a mid-run message (run live) - **steering**: queued for the model's
+          next request, never an interruption.
+
+        Multi-step requests stay visible: the model plans first
+        (``plan_task``), then implements (``implement_task``), so progress,
+        steering points and approvals are streamed rather than hidden inside
+        one opaque call.
 
         The agent, model, and system prompt all come from configuration
         (``.berg-agents/bergagents.jsonc`` and ``.berg-agents/profiles.yaml``) - never
@@ -328,19 +493,16 @@ def register_chat_routes(
             harness, sessions
         )
 
-        agent = build_chat_agent(
-            model_id,
-            root_dir=sessions._harness_root_dir(),
+        agent = _session_agent(
+            request,
+            session_id=session_id,
+            model_id=model_id,
             plugin_tools=plugin_tools,
             disabled_mcp=disabled_mcp,
             disabled_skills=disabled_skills,
             active_agent=active_agent,
             active_agent_description=active_agent_description,
-            # Scopes the plan store to this session so a plan written
-            # in one turn is still there in the next.
-            session_id=session_id,
         )
-        _track_context_usage(agent, session_id)
 
         # sdk_version=6 enables tool-approval streaming (human-in-the-loop).
         # BergVercelAIAdapter.dispatch_request handles all SSE encoding
@@ -377,13 +539,6 @@ def register_chat_routes(
             except Exception as exc:
                 logger.warning(f"router stats record skipped: {exc}")
 
-        def _log_run_cancelled(run_cancelled: object) -> None:
-            # Fired when a client stop/disconnect cancels the run, so
-            # the "Stop" button is observable server-side. A Stop is the
-            # agent yielding control, so the runaway guard's count restarts.
-            logger.info(f"chat run canceled: {run_cancelled}")
-            _reset_runaway_guard()
-
         def _reset_runaway_guard() -> None:
             # The guard counts tool calls since the human last had a say.
             # It resets when the agent YIELDS control - the turn finished,
@@ -396,10 +551,15 @@ def register_chat_routes(
 
             session_store.reset_guard_progress(session_id)
 
-        async def _save_turn(result: Any) -> None:
-            # on_complete receives the AgentRunResult: persist both the
-            # display transcript (any browser can resume it) and the
-            # Conversation (usage + id carry into the next turn).
+        async def _save_turn(
+            all_messages: Callable[[], list[Any]],
+            new_messages: Callable[[], list[Any]],
+        ) -> None:
+            # Persist both the display transcript (any browser can resume it)
+            # and the Conversation (usage + id carry into the next turn).
+            # Reading the messages through callables keeps this callable on
+            # any terminal path - a completed run, a pause, a Stop - where
+            # different objects hold the authoritative history.
             _record_chat_outcome(success=True)
             if not session_id:
                 return
@@ -409,7 +569,7 @@ def register_chat_routes(
 
                 root = sessions._harness_root_dir()
                 store = session_store.get_store(root)
-                messages = result.all_messages()
+                messages = all_messages()
                 await session_store.record_turn(store, session_id, messages)
                 # The durable JSONL log takes only what THIS run produced.
                 # `all_messages()` re-sends the whole conversation every
@@ -421,9 +581,9 @@ def register_chat_routes(
                 # wants. `append_new_messages` still dedupes, because the
                 # memory snapshot legitimately reappears each turn.
                 append_new_messages(
-                    session_id, resolve_project(root), result.new_messages()
+                    session_id, resolve_project(root), new_messages()
                 )
-                conversation_obj = getattr(result, "conversation", None)
+                conversation_obj = session_store.load_conversation(session_id)
                 if conversation_obj is not None:
                     payload = ConversationTypeAdapter.dump_json(
                         conversation_obj
@@ -441,44 +601,39 @@ def register_chat_routes(
             except Exception as exc:
                 logger.warning(f"Session save skipped: {exc}")
 
-        # Proxy hiccups (observed via omniroute) can return an
-        # entirely empty SSE stream; pydantic-ai surfaces that as
-        # UnexpectedModelBehavior("... ended without content ...").
-        # The failed step produced no assistant turn and executed
-        # nothing, so re-sending the same request is safe: the
-        # body is cached by Starlette and the retry simply
-        # regenerates the missing turn instead of failing the chat.
-        try:
-            return await _dispatch_chat_with_retry(
-                request,
-                agent=agent,
-                sdk_version=6,
-                output_type=[str, DeferredToolRequests],
-                session_id=session_id,
-                conversation=conversation,
-                save_turn=_save_turn,
-                log_cancelled=_log_run_cancelled,
+        async def _on_run_finish(run: Any, outcome: Any) -> None:
+            """Persist the turn and hand back unread steering.
+
+            Called by the run itself, so it never depends on a browser still
+            being connected.
+
+            :param run: The finished ``LiveRun``.
+            :param outcome: How it ended.
+            """
+            logger.info(
+                "chat run finished: %s (%s)", outcome.kind, outcome.detail
             )
-        except HTTPException:
-            raise
-        except UnexpectedModelBehavior:
-            # Model-output validation failures keep existing behavior
-            # (the frontend auto-recovery in useAISDKChat handles them).
-            raise
-        except Exception as exc:
-            # NOTE: Model-side 500s (strict chat templates rejecting
-            # the message shape, auth failures, overloaded servers)
-            # used to surface as an opaque 500 dump. Log the full body
-            # server-side, send a readable summary: the frontend shows
-            # it and the failed-send recovery can act on it.
-            logger.exception("chat model request failed")
-            _record_chat_outcome(success=False)
-            text = str(exc)
-            hint = _chat_error_hint(text)
-            raise HTTPException(
-                status_code=502,
-                detail=(
-                    f"Model '{model_id or sessions.active_model}' "
-                    f"returned an error: {text[:300]}.{hint}"
-                ),
-            ) from exc
+            agent_run = run.agent_run
+            if agent_run is not None and session_id:
+                await _save_turn(agent_run.all_messages, agent_run.new_messages)
+            if outcome.kind != "completed":
+                # A pause, a Stop or a failure all return control.
+                _reset_runaway_guard()
+
+        # -- request meaning -------------------------------------------------
+        body = await request.body()
+        registry = request.app.state.run_registry
+
+        run = _steer_live_run(registry, session_id, body)
+        if run is not None:
+            return _follow_response(run)
+
+        live = _start_run(
+            registry,
+            session_id=session_id,
+            body=body,
+            agent=agent,
+            conversation=conversation,
+            on_finish=_on_run_finish,
+        )
+        return _follow_response(live)

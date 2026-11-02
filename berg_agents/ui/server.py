@@ -201,6 +201,11 @@ def create_app(
     )
     app.state.harness = resolved_harness
     app.state.sessions = sessions
+    # Sessions own their agents and runs (see berg_agents.ui.run_registry);
+    # one registry for the process, next to the one harness.
+    from berg_agents.ui.run_registry import RunRegistry
+
+    app.state.run_registry = RunRegistry()
     router = create_router(
         resolved_harness, sessions, providers=resolved_providers
     )
