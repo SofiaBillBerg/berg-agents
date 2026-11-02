@@ -116,6 +116,16 @@ class LiveRun:
         | None = None,
         on_consumed: Callable[[frozenset[str]], Awaitable[None]] | None = None,
     ) -> None:
+        """Construct a run that has not started yet.
+
+        :param agent: The session's agent (never mutated here).
+        :param request: Zero-arg callable returning the ``AgentRun`` async
+            context manager; called inside the run's own task.
+        :param generation: Per-run counter echoed by clients.
+        :param max_duration: Wall-clock ceiling in seconds.
+        :param on_finish: Persistence hook, called once when the run ends.
+        :param on_consumed: Notified with texts the model has now received.
+        """
         self._agent = agent
         self._request = request
         self._on_finish = on_finish
@@ -138,6 +148,7 @@ class LiveRun:
         self._driver_finished = False
         self._agent_run: Any = None
         self._tasks: list[asyncio.Task[None]] = []
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._cancelled_reason: str | None = None
 
         # -- steering ------------------------------------------------------
@@ -196,6 +207,7 @@ class LiveRun:
 
     def start(self) -> None:
         """Start the run's two tasks. Must be called on the event loop."""
+        self._loop = asyncio.get_running_loop()
         self._tasks = [
             asyncio.create_task(self._drive_graph(), name="live-run.graph"),
             asyncio.create_task(self._encode(), name="live-run.encoder")]
@@ -253,38 +265,15 @@ class LiveRun:
 
     async def _drive_graph(self) -> None:
         """Walk the agent graph, handing streamed nodes to the encoder."""
-        outcome = RunOutcome(kind="failed")
-        deadline = time.monotonic() + self.max_duration
         try:
             async with self._request() as agent_run:
                 self._agent_run = agent_run
-                node = agent_run.next_node
-                while not _is_end(node):
-                    if time.monotonic() > deadline:
-                        # The limit PAUSES rather than cancels: the work so far
-                        # is kept and the human decides what happens next.
-                        outcome = RunOutcome(
-                            kind="paused",
-                            detail=f"run exceeded {self.max_duration / 60:.0f} minutes",
-                        )
-                        self._append_text(
-                            "\n\n⏸️ This run reached its time limit. Everything "
-                            "done so far is saved — tell me how to continue."
-                        )
-                        break
-                    if _node_emits_events(node):
-                        ticket = _NodeTicket(node=node)
-                        self._queue.append(ticket)
-                        self._queue_changed.set()
-                        await ticket.done.wait()
-                    node = await agent_run.next(node)
-                if outcome.kind == "failed" and _is_end(node):
-                    outcome = self._classify_end(node)
+                outcome = await self._walk(agent_run)
         except asyncio.CancelledError:
             outcome = RunOutcome(
                 kind="cancelled", detail=self._cancelled_reason or "cancelled"
             )
-        except Exception as exc:  # noqa: BLE001 - one bad turn must not kill chat
+        except Exception as exc:  # broad-exception-caught: one bad turn must not kill the chat surface
             logger.exception("agent run failed")
             self._failure = exc
             outcome = RunOutcome(kind="failed", detail=str(exc)[:500])
@@ -294,7 +283,40 @@ class LiveRun:
 
         self._publish(outcome)
 
-    def _classify_end(self, node: Any) -> RunOutcome:
+    async def _walk(self, agent_run: Any) -> RunOutcome:
+        """Advance the graph to its end, or to the time limit.
+
+        :param agent_run: The started ``AgentRun``.
+        :return: How the run ended.
+        """
+        deadline = time.monotonic() + self.max_duration
+        node = agent_run.next_node
+        while not _is_end(node):
+            if time.monotonic() > deadline:
+                # The limit PAUSES rather than cancels: the work so far is
+                # kept and the human decides what happens next.
+                self._append_text(
+                    "\n\n⏸️ This run reached its time limit. Everything "
+                    "done so far is saved — tell me how to continue."
+                )
+                return RunOutcome(
+                    kind="paused",
+                    detail=f"run exceeded {self.max_duration / 60:.0f} minutes",
+                )
+            if _node_emits_events(node):
+                ticket = _NodeTicket(node=node)
+                self._queue.append(ticket)
+                self._queue_changed.set()
+                # The encoder must finish this node before the graph advances
+                # under it: a half-streamed node cannot be re-entered.
+                await ticket.done.wait()
+            node = await agent_run.next(node)
+        return (
+            self._classify_end(node) if _is_end(node) else RunOutcome("failed")
+        )
+
+    @staticmethod
+    def _classify_end(node: Any) -> RunOutcome:
         """Decide completed vs paused from the run's terminal node."""
         data = getattr(node, "data", None)
         output = getattr(data, "output", None)
@@ -316,9 +338,15 @@ class LiveRun:
         self._unread = list(self._pending_steering.values())
         self._pending_steering.clear()
         self._changed.set()
-        if self._on_finish is not None:
-            task = asyncio.create_task(self._run_finish(outcome))
-            task.add_done_callback(_log_task_error)
+        if self._on_finish is not None and self._loop is not None:
+            # Wake the loop from any thread, so a run finished off-loop still
+            # reports through the same path.
+            self._loop.call_soon_threadsafe(self._schedule_finish, outcome)
+
+    def _schedule_finish(self, outcome: RunOutcome) -> None:
+        """Create the finish-hook task on the run's own event loop."""
+        task = asyncio.create_task(self._run_finish(outcome))
+        task.add_done_callback(_log_task_error)
 
     async def _run_finish(self, outcome: RunOutcome) -> None:
         """Run the finish hook, isolating its failures from the run."""
@@ -336,8 +364,7 @@ class LiveRun:
 
         try:
             async for chunk in encode_run_stream(
-                self._native_events(),
-                on_cancel=lambda cancelled: self._note_cancel(cancelled),
+                self._native_events(), on_cancel=self._note_cancel
             ):
                 self._append(chunk)
         except Exception:
@@ -443,6 +470,7 @@ class RunRegistry:
     """
 
     def __init__(self) -> None:
+        """Create an empty registry (one per app, on ``app.state``)."""
         self._runtimes: dict[str, SessionRuntime] = {}
         self._locks: dict[str, asyncio.Lock] = {}
 

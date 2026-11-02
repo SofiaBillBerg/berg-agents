@@ -153,7 +153,216 @@ async def encode_run_stream(
         yield frame
 
 
-async def _follow_response(run: Any) -> Response:
+async def _persist_turn(
+    request: Request,
+    sessions: SessionManager,
+    *,
+    session_id: str | None,
+    model_id: str,
+    run: Any,
+    outcome: Any,
+) -> None:
+    """Save a finished run: transcript, JSONL log, conversation, guard.
+
+    The run's own messages are the record of the turn - they survive a Stop
+    (first-party cancellation keeps completed work), so a stopped or paused
+    turn is saved rather than lost.
+
+    :param request: The originating request (for the harness).
+    :param sessions: Session store (root dir).
+    :param session_id: Session the turn belongs to.
+    :param model_id: Model used, for the outcome record.
+    :param run: The finished ``LiveRun``.
+    :param outcome: How it ended.
+    """
+    _record_chat_outcome(
+        request,
+        sessions,
+        success=outcome.kind == "completed",
+        model_id=model_id,
+    )
+    # The run has yielded control back to the human: the turn finished, or it
+    # paused on a deferred approval (the runaway guard's hard stop, or any
+    # requires_approval tool), or it was stopped. All end unattended work, so
+    # the runaway guard's count restarts either way.
+    _reset_runaway_guard(session_id)
+
+    agent_run = run.agent_run
+    if not session_id or agent_run is None:
+        return
+    try:
+        from berg_agents.ui import session_store
+        from pydantic_ai import ConversationTypeAdapter
+
+        root = sessions._harness_root_dir()
+        store = session_store.get_store(root)
+        await session_store.record_turn(
+            store, session_id, agent_run.all_messages()
+        )
+        # The durable JSONL log takes only what THIS run produced.
+        # `all_messages()` re-sends the whole conversation every turn (the
+        # model needs the history), so appending it grew the transcript
+        # quadratically and stored each turn's copy of every earlier turn.
+        # `new_messages()` is exactly the turn's own messages - the input
+        # history and older runs are excluded - which is what an append-only
+        # log wants. `append_new_messages` still dedupes, because the memory
+        # snapshot legitimately reappears each turn.
+        append_new_messages(
+            session_id, resolve_project(root), agent_run.new_messages()
+        )
+        conversation_obj = session_store.load_conversation(session_id)
+        if conversation_obj is not None:
+            payload = ConversationTypeAdapter.dump_json(conversation_obj)
+            await asyncio.to_thread(
+                session_store.save_conversation,
+                session_id,
+                payload.decode("utf-8"),
+            )
+    except Exception as exc:
+        logger.warning("Session save skipped: %s", exc)
+
+
+def _record_chat_outcome(
+    request: Request, sessions: SessionManager, *, success: bool, model_id: str
+) -> None:
+    """Feed one chat turn into the shared outcome store.
+
+    Chat is the main surface, so its turns must reach the same outcome store
+    as harness tasks - otherwise router stats never fires. Failure-isolated.
+
+    :param request: The originating request (for the harness).
+    :param sessions: Session store (for the fallback active model).
+    :param success: Whether the turn completed.
+    :param model_id: Model used.
+    """
+    try:
+        harness = request.app.state.harness
+        if harness is None:
+            return
+        record_turn_outcome(
+            harness,
+            task_type="chat",
+            complexity="standard",
+            description="chat turn",
+            inference_attempted=True,
+            model_used=model_id or sessions.active_model or "unknown",
+            success=success,
+        )
+    except Exception as exc:
+        logger.warning("router stats record skipped: %s", exc)
+
+
+def _reset_runaway_guard(session_id: str | None) -> None:
+    """Restart the runaway guard's count when the agent yields control.
+
+    The guard counts tool calls since the human last had a say. It resets when
+    the agent YIELDS control - the turn finished, the run paused for approval,
+    or the user stopped it. It does not reset because the user typed: a message
+    sent while the agent keeps working is steering, not an intervention.
+
+    :param session_id: Session whose count restarts.
+    """
+    if not session_id:
+        return
+    try:
+        from berg_agents.ui import session_store
+
+        session_store.reset_guard_progress(session_id)
+    except Exception as exc:
+        logger.warning("runaway guard reset skipped: %s", exc)
+
+
+def _steer_live_run(
+    registry: Any, session_id: str | None, body: bytes
+) -> Any | None:
+    """Queue this request's text on a live run, if there is one.
+
+    A message typed while the agent works is **steering**, not an
+    interruption: it joins the run and reaches the model at its next request.
+    Nothing in flight is aborted.
+
+    :param registry: The process-wide ``RunRegistry``.
+    :param session_id: Session the request belongs to.
+    :param body: Raw request body.
+    :return: The live run to follow, or ``None`` when this request must start
+        a run instead (no live run, or no text to steer with).
+    """
+    run = registry.live_run(session_id) if session_id else None
+    if run is None:
+        return None
+    text = _latest_user_text(body)
+    if not text:
+        return None
+    return run if run.steer(text) else None
+
+
+async def _start_run(
+    registry: Any,
+    *,
+    session_id: str | None,
+    body: bytes,
+    agent: Any,
+    conversation: Any,
+    on_finish: Callable[[Any, Any], Awaitable[None]],
+) -> Any:
+    """Start the session's next run and return it.
+
+    The run is created under the session's lock so two messages can never
+    start two runs, and it starts in its own task - the HTTP response that
+    follows is only a reader.
+
+    :param registry: The process-wide ``RunRegistry``.
+    :param session_id: Session the run belongs to.
+    :param body: Raw request body (its approvals decide resume vs fresh).
+    :param agent: The session's agent.
+    :param conversation: The session's ``Conversation`` (usage + id carry).
+    :param on_finish: Persistence hook, called once when the run ends.
+    :return: The started ``LiveRun``.
+    """
+    async with registry.lock(session_id or ""):
+        # Re-check under the lock: a run may have started while this request
+        # was resolving its session.
+        run = registry.live_run(session_id) if session_id else None
+        if run is not None:
+            text = _latest_user_text(body)
+            if text and run.steer(text):
+                return run
+            raise RunBusyError("run just ended - retry the send")
+
+        runtime = registry.get(session_id) if session_id else None
+        generation = (runtime.generation if runtime else 0) + 1
+        if runtime is not None:
+            runtime.generation = generation
+
+        # An approval resume carries no user text: the model continues from
+        # the deferred batch. Anything else is a fresh turn.
+        approvals = _approvals_from_body(body)
+        prompt = None if approvals is not None else _latest_user_content(body)
+
+        def _request() -> Any:
+            """Create the graph run inside the run's own task."""
+            return agent.iter(
+                prompt,
+                conversation=conversation,
+                output_type=[str, DeferredToolRequests],
+                usage_limits=_CHAT_USAGE_LIMITS,
+                deferred_tool_results=approvals,
+            )
+
+        live = LiveRun(
+            agent=agent,
+            request=_request,
+            generation=generation,
+            max_duration=get_settings().run_max_duration_minutes * 60,
+            on_finish=on_finish,
+        )
+        if runtime is not None:
+            runtime.run = live
+        live.start()
+        return live
+
+
+def _follow_response(run: Any) -> Response:
     """Return the run's journal as an SSE response.
 
     The response is a *reader*. When the browser goes away the generator is
@@ -519,93 +728,11 @@ def register_chat_routes(
         # contributes a toolset, which we don't use - hence declaring
         # it explicitly.)
 
-        # Learning: chat is the main surface, so its turns feed the same
-        # outcome store as harness tasks - otherwise router
-        # stats never fires.
-        def _record_chat_outcome(success: bool) -> None:
-            try:
-                harness = request.app.state.harness
-                if harness is None:
-                    return
-                record_turn_outcome(
-                    harness,
-                    task_type="chat",
-                    complexity="standard",
-                    description="chat turn",
-                    inference_attempted=True,
-                    model_used=model_id or sessions.active_model or "unknown",
-                    success=success,
-                )
-            except Exception as exc:
-                logger.warning(f"router stats record skipped: {exc}")
-
-        def _reset_runaway_guard() -> None:
-            # The guard counts tool calls since the human last had a say.
-            # It resets when the agent YIELDS control - the turn finished,
-            # the run paused for approval, or the user stopped it. It does
-            # not reset because the user typed: a message sent while the
-            # agent keeps working is steering, not an intervention.
-            if not session_id:
-                return
-            from berg_agents.ui import session_store
-
-            session_store.reset_guard_progress(session_id)
-
-        async def _save_turn(
-            all_messages: Callable[[], list[Any]],
-            new_messages: Callable[[], list[Any]],
-        ) -> None:
-            # Persist both the display transcript (any browser can resume it)
-            # and the Conversation (usage + id carry into the next turn).
-            # Reading the messages through callables keeps this callable on
-            # any terminal path - a completed run, a pause, a Stop - where
-            # different objects hold the authoritative history.
-            _record_chat_outcome(success=True)
-            if not session_id:
-                return
-            try:
-                from berg_agents.ui import session_store
-                from pydantic_ai import ConversationTypeAdapter
-
-                root = sessions._harness_root_dir()
-                store = session_store.get_store(root)
-                messages = all_messages()
-                await session_store.record_turn(store, session_id, messages)
-                # The durable JSONL log takes only what THIS run produced.
-                # `all_messages()` re-sends the whole conversation every
-                # turn (the model needs the history), so appending it grew
-                # the transcript quadratically and stored each turn's
-                # copy of every earlier turn. `new_messages()` is exactly
-                # the turn's own messages — the input history and older
-                # runs are excluded — which is what an append-only log
-                # wants. `append_new_messages` still dedupes, because the
-                # memory snapshot legitimately reappears each turn.
-                append_new_messages(
-                    session_id, resolve_project(root), new_messages()
-                )
-                conversation_obj = session_store.load_conversation(session_id)
-                if conversation_obj is not None:
-                    payload = ConversationTypeAdapter.dump_json(
-                        conversation_obj
-                    )
-                    await asyncio.to_thread(
-                        session_store.save_conversation,
-                        session_id,
-                        payload.decode("utf-8"),
-                    )
-                # The run has yielded control back to the human: either the
-                # turn finished, or it paused on a deferred approval (the
-                # runaway guard's hard stop, or any requires_approval tool).
-                # Both end this stretch of unattended work.
-                _reset_runaway_guard()
-            except Exception as exc:
-                logger.warning(f"Session save skipped: {exc}")
-
         async def _on_run_finish(run: Any, outcome: Any) -> None:
-            """Persist the turn and hand back unread steering.
+            """Persist the turn, then hand control back to the human.
 
-            Called by the run itself, so it never depends on a browser still
-            being connected.
+            Called by the run itself, so persistence never depends on a
+            browser still being connected.
 
             :param run: The finished ``LiveRun``.
             :param outcome: How it ended.
@@ -613,12 +740,14 @@ def register_chat_routes(
             logger.info(
                 "chat run finished: %s (%s)", outcome.kind, outcome.detail
             )
-            agent_run = run.agent_run
-            if agent_run is not None and session_id:
-                await _save_turn(agent_run.all_messages, agent_run.new_messages)
-            if outcome.kind != "completed":
-                # A pause, a Stop or a failure all return control.
-                _reset_runaway_guard()
+            await _persist_turn(
+                request,
+                sessions,
+                session_id=session_id,
+                model_id=model_id,
+                run=run,
+                outcome=outcome,
+            )
 
         # -- request meaning -------------------------------------------------
         body = await request.body()

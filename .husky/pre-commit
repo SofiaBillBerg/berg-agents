@@ -1,3 +1,5 @@
+#!/usr/bin/env sh
+
 git-format-staged -f "panache format ." .
 git-format-staged -f "shfmt . --write" .
 git-format-staged -f 'prettier --ignore-unknown --stdin --stdin-filepath "{}"' .
