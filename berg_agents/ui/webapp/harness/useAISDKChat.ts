@@ -456,12 +456,19 @@ export function useAISDKChat(): UseAISDKChatReturn {
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [sessionTitle, setSessionTitle] = useState<string | null>(null);
 
-    // Callbacks that fire outside React's render (Stop) need the current
-    // session id without re-subscribing on every session switch.
+    // Callbacks that fire outside React's render (Stop, follow, reconnect)
+    // need the current session id without re-subscribing on every session
+    // switch. It is written by `adoptSession` at the same moment as the
+    // state, never by a later effect: a Stop clicked right after a session
+    // switch would otherwise address the previous session's run.
     const sessionIdRef = useRef<string | null>(null);
-    useEffect(() => {
-        sessionIdRef.current = sessionId;
-    }, [sessionId]);
+    const adoptSession = useCallback((id: string | null) => {
+        sessionIdRef.current = id;
+        setSessionId(id);
+    }, []);
+    // Whether this client is currently subscribed to a run it did not start
+    // (after a reload, a tab switch, or a second browser).
+    const isFollowingRef = useRef(false);
 
     const {
         messages: uiMessages,
@@ -475,6 +482,10 @@ export function useAISDKChat(): UseAISDKChatReturn {
         // stream replays the run's journal, so a reload or a second tab
         // rebuilds the same turn.
         resumeStream: sdkResumeStream} = useChat({
+        // Recovering a run is this hook's job below, gated on the server's
+        // status. The SDK's built-in `resume` recovers only after a network
+        // disconnect and would otherwise resume on every mount.
+        resume: false,
         transport: new DefaultChatTransport({
             api: `${API_BASE}/api/chat/stream`,
             // Strip stale approval answers before every send. Anything
@@ -485,6 +496,12 @@ export function useAISDKChat(): UseAISDKChatReturn {
             prepareSendMessagesRequest: ({id, messages, trigger, messageId}) => ({
                 body: {
                     id,
+                    // Latest message goes out exactly as the client has it -
+                    // steering above all. The old "the newest user message is
+                    // what we're sending" reading was wrong once the client
+                    // echoed its whole list back: a message typed mid-run
+                    // arrives as the SECOND-to-last user message, behind the
+                    // assistant turn that is still growing.
                     messages: sanitizeHistory(messages as unknown as unknown[], true),
                     trigger,
                     messageId,
@@ -539,10 +556,19 @@ export function useAISDKChat(): UseAISDKChatReturn {
                     `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
                 );
                 if (!resp.ok || cancelled) return;
-                const data = (await resp.json()) as {steering?: unknown};
-                const queued = Array.isArray(data.steering)
-                    ? data.steering.filter((t): t is string => typeof t === "string")
-                    : [];
+                const data = (await resp.json()) as {
+                    live?: unknown;
+                    steering?: unknown;
+                };
+                // The strip means "the agent is about to read this". Once the
+                // run is over nothing will be read in this turn, so the strip
+                // empties rather than outliving the run that gave it meaning.
+                const queued =
+                    data.live === true && Array.isArray(data.steering)
+                        ? data.steering.filter(
+                              (t): t is string => typeof t === "string",
+                          )
+                        : [];
                 if (!cancelled) setPendingSteering(queued);
             } catch {
                 // Backend unreachable - keep showing what we know.
@@ -777,7 +803,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // Stored snapshots predate this load, so no paused run can be live.
     // Duplicate message ids (e.g. one request dumped to two UI messages)
     // are suffixed — React keys must be unique and ids are otherwise opaque.
-    const restoreMessages = (msgs: unknown[]) => {
+    const restoreMessages = useCallback((msgs: unknown[]) => {
         if (!Array.isArray(msgs)) return;
         const clean = sanitizeHistory(msgs, false) as unknown as Array<{
             id?: unknown;
@@ -797,17 +823,28 @@ export function useAISDKChat(): UseAISDKChatReturn {
             seen.add(id);
         }
         setUIMessages(clean as unknown as UIMessage[]);
-    };
+    }, [setUIMessages]);
+
+    // Replace the transcript with the server's saved copy of a session.
+    // The server owns the conversation, so this is what any client shows
+    // once it has stopped following a run: the turn exactly as saved.
+    const reloadSession = useCallback(
+        async (id: string) => {
+            const resp = await fetch(
+                `${API_BASE}/api/sessions/${encodeURIComponent(id)}`,
+            );
+            if (!resp.ok) throw new Error(`Session ${id}: HTTP ${resp.status}`);
+            const data = await resp.json();
+            restoreMessages(Array.isArray(data.messages) ? data.messages : []);
+            return data;
+        },
+        [restoreMessages],
+    );
 
     // Open a server-side session: load its transcript, adopt its id.
     const openSession = async (id: string) => {
-        const resp = await fetch(
-            `${API_BASE}/api/sessions/${encodeURIComponent(id)}`,
-        );
-        if (!resp.ok) throw new Error(`Session ${id}: HTTP ${resp.status}`);
-        const data = await resp.json();
-        restoreMessages(Array.isArray(data.messages) ? data.messages : []);
-        setSessionId(id);
+        const data = await reloadSession(id);
+        adoptSession(id);
         if (data.session && typeof data.session.title === "string") {
             setSessionTitle(data.session.title);
         }
@@ -824,7 +861,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
         if (!resp.ok) throw new Error(`New session: HTTP ${resp.status}`);
         const data = await resp.json();
         setUIMessages([]);
-        setSessionId(typeof data.id === "string" ? data.id : null);
+        adoptSession(typeof data.id === "string" ? data.id : null);
         setSessionTitle(typeof data.title === "string" ? data.title : null);
         try {
             if (typeof data.id === "string") {
@@ -958,7 +995,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
                                     ) as unknown as UIMessage[],
                                 );
                             }
-                            setSessionId(storedId);
+                            adoptSession(storedId);
                             if (data.session && typeof data.session.title === "string") {
                                 setSessionTitle(data.session.title);
                             }
@@ -987,7 +1024,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
                     try {
                         const minted = crypto.randomUUID();
                         localStorage.setItem(SESSION_ID_KEY, minted);
-                        if (!cancelled) setSessionId(minted);
+                        if (!cancelled) adoptSession(minted);
                     } catch {
                         // Private mode - session stays server-minted per send.
                     }
@@ -1003,35 +1040,59 @@ export function useAISDKChat(): UseAISDKChatReturn {
         };
     }, []);
 
-    // A run can outlive this tab (reload, tab switch, second browser). On
-    // mount, if the session's run is still going, follow it rather than
-    // showing an idle chat over work that is actually happening.
-    const followedRef = useRef(false);
+    // A run can outlive this tab (reload, tab switch, second browser). While
+    // the server reports it live, this client stays subscribed to it, and
+    // once the run ends the transcript is reloaded from the server, which is
+    // the record of what happened - a followed stream cannot be trusted to
+    // have carried the turn's final frames.
     useEffect(() => {
-        if (!sessionId || followedRef.current) return;
-        followedRef.current = true;
+        if (!sessionId || isStreaming) return;
         let cancelled = false;
-        const followIfLive = async () => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const watch = async () => {
+            if (cancelled) return;
             try {
                 const resp = await fetch(
                     `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
                 );
-                if (!resp.ok || cancelled) return;
+                if (cancelled || !resp.ok) return;
                 const status = (await resp.json()) as {live?: unknown};
-                if (status.live === true && !cancelled) {
+                if (cancelled) return;
+                if (status.live === true) {
                     // The GET stream replays the run's journal from the
                     // start, so the turn rebuilds exactly as it happened.
-                    await sdkResumeStream();
+                    // A follow that fails must not strand the page: the run
+                    // is still live, so the next watch subscribes again.
+                    isFollowingRef.current = true;
+                    void sdkResumeStream().catch(() => {
+                        // A run can end in the instant between the status
+                        // check and the subscribe. The backend answers that
+                        // with 204 ("nothing to follow"), which is not an
+                        // error; anything else is retried by the next watch,
+                        // and the saved transcript is the fallback either way.
+                    });
+                    timer = setTimeout(() => void watch(), 3000);
+                    return;
+                }
+                if (isFollowingRef.current) {
+                    // The followed run has ended: take the server's saved
+                    // turn as the transcript of what happened. That turn is
+                    // also where an unread steer now lives, so the strip
+                    // empties with the run it belonged to.
+                    isFollowingRef.current = false;
+                    setPendingSteering([]);
+                    await reloadSession(sessionId);
                 }
             } catch {
-                // Backend unreachable - nothing to follow.
+                // Backend unreachable - the next watch retries.
             }
         };
-        void followIfLive();
+        void watch();
         return () => {
             cancelled = true;
+            clearTimeout(timer);
         };
-    }, [sessionId, sdkSendMessage]);
+    }, [sessionId, isStreaming, sdkResumeStream, reloadSession]);
 
     // handleInputChange for a textarea/input - reads e.target.value.
     const handleInputChange = (
@@ -1078,7 +1139,33 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // server to end the run, then drops the local stream. Everything the run
     // completed is kept (the server persists the turn either way).
     const stopRun = useCallback(() => {
+        // Read through the ref: this callback must stop the session that is
+        // current NOW, not the one that existed when it was created.
         const id = sessionIdRef.current;
+        // An explicit Stop ends the run for good: nothing left to follow.
+        isFollowingRef.current = false;
+        // And nothing will be read in this turn, so the strip goes with the
+        // run. The steer itself is not lost: the server persists it into the
+        // turn's record, where the reloaded transcript shows it.
+        setPendingSteering([]);
+        // Keep the turn up to here - it may hold a steer the model has not
+        // read, the approval card, or text already streamed - but mark it
+        // closed so it stops looking like it is still being written.
+        setUIMessages((msgs) =>
+            msgs.map((m) => {
+                if (m.role !== "assistant") return m;
+                // Not every part kind carries a state; only the ones that
+                // stream text, reasoning or tool input do.
+                const parts = m.parts.map((p) => {
+                    const state = (p as {state?: unknown}).state;
+                    return state === "streaming"
+                        ? ({...p, state: "done"} as typeof p)
+                        : p;
+                });
+                const changed = parts.some((p, i) => p !== m.parts[i]);
+                return changed ? {...m, parts} : m;
+            }) as unknown as UIMessage[],
+        );
         if (id) {
             void fetch(
                 `${API_BASE}/api/chat/stop?session=${encodeURIComponent(id)}`,

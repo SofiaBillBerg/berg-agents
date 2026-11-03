@@ -57,8 +57,8 @@ JOURNAL_MAX_CHUNKS = 20000
 SDK_VERSION = 6
 
 
-class RunBusyError(RuntimeError):
-    """Raised when a start is requested while a run is still live."""
+class StaleApprovalError(RuntimeError):
+    """Raised when an approval answers a run that has already ended."""
 
 
 @dataclass(slots=True)
@@ -78,13 +78,22 @@ class RunOutcome:
 
 @dataclass(slots=True)
 class _NodeTicket:
-    """One streamed node handed from the graph driver to the encoder.
+    """One item handed from the graph driver to the encoder.
 
-    ``done`` is set by the encoder once it has fully consumed the node, so the
-    driver never advances the graph under a half-streamed node.
+    Either a node to stream (its native events go on the wire) or the run's
+    closing result. ``done`` is set by the encoder once it has fully consumed
+    the item, so the driver never advances the graph under a half-streamed
+    node, and never finishes the run before its result has been encoded.
+
+    The closing result is what makes a pause visible to the human: the
+    protocol's approval chunk is derived from the run's final
+    ``DeferredToolRequests`` output, so a run that paused without sending its
+    result would show as merely "tool input available" and no approve/reject
+    UI would ever appear.
     """
 
-    node: Any
+    node: Any = None
+    result: Any = None
     done: asyncio.Event = field(default_factory=asyncio.Event)
     cancel: bool = False
 
@@ -230,7 +239,7 @@ class LiveRun:
             "outcome": self.outcome.kind if self.outcome else None,
             "detail": self.outcome.detail if self.outcome else "",
             "approvals": list(self.outcome.approvals) if self.outcome else [],
-            "steering": [text for _, text in self._pending_steering.values()]}
+            "steering": list(self._pending_steering.values())}
 
     @property
     def unread_steering(self) -> list[str]:
@@ -250,7 +259,9 @@ class LiveRun:
         """Stop the run for real. This is the user's explicit Stop.
 
         First-party cancellation keeps everything the run completed in
-        history, so a Stop never throws the turn away.
+        history, so a Stop never throws the turn away. Both halves of the run
+        are released - the graph walk and the encoder - so a cancelled run
+        always ends and its readers are released.
 
         :param reason: Recorded with the outcome.
         """
@@ -258,9 +269,18 @@ class LiveRun:
         if self._agent_run is not None:
             with contextlib.suppress(Exception):
                 self._agent_run.cancel()
+        current = asyncio.current_task()
+        for task in self._tasks:
+            # Never cancel the caller's own task when a run stops itself.
+            if task is not current:
+                task.cancel()
 
     def steer(self, text: str) -> str | None:
         """Queue a mid-run message for the model's next request.
+
+        Registering the message is synchronous and cannot fail on its own: it
+        either joins the run's pending queue or the run has gone, which the
+        return value reports.
 
         :param text: The human's message.
         :return: The enqueue id, or ``None`` when the run has already ended
@@ -311,11 +331,27 @@ class LiveRun:
             logger.exception("agent run failed")
             self._failure = exc
             outcome = RunOutcome(kind="failed", detail=str(exc)[:500])
-        finally:
-            self._driver_finished = True
-            self._queue_changed.set()
 
-        self._publish(outcome)
+        # The outcome is published only after the encoder has closed the turn
+        # on the wire. A reader subscribes until the run is over, so finishing
+        # first would end every open stream mid-turn - the browser then sees a
+        # turn that stopped but is still reported live, and loses the frames
+        # that describe how it ended (an approval request above all).
+        try:
+            await self._wait_for_encoder()
+        finally:
+            self._publish(outcome)
+
+    async def _wait_for_encoder(self) -> None:
+        """Release the encoder so it flushes the turn's closing frames."""
+        self._driver_finished = True
+        self._queue_changed.set()
+        for task in self._tasks:
+            if (
+                task.get_name() == "live-run.encoder"
+                and task is not asyncio.current_task()
+            ):
+                await asyncio.wait({task})
 
     async def _walk(self, agent_run: Any) -> RunOutcome:
         """Advance the graph to its end, or to the time limit.
@@ -345,9 +381,23 @@ class LiveRun:
                 # under it: a half-streamed node cannot be re-entered.
                 await ticket.done.wait()
             node = await agent_run.next(node)
-        return (
-            self._classify_end(node) if _is_end(node) else RunOutcome("failed")
-        )
+        if not _is_end(node):
+            return RunOutcome("failed")
+        outcome = self._classify_end(node)
+        await self._deliver_result(agent_run)
+        return outcome
+
+    async def _deliver_result(self, agent_run: Any) -> None:
+        """Hand the run's final result to the encoder before finishing.
+
+        The protocol builds its closing frames - the approval request above
+        all - from the run result, so the encoder must see it. The walk above
+        drives the graph by hand and therefore never yields one itself.
+        """
+        ticket = _NodeTicket(result=agent_run.result)
+        self._queue.append(ticket)
+        self._queue_changed.set()
+        await ticket.done.wait()
 
     @staticmethod
     def _classify_end(node: Any) -> RunOutcome:
@@ -409,7 +459,7 @@ class LiveRun:
         self._cancelled_reason = self._cancelled_reason or str(cancelled)[:200]
 
     async def _native_events(self) -> AsyncIterator[Any]:
-        """Yield the run's native events in graph order."""
+        """Yield the run's native events in graph order, ending with its result."""
         index = 0
         while True:
             if index < len(self._queue):
@@ -417,10 +467,13 @@ class LiveRun:
                 index += 1
                 if ticket.cancel:
                     return
-                async for event in _node_events(
-                    ticket.node, self._agent_run.ctx
-                ):
-                    yield event
+                if ticket.result is not None:
+                    yield _run_result_event(ticket.result)
+                else:
+                    async for event in _node_events(
+                        ticket.node, self._agent_run.ctx
+                    ):
+                        yield event
                 ticket.done.set()
                 continue
             if self._driver_finished:
@@ -587,3 +640,18 @@ async def _node_events(node: Any, ctx: Any) -> AsyncIterator[Any]:
     async with node.stream(ctx) as node_stream:
         async for event in node_stream:
             yield event
+
+
+def _run_result_event(result: Any) -> Any:
+    """Wrap a run's final result as the event the encoder closes the turn with.
+
+    ``run_stream`` closes with exactly this event, and the protocol derives its
+    closing frames from it. A hand-driven graph walk has to hand it over
+    itself, or the turn ends without the frames that describe how it ended.
+
+    :param result: The run's ``AgentRunResult``.
+    :return: The corresponding ``AgentRunResultEvent``.
+    """
+    from pydantic_ai.run import AgentRunResultEvent
+
+    return AgentRunResultEvent(result=result)

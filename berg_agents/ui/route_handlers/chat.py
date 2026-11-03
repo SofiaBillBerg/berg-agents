@@ -35,12 +35,17 @@ from berg_agents.config.settings import get_settings
 from berg_agents.core.harness import Harness
 from berg_agents.core.turn import record_turn_outcome
 from berg_agents.ui.projects import resolve_project
-from berg_agents.ui.run_registry import LiveRun, RunBusyError, SessionRuntime
+from berg_agents.ui.run_registry import (
+    LiveRun,
+    SessionRuntime,
+    StaleApprovalError,
+)
 from berg_agents.ui.sessions import SessionManager
 from berg_agents.ui.transcripts import append_new_messages, ensure_transcript
 from fastapi import APIRouter, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic_ai import DeferredToolRequests, DeferredToolResults
+from pydantic_ai.messages import ModelRequest, UserPromptPart
 from pydantic_ai.tools import ToolApproved, ToolDenied
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 from pydantic_ai.ui.vercel_ai.request_types import (
@@ -196,8 +201,15 @@ async def _persist_turn(
 
         root = sessions._harness_root_dir()
         store = session_store.get_store(root)
+        # A steer the run ended before reading is still the human's message:
+        # it joins the turn's record as a user prompt, so the transcript
+        # never drops something Sofia actually typed.
+        unread = [
+            ModelRequest(parts=[UserPromptPart(content=text)])
+            for text in run.unread_steering
+        ]
         await session_store.record_turn(
-            store, session_id, agent_run.all_messages()
+            store, session_id, [*agent_run.all_messages(), *unread]
         )
         # The durable JSONL log takes only what THIS run produced.
         # `all_messages()` re-sends the whole conversation every turn (the
@@ -208,7 +220,9 @@ async def _persist_turn(
         # log wants. `append_new_messages` still dedupes, because the memory
         # snapshot legitimately reappears each turn.
         append_new_messages(
-            session_id, resolve_project(root), agent_run.new_messages()
+            session_id,
+            resolve_project(root),
+            [*agent_run.new_messages(), *unread],
         )
         conversation_obj = session_store.load_conversation(session_id)
         if conversation_obj is not None:
@@ -281,11 +295,16 @@ def _steer_live_run(
     interruption: it joins the run and reaches the model at its next request.
     Nothing in flight is aborted.
 
+    A steer that cannot land (the run ended meanwhile) is not an error to the
+    human: it returns ``None`` so the same request starts a fresh run instead,
+    and the message is answered rather than swallowed.
+
     :param registry: The process-wide ``RunRegistry``.
     :param session_id: Session the request belongs to.
     :param body: Raw request body.
     :return: The live run to follow, or ``None`` when this request must start
-        a run instead (no live run, or no text to steer with).
+        a run instead (no live run, no text to steer with, or a run that
+        ended before the message could join it).
     """
     run = registry.live_run(session_id) if session_id else None
     if run is None:
@@ -293,7 +312,8 @@ def _steer_live_run(
     text = _latest_user_text(body)
     if not text:
         return None
-    return run if run.steer(text) else None
+    enqueue_id = run.steer(text)
+    return run if enqueue_id else None
 
 
 async def _start_run(
@@ -317,17 +337,25 @@ async def _start_run(
     :param agent: The session's agent.
     :param conversation: The session's ``Conversation`` (usage + id carry).
     :param on_finish: Persistence hook, called once when the run ends.
-    :return: The started ``LiveRun``.
+    :return: The started ``LiveRun``, or the live run this text was steered
+        into when one appeared while this request was resolving its session.
     """
     async with registry.lock(session_id or ""):
         # Re-check under the lock: a run may have started while this request
-        # was resolving its session.
+        # was resolving its session. Text then joins that run (steering).
         run = registry.live_run(session_id) if session_id else None
         if run is not None:
             text = _latest_user_text(body)
             if text and run.steer(text):
                 return run
-            raise RunBusyError("run just ended - retry the send")
+
+        if run is not None and _approvals_from_body(body) is not None:
+            # An approval for a run that already ended: the decision is for
+            # nothing, so answer it here instead of failing the request. The
+            # client's own expired-approval handling keeps the card honest.
+            raise StaleApprovalError(
+                "the run this approval belongs to has ended"
+            )
 
         runtime = registry.get(session_id) if session_id else None
         generation = (runtime.generation if runtime else 0) + 1
@@ -410,10 +438,13 @@ def _follow_response(run: Any) -> Response:
 
 
 def _latest_user_text(body: bytes) -> str:
-    """Return the newest user text in a Vercel AI request body, or ''."""
+    """Return the newest user text this request sends, or '' when it sends none."""
     content = _latest_user_content(body)
     if not content:
         return ""
+    if isinstance(content, str):
+        # A single-text message arrives as a plain string.
+        return content
     return "".join(
         part.get("text", "")
         for part in content
@@ -422,12 +453,21 @@ def _latest_user_text(body: bytes) -> str:
 
 
 def _latest_user_content(body: bytes) -> str | list[dict[str, Any]] | None:
-    """Return the newest user message's content in a request body.
+    """Return the user message this request is *sending*, if any.
+
+    A message typed while the agent works is **steering**, and the client
+    sends its whole message list with it: the newest message in the list is
+    then the assistant turn that is still growing, and the steering text sits
+    one user message back. The message being sent is therefore the newest
+    user message **not already answered by an assistant turn**: the last
+    user message when the list ends on a user turn, otherwise the last user
+    message that follows the last assistant turn.
 
     :param body: Raw request body (Vercel AI protocol).
     :return: Plain string for the usual single-text message, a list of
         content parts when the message carries more than text, or ``None``
-        when the body holds no user message (an approval-only resume).
+        when the body sends no new user message (an approval-only resume, or
+        a steer in a run whose model has not answered anything since).
     """
     try:
         import json
@@ -436,21 +476,46 @@ def _latest_user_content(body: bytes) -> str | list[dict[str, Any]] | None:
     except Exception:
         return None
     messages = data.get("messages") if isinstance(data, dict) else None
-    if not isinstance(messages, list):
+    if not isinstance(messages, list) or not messages:
         return None
-    for message in reversed(messages):
-        if not isinstance(message, dict) or message.get("role") != "user":
-            continue
-        parts = message.get("parts")
-        if not isinstance(parts, list):
-            return None
-        texts = [
-            p.get("text", "")
-            for p in parts
-            if isinstance(p, dict) and p.get("type") == "text"
-        ]
-        return texts[0] if len(parts) == 1 and texts else parts
-    return None
+    if isinstance(messages[-1], dict) and messages[-1].get("role") == "user":
+        # The list ends on the user's turn: that message is what is sent.
+        newest = messages[-1]
+    else:
+        # The list ends on an assistant turn still in progress: the text
+        # being sent is the newest user message before it - the last one
+        # the assistant has not answered, i.e. a steering message.
+        newest = None
+        assistant_at = next(
+            (
+                index
+                for index in range(len(messages) - 1, -1, -1)
+                if isinstance(messages[index], dict)
+                and messages[index].get("role") == "assistant"
+            ),
+            None,
+        )
+        if assistant_at is not None:
+            newest = next(
+                (
+                    message
+                    for message in reversed(messages[:assistant_at])
+                    if isinstance(message, dict)
+                    and message.get("role") == "user"
+                ),
+                None,
+            )
+    if not isinstance(newest, dict):
+        return None
+    parts = newest.get("parts")
+    if not isinstance(parts, list):
+        return None
+    texts = [
+        p.get("text", "")
+        for p in parts
+        if isinstance(p, dict) and p.get("type") == "text"
+    ]
+    return texts[0] if len(parts) == 1 and texts else parts
 
 
 def _history_from_body(body: bytes) -> list[Any] | None:
@@ -799,14 +864,22 @@ def register_chat_routes(
         if run is not None:
             return _follow_response(run)
 
-        live = await _start_run(
-            registry,
-            session_id=session_id,
-            body=body,
-            agent=agent,
-            conversation=conversation,
-            on_finish=_on_run_finish,
-        )
+        try:
+            live = await _start_run(
+                registry,
+                session_id=session_id,
+                body=body,
+                agent=agent,
+                conversation=conversation,
+                on_finish=_on_run_finish,
+            )
+        except StaleApprovalError as exc:
+            # Nothing is running to answer: say so plainly instead of failing
+            # the request, so the client can expire the card and move on.
+            logger.info("approval answered after its run ended: %s", exc)
+            return JSONResponse(
+                status_code=409, content={"detail": str(exc), "stale": True}
+            )
         return _follow_response(live)
 
     @router.get("/api/chat/stream")
@@ -820,10 +893,17 @@ def register_chat_routes(
         A finished run is not followed - the transcript is the record then,
         and the client reloads it from ``/api/sessions/{id}``.
 
+        "Nothing to follow" is answered 204, not an error. A client learns a
+        run is live from the status endpoint, and the run can end in the
+        instant before it subscribes; that race is normal, and 204 is the
+        protocol's way of saying so (the client's reconnect returns ``null``
+        and simply stops). An error status would surface a failure to the
+        human for a turn that actually finished correctly.
+
         :param request: FastAPI request (``?session=`` names the session).
-        :return: SSE stream, or 409 when there is no live run to follow.
+        :return: SSE stream, or 204 when there is no live run to follow.
         """
-        from fastapi import HTTPException
+        from fastapi import Response as FastAPIResponse
 
         session_id = request.query_params.get("session")
         run = (
@@ -832,7 +912,7 @@ def register_chat_routes(
             else None
         )
         if run is None:
-            raise HTTPException(status_code=409, detail="no live run")
+            return FastAPIResponse(status_code=204)
         return _follow_response(run)
 
     @router.post("/api/chat/stop")
