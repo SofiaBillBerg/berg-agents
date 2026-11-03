@@ -65,10 +65,18 @@ class PluginMetadata:
     # plugin ships its own component and the host only renders it.
     ui: dict[str, Any] | None = None
 
+    # Per-session storage (optional): when set, the named tool argument
+    # is bound to a session directory by the plugin system, and removed
+    # from the model-visible schema. See plugin_system.session_scope.
+    session_scope: Any = None
+
+    # Which agent roles may use this plugin's tools. Empty means
+    # chat-only, which is what every plugin meant before roles existed.
+    toolset_roles: tuple[str, ...] = ()
+
     # Behavior
     deferred: bool = True  # Enable deferred loading
     auto_enable: bool = False  # Enable on load
-
     # Runtime state
     enabled: bool = False
     loaded: bool = False

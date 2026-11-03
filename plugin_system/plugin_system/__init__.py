@@ -21,16 +21,18 @@
 
 # NOTE: Explicit re-exports (no `from package import *` self-import).
 # NOTE: The host (berg_agents) imports these by name from the package
-# root — the chat seam (`get_chat_plugin_tools` / `list_chat_plugins` /
-# `set_plugin_enabled` / `get_chat_plugin_state`) plus `plugin_slug`.
+# root — the agent seam (`get_plugin_tools_for` for any role),
+# `ensure_plugin_system_ready` for warming, plus `list_chat_plugins` /
+# `set_plugin_enabled` / `get_chat_plugin_state` and `plugin_slug`.
 # They are re-exported here so there is ONE import path
 # (`from plugin_system import ...`) instead of callers reaching into
 # individual submodules — two ways to fetch the same symbol is a
 # near-duplicate variant.
 from plugin_system.chat_integration import (
+    ensure_plugin_system_ready,
     get_chat_plugin_state,
-    get_chat_plugin_tools,
     get_plugin_manager,
+    get_plugin_tools_for,
     list_chat_plugins,
     set_plugin_enabled,
 )
@@ -59,9 +61,10 @@ __all__ = [
     "ProviderCapability",
     "SkillCapability",
     "ToolCapability",
+    "ensure_plugin_system_ready",
     "get_chat_plugin_state",
-    "get_chat_plugin_tools",
     "get_plugin_manager",
+    "get_plugin_tools_for",
     "list_chat_plugins",
     "plugin_slug",
     "set_plugin_enabled"]

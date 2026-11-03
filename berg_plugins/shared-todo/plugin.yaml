@@ -68,7 +68,28 @@ settings_schema:
       description: "Path to directory to use for todo-lists"
       default: "./sharedtodos/"
       secret: false
-      required: false
+
+# === Per-session storage ===
+# The plan belongs to one conversation, not to the process. Every tool
+# below takes `todo_path`; declaring it here makes the plugin system bind
+# that argument to
+#   ~/.berg-agents/projects/<project-id>/todos/<session-key>/
+# and drop it from the model-visible schema, so a model cannot redirect
+# the store and two sessions keep different plans.
+session_scope:
+  parameter: "todo_path"
+  subdir: "todos"
+  default_key: "_default"
+
+# === Which agents may use these tools ===
+# Planning is shared work: the planner authors the plan, the chat agent
+# discusses it with the user, and an implementer works it. Every one of
+# them reads and writes the same list, which is the point.
+toolset:
+  roles:
+    - "chat"
+    - "planner"
+    - "implementer"
 
 # === Permissions (Optional) ===
 permissions:

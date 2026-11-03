@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -123,6 +124,46 @@ class TestingConfig(BaseModel):
     fixtures: list[str] = []
 
 
+class SessionScope(BaseModel):
+    """Declare that a plugin's tools take a per-session storage path.
+
+    A plugin that keeps state per conversation (plans, notes, drafts)
+    exposes a path argument that every call has to supply. Leaving that
+    to the caller means the location depends on the process working
+    directory and two sessions can collide — so the plugin declares the
+    argument here and the plugin system binds it instead::
+
+        ~/.berg-agents/projects/<project-id>/<subdir>/<session-key>/
+
+    The bound argument is removed from the model-visible schema, so the
+    store cannot be redirected by a model. This is deliberately a
+    plugin-system concept: no core code names any plugin, and any plugin
+    with per-session files can declare it.
+    """
+
+    #: Name of the tool argument that must be bound (e.g. ``todo_path``).
+    parameter: str = Field(..., pattern=r"^[a-z_][a-z0-9_]*$")
+
+    #: Folder under the project dir; the session key is one level deeper.
+    subdir: str = Field(..., pattern=r"^[A-Za-z0-9._-]+$")
+
+    #: Session-less callers (probes, first-run UI) use this folder name.
+    default_key: str = Field("_default", pattern=r"^[A-Za-z0-9._-]+$")
+
+
+class ToolsetConfig(BaseModel):
+    """Which agent roles a plugin offers its tools to.
+
+    Declaring no roles means chat-only, which is what every plugin meant
+    before roles existed. A plugin that wants a planner or an implementer
+    to use its tools opts in explicitly, so widening access is never an
+    accident.
+    """
+
+    #: Roles allowed to use this plugin's tools (``chat`` is conventional).
+    roles: list[str] = Field(default_factory=list, max_length=16)
+
+
 class PluginManifest(BaseModel):
     """Plugin manifest."""
 
@@ -164,6 +205,15 @@ class PluginManifest(BaseModel):
     # Settings
     settings_schema: dict[str, Any] | None = None
 
+    # UI surface (optional): the plugin ships its own component.
+    ui: dict[str, Any] | None = None
+
+    # Per-session storage binding (see SessionScope)
+    session_scope: SessionScope | None = None
+
+    # Which agent roles may use this plugin's tools (see ToolsetConfig)
+    toolset: ToolsetConfig = ToolsetConfig()
+
     # Permissions
     permissions: list[str | dict] = []
 
@@ -184,9 +234,54 @@ class PluginManifest(BaseModel):
 
     @field_validator("id")
     @classmethod
-    def validate_id(cls, v: str) -> str:
+    def validate_id(cls, v: str) -> bool | str:
         if not v.startswith("berg-plugin-"):
             import warnings
 
             warnings.warn(f"Plugin ID should start with 'berg-plugin-': {v}")
         return v
+
+    def to_metadata(self, *, path: Path | None = None) -> Any:
+        """Convert this manifest into the discovery record.
+        This is the ONE place a manifest field becomes a
+        :class:`~plugin_system.discovery.plugin_metadata.PluginMetadata`
+        field. Discovery calls it instead of hand-copying keys, so a new
+        manifest field cannot be validated and then silently dropped on
+        the way to the runtime.
+
+        :param path: Directory holding ``plugin.yaml`` (the record keeps
+            the folder, not the file, because plugin code loads relative
+            to it).
+        :return: A populated ``PluginMetadata``.
+        """
+        from plugin_system.dependency.plugin_dependency import PluginDependency
+        from plugin_system.discovery.plugin_metadata import PluginMetadata
+
+        dependencies = [
+            PluginDependency(
+                id=dep.id, version=dep.version, optional=dep.optional
+            )
+            for dep in self.dependencies
+        ]
+
+        return PluginMetadata(
+            id=self.id,
+            version=self.version,
+            name=self.name,
+            description=self.description or "",
+            source="local",
+            path=path,
+            entry_point=self.entry_point,
+            author=self.author.name if self.author else None,
+            license=self.license,
+            homepage=self.homepage,
+            repository=self.repository,
+            tags=list(self.tags),
+            icon=self.icon,
+            ui=self.ui,
+            dependencies=dependencies,
+            permissions=list(self.permissions),
+            settings_schema=self.settings_schema,
+            session_scope=self.session_scope,
+            toolset_roles=tuple(self.toolset.roles),
+        )

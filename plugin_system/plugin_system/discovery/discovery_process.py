@@ -36,8 +36,13 @@ logger = logging.getLogger(__name__)
 # **Discovery mechanism:**
 
 
-def extract_metadata(plugin_class) -> PluginMetadata:
-    """Extract metadata from plugin class."""
+def extract_metadata(plugin_class: Any) -> PluginMetadata:
+    """Extract metadata from a plugin class (the package install path).
+
+    :param plugin_class: A :class:`BergPlugin` subclass exported through
+        the ``berg_plugins`` entry point.
+    :return: Metadata describing that plugin.
+    """
     return PluginMetadata(
         id=getattr(plugin_class, "plugin_id", None),
         version=getattr(plugin_class, "plugin_version", "0.0.1"),
@@ -52,54 +57,30 @@ def extract_metadata(plugin_class) -> PluginMetadata:
     )
 
 
-def discover_package_plugins() -> list[PluginMetadata]:
-    """Discover plugins from installed packages."""
-    discovered = []
-    for ep in entry_points(group="berg_plugins"):
-        try:
-            plugin_class = ep.load()
-            metadata = extract_metadata(plugin_class)
-            discovered.append(metadata)
-        except Exception as e:
-            logger.warning(f"Failed to load plugin {ep.name}: {e}")
-    return discovered
-
-
 # **Discovery:**
 
 
-def parse_manifest(manifest_path: Path) -> PluginMetadata:
-    """Parse plugin manifest file."""
-    with Path(manifest_path).open(encoding="utf-8") as f:
-        manifest = yaml.safe_load(f)
-    return PluginMetadata(
-        id=manifest.get("id"),
-        version=manifest.get("version", "0.0.1"),
-        name=manifest.get("name"),
-        description=manifest.get("description", ""),
-        source="local",
-        path=manifest_path,
-        entry_point=manifest.get("entry_point"),
-        permissions=manifest.get("permissions"),
-        dependencies=manifest.get("dependencies"),
-        tags=manifest.get("tags"),
-    )
+def load_manifest(manifest_path: Path) -> PluginMetadata:
+    """Parse and validate one ``plugin.yaml`` into discovery metadata.
 
+    The manifest is validated by :class:`PluginManifest` (the single
+    schema) and converted by ``to_metadata`` — one place where a file
+    field becomes a runtime field, so nothing can be validated and then
+    dropped on the way.
 
-def discover_local_plugins(plugin_dir: Path) -> list[PluginMetadata]:
-    """Discover plugins from local directory."""
-    discovered = []
-    for item in plugin_dir.iterdir():
-        if not item.is_dir():
-            continue
-        manifest_path = item / "plugin.yaml"
-        if manifest_path.exists():
-            try:
-                metadata = parse_manifest(manifest_path)
-                discovered.append(metadata)
-            except Exception as e:
-                logger.warning(f"Failed to parse {manifest_path}: {e}")
-    return discovered
+    :param manifest_path: Path to the plugin's ``plugin.yaml``.
+    :return: Populated ``PluginMetadata``.
+    :raises Exception: On unreadable YAML or an invalid manifest; callers
+        log and skip the plugin.
+    """
+    from plugin_system.plugin_schema import PluginManifest
+
+    with Path(manifest_path).open(encoding="utf-8") as handle:
+        raw = yaml.safe_load(handle) or {}
+    manifest = PluginManifest(**raw)
+    # The record keeps the plugin's *folder*: plugin code and its UI
+    # bundle resolve relative to it, not to the manifest file.
+    return manifest.to_metadata(path=Path(manifest_path).parent)
 
 
 class PluginDiscovery:
@@ -168,7 +149,7 @@ class PluginDiscovery:
         for ep in entry_points(group="berg_plugins"):
             try:
                 plugin_class = ep.load()
-                metadata = self._extract_metadata(plugin_class, ep.name)
+                metadata = extract_metadata(plugin_class)
                 discovered.append(metadata)
             except Exception as e:
                 logger.warning(f"Failed to load plugin {ep.name}: {e}")
@@ -189,79 +170,8 @@ class PluginDiscovery:
             manifest_path = item / "plugin.yaml"
             if manifest_path.exists():
                 try:
-                    metadata = await self._parse_manifest(manifest_path)
+                    metadata = load_manifest(manifest_path)
                     discovered.append(metadata)
                 except Exception as e:
                     logger.warning(f"Failed to parse {manifest_path}: {e}")
         return discovered
-
-    async def _parse_manifest(self, manifest_path: Path) -> PluginMetadata:
-        """Parse plugin manifest YAML file.
-
-        Args:
-            manifest_path: Path to plugin.yaml file
-
-        Returns:
-            Plugin metadata
-        """
-        with Path(manifest_path).open(encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-
-        # Parse dependencies
-        from plugin_system.dependency.plugin_dependency import PluginDependency
-
-        dependencies = []
-        for dep_data in data.get("dependencies", []):
-            dep = PluginDependency(
-                id=dep_data["id"],
-                version=dep_data["version"],
-                optional=dep_data.get("optional", False),
-            )
-            dependencies.append(dep)
-
-        # Get author info
-        author_data = data.get("author", {})
-        author = (
-            author_data.get("name")
-            if isinstance(author_data, dict)
-            else author_data
-        )
-
-        return PluginMetadata(
-            id=data["id"],
-            version=data["version"],
-            name=data["name"],
-            description=data["description"],
-            source="local",
-            path=manifest_path.parent,
-            entry_point=data["entry_point"],
-            author=author,
-            license=data.get("license"),
-            homepage=data.get("homepage"),
-            repository=data.get("repository"),
-            tags=data.get("tags", []),
-            icon=data.get("icon"),
-            ui=data.get("ui"),
-            dependencies=dependencies,
-            permissions=data.get("permissions", []),
-        )
-
-    def _extract_metadata(self, plugin_class, name: str) -> PluginMetadata:
-        """Extract metadata from plugin class.
-
-        :param plugin_class: The plugin class to extract metadata from
-        :param name: The name of the plugin
-        :return: The extracted plugin metadata
-        """
-        return PluginMetadata(
-            id=getattr(plugin_class, "plugin_id", name),
-            version=getattr(plugin_class, "plugin_version", "0.0.1"),
-            name=getattr(plugin_class, "plugin_name", name),
-            description=getattr(plugin_class, "plugin_description", ""),
-            source="package",
-            path=None,
-            entry_point=f"{plugin_class.__module__}.{plugin_class.__name__}",
-            permissions=getattr(plugin_class, "plugin_permissions", []),
-            dependencies=getattr(plugin_class, "plugin_dependencies", []),
-            tags=getattr(plugin_class, "plugin_tags", []),
-        )

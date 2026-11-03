@@ -385,13 +385,26 @@ def build_plan(
 
 
 def build_planner_agent(
-    model_id: str | None = None, cfg: dict[str, Any] | None = None
+    model_id: str | None = None,
+    cfg: dict[str, Any] | None = None,
+    *,
+    plugin_tools: list[Any] | None = None,
 ) -> Agent:
     """Build the planner Pydantic AI agent.
 
     The model is always an explicit OpenAI-compatible instance
     from :func:`berg_agents.providers.models.resolve_model_instance`;
     bare model ids are rejected there, never here.
+
+    :param model_id: Model id override; the complexity default when None.
+    :param cfg: Plain configuration override.
+    :param plugin_tools: Tools the ``planner`` role may use, already
+        resolved and session-bound by the caller via
+        :func:`plugin_system.get_plugin_tools_for`. The planner is what
+        *writes* the plan into a plugin store (shared-todo), so these
+        must be the same session-bound tools the chat agent and the
+        implementer read.
+    :return: Configured planner agent.
     """
     # Fall back to the planner complexity model so explicit ids
     # stay optional while the complexity preference is kept.
@@ -402,6 +415,10 @@ def build_planner_agent(
         name=PLANNER_NAME,
         deps_type=PlannerDeps,
         instructions=_PLANNER_INSTRUCTIONS,
+        # Empty by default, so the module-level instance below still
+        # builds without a plugin system; role callers pass the bound
+        # plan tools in.
+        tools=list(plugin_tools or []),
     )
 
 

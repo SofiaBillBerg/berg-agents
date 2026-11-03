@@ -1,4 +1,5 @@
 
+/plugin_system/docs/
 /.pycharm_plugin
 **/.venv
 /project_utils/*.zip

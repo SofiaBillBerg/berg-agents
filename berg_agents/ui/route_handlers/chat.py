@@ -807,11 +807,16 @@ def register_chat_routes(
         # NOTE: Plugin state is per-turn and failure-isolated: a broken
         # plugin dir only logs, chat still gets its agent. Disabled
         # plugins are withheld from tools, MCP toolsets, and skills.
+        # Tools are resolved for THIS session, so a plugin's scoped
+        # store (e.g. shared-todo's todo_path) belongs to this
+        # conversation and not to every session under the project.
         (
             plugin_tools,
             disabled_mcp,
             disabled_skills,
-        ) = await get_chat_plugin_state()
+        ) = await get_chat_plugin_state(
+            root_dir=sessions._harness_root_dir(), session_id=session_id
+        )
 
         # Active agent selection (set via /api/agents/active). Routes the
         # next message to that agent: build_chat_agent adopts its persona.

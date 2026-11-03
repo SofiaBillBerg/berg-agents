@@ -81,9 +81,15 @@ async def _lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     Failure-isolated: plugin errors only log, the server always starts.
     """
     try:
-        from plugin_system import get_chat_plugin_tools
+        from plugin_system import (
+            ensure_plugin_system_ready,
+            get_plugin_tools_for,
+        )
 
-        tools = await get_chat_plugin_tools()
+        await ensure_plugin_system_ready()
+        # Report only: the chat role's tool count says the manager came
+        # up with plugins loaded. Never raise — the server must start.
+        tools = await get_plugin_tools_for("chat")
         logger.info("Plugin tools warmed: %d tools", len(tools))
     except Exception as exc:
         logger.warning("Plugin warmup skipped: %s", exc)

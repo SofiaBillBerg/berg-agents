@@ -281,6 +281,7 @@ def build_implementation_agent(
     cfg: dict[str, Any] | None = None,
     instructions: str | None = None,
     read_only: bool = False,
+    plugin_tools: list[Any] | None = None,
 ) -> Agent[ImplementationDeps, str]:
     """Build the implementation Pydantic AI agent.
 
@@ -304,6 +305,12 @@ def build_implementation_agent(
             ``edit_file``) are not registered, so the model
             cannot change files even if it tries - chat-mode
             runs use this; gated/approved runs keep full tools.
+        plugin_tools: Tools the ``implementer`` role may use,
+            already resolved and session-bound by the caller via
+            :func:`plugin_system.get_plugin_tools_for`. This is how
+            the implementer reads the same plan the planner wrote —
+            it must be handed in rather than fetched here, so there
+            is one place that decides a tool's binding.
 
     Returns:
         Configured Pydantic AI agent named ``"implementation"``.
@@ -338,6 +345,10 @@ def build_implementation_agent(
         # prompt at the head (otherwise a non-empty history suppresses
         # it). See pydantic-ai message-history sharing.
         capabilities=[ReinjectSystemPrompt()],
+        # Plugin tools for this role (e.g. the plan store the planner
+        # wrote into). Empty by default, so the agent still runs with no
+        # plugins — the same rule the chat agent follows.
+        tools=list(plugin_tools or []),
         # Plain-text output so the model can freely call tools
         # and return a final answer string. A structured output
         # schema would risk `UnexpectedModelBehavior` retry

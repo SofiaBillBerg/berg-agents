@@ -28,8 +28,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import pathlib
 from typing import Any
 
 from berg_agents.ui.sessions import SessionManager
@@ -39,7 +37,11 @@ logger = logging.getLogger(__name__)
 
 
 async def _run_plugin_tool(
-    plugin_id: str, tool_name: str, args: dict[str, Any], root_dir: str
+    plugin_id: str,
+    tool_name: str,
+    args: dict[str, Any],
+    root_dir: str,
+    session_id: str | None = None,
 ) -> Any:
     """Run a loaded plugin's tool by name (no todo/shared-todo naming).
 
@@ -49,18 +51,26 @@ async def _run_plugin_tool(
     path plugin UIs use — the host knows only tool names, never the
     plugin's domain.
 
+    A plugin that declares ``session_scope`` has that argument bound per
+    session by :func:`plugin_system.get_plugin_tools_for`, so the call is
+    made through the role's *bound* tools: the UI reads and writes the
+    same store the chat agent does. Calling the raw registered function
+    instead would use the manifest default and silently show the user a
+    different list than the model is working on.
+
     :param plugin_id: Plugin identifier.
     :param tool_name: Tool name as declared by the plugin.
     :param args: Keyword arguments for the tool.
     :param root_dir: Project root (plugin config / storage base).
+    :param session_id: Session whose scoped store the UI is looking at.
     :return: The tool's return value (usually a string).
     :raises KeyError: When the plugin or tool is unknown.
     """
-    from plugin_system import get_chat_plugin_tools, get_plugin_manager
+    from plugin_system import ensure_plugin_system_ready, get_plugin_manager
     from plugin_system.lifecycle.lifecycle_states import PluginState
 
     # Ensure the manager is warm (idempotent, cheap after first call).
-    await get_chat_plugin_tools()
+    await ensure_plugin_system_ready()
     try:
         manager = get_plugin_manager()
     except RuntimeError as exc:
@@ -70,19 +80,37 @@ async def _run_plugin_tool(
         raise KeyError(f"Unknown plugin: {plugin_id}")
     if entry.state != PluginState.ENABLED:
         raise KeyError(f"Plugin {plugin_id} is not enabled")
-    for cap in manager.registry.get_capabilities(
-        plugin_id=plugin_id, capability_type="tool"
-    ):
-        tool = getattr(cap, "tool", None)
-        if tool is None:
-            continue
+
+    def _matches(tool: Any) -> bool:
         # Names come from the Tool's `name`, but fall back to the
         # wrapped function's __name__ so server-side helpers (which
         # are not model-facing tools) stay callable too.
         candidates = {
             str(getattr(tool, "name", "") or ""),
             str(getattr(getattr(tool, "function", None), "__name__", "") or "")}
-        if tool_name not in candidates:
+        return tool_name in candidates
+
+    # Preferred: the session-bound tool the model also uses. The roles
+    # come from THIS plugin's manifest (falling back to the chat role,
+    # which is what an undeclared plugin means), so the host never bakes
+    # in a role list that a manifest could disagree with.
+    from plugin_system import get_plugin_tools_for
+
+    roles = tuple(getattr(entry.metadata, "toolset_roles", ()) or ("chat",))
+    for role in roles:
+        for tool in await get_plugin_tools_for(
+            role, root_dir=root_dir, session_id=session_id
+        ):
+            if _matches(tool):
+                return getattr(tool, "function", tool)(**args)
+
+    # Fallback: a server-side helper no agent role is granted. It has no
+    # bound store, so it runs with the plugin's own defaults.
+    for cap in manager.registry.get_capabilities(
+        plugin_id=plugin_id, capability_type="tool"
+    ):
+        tool = getattr(cap, "tool", None)
+        if tool is None or not _matches(tool):
             continue
         function = getattr(tool, "function", tool)
         return function(**args)
@@ -136,13 +164,14 @@ def register_plugin_routes(
             if k not in {"sessionId", "tool", "args"}
         }
         root_dir = sessions._harness_root_dir()
-        # NOTE: run with the plugin config dir as cwd so relative
-        # defaults in the tool signature land inside the project.
-        had_cwd = pathlib.Path.cwd()
-        os.chdir(root_dir)
+        # The UI names the session it is displaying; the tool then runs
+        # against that session's scoped store — the same one the chat
+        # agent writes — instead of a process-global cwd or a manifest
+        # default every session would share.
+        session_id = str((body or {}).get("sessionId") or "") or None
         try:
             result = await _run_plugin_tool(
-                plugin_id, tool_name, args, root_dir
+                plugin_id, tool_name, args, root_dir, session_id=session_id
             )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -151,8 +180,6 @@ def register_plugin_routes(
                 "Plugin tool %s/%s failed: %s", plugin_id, tool_name, exc
             )
             raise HTTPException(status_code=502, detail=str(exc)) from exc
-        finally:
-            os.chdir(had_cwd)
         # Tools return human-readable strings for the model; a UI wants
         # structured data, so non-string returns are passed through as
         # JSON the caller can parse.

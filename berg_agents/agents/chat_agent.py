@@ -50,38 +50,6 @@ def _shell_allowed() -> bool:
         "off"}
 
 
-def _planning_capability(root_dir: str, session_id: str | None) -> Any:
-    """Build ``Planning`` with a per-session plan store.
-
-    Why not ``Planning()``: with no ``store`` the plan is in-memory for
-    the duration of a single run, so ``write_plan`` followed by
-    ``read_plan`` in a later turn found nothing — observed live in the
-    UI. ``store_resolver`` is preferred over a shared ``store`` so each
-    session keeps its own plan instead of every session sharing one.
-
-    :param root_dir: Project root; the plan database lives with the
-        project's other state under ``~/.berg-agents/projects/<id>/``.
-    :param session_id: Session identifier, or None to skip persistence.
-    :return: A configured :class:`~pydantic_ai_harness.Planning`.
-    """
-    from pydantic_ai_harness import Planning
-    from pydantic_ai_harness.planning import SqlitePlanStore
-
-    if not session_id:
-        # No session (e.g. a probe): keep the ephemeral behaviour.
-        return Planning()
-
-    from berg_agents.ui.projects import project_dir, resolve_project
-
-    database = project_dir(resolve_project(root_dir).id) / "plan.db"
-
-    def _resolve(ctx: Any) -> Any:
-        # Imported per call so a relocated store is picked up per run.
-        return SqlitePlanStore(database=str(database), session=session_id)
-
-    return Planning(store_resolver=_resolve)
-
-
 def build_chat_agent(
     model_id: str | None = None,
     *,
@@ -109,8 +77,11 @@ def build_chat_agent(
     :param model_id: Model identifier to resolve; falls back to the session's
         or settings' default.
     :param root_dir: Workspace root for file tools.
-    :param plugin_tools: Extra pydantic-ai tools from enabled plugins;
-        pass ``None`` (or omit) for a plugin-free agent.
+    :param plugin_tools: Tools the ``chat`` role may use, already
+        resolved and session-bound by :func:`plugin_system.get_chat_plugin_state`;
+        pass ``None`` (or omit) for a plugin-free agent. It is handed in
+        rather than fetched here so tool membership and session binding
+        are decided in one place.
     :param disabled_mcp: MCP server keys to withhold (disabled toggles).
     :param disabled_skills: Chat skill ids (``skill-<name>``) to withhold.
     :return: A configured ``Agent`` ready for ``VercelAIAdapter``.
@@ -248,14 +219,12 @@ def build_chat_agent(
             # ollama → duckduckgo → direct).
             WebSearch(local=make_web_search(settings.web_search_backends)),
             WebFetch(local=make_web_fetch(settings.web_search_backends)),
-            # Model-owned task plans with a live reminder: multi-step
-            # work shows its todos/plan in the transcript instead of
-            # happening invisibly. Eager — planning is core behavior.
-            #
-            # The store is resolved per run so a plan belongs to the
-            # session that wrote it. A shared store would leak one
-            # session's plan into every other one under the same root.
-            _planning_capability(root_dir=root_dir, session_id=session_id),
+            # NOTE: There is deliberately no ``Planning`` capability here.
+            # The plan is owned by shared-todo, whose tools arrive in
+            # ``plugin_tools`` and whose list the human can edit. A
+            # second, model-only plan store would give the session two
+            # plans that can disagree — one the user can see and change,
+            # one they cannot.
             # Context, memory, and recall: tiered compaction (keeps the
             # history inside the context window), a persistent Markdown
             # notebook, and step persistence + conversation search so
