@@ -63,8 +63,11 @@ except ImportError:  # pragma: no cover - harness optional at import time
     ConversationSummary = None  # type: ignore[assignment,misc]
     SqliteConversationStore = None  # type: ignore[assignment,misc]
 
-#: Client-minted ids must stay narrow (they become filenames/keys).
-_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_:-]{0,63}")
+#: Session ids must stay narrow (they become filenames/keys). The cap is
+#: sized for a id that names its project: a 32-character unique part, the
+#: ``__`` separator, and a project id (itself capped at 64) — 128 keeps the
+#: suffix from ever being the reason an otherwise valid id is rejected.
+_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_:-]{0,127}")
 
 #: Cache keyed by the global dir (one cache entry, by design).
 _stores: dict[str, Any] = {}
@@ -393,11 +396,52 @@ def summary_to_dict(summary: Any) -> dict[str, Any]:
         "outcome": summary.outcome}
 
 
-def coerce_session_id(raw: Any) -> str:
-    """Validate a client session id, minting one when unusable."""
+#: Separator between the unique part of a session id and its project suffix.
+#: Safe in a filename and in ``_ID_RE``, and it cannot occur in either half.
+SESSION_ID_SEPARATOR = "__"
+
+
+def mint_session_id(project_id: str) -> str:
+    """Mint a new session id that names its project.
+
+    ``<uuid-hex>__<project-id>``, for example
+    ``7ebcc3c2eb2844a2ad53b4d7a8136656__berg-agents``. The transcript file
+    already lives in the project's folder, so the suffix is not what files
+    it - it is what keeps the id readable when it travels without that
+    context (a database row, a log line, a URL).
+
+    :param project_id: Folder-safe project id (``projects.project_id_for``).
+    :return: A fresh, unique session id.
+    """
+    return f"{uuid4().hex}{SESSION_ID_SEPARATOR}{project_id}"
+
+
+def split_session_id(session_id: str) -> tuple[str, str | None]:
+    """Split a session id into its unique part and project suffix.
+
+    :param session_id: Any session id, suffixed or not.
+    :return: ``(unique_part, project_id)``, with ``None`` for a legacy
+        bare id that carries no project.
+    """
+    head, separator, tail = session_id.partition(SESSION_ID_SEPARATOR)
+    return (head, tail) if separator and tail else (session_id, None)
+
+
+def coerce_session_id(raw: Any, project_id: str | None = None) -> str:
+    """Validate a client session id, minting one when unusable.
+
+    This is the ONE place a session id comes into existence. A caller that
+    knows the project passes it, so a minted id names that project; an
+    existing id is returned untouched, which is what lets old bare-uuid
+    sessions keep working.
+
+    :param raw: Client-supplied id (any type; only a string can be valid).
+    :param project_id: Project the new session belongs to, when known.
+    :return: The accepted id, or a newly minted one.
+    """
     if isinstance(raw, str) and _ID_RE.fullmatch(raw):
         return raw
-    return uuid4().hex
+    return mint_session_id(project_id or "unknown-project")
 
 
 #: Utterances that say nothing about intent — never used as a slug.

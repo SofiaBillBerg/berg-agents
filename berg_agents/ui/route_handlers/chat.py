@@ -414,7 +414,7 @@ def _run_status(registry: Any, session_id: str | None) -> dict[str, Any]:
     return runtime.run.status()
 
 
-def _follow_response(run: Any) -> Response:
+def _follow_response(run: Any, session_id: str | None = None) -> Response:
     """Return the run's journal as an SSE response.
 
     The response is a *reader*. When the browser goes away the generator is
@@ -422,6 +422,10 @@ def _follow_response(run: Any) -> Response:
     request replays the journal from the start.
 
     :param run: The ``LiveRun`` to read.
+    :param session_id: Session the run belongs to, echoed as a header. A
+        client that sent no id had one minted for it, and this is how it
+        learns which conversation it is now in - without it, Stop and
+        follow would address nothing until a reload.
     :return: StreamingResponse in the Vercel AI SSE protocol.
     """
     from starlette.responses import StreamingResponse
@@ -432,6 +436,8 @@ def _follow_response(run: Any) -> Response:
         "Cache-Control": "no-cache, no-transform",
         "X-Accel-Buffering": "no",
         "x-vercel-ai-ui-message-stream": "v1"}
+    if session_id:
+        headers["x-berg-session-id"] = session_id
     return StreamingResponse(
         run.subscribe(), media_type="text/event-stream", headers=headers
     )
@@ -572,7 +578,11 @@ async def _track_chat_session(
         raw_session = body.get("sessionId") if isinstance(body, dict) else None
         root_dir = sessions._harness_root_dir()
         store = session_store.get_store(root_dir)
-        session_id = session_store.coerce_session_id(raw_session)
+        # Mint against the resolved project so a new id names it; an id the
+        # client already holds (including a legacy bare uuid) passes through.
+        session_id = session_store.coerce_session_id(
+            raw_session, resolve_project(root_dir).id
+        )
         await session_store.ensure_session(
             store,
             session_id,
@@ -862,7 +872,7 @@ def register_chat_routes(
 
         run = _steer_live_run(registry, session_id, body)
         if run is not None:
-            return _follow_response(run)
+            return _follow_response(run, session_id)
 
         try:
             live = await _start_run(
@@ -880,7 +890,7 @@ def register_chat_routes(
             return JSONResponse(
                 status_code=409, content={"detail": str(exc), "stale": True}
             )
-        return _follow_response(live)
+        return _follow_response(live, session_id)
 
     @router.get("/api/chat/stream")
     async def chat_follow(request: Request) -> Response:
@@ -913,7 +923,7 @@ def register_chat_routes(
         )
         if run is None:
             return FastAPIResponse(status_code=204)
-        return _follow_response(run)
+        return _follow_response(run, session_id)
 
     @router.post("/api/chat/stop")
     async def chat_stop(request: Request) -> dict[str, Any]:

@@ -166,9 +166,15 @@ def register_session_routes(
         """
         from berg_agents.ui import session_store
 
+        from berg_agents.ui.projects import resolve_project
+
         root = sessions._harness_root_dir()
         store = session_store.get_store(root)
-        session_id = session_store.coerce_session_id(None)
+        # New sessions name their project in the id, so it stays readable
+        # wherever the id appears without its folder.
+        session_id = session_store.coerce_session_id(
+            None, resolve_project(root).id
+        )
         summary = await session_store.ensure_session(
             store,
             session_id,

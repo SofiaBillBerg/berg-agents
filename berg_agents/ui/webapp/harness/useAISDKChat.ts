@@ -512,7 +512,26 @@ export function useAISDKChat(): UseAISDKChatReturn {
             prepareReconnectToStreamRequest: () => ({
                 api: `${API_BASE}/api/chat/stream?session=${encodeURIComponent(
                     sessionIdRef.current ?? "",
-                )}`})}),
+                )}`}),
+            // A fresh chat sends no id and the server mints one; the id comes
+            // back as a response header, and this is where the client adopts
+            // it. Without this the page would keep sending empty ids - each
+            // would mint a brand-new session - and Stop/follow would address
+            // nothing until a reload. Storing here (not in an effect) keeps
+            // the very next send on the same session.
+            fetch: async (input, init) => {
+                const resp = await fetch(input, init);
+                const minted = resp.headers.get("x-berg-session-id");
+                if (minted && minted !== sessionIdRef.current) {
+                    adoptSession(minted);
+                    try {
+                        localStorage.setItem(SESSION_ID_KEY, minted);
+                    } catch {
+                        // Private mode - id stays in memory only.
+                    }
+                }
+                return resp;
+            }}),
         // Resume a paused run after approvals. Per-item answers mark parts
         // one at a time; the resend fires once every pending part in the
         // paused message is answered (stepwise decisions never fire a
@@ -1006,9 +1025,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
                     }
                 } else {
                     // No session yet: adopt the project's active session when one
-                    // exists (every window converges), else mint an id for this
-                    // chat — the backend creates the row lazily on first send.
-                    // Either way, fall through to adopt any local transcript.
+                    // exists, so every window converges on the same conversation.
+                    // With none, the page holds NO id at all and the first send
+                    // carries an empty one — the server mints the canonical,
+                    // project-suffixed id. A client-side id is the one place a
+                    // second id format could reappear, so there is none.
                     try {
                         const currentResp = await fetch(`${API_BASE}/api/sessions/current`);
                         if (currentResp.ok && !cancelled) {
@@ -1019,14 +1040,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
                             }
                         }
                     } catch {
-                        // Server unreachable - mint locally below.
-                    }
-                    try {
-                        const minted = crypto.randomUUID();
-                        localStorage.setItem(SESSION_ID_KEY, minted);
-                        if (!cancelled) adoptSession(minted);
-                    } catch {
-                        // Private mode - session stays server-minted per send.
+                        // Server unreachable - the first send retries.
                     }
                 }
             } finally {
