@@ -26,6 +26,7 @@ from pathlib import Path
 import sys
 
 from plugin_system import PluginManager
+
 import pytest
 
 # Add parent directory to path for imports

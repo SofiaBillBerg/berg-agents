@@ -36,6 +36,7 @@ Support multiple plugin categories with unified interface:
 - `error` - Failed to load or crashed
 
 **Transitions:**
+
 ```
 discovered → loaded → enabled ⟷ disabled
      ↓          ↓         ↓
@@ -115,25 +116,25 @@ Plugins receive a context object with access to:
 ```python
 class PluginContext:
     """Runtime context provided to plugins."""
-    
+
     # Plugin metadata
     plugin_id: str
     plugin_version: str
     plugin_dir: Path
-    
+
     # Berg agents access
     app: BergAgentsApp
     harness: Harness
     config: dict[str, Any]
-    
+
     # Plugin system
     plugin_manager: PluginManager
     event_bus: EventBus
     logger: logging.Logger
-    
+
     # Settings
     settings: dict[str, Any]  # Plugin-specific settings
-    
+
     # Methods
     def emit_event(self, event: str, data: Any) -> None: ...
     def subscribe(self, event: str, handler: Callable) -> None: ...
@@ -242,10 +243,14 @@ settings:
 ```
 
 **Config sources (priority order):**
-1. Runtime overrides
-2. User config (`../../../.berg-agents`)
-3. Plugin defaults (`plugin.yaml` in plugin package)
-4. Schema defaults
+1.
+Runtime overrides
+2.
+User config (`../../../.berg-agents`)
+3.
+Plugin defaults (`plugin.yaml` in plugin package)
+4.
+Schema defaults
 
 ### 10. Event System
 
@@ -276,10 +281,14 @@ Multiple ways to discover plugins:
 4. **Built-in plugins** - Shipped with berg_agents
 
 **Discovery order:**
-1. Built-in (highest priority)
-2. Local directory
-3. Installed packages
-4. Remote (cached locally)
+1.
+Built-in (highest priority)
+2.
+Local directory
+3.
+Installed packages
+4.
+Remote (cached locally)
 
 ### 12. Deferred Loading (Critical)
 
@@ -333,29 +342,34 @@ Plugins must be testable:
 ## Non-Functional Requirements
 
 ### Performance
+
 - Plugin discovery < 100ms for 100 plugins
 - Plugin load < 500ms per plugin
 - Deferred loading: catalog < 1KB per plugin
 - Event dispatch < 10ms
 
 ### Reliability
+
 - One plugin crash doesn't crash system
 - Automatic restart on transient failures
 - Graceful degradation when plugin unavailable
 
 ### Security
+
 - Sandboxing for untrusted plugins (future)
 - Permission system enforced
 - No direct access to internals
 - Audit trail
 
 ### Developer Experience
+
 - Simple plugin creation (< 50 lines for basic plugin)
 - Rich documentation and examples
 - Clear error messages
 - Hot reload during development
 
 ### Backward Compatibility
+
 - Existing skills continue working
 - Existing MCP servers continue working
 - Existing web backends continue working
@@ -385,6 +399,7 @@ Plugins must be testable:
 7. Build example plugins
 8. Write migration guide
 
----
+--------------------------------------------------------------------------------
 
-**Note:** This design preserves berg_agents' strengths (deferred loading, resilience, config-driven) while adding the structure needed for a rich plugin ecosystem. The key innovation is **unified interface + deferred loading** - plugins are cheap until actually used.
+**Note:** This design preserves berg_agents' strengths (deferred loading, resilience, config-driven) while adding the structure needed for a rich plugin ecosystem.
+The key innovation is **unified interface + deferred loading** - plugins are cheap until actually used.

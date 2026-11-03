@@ -65,7 +65,7 @@ npm run build:ui
   | Tool specs         | `berg_agents/agents/factory.py` |
   | Web API and TUI    | `berg_agents/ui/`               |
   | Web front-end      | `berg_agents/ui/webapp/app/`    |
-  | Plugin system      | `../plugin_system`    |
+  | Plugin system      | `../plugin_system`              |
   | Providers          | `berg_agents/providers/`        |
   | Config             | `berg_agents/config/`           |
   | Plugins            | `berg_plugins/<plugin-id>/`     |

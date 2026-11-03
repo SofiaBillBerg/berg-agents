@@ -46,8 +46,7 @@ from berg_agents.app import BergAgentsApp
 
 app = BergAgentsApp.create()
 result = app.execute(
-    "Refactor auth module to add rate limiting and tests",
-    task_type="standard",
+    "Refactor auth module to add rate limiting and tests", task_type="standard"
 )
 print(result)
 ```

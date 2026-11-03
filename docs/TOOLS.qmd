@@ -19,16 +19,16 @@ arrives in chat as an `error`-status message --- never as a traceback.
 
 ## 1. How the tool set is assembled
 
-  | Layer                        | Source module                                         | When it attaches                                                                    | Filter switches                                                           |
-  | ---------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-  | Workspace file tools         | `berg_agents/agents/factory.py` (`create_tools`)      | Always in `WorkspaceToolset`                                                        | `read_only=True` hides mutating tools; `allow_shell=False` hides `bash`   |
-  | Plan / implement delegates   | `berg_agents/agents/workspace_toolset.py`             | Non-read-only mode                                                                  | Uses `PlannerDeps` and `ImplementationDeps`                               |
-  | Web helpers                  | `berg_agents/capabilities/web_backends.py`            | If `BERG_AGENT_WEB_SEARCH_BACKENDS` is configured to at least one working backend   | Backends without dependencies are skipped                                 |
+  | Layer                        | Source module                                           | When it attaches                                                                    | Filter switches                                                           |
+  | ---------------------------- | -----------------------------------------------------   | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+  | Workspace file tools         | `berg_agents/agents/factory.py` (`create_tools`)        | Always in `WorkspaceToolset`                                                        | `read_only=True` hides mutating tools; `allow_shell=False` hides `bash`   |
+  | Plan / implement delegates   | `berg_agents/agents/workspace_toolset.py`               | Non-read-only mode                                                                  | Uses `PlannerDeps` and `ImplementationDeps`                               |
+  | Web helpers                  | `berg_agents/capabilities/web_backends.py`              | If `BERG_AGENT_WEB_SEARCH_BACKENDS` is configured to at least one working backend   | Backends without dependencies are skipped                                 |
   | Memory (notebook)            | `../berg_agents/capabilities/context_capabilities.py`   | When the `Memory` capability is available                                           | Degrades to SQLite if `FileStore` fails                                   |
-  | Step persistence / recall    | Same as above                                         | When both `StepPersistence` and `ConversationSearch` load                           | Requires runs DB write access                                             |
-  | MCP toolsets                 | `{config}/mcp.json` (configurable)                    | At startup, per server                                                              | Kill-switch (`enabled: false`), runtime enable/disable, sensitive gate    |
-  | Skills                       | `BERG_AGENT_SKILLS`                                   | As deferred toolsets; body not attached to every call                               | Progressively loaded; tool metadata exposed as `berg-plugin-skill-*`      |
-  | Plugin tools                 | Enabled plugins that register `ToolCapability`        | Each turn (live state)                                                              | "Plugin OFF" removes them next turn; `POST /api/plugins/{id}/disable`     |
+  | Step persistence / recall    | Same as above                                           | When both `StepPersistence` and `ConversationSearch` load                           | Requires runs DB write access                                             |
+  | MCP toolsets                 | `{config}/mcp.json` (configurable)                      | At startup, per server                                                              | Kill-switch (`enabled: false`), runtime enable/disable, sensitive gate    |
+  | Skills                       | `BERG_AGENT_SKILLS`                                     | As deferred toolsets; body not attached to every call                               | Progressively loaded; tool metadata exposed as `berg-plugin-skill-*`      |
+  | Plugin tools                 | Enabled plugins that register `ToolCapability`          | Each turn (live state)                                                              | "Plugin OFF" removes them next turn; `POST /api/plugins/{id}/disable`     |
 
 On a given machine, confirm the exact tools by running
 `/tools` in the chat UI or `GET /api/tools` in the web UI / curl.

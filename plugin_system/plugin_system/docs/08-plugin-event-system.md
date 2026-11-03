@@ -11,11 +11,12 @@ The event system enables plugins to communicate with each other and react to sys
 ### [Event Bus](../events/event_bus.py)
 
 ```python
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Awaitable
-import asyncio
-from enum import Enum
+from typing import Any
+from collections.abc import Awaitable, Callable
+import contextlib
 
 EventHandler = Callable[[Event], Awaitable[None]]
 
@@ -62,10 +63,8 @@ class EventBus:
         """Stop event processing."""
         if self._processing_task:
             self._processing_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._processing_task
-            except asyncio.CancelledError:
-                pass
         logger.info("Event bus stopped")
 
     async def emit(
@@ -193,9 +192,8 @@ class EventBus:
         future: asyncio.Future[Event] = asyncio.Future()
 
         async def handler(event: Event) -> None:
-            if filter_fn is None or filter_fn(event):
-                if not future.done():
-                    future.set_result(event)
+            if (filter_fn is None or filter_fn(event)) and not future.done():
+                future.set_result(event)
 
         self.subscribe(event_pattern, handler)
 
@@ -231,7 +229,7 @@ class EventBus:
 ```python
 class SystemEvents:
     """System event types."""
-    
+
     # Plugin lifecycle
     PLUGIN_DISCOVERED = "plugin.discovered"
     PLUGIN_LOADED = "plugin.loaded"
@@ -240,19 +238,19 @@ class SystemEvents:
     PLUGIN_UNLOADED = "plugin.unloaded"
     PLUGIN_ERROR = "plugin.error"
     PLUGIN_CONFIG_CHANGED = "plugin.config.changed"
-    
+
     # Agent lifecycle
     AGENT_TASK_STARTED = "agent.task.started"
     AGENT_TASK_COMPLETED = "agent.task.completed"
     AGENT_TASK_FAILED = "agent.task.failed"
     AGENT_TOOL_CALLED = "agent.tool.called"
     AGENT_TOOL_COMPLETED = "agent.tool.completed"
-    
+
     # System lifecycle
     SYSTEM_STARTED = "system.started"
     SYSTEM_STOPPED = "system.stopped"
     SYSTEM_ERROR = "system.error"
-    
+
     # User interaction
     USER_APPROVED = "user.approved"
     USER_REJECTED = "user.rejected"
@@ -313,7 +311,7 @@ class ToolCallEvent(Event):
 class EventEmitter:
     """Mixin for plugins to emit events."""
 
-    def __init__(self, plugin_id: str, event_bus: EventBus):
+    def __init__(self, plugin_id: str, event_bus: EventBus) -> None:
         self.plugin_id = plugin_id
         self.event_bus = event_bus
 
@@ -345,7 +343,7 @@ class EventEmitter:
 class BergPlugin(EventEmitter, ABC):
     """Base plugin with event support."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # EventEmitter initialized by context in on_load
         pass
 
@@ -411,7 +409,7 @@ class GithubPlugin(BergPlugin):
 class RequestResponsePattern:
     """Request-response communication pattern."""
 
-    def __init__(self, event_bus: EventBus):
+    def __init__(self, event_bus: EventBus) -> None:
         self.event_bus = event_bus
 
     async def request(
@@ -473,7 +471,7 @@ class RequestResponsePattern:
 
 
 # Usage example
-async def example_request_response():
+async def example_request_response() -> None:
     pattern = RequestResponsePattern(event_bus)
 
     # Plugin A requests data from Plugin B
@@ -492,7 +490,7 @@ async def example_request_response():
 class PubSubChannel:
     """Pub-sub channel for topic-based messaging."""
 
-    def __init__(self, event_bus: EventBus, channel: str):
+    def __init__(self, event_bus: EventBus, channel: str) -> None:
         self.event_bus = event_bus
         self.channel = channel
 
@@ -517,7 +515,7 @@ notifications = PubSubChannel(event_bus, "notifications")
 
 
 # Subscribe
-async def handle_notification(event: Event):
+async def handle_notification(event: Event) -> None:
     print(f"Notification: {event.data}")
 
 
@@ -535,7 +533,7 @@ await notifications.publish(
 class EventAggregator:
     """Aggregate multiple events into one."""
 
-    def __init__(self, event_bus: EventBus):
+    def __init__(self, event_bus: EventBus) -> None:
         self.event_bus = event_bus
 
     async def aggregate(
@@ -628,13 +626,12 @@ class EventTransformer:
 class EventStore:
     """Persistent event storage."""
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
 
     async def save(self, event: Event) -> None:
         """Save event to persistent storage."""
         # Implementation would use SQLite, PostgreSQL, etc.
-        pass
 
     async def query(
         self,
@@ -644,7 +641,6 @@ class EventStore:
         limit: int = 100,
     ) -> list[Event]:
         """Query stored events."""
-        pass
 
     async def replay(
         self, event_bus: EventBus, since: datetime | None = None
@@ -660,19 +656,19 @@ class EventStore:
 ```python
 class EventMonitor:
     """Monitor event bus activity."""
-    
-    def __init__(self, event_bus: EventBus):
+
+    def __init__(self, event_bus: EventBus) -> None:
         self.event_bus = event_bus
         self.stats: dict[str, int] = {}
-    
+
     async def start(self) -> None:
         """Start monitoring."""
         self.event_bus.subscribe("*", self._track_event)
-    
+
     async def _track_event(self, event: Event) -> None:
         """Track event statistics."""
         self.stats[event.type] = self.stats.get(event.type, 0) + 1
-    
+
     def get_stats(self) -> dict[str, int]:
         """Get event statistics."""
         return self.stats.copy()

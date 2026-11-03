@@ -129,17 +129,18 @@ BERG_PLUGIN_GITHUB_RATE_LIMIT=2000
 
 ```python
 import os
-import re
 from pathlib import Path
+import re
 from typing import Any
+
+from jsonschema import ValidationError, validate
 import yaml
-from jsonschema import validate, ValidationError
 
 
 class PluginConfigManager:
     """Manage plugin configurations."""
 
-    def __init__(self, config_dir: Path):
+    def __init__(self, config_dir: Path) -> None:
         self.config_dir = config_dir
         self._cache: dict[str, dict[str, Any]] = {}
         self._env_pattern = re.compile(r"\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}")
@@ -239,9 +240,9 @@ class PluginConfigManager:
     def _parse_env_value(self, value: str) -> Any:
         """Parse environment variable value."""
         # Boolean
-        if value.lower() in ("true", "yes", "1"):
+        if value.lower() in {"true", "yes", "1"}:
             return True
-        if value.lower() in ("false", "no", "0"):
+        if value.lower() in {"false", "no", "0"}:
             return False
 
         # Number
@@ -352,7 +353,7 @@ class PluginConfigWatcher:
 
     def __init__(
         self, config_manager: PluginConfigManager, lifecycle: PluginLifecycle
-    ):
+    ) -> None:
         self.config_manager = config_manager
         self.lifecycle = lifecycle
         self.watchers: dict[str, FileWatcher] = {}
@@ -407,7 +408,6 @@ class BergPlugin(ABC):
 
         Optional hook - implement to support live reconfiguration.
         """
-        pass
 ```
 
 ## Secrets Management
@@ -454,7 +454,7 @@ from cryptography.fernet import Fernet
 class SecretStore:
     """Encrypted storage for plugin secrets."""
 
-    def __init__(self, key_file: Path):
+    def __init__(self, key_file: Path) -> None:
         self.key_file = key_file
         self._cipher = self._load_or_create_key()
 
@@ -481,9 +481,8 @@ class SecretStore:
 
     async def store_secret(self, plugin_id: str, key: str, value: str) -> None:
         """Store an encrypted secret."""
-        encrypted = self.encrypt(value)
+        self.encrypt(value)
         # Store in secure location (e.g., keyring, vault)
-        pass
 
     async def retrieve_secret(self, plugin_id: str, key: str) -> str | None:
         """Retrieve and decrypt a secret."""
@@ -499,13 +498,13 @@ class SecretStore:
 ### [Custom Validators](../config/validators.py)
 
 ```python
-from typing import Callable
+from collections.abc import Callable
 
 
 class ConfigValidator:
     """Custom configuration validators."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.validators: dict[str, Callable] = {}
 
     def register(self, name: str, validator: Callable) -> None:
@@ -606,28 +605,28 @@ $ berg-agents .berg-agents list
 @dataclass
 class PluginContext:
     """Plugin runtime context (includes configuration)."""
-    
+
     # ... other fields ...
-    
+
     # Settings
     settings: dict[str, Any]  # Plugin-specific settings
-    
+
     def get_setting(self, key: str, default: Any = None) -> Any:
         """Get a configuration setting."""
         keys = key.split(".")
         value = self.settings
-        
+
         for k in keys:
             if isinstance(value, dict):
                 value = value.get(k)
             else:
                 return default
-            
+
             if value is None:
                 return default
-        
+
         return value
-    
+
     def has_setting(self, key: str) -> bool:
         """Check if setting exists."""
         return self.get_setting(key) is not None

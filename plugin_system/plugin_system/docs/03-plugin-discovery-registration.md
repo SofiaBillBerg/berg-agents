@@ -20,6 +20,7 @@ The plugin discovery system finds, validates, and registers plugins from multipl
 - Highest priority (cannot be overridden)
 
 **Structure:**
+
 ```
 berg_agents/plugins/builtin/
 ├── skills/              # Existing skills as plugins
@@ -38,6 +39,7 @@ berg_agents/plugins/builtin/
 **Location:** Python packages with `../../../..` entry point
 
 **Discovery:**
+
 ```toml
 # setup.py or pyproject.toml
 [project.entry-points."berg_plugins"]
@@ -77,6 +79,7 @@ def discover_package_plugins() -> list[PluginMetadata]:
 **Location:** `../../../.berg-agents`
 
 **Structure:**
+
 ```
 .berg-agents/plugins/
 ├── my-custom-plugin/
@@ -123,6 +126,7 @@ def discover_local_plugins(plugin_dir: Path) -> list[PluginMetadata]:
 **Location:** Git repositories, HTTP archives
 
 **Examples:**
+
 ```yaml
 # .berg-agents/plugins.yaml
 remote_plugins:
@@ -180,7 +184,7 @@ remote_plugins:
 class PluginDiscovery:
     """Plugin discovery coordinator."""
 
-    def __init__(self, config: dict[str, Any]):
+    def __init__(self, config: dict[str, Any]) -> None:
         self.plugin_dir = Path(config.get("plugin_dir", ".berg-agents/plugins"))
         self.cache_dir = Path(config.get("cache_dir", ".cache/plugins"))
 
@@ -305,7 +309,7 @@ class PluginMetadata:
 class PluginRegistry:
     """Central plugin registry."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._plugins: dict[str, PluginEntry] = {}
         self._capabilities: dict[str, list[PluginCapability]] = {}
         self._lock = asyncio.Lock()
@@ -376,22 +380,22 @@ class PluginRegistry:
 @dataclass
 class PluginEntry:
     """Registry entry for a plugin."""
-    
+
     metadata: PluginMetadata
     state: PluginState
     instance: BergPlugin | None
-    
+
     loaded_at: datetime | None = None
     enabled_at: datetime | None = None
     error: Exception | None = None
-    
+
     def is_enabled(self) -> bool:
         """Check if plugin is enabled."""
         return self.state == PluginState.ENABLED
-    
+
     def is_loaded(self) -> bool:
         """Check if plugin is loaded."""
-        return self.state in (PluginState.LOADED, PluginState.ENABLED)
+        return self.state in {PluginState.LOADED, PluginState.ENABLED}
 ```
 
 ## [Backward Compatibility](../discovery/plugin_compat.py)
@@ -404,7 +408,7 @@ Wrap existing skills as plugins:
 class SkillPluginAdapter(BergPlugin):
     """Adapter to wrap existing skills as plugins."""
 
-    def __init__(self, skill_path: Path):
+    def __init__(self, skill_path: Path) -> None:
         self.skill_path = skill_path
         self.skill_data = None
 
@@ -433,7 +437,7 @@ Wrap MCP servers as plugins:
 class MCPPluginAdapter(BergPlugin):
     """Adapter to wrap MCP servers as plugins."""
 
-    def __init__(self, server_config: dict[str, Any]):
+    def __init__(self, server_config: dict[str, Any]) -> None:
         self.config = server_config
         self.toolset = None
 
@@ -483,27 +487,27 @@ async def discover_all_parallel() -> list[PluginMetadata]:
 ```python
 class PluginCache:
     """Cache for plugin metadata."""
-    
-    def __init__(self, cache_file: Path):
+
+    def __init__(self, cache_file: Path) -> None:
         self.cache_file = cache_file
         self.cache: dict[str, PluginMetadata] = {}
-    
+
     def load(self) -> None:
         """Load cache from disk."""
         if self.cache_file.exists():
             data = json.loads(self.cache_file.read_text())
             self.cache = {k: PluginMetadata(**v) for k, v in data.items()}
-    
+
     def save(self) -> None:
         """Save cache to disk."""
         data = {k: asdict(v) for k, v in self.cache.items()}
         self.cache_file.write_text(json.dumps(data, indent=2))
-    
+
     def get(self, plugin_id: str, version: str) -> PluginMetadata | None:
         """Get cached metadata."""
         key = f"{plugin_id}@{version}"
         return self.cache.get(key)
-    
+
     def set(self, metadata: PluginMetadata) -> None:
         """Cache metadata."""
         key = f"{metadata.id}@{metadata.version}"

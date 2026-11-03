@@ -89,14 +89,15 @@ capabilities:
 
 ```python
 # my_skill.py
-from berg_agents.plugins import BergPlugin, PluginContext
 from pathlib import Path
+
+from berg_agents.plugins import BergPlugin, PluginContext
 
 
 class MySkillPlugin(BergPlugin):
     """Native skill plugin."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.content = None
 
     async def on_load(self, context: PluginContext) -> None:
@@ -229,14 +230,14 @@ permissions:
 
 ```python
 # github_mcp.py
-from berg_agents.plugins import BergPlugin, PluginContext
 from berg_agents.core.mcp import create_mcp_client
+from berg_agents.plugins import BergPlugin, PluginContext
 
 
 class GitHubMCPPlugin(BergPlugin):
     """GitHub MCP as a plugin."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.mcp_client = None
         self.tools = []
 
@@ -352,7 +353,7 @@ class MySearchBackend:
 class MySearchPlugin(BergPlugin):
     """Search backend plugin."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.backend = None
 
     async def on_load(self, context: PluginContext) -> None:
@@ -386,10 +387,10 @@ class MySearchPlugin(BergPlugin):
    # test_backend.py
    plugin = MySearchPlugin()
    await plugin.on_load(mock_context)
-   
+
    caps = plugin.get_capabilities()
    backend = caps[0].backend_instance
-   
+
    results = await backend.search("test query")
    assert len(results) > 0
    ```
@@ -429,7 +430,7 @@ capabilities:
 
 ```python
 # my_tools.py
-from berg_agents.plugins import BergPlugin, PluginContext
+from berg_agents.plugins import BergPlugin
 from berg_agents.plugins.capabilities import ToolCapability
 from pydantic import BaseModel
 
@@ -511,9 +512,9 @@ capabilities:
 
 ```python
 # my_agent.py
-from berg_agents.plugins import BergPlugin, PluginContext
-from berg_agents.plugins.capabilities import AgentCapability
 from berg_agents.core import AbstractAgent, AgentResult, TaskContext
+from berg_agents.plugins import BergPlugin
+from berg_agents.plugins.capabilities import AgentCapability
 
 
 class MyCustomAgent(AbstractAgent):
@@ -564,12 +565,12 @@ class MyAgentPlugin(BergPlugin):
 
 ```python
 # test_migration.py
-import pytest
 from my_plugin import MyPlugin
+import pytest
 
 
 @pytest.mark.asyncio
-async def test_migrated_functionality():
+async def test_migrated_functionality() -> None:
     """Test that migrated plugin works like original."""
     plugin = MyPlugin()
 
@@ -623,6 +624,7 @@ $ berg-agents restart
 **Cause:** Invalid manifest or missing dependencies
 
 **Solution:**
+
 ```bash
 $ berg-agents plugin validate plugin.yaml
 $ pip install -e .
@@ -633,6 +635,7 @@ $ pip install -e .
 **Cause:** Capabilities not registered properly
 
 **Solution:**
+
 ```python
 def get_capabilities(self) -> list:
     # Ensure returning list of capabilities
@@ -644,6 +647,7 @@ def get_capabilities(self) -> list:
 **Cause:** Settings schema mismatch
 
 **Solution:**
+
 ```bash
 $ berg-agents config validate berg-plugin-name
 ```
@@ -653,6 +657,7 @@ $ berg-agents config validate berg-plugin-name
 **Cause:** Missing permissions in manifest
 
 **Solution:**
+
 ```yaml
 # Add to plugin.yaml
 permissions:
@@ -725,14 +730,21 @@ If you encounter issues during migration:
 ## Summary
 
 Migration path:
-1. **Keep using old format** (adapters work automatically)
-2. **Migrate critical capabilities** to plugins when ready
-3. **Use auto-migration tools** to save time
-4. **Test thoroughly** before and after
-5. **Monitor and rollback** if needed
+1.
+**Keep using old format** (adapters work automatically)
+2.
+**Migrate critical capabilities** to plugins when ready
+3.
+**Use auto-migration tools** to save time
+4.
+**Test thoroughly** before and after
+5.
+**Monitor and rollback** if needed
 
-The plugin system is designed for **gradual adoption** - you don't need to migrate everything at once. Start with new features as plugins, migrate existing capabilities over time.
+The plugin system is designed for **gradual adoption** - you don't need to migrate everything at once.
+Start with new features as plugins, migrate existing capabilities over time.
 
----
+--------------------------------------------------------------------------------
 
-Good luck with your migration! 🚀
+Good luck with your migration!
+🚀

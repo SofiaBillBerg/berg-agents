@@ -50,9 +50,8 @@ dependencies:
 ### [Version Parsing](../dependency/version_parsing.py)
 
 ```python
-import re
 from dataclasses import dataclass
-from typing import Literal
+import re
 
 
 @dataclass
@@ -119,7 +118,7 @@ class Version:
 class VersionConstraint:
     """Version constraint matcher."""
 
-    def __init__(self, constraint_str: str):
+    def __init__(self, constraint_str: str) -> None:
         self.constraint_str = constraint_str
         self.matchers = self._parse(constraint_str)
 
@@ -242,7 +241,7 @@ from collections import defaultdict, deque
 class DependencyGraph:
     """Plugin dependency graph."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.nodes: dict[str, PluginMetadata] = {}
         self.edges: dict[str, list[str]] = defaultdict(list)
         self.reverse_edges: dict[str, list[str]] = defaultdict(list)
@@ -322,7 +321,7 @@ class DependencyGraph:
             )
 
         # Kahn's algorithm
-        in_degree = {node: 0 for node in self.nodes}
+        in_degree = dict.fromkeys(self.nodes, 0)
         for node in self.nodes:
             for neighbor in self.edges.get(node, []):
                 in_degree[neighbor] += 1
@@ -347,7 +346,7 @@ class DependencyGraph:
 class DependencyResolver:
     """Resolve plugin dependencies."""
 
-    def __init__(self, registry: PluginRegistry):
+    def __init__(self, registry: PluginRegistry) -> None:
         self.registry = registry
 
     async def resolve(
@@ -470,12 +469,11 @@ class ConflictResolver:
 
 ## [Load Order Calculation](../dependency/dependency_resolver.py)
 
-
 ```python
 class LoadOrderCalculator:
     """Calculate plugin load order."""
 
-    def __init__(self, resolver: DependencyResolver):
+    def __init__(self, resolver: DependencyResolver) -> None:
         self.resolver = resolver
 
     async def calculate(
@@ -514,7 +512,7 @@ class LoadOrderCalculator:
         must still load before dependents.
         """
         # Build dependency constraints
-        graph = DependencyGraph()
+        DependencyGraph()
         for plugin_id in load_order:
             # Would need access to metadata here
             pass
@@ -528,57 +526,56 @@ class LoadOrderCalculator:
 
 ## [Runtime Dependency Checking](../dependencyver.py)
 
-
 ```python
 class RuntimeDependencyChecker:
     """Check dependencies at runtime."""
-    
-    def __init__(self, registry: PluginRegistry):
+
+    def __init__(self, registry: PluginRegistry) -> None:
         self.registry = registry
-    
+
     async def check_before_enable(self, plugin_id: str) -> None:
         """Check dependencies before enabling plugin.
-        
+
         Raises:
             DependencyError: If dependencies not satisfied
         """
         entry = self.registry.get(plugin_id)
         if not entry:
             raise PluginNotFoundError(f"Plugin not found: {plugin_id}")
-        
+
         # Check required dependencies are enabled
         for dep in entry.metadata.dependencies:
             if dep.optional or dep.peer:
                 continue
-            
+
             dep_entry = self.registry.get(dep.id)
             if not dep_entry:
                 raise DependencyNotFoundError(
                     f"Required dependency not found: {dep.id}"
                 )
-            
+
             if dep_entry.state != PluginState.ENABLED:
                 raise DependencyNotEnabledError(
                     f"Required dependency not enabled: {dep.id}"
                 )
-            
+
             # Check version
             if not dep.is_satisfied_by(dep_entry.metadata.version):
                 raise DependencyVersionError(
                     f"Version mismatch: requires {dep.id} {dep.version}, "
                     f"found {dep_entry.metadata.version}"
                 )
-    
+
     async def check_before_disable(self, plugin_id: str) -> list[str]:
         """Check dependents before disabling plugin.
-        
+
         Returns:
             List of dependent plugin IDs that would break
         """
         entry = self.registry.get(plugin_id)
         if not entry:
             return []
-        
+
         # Find enabled plugins that depend on this one
         dependents = []
         for other in self.registry.list_plugins(state=PluginState.ENABLED):
@@ -586,12 +583,11 @@ class RuntimeDependencyChecker:
                 if dep.id == plugin_id and not dep.optional:
                     dependents.append(other.metadata.id)
                     break
-        
+
         return dependents
 ```
 
 ## [Plugin API Versioning](../dependencyver.py)
-
 
 ```python
 @dataclass

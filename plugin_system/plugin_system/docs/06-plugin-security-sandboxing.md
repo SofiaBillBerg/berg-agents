@@ -19,10 +19,10 @@ The security model protects berg_agents from malicious or poorly-written plugins
 ### [Permission Categories](../permissions/permissions.py)
 
 ```python
-from enum import Enum
+from enum import Enum, StrEnum
 
 
-class PermissionCategory(str, Enum):
+class PermissionCategory(StrEnum):
     """Plugin permission categories."""
 
     # Filesystem
@@ -130,14 +130,11 @@ class Permission:
 
     def _check_path_scope(self, path: str, allowed_patterns: list[str]) -> bool:
         """Check if path matches allowed patterns."""
-        from pathlib import Path
         import fnmatch
+        from pathlib import Path
 
         path_obj = Path(path)
-        for pattern in allowed_patterns:
-            if fnmatch.fnmatch(str(path_obj), pattern):
-                return True
-        return False
+        return any(fnmatch.fnmatch(str(path_obj), pattern) for pattern in allowed_patterns)
 
     def _check_domain_scope(self, url: str, allowed_domains: list[str]) -> bool:
         """Check if URL domain is allowed."""
@@ -156,7 +153,7 @@ class Permission:
 class PermissionChecker:
     """Check plugin permissions at runtime."""
 
-    def __init__(self, registry: PluginRegistry):
+    def __init__(self, registry: PluginRegistry) -> None:
         self.registry = registry
         self.granted: dict[str, set[Permission]] = {}
 
@@ -259,7 +256,7 @@ class SandboxLevel(str, Enum):
 class ProcessSandbox:
     """Run plugin in isolated process."""
 
-    def __init__(self, plugin_id: str, permissions: set[Permission]):
+    def __init__(self, plugin_id: str, permissions: set[Permission]) -> None:
         self.plugin_id = plugin_id
         self.permissions = permissions
         self.process: asyncio.subprocess.Process | None = None
@@ -337,7 +334,7 @@ class ProcessSandbox:
 class ContainerSandbox:
     """Run plugin in Docker/Podman container."""
 
-    def __init__(self, plugin_id: str, permissions: set[Permission]):
+    def __init__(self, plugin_id: str, permissions: set[Permission]) -> None:
         self.plugin_id = plugin_id
         self.permissions = permissions
         self.container_id: str | None = None
@@ -385,10 +382,9 @@ class ContainerSandbox:
         """Determine network mode based on permissions."""
         has_network = any(
             p.category
-            in (
+            in {
                 PermissionCategory.NETWORK_OUTBOUND,
-                PermissionCategory.NETWORK_INBOUND,
-            )
+                PermissionCategory.NETWORK_INBOUND}
             for p in self.permissions
         )
 
@@ -414,7 +410,7 @@ class ContainerSandbox:
 class SecureFilesystem:
     """Filesystem operations with permission checking."""
 
-    def __init__(self, plugin_id: str, checker: PermissionChecker):
+    def __init__(self, plugin_id: str, checker: PermissionChecker) -> None:
         self.plugin_id = plugin_id
         self.checker = checker
 
@@ -459,7 +455,7 @@ class SecureFilesystem:
 class SecureNetwork:
     """Network operations with permission checking."""
 
-    def __init__(self, plugin_id: str, checker: PermissionChecker):
+    def __init__(self, plugin_id: str, checker: PermissionChecker) -> None:
         self.plugin_id = plugin_id
         self.checker = checker
 
@@ -502,7 +498,7 @@ class AuditEntry:
 class AuditLogger:
     """Audit log for plugin actions."""
 
-    def __init__(self, log_file: Path):
+    def __init__(self, log_file: Path) -> None:
         self.log_file = log_file
         self._lock = asyncio.Lock()
 
@@ -549,7 +545,7 @@ class AuditLogger:
 class PluginHITL:
     """Human-in-the-loop approval for plugins."""
 
-    def __init__(self, hitl_manager: HITLManager):
+    def __init__(self, hitl_manager: HITLManager) -> None:
         self.hitl_manager = hitl_manager
 
     async def request_approval(
@@ -608,7 +604,7 @@ class TrustLevel(str, Enum):
 class TrustManager:
     """Manage plugin trust levels."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.trust_levels: dict[str, TrustLevel] = {}
 
     def get_trust_level(self, plugin_id: str) -> TrustLevel:
@@ -617,9 +613,7 @@ class TrustManager:
 
     def get_sandbox_level(self, trust: TrustLevel) -> SandboxLevel:
         """Determine sandbox level from trust."""
-        if trust == TrustLevel.BUILTIN:
-            return SandboxLevel.NONE
-        elif trust == TrustLevel.VERIFIED:
+        if trust in (TrustLevel.BUILTIN, TrustLevel.VERIFIED):
             return SandboxLevel.NONE
         elif trust == TrustLevel.COMMUNITY:
             return SandboxLevel.PROCESS

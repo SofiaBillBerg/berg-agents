@@ -9,10 +9,10 @@ The plugin lifecycle system manages state transitions, resource allocation, erro
 ## [Lifecycle States](../lifecycle/lifecycle_states.py)
 
 ```python
-from enum import Enum
+from enum import Enum, StrEnum
 
 
-class PluginState(str, Enum):
+class PluginState(StrEnum):
     """Plugin lifecycle states."""
 
     DISCOVERED = "discovered"  # Found but not loaded
@@ -59,50 +59,50 @@ DEPRECATED → eventual unload
 ```python
 class BergPlugin(ABC):
     """Base plugin interface with lifecycle hooks."""
-    
+
     @abstractmethod
     async def on_load(self, context: PluginContext) -> None:
         """Called when plugin is loaded.
-        
+
         Initialize plugin, parse configuration, validate dependencies.
         Do NOT start services or register capabilities here.
-        
+
         Raises:
             PluginLoadError: If plugin cannot be loaded
         """
-        
+
     async def on_enable(self, context: PluginContext) -> None:
         """Called when plugin is enabled.
-        
+
         Start services, register capabilities, connect to external resources.
-        
+
         Raises:
             PluginEnableError: If plugin cannot be enabled
         """
-        
+
     async def on_disable(self, context: PluginContext) -> None:
         """Called when plugin is disabled.
-        
+
         Stop services, unregister capabilities, disconnect resources.
         Should be idempotent - safe to call multiple times.
         """
-        
+
     async def on_unload(self, context: PluginContext) -> None:
         """Called when plugin is unloaded.
-        
+
         Final cleanup, close connections, free resources.
         Should be idempotent - safe to call multiple times.
         """
-        
+
     async def on_error(self, context: PluginContext, error: Exception) -> None:
         """Called when plugin encounters an error.
-        
+
         Log error, attempt recovery, notify users.
         """
-        
+
     async def health_check(self, context: PluginContext) -> HealthStatus:
         """Check plugin health.
-        
+
         Returns:
             HealthStatus with status and optional message
         """
@@ -120,7 +120,7 @@ class PluginLifecycle:
         registry: PluginRegistry,
         event_bus: EventBus,
         config: dict[str, Any],
-    ):
+    ) -> None:
         self.registry = registry
         self.event_bus = event_bus
         self.config = config
@@ -291,11 +291,10 @@ class PluginLifecycle:
         if entry.state == PluginState.ENABLED:
             await self.disable(plugin_id)
 
-        if entry.state not in (
+        if entry.state not in {
             PluginState.LOADED,
             PluginState.DISABLED,
-            PluginState.ERROR,
-        ):
+            PluginState.ERROR}:
             logger.debug(
                 f"Plugin {plugin_id} cannot be unloaded from state {entry.state}"
             )
@@ -368,40 +367,40 @@ class PluginLifecycle:
 ```python
 class PluginResources:
     """Track resources allocated by a plugin."""
-    
-    def __init__(self, plugin_id: str):
+
+    def __init__(self, plugin_id: str) -> None:
         self.plugin_id = plugin_id
         self.tasks: set[asyncio.Task] = set()
         self.connections: list[Any] = []
         self.file_handles: list[Any] = []
         self.timers: list[Any] = []
-    
+
     def add_task(self, task: asyncio.Task) -> None:
         """Track an async task."""
         self.tasks.add(task)
-        task.add_done_callback(lambda t: self.tasks.discard(t))
-    
+        task.add_done_callback(self.tasks.discard)
+
     def add_connection(self, conn: Any) -> None:
         """Track a network connection."""
         self.connections.append(conn)
-    
+
     async def cleanup(self) -> None:
         """Clean up all resources."""
         # Cancel tasks
         for task in self.tasks:
             if not task.done():
                 task.cancel()
-        
+
         if self.tasks:
             await asyncio.gather(*self.tasks, return_exceptions=True)
-        
+
         # Close connections
         for conn in self.connections:
             try:
                 await conn.close()
             except Exception as e:
                 logger.warning(f"Failed to close connection: {e}")
-        
+
         # Close file handles
         for fh in self.file_handles:
             try:
@@ -428,7 +427,7 @@ class HealthStatus:
 class HealthMonitor:
     """Monitor plugin health."""
 
-    def __init__(self, lifecycle: PluginLifecycle, interval: float = 60.0):
+    def __init__(self, lifecycle: PluginLifecycle, interval: float = 60.0) -> None:
         self.lifecycle = lifecycle
         self.interval = interval
         self.task: asyncio.Task | None = None
@@ -485,39 +484,39 @@ class HealthMonitor:
 ```python
 class PluginReloader:
     """Hot reload plugins during development."""
-    
-    def __init__(self, lifecycle: PluginLifecycle):
+
+    def __init__(self, lifecycle: PluginLifecycle) -> None:
         self.lifecycle = lifecycle
         self.watchers: dict[str, FileSystemWatcher] = {}
-    
+
     async def watch(self, plugin_id: str) -> None:
         """Watch plugin for changes and auto-reload."""
         entry = self.lifecycle.registry.get(plugin_id)
         if not entry or not entry.metadata.path:
             raise ValueError(f"Cannot watch plugin: {plugin_id}")
-        
+
         watcher = FileSystemWatcher(entry.metadata.path)
         watcher.on_change(lambda: self._reload(plugin_id))
         self.watchers[plugin_id] = watcher
         await watcher.start()
-    
+
     async def _reload(self, plugin_id: str) -> None:
         """Reload a plugin."""
         logger.info(f"Reloading plugin: {plugin_id}")
-        
+
         try:
             # Unload
             await self.lifecycle.unload(plugin_id)
-            
+
             # Rediscover
             # ... (would need to re-run discovery for this plugin)
-            
+
             # Load and enable
             await self.lifecycle.load(plugin_id)
             await self.lifecycle.enable(plugin_id)
-            
+
             logger.info(f"Plugin reloaded: {plugin_id}")
-            
+
         except Exception as e:
             logger.error(f"Reload failed: {plugin_id}: {e}")
 ```

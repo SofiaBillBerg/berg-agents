@@ -1020,6 +1020,13 @@ export function useAISDKChat(): UseAISDKChatReturn {
                             }
                             return;
                         }
+                        if (resp.status === 404) {
+                            // The stored session is gone (deleted server-side).
+                            // Forget it rather than retrying a dead id on every
+                            // mount - and so a later send never resurrects it
+                            // through the lazy row-create on first message.
+                            localStorage.removeItem(SESSION_ID_KEY);
+                        }
                     } catch {
                         // Server unreachable - fall through to local cache.
                     }

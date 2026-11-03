@@ -4,12 +4,13 @@
 
 ## Overview
 
-Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture. 
+Berg Agents is a sophisticated multi-agent system built on Pydantic AI with a modular, extensible architecture.
 The system follows a harness-based execution model with multiple specialized agents working together.
 
 ## Core Components
 
 ### 1. **Harness System** (`../../../berg_agents/core/harness`)
+
 The orchestration layer that coordinates agent execution:
 - **Guardian** - Entry point, safety checks, and risk assessment
 - **Planner** - Task decomposition and step planning
@@ -18,6 +19,7 @@ The orchestration layer that coordinates agent execution:
 - **Learning Gate** - Captures outcomes for continuous improvement
 
 ### 2. **Agents** (`../../../berg_agents/agents`)
+
 Specialized agent implementations:
 - `guardian.py` - Security and safety validation
 - `planner.py` - Task planning and decomposition
@@ -32,6 +34,7 @@ Specialized agent implementations:
 Current capability types:
 
 #### **Skills** (`skills.py`)
+
 - Reads `SKILL.md` files (Anthropic Agent Skills format)
 - YAML frontmatter (name, description) + Markdown body
 - **Deferred loading** - catalog entry shown, full content loaded on demand
@@ -40,6 +43,7 @@ Current capability types:
 - Hard cap: 6000 chars per skill body
 
 #### **MCP Toolsets** (`mcp_toolsets.py`)
+
 - Reads `../../../.berg-agents` (Claude-style `mcpServers` format)
 - Remote (HTTP) and local (stdio) transports
 - Automatic `mcp_<server>__<tool>` naming
@@ -48,14 +52,17 @@ Current capability types:
 - Process-wide caching with keep-alive
 
 #### **Web Backends** (`web_backends.py`)
+
 - Search and fetch capabilities
 - Plugin-based architecture already present
 
 #### **Base** (`base.py`)
+
 - Risk classification vocabulary: `low`, `medium`, `high`
 - Used by tools and harness routing for HITL decisions
 
 #### **Registry** (`registry.py`)
+
 - Tool catalog and routing
 - Maps task types to required tools
 - Single source of truth for tool requirements
@@ -83,15 +90,18 @@ Config-driven model registry:
 ```
 
 ### 5. **Configuration** (`../../../berg_agents/config`)
+
 - `bergagents.jsonc` - main config
 - `mcp.json` - MCP server definitions
 - Environment variable support
 - Settings validation with Pydantic
 
 ### 6. **Tools** (`../../../berg_agents/tools`)
+
 Currently minimal - mostly I/O utilities
 
 ### 7. **UI Layer** (`../../../berg_agents/ui`)
+
 - FastAPI web server
 - Rich terminal UI
 - Session management
@@ -99,30 +109,35 @@ Currently minimal - mostly I/O utilities
 ## Key Architectural Patterns
 
 ### 1. **Deferred Loading**
+
 Skills use a catalog-then-load pattern:
 - Models see only `id` + `description` (~20 lines for 20 skills)
 - Full content loaded via `load_capability` tool when needed
 - Prevents context window flooding
 
 ### 2. **Resilient External Resources**
+
 MCP toolsets wrap external processes:
 - Listing failures → empty tool list
 - Call failures → error message, not exception
 - One broken server doesn't break the turn
 
 ### 3. **Risk-Based HITL**
+
 Tools declare risk levels:
 - `low` - auto-execute
 - `medium` - context-dependent
 - `high` - requires approval
 
 ### 4. **Config-Driven Extensibility**
+
 - Providers defined in JSON, not code
 - Skills from file paths
 - MCP servers from config
 - No recompilation needed
 
 ### 5. **Single Source of Truth**
+
 - Provider registry: model resolution
 - Tool catalog: routing rules
 - Risk vocabulary: HITL decisions

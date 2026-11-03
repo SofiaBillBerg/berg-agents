@@ -179,8 +179,9 @@ class GitHubSettings(BaseModel):
 
 ```python
 # tools_schema.py
-from pydantic import BaseModel, Field
 from typing import Literal
+
+from pydantic import BaseModel, Field
 
 
 class CreateIssueInput(BaseModel):
@@ -232,18 +233,19 @@ class CloseIssueInput(BaseModel):
 
 ```python
 # tools.py
-import httpx
 import logging
 from typing import Any
 
 from .config import GitHubSettings
 from .tools_schema import (
+    CloseIssueInput,
     CreateIssueInput,
     CreateIssueOutput,
     ListIssuesInput,
     ListIssuesOutput,
-    CloseIssueInput,
 )
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +253,7 @@ logger = logging.getLogger(__name__)
 class GitHubClient:
     """GitHub API client."""
 
-    def __init__(self, settings: GitHubSettings):
+    def __init__(self, settings: GitHubSettings) -> None:
         self.settings = settings
         self.base_url = "https://api.github.com"
         self._client: httpx.AsyncClient | None = None
@@ -286,9 +288,7 @@ class GitHubClient:
         """Create a GitHub issue."""
         client = await self._get_client()
 
-        data = {
-            "title": title,
-            "body": body}
+        data = {"title": title, "body": body}
 
         if labels:
             data["labels"] = labels
@@ -418,16 +418,17 @@ async def close_issue(
 
 ```python
 # github_plugin.py
+from berg_agents.events import Event
 import logging
 from pathlib import Path
 from typing import Any
 
+from .config import GitHubSettings as SettingsModel
+from .tools import close_issue, create_issue, list_issues
+
 from berg_agents.plugins import BergPlugin, PluginContext
 from berg_agents.plugins.capabilities import ToolCapability
 from berg_agents.plugins.config import GitHubSettings
-
-from .config import GitHubSettings as SettingsModel
-from .tools import create_issue, list_issues, close_issue
 
 logger = logging.getLogger(__name__)
 
@@ -556,7 +557,6 @@ class GitHubPlugin(BergPlugin):
 
 # Health status import
 from berg_agents.plugins.health import HealthStatus
-from berg_agents.events import Event
 ```
 
 ## 6. Package Init
@@ -574,12 +574,12 @@ __all__ = ["GitHubPlugin"]
 
 ```python
 # tests/test_plugin.py
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-from github_plugin import GitHubPlugin
 from config import GitHubSettings
-from tools_schema import CreateIssueInput
+
+from github_plugin import GitHubPlugin
+import pytest
 
 
 @pytest.fixture
@@ -612,7 +612,7 @@ class TestGitHubPlugin:
     """Test GitHub plugin."""
 
     @pytest.mark.asyncio
-    async def test_on_load(self, mock_context):
+    async def test_on_load(self, mock_context) -> None:
         """Test plugin loads with settings."""
         plugin = GitHubPlugin()
 
@@ -622,7 +622,7 @@ class TestGitHubPlugin:
         assert plugin._settings.org == "test-org"
 
     @pytest.mark.asyncio
-    async def test_on_enable(self, mock_context):
+    async def test_on_enable(self, mock_context) -> None:
         """Test plugin enables correctly."""
         plugin = GitHubPlugin()
         await plugin.on_load(mock_context)
@@ -633,7 +633,7 @@ class TestGitHubPlugin:
         mock_context.event_bus.emit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_capabilities(self, mock_context):
+    async def test_get_capabilities(self, mock_context) -> None:
         """Test plugin returns capabilities."""
         plugin = GitHubPlugin()
         await plugin.on_load(mock_context)
@@ -644,20 +644,20 @@ class TestGitHubPlugin:
         assert all(c.type == "tool" for c in capabilities)
 
     @pytest.mark.asyncio
-    async def test_health_check(self, mock_context):
+    async def test_health_check(self, mock_context) -> None:
         """Test health check."""
         plugin = GitHubPlugin()
         await plugin.on_load(mock_context)
 
         health = await plugin.health_check(mock_context)
 
-        assert health.status in ("healthy", "degraded")
+        assert health.status in {"healthy", "degraded"}
 
 
 class TestConfig:
     """Test configuration."""
 
-    def test_settings_defaults(self):
+    def test_settings_defaults(self) -> None:
         """Test default values."""
         settings = GitHubSettings(token="test")
 
@@ -665,7 +665,7 @@ class TestConfig:
         assert settings.cache_ttl == 300
         assert settings.auto_comment is False
 
-    def test_settings_with_org(self):
+    def test_settings_with_org(self) -> None:
         """Test settings with organization."""
         settings = GitHubSettings(
             token="test", org="myorg", default_repo="myrepo"

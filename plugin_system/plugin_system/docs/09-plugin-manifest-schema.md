@@ -4,7 +4,8 @@
 
 ## Overview
 
-The plugin manifest defines plugin metadata, capabilities, dependencies, and configuration. This document specifies the YAML schema, JSON Schema for validation, and Python models for parsing.
+The plugin manifest defines plugin metadata, capabilities, dependencies, and configuration.
+This document specifies the YAML schema, JSON Schema for validation, and Python models for parsing.
 
 ## Manifest Format
 
@@ -326,8 +327,9 @@ testing:
 ## [Python Models](../plugin_schema.py)
 
 ```python
-from pydantic import BaseModel, Field, field_validator
 from typing import Literal
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class Author(BaseModel):
@@ -505,16 +507,18 @@ class PluginManifest(BaseModel):
 ### [Validation Functions](../plugin_validation.py)
 
 ```python
-import yaml
 from pathlib import Path
-from jsonschema import validate, ValidationError as JsonValidationError
+
+from jsonschema import ValidationError as JsonValidationError
+from jsonschema import validate
 from pydantic import ValidationError as PydanticValidationError
+import yaml
 
 
 class ManifestValidator:
     """Validate plugin manifest."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.schema = self._load_schema()
 
     def _load_schema(self) -> dict:
@@ -534,7 +538,7 @@ class ManifestValidator:
 
         # Read file
         try:
-            with path.open() as f:
+            with path.open(encoding="utf-8") as f:
                 data = yaml.safe_load(f)
         except Exception as e:
             raise ManifestError(f"Failed to parse YAML: {e}")
@@ -565,7 +569,6 @@ class ManifestValidator:
             if dep.optional:
                 continue
             # Would check registry for dependency
-            pass
 
     async def _validate_entry_point(
         self, manifest: PluginManifest, warnings: list[str]
@@ -577,14 +580,12 @@ class ManifestValidator:
             module = importlib.import_module(module_path)
             if not hasattr(module, class_name):
                 warnings.append(f"Entry point class not found: {class_name}")
-        except ImportError as e:
+        except ImportError:
             warnings.append(f"Entry point module not found: {module_path}")
 
 
 class ManifestError(Exception):
     """Manifest validation error."""
-
-    pass
 ```
 
 ### CLI Validation

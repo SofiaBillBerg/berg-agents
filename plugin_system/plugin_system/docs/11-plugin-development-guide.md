@@ -76,7 +76,7 @@ class MyAwesomeSettings(BaseModel):
 class MyAwesomePlugin(BergPlugin):
     """My awesome plugin."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.settings: MyAwesomeSettings | None = None
 
     async def on_load(self, context: PluginContext) -> None:
@@ -202,10 +202,12 @@ class CreateThingOutput(BaseModel):
 
 ```python
 # tools.py
-import httpx
 import logging
+
 from .config import MyPluginSettings
 from .schemas import CreateThingInput, CreateThingOutput
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -238,11 +240,13 @@ async def create_thing(
 ```python
 # plugin.py
 import logging
+
+from .config import MyPluginSettings
+from .tools import create_thing
+
 from berg_agents.plugins import BergPlugin, PluginContext
 from berg_agents.plugins.capabilities import ToolCapability
 from berg_agents.plugins.health import HealthStatus
-from .config import MyPluginSettings
-from .tools import create_thing
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +254,7 @@ logger = logging.getLogger(__name__)
 class MyPlugin(BergPlugin):
     """My plugin implementation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.settings: MyPluginSettings | None = None
 
     # === Lifecycle Hooks ===
@@ -292,7 +296,7 @@ class MyPlugin(BergPlugin):
 
     async def on_error(self, context: PluginContext, error: Exception) -> None:
         """Handle errors."""
-        logger.error(f"Plugin error: {error}", exc_info=True)
+        logger.error(f"Plugin error: {error}")
         await self.emit("plugin.myplugin.error", {"error": str(error)})
 
     # === Configuration ===
@@ -322,7 +326,8 @@ class MyPlugin(BergPlugin):
                 tool=create_thing,
                 risk_level="medium",
                 deferred=True,
-            )]
+            )
+        ]
 
     def get_settings_schema(self) -> dict | None:
         """Return settings schema."""
@@ -350,10 +355,11 @@ class MyPlugin(BergPlugin):
 
 ```python
 # tests/test_plugin.py
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+
 from plugin import MyPlugin
-from config import MyPluginSettings
+import pytest
 
 
 @pytest.fixture
@@ -371,7 +377,7 @@ def mock_context():
 
 
 @pytest.mark.asyncio
-async def test_plugin_loads(mock_context):
+async def test_plugin_loads(mock_context) -> None:
     """Test plugin loads successfully."""
     plugin = MyPlugin()
     await plugin.on_load(mock_context)
@@ -381,7 +387,7 @@ async def test_plugin_loads(mock_context):
 
 
 @pytest.mark.asyncio
-async def test_plugin_enables(mock_context):
+async def test_plugin_enables(mock_context) -> None:
     """Test plugin enables."""
     plugin = MyPlugin()
     await plugin.on_load(mock_context)
@@ -397,7 +403,7 @@ async def test_plugin_enables(mock_context):
 
 ### Step 5: Add Documentation
 
-```markdown
+````markdown
 # README.md
 
 # My Awesome Plugin
@@ -408,7 +414,7 @@ Description of what your plugin does.
 
 ```bash
 pip install berg-plugin-myawesome
-```
+````
 
 ## Configuration
 
@@ -432,7 +438,8 @@ print(result.url)
 ## License
 
 AGPL
-```
+
+````
 
 ## Debugging Tips
 
@@ -442,7 +449,7 @@ AGPL
 # In your plugin
 import logging
 logging.getLogger(__name__).setLevel(logging.DEBUG)
-```
+````
 
 ```yaml
 # .berg-agents/bergagents.yaml
@@ -466,11 +473,12 @@ async def on_load(self, context: PluginContext) -> None:
 ```python
 # test_isolated.py
 import asyncio
-from plugin import MyPlugin
 from unittest.mock import MagicMock
 
+from plugin import MyPlugin
 
-async def main():
+
+async def main() -> None:
     plugin = MyPlugin()
 
     # Create minimal context
@@ -582,7 +590,7 @@ await asyncio.sleep(10)
 # Validate settings early
 class Settings(BaseModel):
     url: str
-    
+
     @field_validator("url")
     @classmethod
     def validate_url(cls, v: str) -> str:
@@ -686,6 +694,7 @@ self.subscribe("agent.task.*", self._on_task)
 5. Submit to plugin registry
 6. Share with the community!
 
----
+--------------------------------------------------------------------------------
 
-Happy plugin development! 🚀
+Happy plugin development!
+🚀

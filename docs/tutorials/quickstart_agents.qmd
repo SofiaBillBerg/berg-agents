@@ -36,10 +36,7 @@ class CustomReviewer(AbstractAgent):
         return 0.1
 
     def execute(
-        self,
-        task: dict[str, Any],
-        context: TaskContext,
-        model: Any = None,
+        self, task: dict[str, Any], context: TaskContext, model: Any = None
     ) -> AgentResult:
         snippet = task.get("description", "")[:100]
         return AgentResult(success=True, output=f"Review snippet: {snippet}")

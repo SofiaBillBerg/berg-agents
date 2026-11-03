@@ -165,7 +165,6 @@ def register_session_routes(
         :return: The created session summary.
         """
         from berg_agents.ui import session_store
-
         from berg_agents.ui.projects import resolve_project
 
         root = sessions._harness_root_dir()

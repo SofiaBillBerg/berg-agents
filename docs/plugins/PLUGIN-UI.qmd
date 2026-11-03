@@ -99,24 +99,24 @@ contents read from the host runtime:
 const runtimeGlobals = {
   name: "berg-runtime-globals",
   setup(build) {
-    build.onResolve({filter: /^react$/}, () => ({
+    build.onResolve({ filter: /^react$/ }, () => ({
       path: "react",
       namespace: "berg-runtime"}));
-    build.onResolve({filter: /^react\/jsx-runtime$/}, () => ({
+    build.onResolve({ filter: /^react\/jsx-runtime$/ }, () => ({
       path: "react/jsx-runtime",
       namespace: "berg-runtime"}));
     // ... react-dom, react-dom/client, jsx-dev-runtime ...
 
     // Everything else bare → host runtime too.
-    build.onResolve({filter: /.*/}, (args) => {
+    build.onResolve({ filter: /.*/ }, (args) => {
       if (args.kind === "entry-point") return null;
       if (!args.path.startsWith(".") && !path.isAbsolute(args.path)) {
-        return {path: args.path, namespace: "berg-runtime"};
+        return { path: args.path, namespace: "berg-runtime" };
       }
       return null;
     });
 
-    build.onLoad({filter: /.*/, namespace: "berg-runtime"}, (args) => ({
+    build.onLoad({ filter: /.*/, namespace: "berg-runtime" }, (args) => ({
       contents: `module.exports = window.BergRuntime.require(${JSON.stringify(args.path)});`,
       loader: "js"}));
   }};
@@ -185,7 +185,10 @@ export function apiBase(): string {
   return String(window.BergRuntime?.apiBase ?? "");
 }
 
-export function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+export function apiFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
   return fetch(`${apiBase()}${path}`, init);
 }
 ```
@@ -212,11 +215,11 @@ bundle instead would freeze it at build time and break under
 
 ```ts
 interface PluginSurfaceProps {
-  view: "panel" | "canvas";   // docked vs wide
-  refreshKey: number;         // bump → refetch
+  view: "panel" | "canvas"; // docked vs wide
+  refreshKey: number; // bump → refetch
   onClose?: () => void;
   onToggleView?: () => void;
-  onCount?: (n: number) => void;  // report a headline count
+  onCount?: (n: number) => void; // report a headline count
   className?: string;
   style?: React.CSSProperties;
 }

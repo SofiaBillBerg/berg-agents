@@ -37,18 +37,18 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from shared_todo.shared_todo_distribution import (
-    is_integrated_into_berg_agents,
-    is_plugin_installable,
-)
-from shared_todo.shared_todo_user_cfg import validate_user_config
-
 # NOTE: Use the real plugin base classes so PluginManager's
 # isinstance(plugin, BergPlugin) check passes. The previous local
 # dummy BergPlugin/ToolCapability stubs broke discovery.
 from plugin_system.lifecycle.bergplugin import BergPlugin
 from plugin_system.plugin_context import PluginContext
 from plugin_system.plugin_contract import ToolCapability
+from shared_todo.shared_todo_distribution import (
+    is_integrated_into_berg_agents,
+    is_plugin_installable,
+)
+from shared_todo.shared_todo_user_cfg import validate_user_config
+
 from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
