@@ -47,7 +47,7 @@ from berg_agents.core.interface import (
 )
 from berg_agents.providers.models import resolve_model_instance
 from berg_agents.providers.tiers import model_for_complexity
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, RunContext, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -388,8 +388,8 @@ def build_planner_agent(
     model_id: str | None = None,
     cfg: dict[str, Any] | None = None,
     *,
-    plugin_tools: list[Any] | None = None,
-) -> Agent:
+    plugin_tools: list[Tool[PlannerDeps]] | None = None,
+) -> Agent[PlannerDeps, str]:
     """Build the planner Pydantic AI agent.
 
     The model is always an explicit OpenAI-compatible instance
@@ -410,7 +410,10 @@ def build_planner_agent(
     # stay optional while the complexity preference is kept.
     if model_id is None:
         model_id = model_for_complexity(PLANNER_COMPLEXITY, cfg)
-    return Agent(
+    # Specialized on the constructor for the same reason as the
+    # implementation agent: an unparameterized call infers `object` for
+    # the deps slot and contradicts the declared return type.
+    agent: Agent[PlannerDeps, str] = Agent[PlannerDeps, str](
         resolve_model_instance(model_id, cfg),
         name=PLANNER_NAME,
         deps_type=PlannerDeps,
@@ -420,6 +423,7 @@ def build_planner_agent(
         # plan tools in.
         tools=list(plugin_tools or []),
     )
+    return agent
 
 
 #: Module-level planner agent for the harness to import.
@@ -432,8 +436,12 @@ def build_planner_agent(
 #: in favor of the first model the registry declares (``None``), and
 #: the failure is logged loudly so a typo in ``model_routing`` is
 #: visible instead of silently substituting some other model.
+#:
+#: The annotation carries the deps type, like the builder's return type:
+#: a bare ``Agent`` here would erase it and report the assignment of a
+#: correctly-typed agent as an error.
 try:
-    planner_agent: Agent = build_planner_agent()
+    planner_agent: Agent[PlannerDeps, str] = build_planner_agent()
 except Exception as exc:
     logger.warning(
         "Planner agent: configured model unusable (%s); "

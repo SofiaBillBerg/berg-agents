@@ -75,7 +75,7 @@ Workspace tools (toolset `workspace`) - how to work the filesystem:
 - WRITE with intent: write_file creates, edit_file replaces. Both
   need human approval in chat - the user sees an approve/reject
   dialog, so say what you are about to do before calling.
-- COMPLEX work (multi-step plans, refactors, research) starts with
+- COMPLEX work (multistep plans, refactors, research) starts with
   plan_task, then implement_task runs the approved plan. Each stage
   streams its own result — progress stays visible.
 - If a tool answers "not found" or "is a directory", follow the

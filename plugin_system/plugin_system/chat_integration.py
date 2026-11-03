@@ -99,7 +99,9 @@ async def ensure_plugin_system_ready() -> None:
             # now — the pilot only needs tools + settings + events.
             manager = PluginManager(app=None, harness=None)
             await manager.initialize()
-            await manager.discover_plugins(search_paths)
+            # ``list`` is invariant, so the concrete Path list is widened
+            # to the parameter's declared element type explicitly.
+            await manager.discover_plugins(list[Path | str](search_paths))
             # NOTE: Migration-guide Phase 1 — repo skills join the
             # registry as adapter plugins (same lifecycle, no rewrites).
             try:

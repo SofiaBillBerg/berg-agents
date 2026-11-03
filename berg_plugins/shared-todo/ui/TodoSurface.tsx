@@ -8,7 +8,7 @@ import {
   Chip,
   Fieldset,
   FieldsetLegend} from "@heroui/react";
-import { apiFetch } from "./runtime";
+import { apiFetch, sessionId } from "./runtime";
 
 /**
  * Types mirroring the tools this plugin's REST API returns. They are
@@ -64,10 +64,15 @@ async function callTool(
   tool: string,
   args: Record<string, unknown> = {},
 ): Promise<string> {
+  // Name the session so the server binds the plugin's scoped store to
+  // this conversation. Without it the call falls back to the manifest
+  // default and the panel shows a list no session owns.
+  const sid = sessionId();
+  const body = sid ? { ...args, sessionId: sid } : args;
   const resp = await apiFetch(`/api/plugins/${PLUGIN_ID}/tools/${tool}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(args)});
+    body: JSON.stringify(body)});
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) {
     throw new Error(

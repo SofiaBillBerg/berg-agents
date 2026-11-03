@@ -53,6 +53,7 @@ import Navbar from "./components/Navbar.tsx";
 
 import { buildExportMarkdown } from "@/utils/utils";
 import { API_BASE } from "@/envConfig";
+import { setRuntimeSessionId } from "./runtime/berg-runtime.ts";
 import { useAISDKChat } from "@/harness";
 
 /*
@@ -146,6 +147,14 @@ function ChatContent() {
       })
       .catch(() => setBackendTools([]));
   }, []);
+
+  // Publish the active session to plugin surfaces (via window.BergRuntime).
+  // A plugin whose storage is per session reads this to name the store it
+  // writes to; without it the panel would write to a store no session owns
+  // and show a different plan than the model.
+  useEffect(() => {
+    setRuntimeSessionId(aiChat.sessionId ?? "");
+  }, [aiChat.sessionId]);
 
   // Commands for the slash-autocomplete palette
   const localCommands: Command[] = [

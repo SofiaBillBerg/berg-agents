@@ -43,7 +43,7 @@ from berg_agents.providers.models import (
 from berg_agents.providers.tiers import model_for_complexity
 from berg_agents.tools._io import _atomic_write, _normalize_target
 from pydantic import BaseModel
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.capabilities import ReinjectSystemPrompt
 
 logger = logging.getLogger(__name__)
@@ -281,7 +281,7 @@ def build_implementation_agent(
     cfg: dict[str, Any] | None = None,
     instructions: str | None = None,
     read_only: bool = False,
-    plugin_tools: list[Any] | None = None,
+    plugin_tools: list[Tool[ImplementationDeps]] | None = None,
 ) -> Agent[ImplementationDeps, str]:
     """Build the implementation Pydantic AI agent.
 
@@ -335,7 +335,10 @@ def build_implementation_agent(
         "of what you would do."
     )
 
-    agent: Agent[ImplementationDeps, str] = Agent(
+    # The type parameters are repeated on the constructor: without them a
+    # checker infers the deps slot as `object` and the annotation above is
+    # reported as a mismatch.
+    agent: Agent[ImplementationDeps, str] = Agent[ImplementationDeps, str](
         model,
         # Explicit name labels this agent's Logfire run span.
         name=IMPLEMENTATION_AGENT_NAME,

@@ -18,6 +18,11 @@ declare global {
   interface Window {
     BergRuntime?: {
       apiBase?: string;
+      /**
+       * Session the host is displaying. Used to scope calls to the same
+       * store the chat agent writes to.
+       */
+      sessionId?: string;
       require?: (specifier: string) => unknown;
     };
   }
@@ -31,6 +36,22 @@ declare global {
 export function apiBase(): string {
   if (typeof window === "undefined") return "";
   return String(window.BergRuntime?.apiBase ?? "");
+}
+
+/**
+ * Session the host is currently showing.
+ *
+ * The host scopes a plugin's storage per conversation, so a call that
+ * does not name its session lands in a store no conversation owns (the
+ * manifest default) — the panel would then show a list the model is not
+ * working on. Read at call time, never captured, because switching
+ * sessions changes it without reloading the bundle.
+ *
+ * @returns The active session id, or "" when none is known.
+ */
+export function sessionId(): string {
+  if (typeof window === "undefined") return "";
+  return String(window.BergRuntime?.sessionId ?? "");
 }
 
 /**

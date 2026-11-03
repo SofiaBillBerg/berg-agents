@@ -60,6 +60,17 @@ interface BergRuntimeGlobal {
      * frozen into the plugin at its own build time.
      */
     apiBase: string;
+    /**
+     * The conversation the host is currently showing.
+     *
+     * Published because a plugin's storage can be per session: the host
+     * binds a plugin's scoped store per conversation, and a plugin
+     * surface that calls that store without naming its session would
+     * read and write a store no conversation owns — the user's panel
+     * and the model would then be looking at different plans. Empty
+     * when no session is active (nothing to scope to yet).
+     */
+    sessionId: string;
     /** Resolve a bare specifier to the host's own module object. */
     require: (specifier: string) => unknown;
 }
@@ -68,6 +79,20 @@ declare global {
     interface Window {
         BergRuntime?: BergRuntimeGlobal;
     }
+}
+
+/**
+ * Announce the session plugin surfaces should scope their calls to.
+ *
+ * Called by the chat view whenever the active session changes. Kept
+ * separate from `installBergRuntime` because the session is not known
+ * at install time and changes many times per page load.
+ *
+ * @param sessionId - Active session id, or "" when none is active.
+ */
+export function setRuntimeSessionId(sessionId: string): void {
+    if (typeof window === "undefined" || !window.BergRuntime) return;
+    window.BergRuntime.sessionId = String(sessionId ?? "");
 }
 
 /**
@@ -83,6 +108,8 @@ export function installBergRuntime(): void {
         React,
         HeroUI,
         apiBase: API_BASE,
+        // Replaced as soon as the chat view knows which session is open.
+        sessionId: "",
         require: (specifier: string) => {
             const mod = RUNTIME_MODULES[specifier];
             if (mod === undefined) {

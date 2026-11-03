@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -132,7 +133,10 @@ def build_chat_agent(
     # Rendered fresh per request (this builder runs per /api/chat/stream),
     # project scope shadowing global. The block below is the read path;
     # the two tools are the contribute path (author + why recorded).
-    shared_context = SharedContext.resolve(root_dir)
+    # ``root_dir`` arrives as a str (it is interpolated into the prompt
+    # above); the resolver takes a Path, so convert once here rather than
+    # rely on the callee tolerating either.
+    shared_context = SharedContext.resolve(Path(root_dir))
     rendered_context = shared_context.render()
     if rendered_context:
         system_prompt += (
@@ -149,6 +153,41 @@ def build_chat_agent(
             "turns out to be true, write it here instead of establishing "
             "it again later."
         )
+
+    # The ask_user_question schema is strict (extra fields are rejected) and
+    # its limits are short, but nothing in the model's context states them:
+    # an underspecified call fails validation, is retried verbatim, and the
+    # run dies at the retry limit. State the contract explicitly, taken from
+    # the harness constants so the text cannot drift from what is enforced.
+    try:
+        from pydantic_ai_harness.ask_user._types import (
+            MAX_HEADER_LENGTH,
+            MAX_OPTIONS,
+            MAX_QUESTION_LENGTH,
+            MIN_OPTIONS,
+        )
+
+        system_prompt += (
+            "\n\n# ask_user_question\n"
+            "Call `ask_user_question` only when you genuinely cannot proceed "
+            "without an answer, and keep the call strictly to this shape:\n"
+            "`ask_user_question(questions=[{header, question, options, "
+            "multi_select}])`\n"
+            "Each question object has exactly these keys:\n"
+            f"- header: short label, at most {MAX_HEADER_LENGTH} characters, "
+            "must be unique within the call (it is the answer's key).\n"
+            f"- question: the full question text, at most "
+            f"{MAX_QUESTION_LENGTH} characters.\n"
+            f"- options: {MIN_OPTIONS} to {MAX_OPTIONS} choices, each "
+            "{label, description}; labels must be unique and at most 50 "
+            "characters.\n"
+            "- multi_select: true or false.\n"
+            "Do NOT add any other key (for example `id` or `tool`); unknown "
+            "keys are rejected. Ask in prose instead of calling the tool when "
+            "a short clarifying sentence would do."
+        )
+    except Exception:  # NOTE: never let prompt text break agent build.
+        pass
 
     def write_shared_context(section: str, content: str, why: str) -> str:
         """Overwrite a shared-context section (project scope).
@@ -206,7 +245,11 @@ def build_chat_agent(
         # output type so the VercelAIAdapter streams an approval
         # request, and the frontend answers it with an approval
         # response. Every approval is collected through the UI.
-        retries={"output": 3},
+        # Output retries cover malformed final answers. Tool retries get
+        # their own, larger budget: a wrong tool call is usually a schema
+        # mistake the model can fix when it sees the validation error, and
+        # the library default of 1 kills the whole run on the first miss.
+        retries={"output": 3, "tools": 3},
         # NOTE: Enabled plugin tools (shared-todo pilot). Empty by
         # default — low-risk tools need no HITL approval.
         tools=[*shared_context_tools, *(plugin_tools or [])],

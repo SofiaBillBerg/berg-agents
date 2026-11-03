@@ -545,7 +545,7 @@ def intent_slug(text: str, *, max_words: int = 4, max_chars: int = 40) -> str:
     candidate = (text or "").strip().lower()
     if not candidate:
         return ""
-    # Words first, so a greeting can be recognised even when filler
+    # Words first, so a greeting can be recognized even when filler
     # follows it ("hi there", "hello again").
     words = re.findall(r"[a-z0-9]+", candidate)
     if not words:
