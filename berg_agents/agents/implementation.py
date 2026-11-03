@@ -31,7 +31,7 @@ as a ``provider:model`` string via
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 from typing import Any, Literal
 
@@ -113,6 +113,19 @@ _GENERIC_PLAN: list[dict[str, str]] = [
 
 
 @dataclass
+class FileChange:
+    """One file a run actually modified on disk.
+
+    Attributes:
+        action: Which mutating tool did it (write/edit/patch).
+        path: Workspace-relative path as the tool resolved it.
+    """
+
+    action: str
+    path: str
+
+
+@dataclass
 class ImplementationDeps:
     """Dependencies injected into each implementation agent run.
 
@@ -120,11 +133,17 @@ class ImplementationDeps:
         workspace_root: Workspace directory file tools are bound to.
         complexity: Task complexity level driving model selection.
         task_type: Task type being executed (e.g. ``"edit_file"``).
+        changes: Every file this run actually wrote, appended by the
+            mutating tools. This is the ground truth for "did the work
+            happen" - the model's own summary is narration and may claim
+            success for a write that never occurred. Callers report from
+            here, never from the model's prose.
     """
 
     workspace_root: str = "."
     complexity: str = "standard"
     task_type: str = "generic"
+    changes: list[FileChange] = field(default_factory=list)
 
 
 class PlanStep(BaseModel):
@@ -200,6 +219,59 @@ def estimate_confidence(task_type: str, description: str) -> float:
     if any(kw in lowered for kw in ToolCatalog.EXECUTION_KEYWORDS):
         return 0.7
     return 0.1
+
+
+def _record_change(
+    ctx: RunContext[ImplementationDeps], action: str, target: Any, root: Any
+) -> None:
+    """Note that this run really wrote *target*, for honest reporting.
+
+    The record is written only AFTER the file operation succeeded, so it
+    cannot claim a change that did not happen. Paths are stored relative
+    to the workspace root when possible, because an absolute host path is
+    noise in a chat transcript.
+
+    :param ctx: Run context carrying the run's deps.
+    :param action: Mutating tool that made the change.
+    :param target: Resolved absolute path that was written.
+    :param root: Workspace root the tools are bound to.
+    """
+    try:
+        display = str(target.relative_to(_resolve_path(root)))
+    except (ValueError, OSError):
+        # Outside the workspace, or unresolvable: keep the absolute path
+        # rather than inventing a relative one that would be wrong.
+        display = str(target)
+    ctx.deps.changes.append(FileChange(action=action, path=display))
+
+
+def _resolve_path(path: Any) -> Any:
+    """Resolve a workspace root the same way the file tools do.
+
+    :param path: Workspace root (str or Path).
+    :return: Resolved ``Path``.
+    """
+    from pathlib import Path
+
+    return Path(path or ".").expanduser().resolve()
+
+
+def summarize_changes(changes: list[FileChange]) -> str:
+    """Render what a run actually changed, for the caller to report.
+
+    This is the honest counterpart to the model's own summary: it answers
+    "what touched the disk" from the run's own record, so a caller never
+    has to trust prose that may describe work that never happened.
+
+    :param changes: Recorded file changes from the run's deps.
+    :return: One line per change, or a plain statement that nothing was
+        written.
+    """
+    if not changes:
+        return "No files were changed."
+    lines = [f"- {change.action}: {change.path}" for change in changes]
+    noun = "file" if len(changes) == 1 else "files"
+    return f"Changed {len(changes)} {noun}:\n" + "\n".join(lines)
 
 
 def build_implementation_agent(
@@ -569,6 +641,7 @@ def build_implementation_agent(
             root = ctx.deps.workspace_root or "."
             target = _normalize_target(file_path, root)
             _atomic_write(target, content)
+            _record_change(ctx, "write", target, root)
             return f"Wrote {target}"
 
         @agent.tool
@@ -587,6 +660,7 @@ def build_implementation_agent(
             root = ctx.deps.workspace_root or "."
             target = _normalize_target(file_path, root)
             _atomic_write(target, content)
+            _record_change(ctx, "edit", target, root)
             return f"Edited {target}"
 
         @agent.tool
@@ -638,6 +712,7 @@ def build_implementation_agent(
                 )
             remaining = text.count(old_text) - 1
             _atomic_write(target, text.replace(old_text, new_text, 1))
+            _record_change(ctx, "patch", target, root)
             note = (
                 f" ({remaining} identical block(s) left untouched)"
                 if remaining

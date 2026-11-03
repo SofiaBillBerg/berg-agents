@@ -221,15 +221,63 @@ def _make_plan_task() -> Any:
         Always plan before implementing multi-step work.
 
         :param description: What needs doing, in plain language.
-        :return: Numbered step plan as text.
+        :return: Numbered step plan as text, or an explicit failure
+            message when the planner produced no usable plan.
         """
         from berg_agents.agents.planner import PlannerDeps, build_planner_agent
 
         agent = build_planner_agent()
         result = await agent.run(description, deps=PlannerDeps())
-        return str(result.output)
+        plan = str(result.output).strip()
+        # A planner that answers "I can't" is not a plan. Handing that
+        # text to implement_task made an implementer improvise from a
+        # refusal - and invent a corrupted path while doing it. Fail
+        # loudly here instead of corrupting the next stage.
+        if not _looks_like_plan(plan):
+            return (
+                "plan_task failed: the planner returned no usable plan "
+                f"and nothing was implemented. Planner said:\n{plan}"
+            )
+        return plan
 
     return _plan_task
+
+
+def _looks_like_plan(text: str) -> bool:
+    """Whether *text* is a step plan rather than a refusal or apology.
+
+    A plan enumerates steps; a refusal talks about what the assistant
+    cannot do. The check is deliberately conservative - it only rejects
+    text that is clearly not a plan, because a false rejection is cheap
+    (the caller sees an honest failure) while a false acceptance is the
+    bug this guards against.
+
+    :param text: The planner's raw output.
+    :return: True when the text reads as a plan.
+    """
+    if not text:
+        return False
+    lowered = text.lower()
+    # Refusals and self-described limits never count as plans.
+    refusal_markers = (
+        "i can't",
+        "i cannot",
+        "i don't have",
+        "i do not have",
+        "i'm unable",
+        "i am unable",
+        "no way to write",
+        "don't have access",
+    )
+    if any(marker in lowered for marker in refusal_markers):
+        return False
+    # A real plan enumerates: numbered steps, bullets, or explicit
+    # sequencing words. Anything else is prose about the task.
+    has_steps = any(
+        marker in lowered
+        for marker in ("1.", "1)", "step 1", "- ", "* ", "first,", "then ")
+    )
+    return has_steps
 
 
 def _make_implement_task(root_dir: str) -> Any:
@@ -239,25 +287,32 @@ def _make_implement_task(root_dir: str) -> Any:
         """Execute an approved step plan via the implementation subagent.
 
         Runs in an isolated run with workspace-rooted file tools and
-        returns what was done. Only call with a plan the user has
-        seen — execution needs human approval first.
+        reports what was actually written. Only call with a plan the
+        user has seen — execution needs human approval first.
 
         :param plan: The step plan to execute (from ``plan_task``).
         :param task_type: Task type label for model routing.
-        :return: Execution summary as text.
+        :return: Execution summary naming the files really changed.
         """
         from berg_agents.agents.implementation import (
             ImplementationDeps,
             build_implementation_agent,
+            summarize_changes,
         )
 
         agent = build_implementation_agent()
-        result = await agent.run(
-            plan,
-            deps=ImplementationDeps(
-                workspace_root=root_dir, task_type=task_type
-            ),
-        )
-        return str(result.output)
+        deps = ImplementationDeps(workspace_root=root_dir, task_type=task_type)
+        result = await agent.run(plan, deps=deps)
+        # The model's own text is narration: it can say "Task completed"
+        # while having written nothing, or to a path it invented. Report
+        # from the run's recorded writes so the caller (and the human
+        # reading the chat) sees what actually happened on disk.
+        summary = summarize_changes(deps.changes)
+        narration = str(result.output).strip()
+        if not deps.changes:
+            return (
+                f"{summary}\n\nThe implementation agent reported:\n{narration}"
+            )
+        return f"{summary}\n\nAgent report:\n{narration}"
 
     return _implement_task
