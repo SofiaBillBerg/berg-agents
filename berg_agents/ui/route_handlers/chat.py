@@ -121,6 +121,67 @@ class BergVercelAIAdapter(VercelAIAdapter):
         return DeferredToolResults(approvals=approvals) if approvals else None
 
 
+async def _cap_tool_results(events: Any) -> Any:
+    """Cap every tool result before it is sent back to the model.
+
+    Tool results accumulate in the conversation and are re-sent with each
+    later request, so one enormous result does not just bloat that turn -
+    it bloats every turn after it, until the provider rejects the request
+    outright (observed: a looping tool returned 65 MB, and the provider's
+    50 MB limit turned every retry into an HTTP 413 that ended the
+    session).
+
+    This sits on the event stream rather than in any one tool because the
+    cap must hold for every tool, including plugin tools written later
+    that know nothing about it. Truncation is marked in the text so the
+    model can tell its view is partial and narrow the call, rather than
+    reasoning from a silently gutted result.
+
+    :param events: Async iterator of pydantic-ai native events.
+    :return: The same events, with oversized tool-return parts trimmed.
+    """
+    from berg_agents.core.loop import MAX_TOOL_RESULT_CHARS
+
+    async for event in events:
+        part = getattr(event, "part", None)
+        content = getattr(part, "content", None)
+        if (
+            part is not None
+            and isinstance(content, str)
+            and len(content) > MAX_TOOL_RESULT_CHARS
+        ):
+            name = str(getattr(part, "tool_name", "") or "tool")
+            dropped = len(content) - MAX_TOOL_RESULT_CHARS
+            logger.warning(
+                "tool %s returned %d chars; capped to %d for the model",
+                name,
+                len(content),
+                MAX_TOOL_RESULT_CHARS,
+            )
+            part.content = _truncated_result(name, content, dropped)
+        yield event
+
+
+def _truncated_result(name: str, content: str, dropped: int) -> str:
+    """Render a capped tool result with an explicit truncation notice.
+
+    :param name: Tool name, named in the notice.
+    :param content: The full result text.
+    :param dropped: Characters that did not fit.
+    :return: The head of the result plus a notice telling the model what
+        was cut and how to get the rest.
+    """
+    from berg_agents.core.loop import MAX_TOOL_RESULT_CHARS
+
+    return (
+        content[:MAX_TOOL_RESULT_CHARS]
+        + f"\n\n[... TRUNCATED by berg-agents: {dropped} more characters "
+        f"were dropped from this {name} result. Only the first "
+        f"{MAX_TOOL_RESULT_CHARS} characters are shown. Re-run the call "
+        "with a narrower scope if you need the rest.]"
+    )
+
+
 async def encode_run_stream(
     events: Any, *, on_cancel: Callable[[Any], Awaitable[None]] | None = None
 ) -> Any:
@@ -153,7 +214,7 @@ async def encode_run_stream(
 
     stream = VercelAIEventStream(sdk_version=6)
     async for frame in stream.encode_stream(
-        stream.transform_stream(events, on_cancel=_on_cancel)
+        stream.transform_stream(_cap_tool_results(events), on_cancel=_on_cancel)
     ):
         yield frame
 

@@ -83,6 +83,52 @@ from berg_agents.core.tool_spec import ToolRegistry, effective_risk_class
 
 _LOGGER = logging.getLogger(__name__)
 
+#: Maximum characters of a tool result fed back to the model.
+#:
+#: Tool results are appended to the conversation and re-sent with every
+#: later request, so one unbounded result does not just make that turn
+#: large - it makes every subsequent turn large too. A looping tool
+#: (observed: a planner returning 65 MB) then exceeds the provider's
+#: request limit and every retry fails, killing the session outright.
+#:
+#: The ceiling is deliberately high: ordinary results (file reads,
+#: searches, command output) fit well inside it and pass through
+#: untouched. Only pathological output is truncated, and the model is
+#: told plainly that it was - a visible cut is recoverable (the model can
+#: re-run a narrower query); an HTTP 413 is not.
+MAX_TOOL_RESULT_CHARS = 100_000
+
+
+def _truncate_tool_result(name: str, output: str) -> str:
+    """Cap *output* at :data:`MAX_TOOL_RESULT_CHARS`.
+
+    Truncation is marked in the text itself so the model knows its view
+    is partial and can narrow the call, rather than reasoning from a
+    silently gutted result as if it were complete.
+
+    :param name: Tool name, used in the log line and the notice.
+    :param output: The tool's result text.
+    :return: The text unchanged when it fits, otherwise a head slice
+        followed by an explicit truncation notice.
+    """
+    if len(output) <= MAX_TOOL_RESULT_CHARS:
+        return output
+    dropped = len(output) - MAX_TOOL_RESULT_CHARS
+    _LOGGER.warning(
+        "tool %s returned %d chars; truncated to %d for the model (dropped %d)",
+        name,
+        len(output),
+        MAX_TOOL_RESULT_CHARS,
+        dropped,
+    )
+    return (
+        output[:MAX_TOOL_RESULT_CHARS]
+        + f"\n\n[... TRUNCATED by berg-agents: {dropped} more characters "
+        f"were dropped from this {name} result. Only the first "
+        f"{MAX_TOOL_RESULT_CHARS} characters are shown. Re-run the call "
+        "with a narrower scope if you need the rest.]"
+    )
+
 
 # ---------------------------------------------------------------------------
 # LoopEvent dataclasses (16 variants - see design-contract §2)
@@ -1105,6 +1151,10 @@ def _tool_result_message(
 ) -> dict[str, Any]:
     """Build a ``tool`` role message that feeds the result back to the model.
 
+    The result is capped at :data:`MAX_TOOL_RESULT_CHARS` here, at the
+    single point every tool result passes through, so no tool or plugin
+    can overflow the conversation by returning too much.
+
     :param call_id: The tool call ID.
     :param name: The tool name.
     :param output: The tool's output, which will be coerced to a string.
@@ -1116,7 +1166,7 @@ def _tool_result_message(
         "role": "tool",
         "tool_call_id": call_id,
         "name": name,
-        "content": output}
+        "content": _truncate_tool_result(name, output)}
 
 
 def _tool_error_message(call_id: str, name: str, error: str) -> dict[str, Any]:
