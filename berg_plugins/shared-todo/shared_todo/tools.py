@@ -72,8 +72,8 @@ def _render_subtasks(items: list[dict[str, Any]]) -> str:
     return "\n".join(rendered)
 
 
-def _split_sections(content: str) -> tuple[str, str, str]:
-    """Split a todo file into description body, subtask items stay coded.
+def _split_sections(content: str) -> tuple[str, str, list[dict[str, Any]]]:
+    """Split a todo file into description text, notes text, subtask items.
 
     Returns ``(description, notes, subtask_items)`` where description is
     the raw text between ``## Description`` and the next ``##`` header
@@ -81,7 +81,7 @@ def _split_sections(content: str) -> tuple[str, str, str]:
     as parsed items so rewrites (status changes) never drop them.
 
     :param content: Full todo Markdown file text.
-    :return: Tuple of description text, notes text, subtask items.
+    :return: Tuple of description text, notes text, parsed subtask items.
     """
     lines = content.split("\n")
     description_lines: list[str] = []
@@ -166,7 +166,7 @@ def create_todo(
 
 def list_todo_items(
     status: str | None = None, todo_path: str = "./sharedtodos/"
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     """List todo items as structured data (for API/UI surfaces).
 
     Uses the same Markdown parsing rules as :func:`list_todos` but
@@ -177,7 +177,8 @@ def list_todo_items(
         todo_path: Path to todo directory.
 
     Returns:
-        List of ``{"id", "title", "status", "file"}`` mappings.
+        List of ``{"id", "title", "status", "description", "subtasks",
+        "file"}`` mappings, where ``subtasks`` is the parsed checklist.
     """
     todo_dir = Path(todo_path)
 
@@ -203,7 +204,6 @@ def list_todo_items(
 
             # Extract description via the shared splitter (also parses
             # subtasks so one parse rule serves every reader).
-            content = file_path.read_text(encoding="utf-8")
             description, _, subtasks = _split_sections(content)
 
             # Filter by status if requested
@@ -537,6 +537,40 @@ def add_subtask(
         return f"Error: Could not write todo '{todo_id}': {e}"
     logger.info(f"Added subtask to {todo_id}: {text.strip()}")
     return f"Added subtask #{len(subtasks) - 1} to '{todo_id}': {text.strip()}"
+
+
+def list_subtasks(
+    todo_id: Annotated[str, "ID of the todo to read"],
+    todo_path: str = "./sharedtodos/",
+) -> list[dict[str, str]]:
+    """List a todo's subtasks in file order (the plan's steps).
+
+    Subtasks were writable but not readable: ``list_todo_items`` lists
+    todos and ``list_todos`` formats headers, so nothing returned a
+    single todo's steps. Anything that executes a plan therefore had to
+    carry it as text instead of reading it back.
+
+    Args:
+        todo_id: ID of the todo to read
+        todo_path: Path to todo directory
+
+    Returns:
+        One mapping per subtask: ``{"index", "text", "status"}`` where
+        status is ``done`` or ``todo``. Empty when the todo has no
+        subtasks; a single error mapping is never returned.
+    """
+    loaded = _load_subtasks(todo_id, todo_path)
+    if isinstance(loaded, str):
+        logger.warning("list_subtasks: %s", loaded)
+        return []
+    _file, _lines, subtasks = loaded
+    return [
+        {
+            "index": str(item.get("index", position)),
+            "text": str(item.get("text", "")),
+            "status": "done" if item.get("done") else "todo"}
+        for position, item in enumerate(subtasks)
+    ]
 
 
 def set_subtask_done(

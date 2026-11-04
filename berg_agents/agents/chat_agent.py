@@ -229,8 +229,19 @@ def build_chat_agent(
 
     shared_context_tools = [write_shared_context, append_shared_context]
 
-    # Shared workspace root for file tools and subagent delegates.
-    toolset = WorkspaceToolset(root_dir, allow_shell=_shell_allowed())
+    # Shared workspace root for file tools and subagent delegates. The
+    # plan tools are the session-bound ones from the todo plugin: the
+    # staged delegates write and read the plan there, so it is the same
+    # list the user edits — one plan authority, not a string passed from
+    # stage to stage.
+    plan_tools = {
+        getattr(tool, "name", ""): getattr(tool, "function", tool)
+        for tool in (plugin_tools or [])
+        if getattr(tool, "name", "")
+    }
+    toolset = WorkspaceToolset(
+        root_dir, allow_shell=_shell_allowed(), plan_tools=plan_tools
+    )
 
     agent = Agent(
         model,

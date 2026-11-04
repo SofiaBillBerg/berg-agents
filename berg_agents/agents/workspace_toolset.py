@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import re
 from typing import Any
 
 from pydantic_ai.toolsets.wrapper import WrapperToolset
@@ -76,8 +77,14 @@ Workspace tools (toolset `workspace`) - how to work the filesystem:
   need human approval in chat - the user sees an approve/reject
   dialog, so say what you are about to do before calling.
 - COMPLEX work (multistep plans, refactors, research) starts with
-  plan_task, then implement_task runs the approved plan. Each stage
-  streams its own result — progress stays visible.
+  plan_task, which writes the plan into this session's todo list (the
+  plan panel the user can see and edit). Then implement_task runs the
+  plan by its id. Each stage streams its own result — progress stays
+  visible.
+- The todo list IS the plan. If the user edits it, that edited version
+  is what implement_task executes — never re-plan over their changes.
+  Use the todo tools to update it (add_subtask, complete_todo) instead
+  of restating the plan in chat.
 - If a tool answers "not found" or "is a directory", follow the
   message. Do not retry the same call and do not invent tool names —
   the toolset above is the complete inventory.
@@ -109,6 +116,7 @@ class WorkspaceToolset(WrapperToolset[None]):
         *,
         read_only: bool = False,
         allow_shell: bool = True,
+        plan_tools: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the workspace toolset.
 
@@ -119,6 +127,15 @@ class WorkspaceToolset(WrapperToolset[None]):
             instructed away.
         :param allow_shell: When False, the ``bash`` tool is withheld
             (safe default for untrusted deployments).
+        :param plan_tools: The session-bound plan-store tools, keyed by
+            the names the delegates call (``create_todo``,
+            ``add_subtask``, ``list_subtasks``).
+            Both delegates go through these, so the plan they write and
+            the plan they execute is the one store the user also edits —
+            never a string passed between stages. When None the staged
+            delegates are withheld entirely: a planner with nowhere to
+            write a plan would otherwise hand back prose that the
+            implementer has to guess at, which is the seam this replaced.
         """
         from berg_agents.agents.factory import create_tools
         from pydantic_ai.toolsets import FunctionToolset
@@ -141,32 +158,42 @@ class WorkspaceToolset(WrapperToolset[None]):
                 description=spec.description or spec.name,
                 requires_approval=risk != "low",
             )
-        if not read_only:
-            # Staged delegation: plan first (read-only, no approval),
-            # then implement against the approved plan (approval-gated).
-            # Each stage streams its own result, so progress stays
-            # visible instead of vanishing inside one opaque call.
+        missing = _missing_plan_tools(plan_tools)
+        if not read_only and not missing and plan_tools is not None:
+            # Staged delegation over ONE plan store: plan_task writes the
+            # plan into the session's todo list, implement_task reads it
+            # back by id. The human sees and edits that same list, so the
+            # three views never diverge.
             inner.add_function(
-                _make_plan_task(),
+                _make_plan_task(plan_tools),
                 name="plan_task",
                 description=(
-                    "Decompose a task into an ordered step plan via the "
-                    "planner subagent. Call this before implement_task "
-                    "on any multi-step work."
+                    "Decompose a task into an ordered step plan and write "
+                    "it to this session's todo list. Returns the plan's "
+                    "id, which implement_task consumes."
                 ),
                 requires_approval=False,
                 timeout=240.0,
             )
             inner.add_function(
-                _make_implement_task(str(root_dir)),
+                _make_implement_task(str(root_dir), plan_tools),
                 name="implement_task",
                 description=(
-                    "Execute an approved step plan via the implementation "
-                    "subagent (workspace-rooted file tools). Only call "
-                    "with a plan the user has seen."
+                    "Execute a plan from this session's todo list, by id, "
+                    "via the implementation subagent (workspace-rooted "
+                    "file tools). Reads the list as the user left it."
                 ),
                 requires_approval=True,
                 timeout=600.0,
+            )
+        elif not read_only:
+            # Say so rather than registering a planner that cannot store
+            # what it plans.
+            logger.warning(
+                "Workspace stage tools withheld: plan store tools missing "
+                "(%s). The todo plugin must grant the planner and "
+                "implementer roles.",
+                ", ".join(missing),
             )
         super().__init__(wrapped=inner)
         self._root_dir = str(root_dir)
@@ -210,87 +237,340 @@ class WorkspaceToolset(WrapperToolset[None]):
         return result
 
 
-def _make_plan_task() -> Any:
-    """Build the ``plan_task`` delegate (planner subagent, read-only)."""
+#: Plan-store tools the staged delegates need, by name. Both delegates go
+#: through the same store, so this is the minimum a working plan pipeline
+#: requires; the todo plugin grants all four to the planner and implementer.
+_REQUIRED_PLAN_TOOLS = ("create_todo", "add_subtask", "list_subtasks")
+
+
+def _missing_plan_tools(plan_tools: dict[str, Any] | None) -> list[str]:
+    """Plan-store tools the given mapping does not provide.
+
+    :param plan_tools: Session-bound tools keyed by name, or None.
+    :return: Names that are missing; empty when the store is usable.
+    """
+    if not plan_tools:
+        return list(_REQUIRED_PLAN_TOOLS)
+    return [name for name in _REQUIRED_PLAN_TOOLS if name not in plan_tools]
+
+
+async def _call_plan_tool(
+    plan_tools: dict[str, Any], name: str, **kwargs: Any
+) -> Any:
+    """Call one plan-store tool, sync or async.
+
+    The store is a plugin's plain function today, but a plugin is free to
+    make it async later. Awaiting a non-awaitable raises ``TypeError``,
+    which would surface as a failed plan rather than a contract problem,
+    so this detects the shape instead of assuming one.
+
+    :param plan_tools: Session-bound tools keyed by name.
+    :param name: Tool to call.
+    :param kwargs: Arguments for the tool.
+    :return: The tool's return value.
+    """
+    import inspect
+
+    result = plan_tools[name](**kwargs)
+    if inspect.isawaitable(result):
+        return await result
+    return result
+
+
+def _plan_items_to_text(items: list[dict[str, Any]], title: str) -> str:
+    """Render stored plan items as the step list an implementer reads.
+
+    Completed steps stay in the list, marked done: the implementer needs
+    to know what is already finished, and dropping them would let it redo
+    work the user already checked off.
+
+    :param items: Subtask dicts from the store, in order.
+    :param title: The plan's title, used as a heading.
+    :return: A Markdown step list; empty string when there are no items.
+    """
+    lines: list[str] = []
+    for item in items:
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+        done = str(item.get("status") or "") == "done"
+        lines.append(f"{len(lines) + 1}. {'[done] ' if done else ''}{text}")
+    if not lines:
+        return ""
+    body = "\n".join(lines)
+    return (
+        f"Plan: {title}\n\n{body}\n\n"
+        "Steps marked [done] are already finished — do not redo them."
+    )
+
+
+def _make_plan_task(plan_tools: dict[str, Any]) -> Any:
+    """Build the ``plan_task`` delegate (planner writes the todo list)."""
 
     async def _plan_task(description: str) -> str:
-        """Decompose a task into an ordered step plan.
+        """Decompose a task into an ordered step plan, stored as a todo.
 
-        Calls the planner subagent in an isolated run and returns
-        its plan as text. Read-only: plans nothing, changes nothing.
-        Always plan before implementing multi-step work.
+        Runs the planner subagent, then records its steps in this
+        session's todo list — the same list the user sees and can edit.
+        Nothing is executed here.
 
         :param description: What needs doing, in plain language.
-        :return: Numbered step plan as text, or an explicit failure
+        :return: The plan's todo id and its steps, or an explicit failure
             message when the planner produced no usable plan.
         """
         from berg_agents.agents.planner import PlannerDeps, build_planner_agent
 
-        agent = build_planner_agent()
-        result = await agent.run(description, deps=PlannerDeps())
+        # Hand the planner the same session-bound store tools the delegate
+        # uses. Without them the planner is blind to the repo and can only
+        # answer "I have no tools" - which is a refusal, not a plan.
+        agent = build_planner_agent(plugin_tools=list(plan_tools.values()))
+        # A plan is a short list, never an essay. Without a cap a looping
+        # planner produced 65 MB of output, which then exceeded the
+        # model's 50 MB request limit when the tool result was echoed
+        # back - one bad planning run became a dead session.
+        result = await agent.run(
+            description,
+            deps=PlannerDeps(),
+            model_settings={"max_tokens": _MAX_PLAN_OUTPUT_TOKENS},
+        )
         plan = str(result.output).strip()
-        # A planner that answers "I can't" is not a plan. Handing that
-        # text to implement_task made an implementer improvise from a
-        # refusal - and invent a corrupted path while doing it. Fail
-        # loudly here instead of corrupting the next stage.
-        if not _looks_like_plan(plan):
+        # Only enumerated lines become steps. If the planner wrote prose
+        # and no list - including a refusal such as "I can't" - there is
+        # no plan to store. Say so instead of creating an empty todo the
+        # user has to clean up, and never let a refusal reach the
+        # implementer as if it were a plan.
+        steps = [
+            s
+            for s in _plan_steps_from_text(plan, limit=_MAX_PLAN_STEPS)
+            if not _is_commentary(s)
+        ]
+        if not steps:
             return (
-                "plan_task failed: the planner returned no usable plan "
-                f"and nothing was implemented. Planner said:\n{plan}"
+                "plan_task failed: the planner returned prose with no "
+                "enumerated steps, so nothing was stored. Planner said:"
+                f"\n{_excerpt(plan)}"
             )
-        return plan
+        title = _plan_title(description)
+        created = await _call_plan_tool(plan_tools, "create_todo", title=title)
+        todo_id = _todo_id_from(created)
+        if not todo_id:
+            return (
+                "plan_task failed: the plan could not be stored in the "
+                f"todo list. Store said:\n{created}"
+            )
+        # Subtasks are the plan: one per enumerated step, in order.
+        for step in steps:
+            await _call_plan_tool(
+                plan_tools, "add_subtask", todo_id=todo_id, text=step
+            )
+        return (
+            f"Planned '{title}' as todo {todo_id} with "
+            f"{len(steps)} steps. The user can edit this plan in the "
+            "todo panel; implement_task runs it as it stands.\n\n"
+            + _excerpt(plan)
+        )
 
     return _plan_task
 
 
-def _looks_like_plan(text: str) -> bool:
-    """Whether *text* is a step plan rather than a refusal or apology.
+def _plan_title(description: str) -> str:
+    """A short, stable title for a plan stored from *description*.
 
-    A plan enumerates steps; a refusal talks about what the assistant
-    cannot do. The check is deliberately conservative - it only rejects
-    text that is clearly not a plan, because a false rejection is cheap
-    (the caller sees an honest failure) while a false acceptance is the
-    bug this guards against.
-
-    :param text: The planner's raw output.
-    :return: True when the text reads as a plan.
+    :param description: The user's task text.
+    :return: First line, trimmed to a reasonable todo title length.
     """
-    if not text:
-        return False
-    lowered = text.lower()
-    # Refusals and self-described limits never count as plans.
+    first = " ".join(description.strip().splitlines()[0].split())
+    return (first[:80] or "Plan").rstrip(" .:")
+
+
+def _todo_id_from(created: Any) -> str:
+    """Extract the todo id from a ``create_todo`` response.
+
+    :param created: Whatever the store returned (string or structured).
+    :return: The id, or "" when it cannot be determined.
+    """
+    if isinstance(created, dict):
+        for key in ("id", "todo_id", "todoId"):
+            value = created.get(key)
+            if value:
+                return str(value)
+        return ""
+    text = str(created or "")
+    # The store's human-readable line ends with "ID: <id>".
+    marker = "ID:"
+    if marker in text:
+        tail = text.split(marker, 1)[1].strip()
+        return tail.split()[0].strip("`'\"[]()") if tail else ""
+    return ""
+
+
+#: Hard cap on the planner's own output length, in tokens. A step plan
+#: fits comfortably here; anything longer is a runaway generation, not a
+#: plan.
+_MAX_PLAN_OUTPUT_TOKENS = 2000
+
+#: Hard cap on how many steps one plan may store. A plan with more steps
+#: than this is not a plan a human will read - and a looping planner can
+#: return megabytes, which then blew the model request limit when the
+#: tool result was sent back.
+_MAX_PLAN_STEPS = 50
+
+#: Hard cap on characters of planner output echoed into a tool result.
+#: Tool results are fed back to the model, so unbounded echoes turn one
+#: bad planning run into a failed request (observed: 65 MB -> HTTP 413).
+_MAX_ECHO_CHARS = 4000
+
+
+def _excerpt(text: str, limit: int = _MAX_ECHO_CHARS) -> str:
+    """Trim *text* for inclusion in a tool result.
+
+    :param text: Text to echo back.
+    :param limit: Maximum characters to keep.
+    :return: The text, truncated with a note when it was longer.
+    """
+    if len(text) <= limit:
+        return text
+    dropped = len(text) - limit
+    return f"{text[:limit]}\n\n[... {dropped} more characters truncated]"
+
+
+def _plan_steps_from_text(plan: str, limit: int = 0) -> list[str]:
+    """Split a planner's output into ordered step strings.
+
+    Only enumerations count as steps: ``1. ...``, ``1) ...``, ``- ...``,
+    ``* ...``. Every other line - narration, headings, "here's what I
+    did" preambles, trailing notes - is dropped.
+
+    This is deliberately strict. An earlier version kept any non-empty
+    line, so a planner that narrated ("The plan is in place...", "Two
+    notes on what happened...") had that narration stored as plan steps
+    the user then saw in the todo panel. The stored plan must contain
+    steps and nothing else; prose belongs in the chat reply, which
+    ``plan_task`` already returns.
+
+    :param plan: The planner's raw output.
+    :param limit: Stop after this many steps; 0 means no limit. A
+        runaway planner can return a book, and both the write loop and
+        the tool's return value must stay bounded.
+    :return: Step texts in order; empty when nothing enumerates.
+    """
+    steps: list[str] = []
+    for raw in plan.splitlines():
+        if limit and len(steps) >= limit:
+            # Stopping the scan is not enough: the caller often passes a
+            # huge string, so fail fast instead of walking every line.
+            break
+        line = raw.strip()
+        if not line:
+            continue
+        # Numbered item: "1. " / "1) " - but not a decimal like "50.5 ms".
+        numbered = False
+        for marker in (".", ")"):
+            head, sep, rest = line.partition(marker)
+            if sep and head.strip().isdigit() and rest[:1].isspace():
+                # "50.5 ms" fails here: the character after "." is a digit.
+                line = rest.strip()
+                numbered = True
+                break
+        if not numbered:
+            # Bullet item: "- " / "* ". Anything else is narration, a
+            # heading, or a sign-off - never a step.
+            if line[:2] in ("- ", "* "):
+                line = line[2:].strip()
+            else:
+                continue
+        if not line or line.startswith("#"):
+            continue
+        steps.append(line)
+    return steps
+
+
+def _is_commentary(step: str) -> bool:
+    """Whether *step* is the planner talking about the plan, not a step.
+
+    A planner often ends with commentary written as list items - "Two
+    notes on what happened:", "Complexity is low-to-moderate", "Step 6
+    has no human review gate". Stored verbatim those appear in the todo
+    panel as if they were work to do, which is exactly the kind of
+    noise a human then has to clean up by hand.
+
+    The test is about what the text *is*, not what words it uses: a
+    step tells someone to do something. Commentary describes the plan,
+    grades it, or refers to steps by number.
+
+    :param step: One candidate step line, already un-marked.
+    :return: True when the line is commentary and must not be stored.
+    """
+    lowered = step.lower().strip()
+    if not lowered:
+        return True
+    # A clause that ends in ":" introduces the list that follows it. It is
+    # a heading for sub-items, not work on its own - stored as a step it
+    # reads "Define "stale" — Concrete, auditable criteria, e.g.:" with
+    # nothing under it.
+    if lowered.endswith(":"):
+        return True
+    # Declining to do the work is not a step. "Enable file access. Give me
+    # a tool..." is the planner pushing back on the user; executing it
+    # would ask a human to hand over tools mid-plan.
     refusal_markers = (
+        "paste the",
+        "give me",
         "i can't",
         "i cannot",
         "i don't have",
         "i do not have",
         "i'm unable",
         "i am unable",
+        "enable file access",
+        "file access",
         "no way to write",
         "don't have access",
+        "you write it",
     )
     if any(marker in lowered for marker in refusal_markers):
-        return False
-    # A real plan enumerates: numbered steps, bullets, or explicit
-    # sequencing words. Anything else is prose about the task.
-    has_steps = any(
-        marker in lowered
-        for marker in ("1.", "1)", "step 1", "- ", "* ", "first,", "then ")
+        return True
+    # Self-narration is first person: a step tells *you* to act ("Read the
+    # README"), commentary reports what the planner did ("I first wrote
+    # all four subtasks...", "Here's what I created").
+    if re.match(r"^(i|we)\b|^(here'?s|here is|below)\b", lowered):
+        return True
+    # Meta-commentary that describes the plan rather than ordering work.
+    meta_markers = (
+        "what happened",
+        "the plan is",
+        "this plan",
+        "complexity",
+        "low-risk",
+        "low risk",
+        "straightforward",
+        "no human review",
+        "human review gate",
+        "if you expected",
+        "wasn't one",
+        "not one",
+        "consider adding",
     )
-    return has_steps
+    if any(marker in lowered for marker in meta_markers):
+        return True
+    # "Step 6 has no review gate" - refers to another step by number and
+    # therefore is about the plan, not an instruction of its own.
+    if re.search(r"\bstep[s]?\s+\d", lowered):
+        return True
+    return False
 
 
-def _make_implement_task(root_dir: str) -> Any:
-    """Build the ``implement_task`` delegate (implementation subagent)."""
+def _make_implement_task(root_dir: str, plan_tools: dict[str, Any]) -> Any:
+    """Build the ``implement_task`` delegate (reads the stored plan)."""
 
-    async def _implement_task(plan: str, task_type: str = "generic") -> str:
-        """Execute an approved step plan via the implementation subagent.
+    async def _implement_task(todo_id: str, task_type: str = "generic") -> str:
+        """Execute a stored step plan via the implementation subagent.
 
-        Runs in an isolated run with workspace-rooted file tools and
-        reports what was actually written. Only call with a plan the
-        user has seen — execution needs human approval first.
+        Reads the plan from this session's todo list at call time, so a
+        plan the user edited is the plan that runs. Reports what was
+        actually written. Execution needs human approval first.
 
-        :param plan: The step plan to execute (from ``plan_task``).
+        :param todo_id: Id of the todo whose subtasks form the plan.
         :param task_type: Task type label for model routing.
         :return: Execution summary naming the files really changed.
         """
@@ -300,9 +580,35 @@ def _make_implement_task(root_dir: str) -> Any:
             summarize_changes,
         )
 
-        agent = build_implementation_agent()
+        # Read the plan from the store at call time: a subtask the user
+        # added, reworded, or checked off between planning and executing
+        # is part of the plan that runs.
+        steps = await _call_plan_tool(
+            plan_tools, "list_subtasks", todo_id=todo_id
+        )
+        if not steps:
+            return (
+                f"implement_task: todo {todo_id} has no steps to execute. "
+                "Plan first with plan_task, or add subtasks to the todo."
+            )
+        plan_text = _plan_items_to_text(steps, todo_id)
+        if not plan_text:
+            return (
+                f"implement_task: todo {todo_id} has no readable steps. "
+                "Add subtasks to the todo and try again."
+            )
+        completed = [i for i in steps if str(i.get("status")) == "done"]
+        if completed and len(completed) == len(steps):
+            return f"implement_task: every step of {todo_id} is already done."
+
+        # Same session-bound store tools: the implementer can check off a
+        # step as it finishes, so the panel reflects real progress rather
+        # than the model's narration.
+        agent = build_implementation_agent(
+            plugin_tools=list(plan_tools.values())
+        )
         deps = ImplementationDeps(workspace_root=root_dir, task_type=task_type)
-        result = await agent.run(plan, deps=deps)
+        result = await agent.run(plan_text, deps=deps)
         # The model's own text is narration: it can say "Task completed"
         # while having written nothing, or to a path it invented. Report
         # from the run's recorded writes so the caller (and the human

@@ -42,7 +42,7 @@ from typing import Any
 # dummy BergPlugin/ToolCapability stubs broke discovery.
 from plugin_system.lifecycle.bergplugin import BergPlugin
 from plugin_system.plugin_context import PluginContext
-from plugin_system.plugin_contract import ToolCapability
+from plugin_system.plugin_contract import PluginCapability, ToolCapability
 from shared_todo.shared_todo_distribution import (
     is_integrated_into_berg_agents,
     is_plugin_installable,
@@ -184,14 +184,19 @@ class SharedToDoPlugin(BergPlugin):
         """
         logger.info(f"Unloading {context.plugin_id}")
 
-    def get_capabilities(self) -> list[ToolCapability]:
+    def get_capabilities(self) -> list[PluginCapability]:
         """Return plugin capabilities.
 
         Each todo function is wrapped in a pydantic-ai Tool so the
         agent runtime can call it with a generated JSON schema.
 
+        Returns a ``list[PluginCapability]`` (not the narrower
+        ``ToolCapability``) to match the base class contract: list types
+        are invariant, so a narrower element type is not a valid
+        override even though every item here is a tool.
+
         Returns:
-            List of tool capabilities
+            List of tool capabilities as the base capability type.
         """
         # NOTE: Absolute package import works when the plugin dir is
         # on sys.path (see PluginManager._import_plugin).
@@ -202,6 +207,7 @@ class SharedToDoPlugin(BergPlugin):
             delete_subtask,
             delete_todo,
             list_todo_items,
+            list_subtasks,
             list_todos,
             rename_subtask,
             set_subtask_done,
@@ -218,6 +224,9 @@ class SharedToDoPlugin(BergPlugin):
             ToolCapability(tool=Tool(complete_todo), risk_level="low"),
             ToolCapability(tool=Tool(delete_todo), risk_level="low"),
             ToolCapability(tool=Tool(add_subtask), risk_level="low"),
+            # Read counterpart to add_subtask: without it a plan stored as
+            # subtasks could be written but never read back.
+            ToolCapability(tool=Tool(list_subtasks), risk_level="low"),
             ToolCapability(tool=Tool(set_subtask_done), risk_level="low"),
             ToolCapability(tool=Tool(rename_subtask), risk_level="low"),
             ToolCapability(tool=Tool(delete_subtask), risk_level="low")]
