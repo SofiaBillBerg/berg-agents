@@ -20,12 +20,6 @@
  */
 
 /*
- * HeroUI Theme Customization
- * Add this to your global.css after importing @heroui/styles
- * Only includes variables users need to customize
- * @see https://heroui.com/docs/react/getting-started/theming
- */
-/*
  * Tailwind v4 (CSS-first) must be imported as a bare module specifier,
  * NOT `@import url("tailwindcss")`. The url() form is treated as an
  * external CSS import that PostCSS/Next cannot resolve to the bundle,
@@ -33,29 +27,20 @@
  * entirely — the app falls back to block layout with no utilities
  * (the exact "fixed / can't scroll" regression). Keep this as a string.
  * Order matters: tailwindcss, then @heroui/styles, then local theme.
+ * https://heroui.com/en/themes?chroma=0.13&hue=336.3409276429381&lightness=0.77&formRadius=small&fontFamily=public-sans&base=0.0154 
  */
-@import "tailwindcss";
-@import "@heroui/styles";
-@import "./styles.css";
-@import "./theme.css";
+@import url("tailwindcss");
+@import url("@heroui/styles");
+@import url("./styles.css");
+@import url("./theme.css");
 
-/* https://heroui.com/en/themes?chroma=0.13&hue=336.3409276429381&lightness=0.77&formRadius=small&fontFamily=public-sans&base=0.0154 */
-
-/*
- * HeroUI Theme Customization
- * Add this to your global.css after importing @heroui/styles
- * Only includes variables users need to customize
- * @see https://heroui.com/docs/react/getting-started/theming
- */
 
 :root,
 .light,
 .default,
 [data-theme="light"],
 [data-theme="default"] {
-    /* Theme Colors (Light Mode) - Sofia's HeroUI builder theme
-         (notes/theme.css), except --background which she asked to soften
-         toward pale pink (was near-white, now #f8edf8). */
+    /* Theme Colors (Light Mode) */
     --accent: oklch(77% 0.13 336.34deg);
     --accent-foreground: oklch(15% 0.026 336.34deg);
     --background: oklch(95.79% 0.0187 325.72deg);
@@ -102,10 +87,7 @@
 [data-theme="dark"] {
     color-scheme: dark;
 
-    /* Theme Colors (Dark Mode) - Sofia's HeroUI builder theme
-         (notes/theme.css) verbatim, except --field-background which is
-         shifted blue-purple (hue 293) per her direction: input fields
-         must not hold the red tint. Do not retune anything else. */
+    /* Theme Colors (Dark Mode) */
     --accent: oklch(77% 0.13 336.34deg);
     --accent-foreground: oklch(15% 0.026 336.34deg);
     --background: oklch(12% 0.0154 336.34deg);

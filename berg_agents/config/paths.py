@@ -51,6 +51,26 @@ _PROJECT_DIR_NAMES = (".berg-config", ".berg-agents")
 #: Name used when creating a fresh global directory.
 _GLOBAL_DIR_NAME = ".berg-agents"
 
+#: Environment variable that names the plugin checkout directory. Set it when
+#: the plugins live anywhere other than ``<project_root>/berg_plugins``.
+PLUGINS_DIR_ENV = "BERG_AGENT_PLUGINS_DIR"
+
+
+def plugins_dir() -> Path:
+    """The directory the plugin loader scans for ``berg_plugins/``.
+
+    Never derived from ``__file__``: an installed wheel has no checkout
+    around it, so a path relative to this module would resolve inside
+    ``site-packages``. The environment variable wins; otherwise the
+    conventional checkout location next to the project root.
+
+    :return: Absolute path to the plugins directory (may not exist).
+    """
+    override = os.environ.get(PLUGINS_DIR_ENV)
+    if override:
+        return Path(override).expanduser().resolve()
+    return project_root() / "berg_plugins"
+
 
 def project_root() -> Path:
     """The checkout root (parent of the ``berg_agents`` package)."""

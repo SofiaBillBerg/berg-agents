@@ -26,12 +26,15 @@ Builds the web application around one injected harness: routes in
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
+import contextlib
 from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
 from typing import Any
 
+from berg_agents.config.paths import plugins_dir
 from berg_agents.config.settings import get_settings
 from berg_agents.core.harness import Harness
 from berg_agents.ui.routes import create_router
@@ -43,13 +46,10 @@ from fastapi.staticfiles import StaticFiles
 
 logger = logging.getLogger(__name__)
 
+
 # Static export of the Next.js webapp: ``bun run next build`` writes
 # ``berg_agents/ui/webapp/dist/`` (see ``next.config.mjs`` distDir).
 _WEB_DIST = Path(__file__).resolve().parent / "webapp" / "dist"
-
-# Plugin packages live at the checkout root: this file is
-# berg_agents/ui/server.py, so root is three parents up.
-_PLUGINS_DIR = Path(__file__).resolve().parents[2] / "berg_plugins"
 
 
 def _mount_plugin_assets(app: Any) -> None:
@@ -60,25 +60,27 @@ def _mount_plugin_assets(app: Any) -> None:
     never imports plugin source. Mounts the whole ``berg_plugins``
     directory so installing a plugin needs no host change.
     """
-    if not _PLUGINS_DIR.is_dir():
+    if not plugins_dir().is_dir():
         logger.warning(
             "Plugin directory %s missing; no plugin UI assets served.",
-            _PLUGINS_DIR,
+            plugins_dir(),
         )
         return
     app.mount(
         "/berg-plugins",
-        StaticFiles(directory=_PLUGINS_DIR),
+        StaticFiles(directory=plugins_dir()),
         name="berg-plugins",
     )
     logger.info("Plugin UI assets mounted at /berg-plugins")
 
 
 @asynccontextmanager
-async def _lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
-    """Warm the plugin tool cache at server startup.
+async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Warm the plugin tool cache, then keep the run registry swept.
 
     Failure-isolated: plugin errors only log, the server always starts.
+    The sweeper is cancelled on shutdown, which is what releases every
+    finished run's journal when the process goes down.
     """
     try:
         from plugin_system import (
@@ -93,7 +95,18 @@ async def _lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Plugin tools warmed: %d tools", len(tools))
     except Exception as exc:
         logger.warning("Plugin warmup skipped: %s", exc)
-    yield
+    # Without this task nothing ever calls prune_finished, so finished
+    # runs keep their journals and their sessions keep warm agents.
+    from berg_agents.ui.run_registry import SWEEP_INTERVAL_SECONDS
+
+    registry = app.state.run_registry
+    sweeper = asyncio.create_task(registry.sweep(SWEEP_INTERVAL_SECONDS))
+    try:
+        yield
+    finally:
+        sweeper.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await sweeper
 
 
 def create_app(

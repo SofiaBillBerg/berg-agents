@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING as __TYPE_CHECKING
 from typing import Any
@@ -39,10 +40,6 @@ logger = logging.getLogger(__name__)
 
 if __TYPE_CHECKING:
     from plugin_system.plugin_manager import PluginManager
-
-# Checkout root of the plugin packages (this file is
-# plugin_system/plugin_system/chat_integration.py → up two).
-_PLUGINS_ROOT = Path(__file__).resolve().parents[2] / "berg_plugins"
 
 #: Role used when a caller does not say which agent it is. Declared here,
 #: above every use, because the collectors below default to it.
@@ -59,14 +56,26 @@ _INIT_LOCK = asyncio.Lock()
 
 
 def _plugin_search_paths() -> list[Path]:
-    """Locate checkout plugin directories.
+    """Locate the plugin directory to scan for ``plugin.yaml`` files.
+
+    The location belongs to the host, not to this library: an installed
+    plugin_system has no checkout around it, so the path comes from
+    :func:`berg_agents.config.paths.plugins_dir` when the host is
+    importable, and from ``BERG_AGENT_PLUGINS_DIR`` otherwise.
 
     :return: Existing directories to scan for ``plugin.yaml`` files.
     """
-    # NOTE: This file lives at plugin_system_/plugin_system/, so the
-    # repo checkout root is two parents up.
-    repo_root = Path(__file__).resolve().parents[2]
-    candidates = [repo_root / "berg_plugins"]
+    try:
+        from berg_agents.config.paths import plugins_dir
+    except ImportError:  # standalone plugin_system, no host package
+        plugins_dir = None
+    if plugins_dir is not None:
+        candidates = [plugins_dir()]
+    else:
+        override = os.environ.get("BERG_AGENT_PLUGINS_DIR")
+        if not override:
+            return []
+        candidates = [Path(override).expanduser()]
     return [p for p in candidates if p.is_dir()]
 
 
@@ -416,7 +425,10 @@ def _resolve_ui_declaration(
     # URL is relative to the mounted berg_plugins/ root, so it is
     # <plugin-dir>/<entry> (NOT the absolute package dir name).
     try:
-        url_suffix = package_dir.relative_to(_PLUGINS_ROOT).as_posix()
+        roots = _plugin_search_paths()
+        if not roots:
+            raise ValueError("no plugin root configured")
+        url_suffix = package_dir.relative_to(roots[0]).as_posix()
     except ValueError:
         # Plugin lives outside the mounted root: fall back to the dir
         # name so the URL is still well-formed and the host can say

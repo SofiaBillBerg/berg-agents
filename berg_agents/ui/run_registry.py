@@ -47,6 +47,15 @@ logger = logging.getLogger(__name__)
 #: sent to the server's history instead - the transcript is authoritative.
 JOURNAL_GRACE_SECONDS = 120.0
 
+#: How often the registry sweeps finished runs and idle sessions. Short enough
+#: that a released journal is invisible, long enough to cost nothing.
+SWEEP_INTERVAL_SECONDS = 30.0
+
+#: How long a session keeps a warm agent with no traffic. The plan wanted
+#: "keep warm for the life of the process, evict only under pressure"; a bound
+#: is cheaper to reason about and the rebuild is one fingerprint check away.
+INTERACTIVE_IDLE_SECONDS = 60.0 * 60.0
+
 #: Bound on journaled chunks held for one run. A run that outgrows this drops
 #: its oldest chunks and marks itself truncated; the server's transcript is the
 #: source of truth, so truncation is a UI staleness problem, never a lost turn.
@@ -593,6 +602,45 @@ class RunRegistry:
                 continue
             if now - run.finished_at > JOURNAL_GRACE_SECONDS:
                 runtime.run = None
+
+    def prune_idle(self, max_idle_seconds: float) -> None:
+        """Drop session runtimes untouched for ``max_idle_seconds``.
+
+        Only idle sessions go: a runtime that still holds a live run is in
+        use by definition, and dropping its agent would rebuild it under a
+        running turn.
+
+        :param max_idle_seconds: Age past ``last_used`` that counts as idle.
+        """
+        now = time.monotonic()
+        stale = [
+            session_id
+            for session_id, runtime in self._runtimes.items()
+            if (runtime.run is None or not runtime.run.live)
+            and now - runtime.last_used > max_idle_seconds
+        ]
+        for session_id in stale:
+            logger.info("Releasing idle session runtime %s", session_id)
+            del self._runtimes[session_id]
+            self._locks.pop(session_id, None)
+
+    async def sweep(self, interval_seconds: float) -> None:
+        """Run :meth:`prune_finished` forever, once per ``interval_seconds``.
+
+        Without a sweeper nothing ever calls ``prune_finished``: a finished
+        run keeps its journal alive, and its session keeps a warm agent, for
+        the life of the process. Started by the server lifespan and cancelled
+        with it.
+
+        :param interval_seconds: Pause between sweeps.
+        """
+        while True:
+            await asyncio.sleep(interval_seconds)
+            try:
+                self.prune_finished()
+                self.prune_idle(INTERACTIVE_IDLE_SECONDS)
+            except Exception:  # keep the sweeper alive; log the failure
+                logger.exception("Run registry sweep failed")
 
 
 def _enqueued_chunk_id(chunk: str) -> str | None:

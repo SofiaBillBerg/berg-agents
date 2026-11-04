@@ -38,7 +38,7 @@ the history is an append-only `JSONL` journal at
 who/what/when/**why**. The why is the point: learning here is what-and-why,
 never bare outcome counters.
 
-See ``notes/session-model-map.md`` and the session-model baseline note
+See ``notes/session-model.md`` and the session-model baseline note
 under ``notes/`` (the Human/Berg Collaborative Session doc).
 """
 

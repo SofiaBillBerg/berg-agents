@@ -445,8 +445,9 @@ class RouterStats:
         # no-op beyond the log. Real adaptation is NOT pure outcome
         # statistics — that lever was removed on purpose. It belongs to
         # the Shared Context learning model (WHAT/WHY) and the router
-        # self-improvement loop. See notes/session-model-map.md, ADR-0001,
-        # and notes/consolidation-plan-2026-10-28.md.
+        # self-improvement loop. See notes/tooling-and-router.md §3,
+        # decisions/0001-tooling-roles.md, and the 2026-10-28 entries in
+        # decisions/decisions-log.md.
         logger.info("Routing adjustment candidate: %s", adjustment["action"])
 
     def get_stats(self) -> dict[str, Any]:

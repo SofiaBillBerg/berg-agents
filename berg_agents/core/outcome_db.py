@@ -71,7 +71,7 @@ def db_path() -> str:
 
     The old location (``{checkpoint_dir}/agent_state.db``) is no longer
     consulted: two roots for one concern is the duplication ADR-0001
-    removes. See ``notes/consolidation-plan-2026-10-28.md``.
+    removes. See ``notes/tooling-and-router.md`` §4.2.
     """
     try:
         import os

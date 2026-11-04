@@ -101,8 +101,7 @@
     --berg-shadow-lg: 0 4px 12px rgb(0 0 0 / 15%);
 }
 
-/* Dark mode - Sofia's builder dark (notes/theme.css) for the app
-   shell to match the HeroUI surfaces: near-black rose + hot pink
+/* Dark mode: near-black rose + hot pink
    pop. Verbatim mapping; do not retune. */
 .dark {
     /* Neutrals - near-white copy on near-black rose surfaces */
