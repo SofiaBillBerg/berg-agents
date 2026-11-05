@@ -48,6 +48,8 @@ from fastapi.responses import JSONResponse, Response
 from pydantic_ai import DeferredToolRequests, DeferredToolResults
 from pydantic_ai.messages import (
     ModelRequest,
+    ModelResponse,
+    TextPart,
     ToolCallPart,
     ToolReturnPart,
     UserPromptPart,
@@ -399,8 +401,28 @@ async def _persist_turn(
             ModelRequest(parts=[UserPromptPart(content=text)])
             for text in run.unread_steering
         ]
+        # A failed turn leaves no assistant message in the run's history -
+        # the model never answered. Persist the same failure text the wire
+        # journaled (see LiveRun._drive_graph) as the turn's closing note,
+        # so a reload shows why the turn died instead of a message hanging
+        # unanswered forever.
+        failure_note = (
+            [
+                ModelResponse(
+                    parts=[
+                        TextPart(
+                            content=f"❌ This turn failed: {outcome.detail}"
+                        )
+                    ]
+                )
+            ]
+            if outcome.kind == "failed"
+            else []
+        )
         await session_store.record_turn(
-            store, session_id, [*agent_run.all_messages(), *unread]
+            store,
+            session_id,
+            [*agent_run.all_messages(), *unread, *failure_note],
         )
         # The durable JSONL log takes only what THIS run produced.
         # `all_messages()` re-sends the whole conversation every turn (the
@@ -413,7 +435,7 @@ async def _persist_turn(
         append_new_messages(
             session_id,
             resolve_project(root),
-            [*agent_run.new_messages(), *unread],
+            [*agent_run.new_messages(), *unread, *failure_note],
         )
         conversation_obj = session_store.load_conversation(session_id)
         if conversation_obj is not None:

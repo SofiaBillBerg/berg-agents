@@ -3,28 +3,28 @@ revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.15' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version >= '3.15' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
-    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
-    "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
-    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
-    "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
-    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version >= '3.15' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version >= '3.15' and platform_python_implementation != 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
+    "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
+    "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
+    "python_full_version == '3.14.*' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version == '3.14.*' and platform_python_implementation != 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
+    "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
+    "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version == '3.13.*' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
-    "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
-    "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and platform_python_implementation != 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
+    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
+    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
+    "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
@@ -784,7 +784,7 @@ agent-deps = [
     { name = "cryptography" },
     { name = "fastapi" },
     { name = "httpx" },
-    { name = "httpx2" },
+    { name = "httpx2", extra = ["cli", "rich"] },
     { name = "jsonschema" },
     { name = "markdown" },
     { name = "mempalace" },
@@ -820,7 +820,7 @@ default-base = [
     { name = "fastapi" },
     { name = "flake8" },
     { name = "httpx" },
-    { name = "httpx2" },
+    { name = "httpx2", extra = ["cli", "rich"] },
     { name = "hypothesis" },
     { name = "isort" },
     { name = "jsonschema" },
@@ -1047,16 +1047,16 @@ version = "5.9.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.15' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version >= '3.15' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
+    "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version == '3.14.*' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
-    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
-    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform == 'win32'",
+    "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version < '3.13' and platform_python_implementation == 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/bd/cb/09939728be094d155b5d4ac262e39877875f5f7e36eea66beb359f647bd0/cbor2-5.9.0.tar.gz", hash = "sha256:85c7a46279ac8f226e1059275221e6b3d0e370d2bb6bd0500f9780781615bcea", size = 111231, upload-time = "2026-03-22T15:56:50.638Z" }
@@ -1091,16 +1091,16 @@ version = "6.2.0.post2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.15' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version >= '3.15' and platform_python_implementation != 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
+    "python_full_version == '3.14.*' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version == '3.14.*' and platform_python_implementation != 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version == '3.13.*' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
-    "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
-    "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and platform_python_implementation != 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform == 'win32'",
+    "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform == 'emscripten'",
     "python_full_version < '3.13' and platform_python_implementation != 'PyPy' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cd/eb/e2ef5f241f15131babf4854032953b97c88b2c2700d7712a0ba8f57cbe81/cbor2-6.2.0.post2.tar.gz", hash = "sha256:3b08ba9f3a556186515000949d478e47e6d55322f9d86bdaef5b4e3d27d48298", size = 101466, upload-time = "2026-11-02T10:44:01.627Z" }
@@ -2483,6 +2483,14 @@ sdist = { url = "https://files.pythonhosted.org/packages/43/73/5ca2cedf5e4e50423
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/3d/2e4bc4fd1ef9770871669adb348d612a6e4786b303a23f9935b81c48dd60/httpx2-2.16.0-py3-none-any.whl", hash = "sha256:fd2c5d7909e8d86fe92d53020c310ca0e4e431b838c207c5754b9bbf0308d49a", size = 97880, upload-time = "2026-10-21T07:09:44.01Z" },
 ]
+
+[package.optional-dependencies]
+cli = [
+    { name = "click" },
+    { name = "pygments" },
+    { name = "rich" },
+]
+rich = []
 
 [[package]]
 name = "httpx2-jsfetch"

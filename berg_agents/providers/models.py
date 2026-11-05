@@ -152,6 +152,11 @@ def resolve_model_instance(
     anything else (or nothing) builds an
     :class:`~pydantic_ai.models.openai.OpenAIChatModel`.
 
+    A provider-level ``"timeout"`` option is honored: declared in
+    milliseconds (the AI SDK convention the configuration file follows),
+    converted to seconds once here and applied to the HTTP client of
+    either flavor. Without it the provider's own default applies.
+
     Args:
         model_id: Model identifier exactly as declared
             under a provider's ``models`` map.
@@ -222,6 +227,36 @@ def resolve_model_instance(
             "or base URL; refusing to build a model "
             "instance."
         )
+    # Request timeout from the provider block (``"timeout": 120000``).
+    # The configuration file follows the AI SDK convention - milliseconds -
+    # while the HTTP clients take seconds, so convert once here, at the
+    # only place a model instance is built. Missing or non-positive means
+    # "no override": the provider's own default applies, byte-for-byte the
+    # previous behavior.
+    raw_timeout = resolved.get("timeout")
+    timeout_s: float | None = None
+    if (
+        isinstance(raw_timeout, (int, float))
+        and not isinstance(raw_timeout, bool)
+        and raw_timeout > 0
+    ):
+        timeout_s = float(raw_timeout) / 1000.0
+    # pydantic-ai's providers take no timeout parameter, but they ship the
+    # documented factory for exactly this: `create_async_httpx2_client`'s
+    # own docstring says to call it with the timeout you want and pass the
+    # result as `http_client`. The factory keeps the defaults worth
+    # keeping - SDK-matching connection-pool limits and pydantic-ai's user
+    # agent - and the explicit ``connect=`` preserves its 5-second
+    # fast-fail default for dead endpoints. ``None`` leaves client creation
+    # entirely to the provider, as before.
+    http_client = None
+    if timeout_s is not None:
+        import httpx2
+        from pydantic_ai.models import create_async_httpx2_client
+
+        http_client = create_async_httpx2_client(
+            timeout=httpx2.Timeout(timeout_s, connect=5)
+        )
     # Provider API flavor (per provider block, e.g.
     # ``"api": "anthropic-messages"``). Default is OpenAI
     # Chat Completions. A Messages-style base URL on the
@@ -242,7 +277,10 @@ def resolve_model_instance(
                 root = root[: -len(suffix)] or "/"
                 break
         return AnthropicModel(  # type: ignore[return-value]
-            name, provider=AnthropicProvider(base_url=root, api_key=api_key)
+            name,
+            provider=AnthropicProvider(
+                base_url=root, api_key=api_key, http_client=http_client
+            ),
         )
     if base_url.rstrip("/").endswith("/messages"):
         raise ValueError(
@@ -252,5 +290,8 @@ def resolve_model_instance(
             "letting the OpenAI client append /chat/completions to it."
         )
     return OpenAIChatModel(
-        name, provider=OpenAIProvider(base_url=base_url, api_key=api_key)
+        name,
+        provider=OpenAIProvider(
+            base_url=base_url, api_key=api_key, http_client=http_client
+        ),
     )

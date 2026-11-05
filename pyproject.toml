@@ -52,7 +52,7 @@ agent-deps = [
     "pyyaml>=6.0.3",
     "click>=8.1.7",
     "fastapi",
-    "httpx2>=2.9.1",
+    "httpx2[cli,rich]>=2.9.1",
     "markdown>=3.10.3",
     "ollama>=0.6.2",
     "openai==3.42.1",

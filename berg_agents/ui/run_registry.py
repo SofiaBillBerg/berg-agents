@@ -117,6 +117,10 @@ class _NodeTicket:
     result: Any = None
     done: asyncio.Event = field(default_factory=asyncio.Event)
     cancel: bool = False
+    #: How the node's stream ended when it did not complete: the exception
+    #: the encoder caught mid-stream, stashed before ``done`` is set so the
+    #: driver sees it the instant it wakes. ``None`` on every normal path.
+    error: BaseException | None = None
 
 
 class LiveRun:
@@ -438,8 +442,28 @@ class LiveRun:
                 # as long as the model or tool takes, so any timeout here
                 # would advance the graph under a live stream and corrupt the
                 # run. Deadlock is prevented at the source instead - every
-                # encoder death path releases queued tickets (see _encode).
+                # encoder death path releases queued tickets (see _encode
+                # and _native_events).
                 await self._wait_ticket(ticket)
+                if ticket.error is not None:
+                    # The node's stream died mid-way (a model request
+                    # failed and the protocol layer already turned it
+                    # into the wire's error frame). Never call
+                    # agent_run.next() on the abandoned node: the graph
+                    # state no longer matches the stream the wire
+                    # described, and advancing past it is exactly what
+                    # pydantic-ai rejects. Re-raise the stashed exception
+                    # so _drive_graph journals it and ends the run
+                    # "failed". A first-party cancellation (Stop, run
+                    # timeout) stays a cancel - work done before it is
+                    # kept, not failed.
+                    from pydantic_ai.exceptions import RunCancelled
+
+                    if isinstance(ticket.error, RunCancelled):
+                        return RunOutcome(
+                            kind="cancelled", detail=str(ticket.error)[:200]
+                        )
+                    raise ticket.error
             node = await agent_run.next(node)
         if not _is_end(node):
             return RunOutcome("failed")
@@ -456,7 +480,8 @@ class LiveRun:
         here would advance the graph under a live stream, which pydantic-ai
         rejects ("You must finish streaming before calling run()"). The wait
         cannot deadlock: every encoder death path releases queued tickets
-        (see :meth:`_encode`), and a wedged run is recoverable with Stop.
+        (see :meth:`_encode` and :meth:`_native_events`), and a wedged run
+        is recoverable with Stop.
 
         Bounded for the run's closing result: the graph has already finished,
         so a wedged encoder must not hold the run ``live`` forever.
@@ -618,10 +643,28 @@ class LiveRun:
                 if ticket.result is not None:
                     yield _run_result_event(ticket.result)
                 else:
-                    async for event in _node_events(
-                        ticket.node, self._agent_run.ctx
-                    ):
-                        yield event
+                    try:
+                        async for event in _node_events(
+                            ticket.node, self._agent_run.ctx
+                        ):
+                            yield event
+                    except Exception as exc:
+                        # The node's stream died mid-way (a model request
+                        # failed). The protocol layer converts the
+                        # exception into its error frame further down, so
+                        # it never reaches _encode's except branches -
+                        # without this handler the driver waits on this
+                        # ticket forever and the run stays "live" until
+                        # Stop. Stash the exception on the ticket and
+                        # release it, so the driver can end the run
+                        # properly (see _walk); stash BEFORE releasing,
+                        # because the driver reads ticket.error the instant
+                        # it wakes. The re-raise preserves the wire: the
+                        # protocol layer still produces the same error
+                        # frame it does today.
+                        ticket.error = exc
+                        ticket.done.set()
+                        raise
                 ticket.done.set()
                 continue
             if self._driver_finished:
