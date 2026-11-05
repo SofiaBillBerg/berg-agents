@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from functools import cached_property
 import logging
 from typing import Any
@@ -38,7 +39,7 @@ from berg_agents.ui.projects import resolve_project
 from berg_agents.ui.run_registry import (
     LiveRun,
     SessionRuntime,
-    StaleApprovalError,
+    StaleAnswerError,
 )
 from berg_agents.ui.sessions import SessionManager
 from berg_agents.ui.transcripts import append_new_messages, ensure_transcript
@@ -48,16 +49,26 @@ from pydantic_ai import DeferredToolRequests, DeferredToolResults
 from pydantic_ai.messages import (
     ModelRequest,
     ToolCallPart,
+    ToolReturnPart,
     UserPromptPart,
     repair_messages,
 )
 from pydantic_ai.tools import ToolApproved, ToolDenied
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 from pydantic_ai.ui.vercel_ai.request_types import (
+    DynamicToolOutputAvailablePart,
     ToolApprovalResponded,
     ToolApprovalRespondedPart,
+    ToolOutputAvailablePart,
 )
 from pydantic_ai.usage import UsageLimits
+from pydantic_ai_harness.ask_user import TOOL_NAME as ASK_USER_TOOL_NAME
+from pydantic_ai_harness.ask_user import (
+    AskUserAnswer,
+    AskUserRequest,
+    AskUserResponse,
+    ask_user_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,52 +89,166 @@ _CHAT_USAGE_LIMITS = UsageLimits(request_limit=None)
 
 
 class BergVercelAIAdapter(VercelAIAdapter):
-    """Vercel AI adapter with per-step HITL approval support.
+    """Vercel AI adapter with per-step HITL support for approvals and questions.
 
-    The stock adapter maps each answered approval to a bare ``True`` or
-    ``False``. That discards the arguments the user edited in the UI
-    before approving. This subclass instead maps an *approved* call to
+    Approvals: the stock adapter maps each answered approval to a bare
+    ``True`` or ``False``, discarding the arguments the user edited in the
+    UI before approving. This subclass instead maps an *approved* call to
     :class:`pydantic_ai.ToolApproved` carrying the part's ``input`` as
     ``override_args``: the part's input is the original call's args
     when untouched (a no-op override) and the user's edited args when
     they revised them, so edits reach the actual tool execution.
-
     Denials keep the stock behavior (``False``, or
     ``ToolDenied(message=...)`` when the user gave a reason).
+
+    Questions: an answered ``ask_user_question`` part (the client wrote
+    the canonical answer payload into the part's output) is validated
+    against the question that was asked and rendered with the harness's
+    ``ask_user_result``, landing in ``DeferredToolResults.calls`` - the
+    same channel approvals use, so one resume answers both kinds.
     """
 
     @cached_property
     def deferred_tool_results(self) -> DeferredToolResults | None:
-        """Build the resume payload from the answered approval parts.
+        """Build the resume payload from the answered approval parts or question answers.
 
-        :return: Deferred results for every answered approval in the
+        :return: Deferred results for every answered approval or question in the
             incoming request, or ``None`` when it carries no answers.
         """
         approvals: dict[str, ToolApproved | ToolDenied | bool] = {}
+        calls: dict[str, Any] = {}
+
         for msg in self.run_input.messages:
             if msg.role != "assistant":
                 continue
             for part in msg.parts:
-                if not isinstance(part, ToolApprovalRespondedPart):
-                    continue
-                approval = part.approval
-                if not isinstance(approval, ToolApprovalResponded):
-                    continue
-                if approval.approved:
-                    # The part's input carries the (possibly user-edited)
-                    # args; unchanged input is a no-op override.
-                    approvals[part.tool_call_id] = (
-                        ToolApproved(override_args=part.input)
-                        if part.input is not None
-                        else True
+                # 1. Handle Approvals (Type: ToolApprovalRespondedPart)
+                if isinstance(part, ToolApprovalRespondedPart):
+                    approval = part.approval
+                    if not isinstance(approval, ToolApprovalResponded):
+                        continue
+                    if approval.approved:
+                        approvals[part.tool_call_id] = (
+                            ToolApproved(override_args=part.input)
+                            if part.input is not None
+                            else True
+                        )
+                    elif approval.reason:
+                        approvals[part.tool_call_id] = ToolDenied(
+                            message=approval.reason
+                        )
+                    else:
+                        approvals[part.tool_call_id] = False
+
+                # 2. Handle Question Answers (Type: ToolOutputAvailablePart)
+                # The AI SDK (v7) marks an answered question as output-available.
+                # Typed tool parts carry the name in the `type` prefix, not a
+                # separate field (e.g. type == "tool-ask_user_question"); a
+                # part the client normalized to a dynamic tool carries a
+                # `tool_name` field instead.
+                elif (
+                    isinstance(part, ToolOutputAvailablePart)
+                    and part.type == f"tool-{ASK_USER_TOOL_NAME}"
+                ) or (
+                    isinstance(part, DynamicToolOutputAvailablePart)
+                    and part.tool_name == ASK_USER_TOOL_NAME
+                ):
+                    answer_data = _ask_user_answer_from_output(
+                        part.output, part.input, part.tool_call_id
                     )
-                elif approval.reason:
-                    approvals[part.tool_call_id] = ToolDenied(
-                        message=approval.reason
-                    )
-                else:
-                    approvals[part.tool_call_id] = False
-        return DeferredToolResults(approvals=approvals) if approvals else None
+                    if answer_data is not None:
+                        calls[part.tool_call_id] = answer_data
+
+        return (
+            DeferredToolResults(approvals=approvals, calls=calls)
+            if approvals or calls
+            else None
+        )
+
+
+#: Custom answers are free text from a client; the harness sets no length
+#: limit on them, so this is where the cap lives. Truncation should only
+#: ever bite a forged body: the card's own input is maxlength-bounded.
+_ASK_USER_CUSTOM_ANSWER_MAX_CHARS = 2000
+
+
+def _ask_user_answer_from_output(
+    output: Any, question_args: Any, tool_call_id: str
+) -> dict[str, list[str]] | str | None:
+    """Render a client-submitted answer for one ``ask_user_question`` part.
+
+    The card submits a canonical answer payload in the part's output:
+    ``{"answers": [{"header", "selected", "custom_answer"}], "cancelled"}``,
+    or ``{"answers": [], "cancelled": true}`` for a decline. The part's own
+    input carries the question that was asked, so the answer is checked
+    against it (:func:`~pydantic_ai_harness.ask_user.ask_user_result` runs
+    ``check_response``): a forged body that answers a question it was never
+    asked, or picks a label the question never offered, fails here instead
+    of reaching the model.
+
+    Anything that is not a well-formed payload returns ``None``. A
+    completed turn's part carries the *rendered* result (``{header:
+    [labels]}`` or the DECLINED sentence), which never matches this
+    shape, so spent answers cannot re-arm a resume.
+
+    :param output: The answered part's ``output`` (the canonical payload).
+    :param question_args: The part's ``input`` - the original call args.
+    :param tool_call_id: The answered call's id.
+    :return: The rendered tool result for ``DeferredToolResults.calls``,
+        or ``None`` when the output is not a well-formed answer payload.
+    """
+    if not isinstance(output, dict) or not isinstance(
+        output.get("cancelled"), bool
+    ):
+        return None
+    entries = output.get("answers")
+    if not isinstance(entries, list):
+        return None
+    answers: list[AskUserAnswer] = []
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(
+            entry.get("header"), str
+        ):
+            return None
+        selected = entry.get("selected") or []
+        custom = entry.get("custom_answer")
+        if not isinstance(selected, list) or not all(
+            isinstance(label, str) for label in selected
+        ):
+            return None
+        if custom is not None and not isinstance(custom, str):
+            return None
+        answers.append(
+            AskUserAnswer(
+                header=entry["header"],
+                selected=tuple(selected),
+                custom_answer=(
+                    custom[:_ASK_USER_CUSTOM_ANSWER_MAX_CHARS]
+                    if custom is not None
+                    else None
+                ),
+            )
+        )
+    try:
+        # The part's input is the original call's args; rebuild the exact
+        # request the harness deferred, so validation runs against what
+        # the model actually asked.
+        call = ToolCallPart(
+            tool_name=ASK_USER_TOOL_NAME,
+            args=question_args,
+            tool_call_id=tool_call_id,
+        )
+        request = AskUserRequest.from_tool_call(call)
+        response = AskUserResponse(
+            answers=tuple(answers), cancelled=bool(output["cancelled"])
+        )
+        return ask_user_result(request, response)
+    except (ValueError, TypeError) as exc:
+        # An answer that does not fit its question (unknown header, a label
+        # the question never offered, unreadable args) is dropped: the run
+        # simply stays paused and the card stays up.
+        logger.warning("question answer skipped for %s: %s", tool_call_id, exc)
+        return None
 
 
 async def _cap_tool_results(events: Any) -> Any:
@@ -415,42 +540,52 @@ async def _start_run(
             if text and run.steer(text):
                 return run
 
-        if run is not None and _approvals_from_body(body) is not None:
-            # An approval for a run that already ended: the decision is for
+        if run is not None and _deferred_from_body(body) is not None:
+            # An answer for a run that already ended: the decision is for
             # nothing, so answer it here instead of failing the request. The
-            # client's own expired-approval handling keeps the card honest.
-            raise StaleApprovalError(
-                "the run this approval belongs to has ended"
-            )
+            # client's own expired-card handling keeps the card honest.
+            raise StaleAnswerError("the run this answer belongs to has ended")
 
         runtime = registry.get(session_id) if session_id else None
         generation = (runtime.generation if runtime else 0) + 1
         if runtime is not None:
             runtime.generation = generation
 
-        # An approval resume carries no user text: the model continues from
-        # the deferred batch. Anything else is a fresh turn with a prompt.
-        approvals = _approvals_from_body(body)
+        # A deferred resume (approval decisions or question answers) carries
+        # no user text: the model continues from the deferred batch.
+        # Anything else is a fresh turn with a prompt.
+        deferred = _deferred_from_body(body)
         # A resume whose history has no unfinished call has nothing to answer:
-        # the client re-sent an approval the server already applied. Sending it
+        # the client re-sent an answer the server already applied. Sending it
         # makes pydantic-ai reject the whole request, so drop it and report the
-        # approval as spent instead of starting a doomed run.
-        if approvals is not None and not _has_pending_tool_call(body):
-            raise StaleApprovalError(
-                "this approval was already applied; nothing is left to answer"
+        # answer as spent instead of starting a doomed run.
+        if deferred is not None and not _has_pending_tool_call(body):
+            raise StaleAnswerError(
+                "this answer was already applied; nothing is left to answer"
             )
-        prompt = None if approvals is not None else _latest_user_content(body)
+        prompt = None if deferred is not None else _latest_user_content(body)
 
         # A resume continues from the client's own message list: that is where
         # the paused tool call lives (the run's history holds only what the
-        # model already saw), and it is what the approval ids point into. A
-        # fresh turn uses the session's conversation, so usage and the
+        # model already saw), and it is what the answered call ids point into.
+        # A fresh turn uses the session's conversation, so usage and the
         # conversation id carry across turns.
         start_args: dict[str, Any] = (
             {"message_history": _history_from_body(body, announce=True)}
-            if approvals is not None
+            if deferred is not None
             else {"conversation": conversation}
         )
+        if deferred is not None and deferred.calls:
+            # An answered question rides in the client's part output (the AI
+            # SDK's addToolOutput), so the loaded history already carries a
+            # ToolReturnPart for that call - the raw payload, not the rendered
+            # result. pydantic-ai refuses to resume a call that has both
+            # ("already executed and its result cannot be overridden"), and
+            # the deferred result is the authoritative answer, so the client's
+            # copy is removed here. Only the answered call ids are touched.
+            start_args["message_history"] = _strip_answered_question_returns(
+                start_args["message_history"], set(deferred.calls)
+            )
         if "message_history" not in start_args and conversation is not None:
             _heal_conversation(conversation)
 
@@ -460,7 +595,7 @@ async def _start_run(
                 prompt,
                 output_type=[str, DeferredToolRequests],
                 usage_limits=_CHAT_USAGE_LIMITS,
-                deferred_tool_results=approvals,
+                deferred_tool_results=deferred,
                 **start_args,
             )
 
@@ -692,11 +827,54 @@ def _has_pending_tool_call(body: bytes) -> bool:
     return False
 
 
-def _approvals_from_body(body: bytes) -> DeferredToolResults | None:
-    """Build the resume payload from a request's answered approvals.
+def _strip_answered_question_returns(
+    messages: list[Any], answered_call_ids: set[str]
+) -> list[Any]:
+    """Remove the client's copies of answered ``ask_user_question`` results.
+
+    The client answers a deferred question by writing the canonical answer
+    payload into the part's output (the AI SDK's ``addToolOutput``), so the
+    resume history already carries a ``ToolReturnPart`` for that call - the
+    raw payload rather than the rendered result. pydantic-ai refuses a
+    deferred result for a call the history already answers ("already
+    executed and its result cannot be overridden"), and the deferred result
+    is the authoritative one: validated against the question that was
+    asked, rendered by the harness, recorded by the framework. The client's
+    echo is dropped here; only the answered call ids are touched.
+
+    :param messages: History loaded from the resume body.
+    :param answered_call_ids: Call ids the deferred batch answers.
+    :return: New history list with those echoes removed.
+    """
+    stripped: list[Any] = []
+    for message in messages:
+        parts = getattr(message, "parts", None)
+        if isinstance(message, ModelRequest) and isinstance(parts, list):
+            kept = [
+                part
+                for part in parts
+                if not (
+                    isinstance(part, ToolReturnPart)
+                    and part.tool_call_id in answered_call_ids
+                    and part.tool_name == ASK_USER_TOOL_NAME
+                )
+            ]
+            if len(kept) != len(parts):
+                # dataclasses.replace: ModelRequest is a dataclass, and the
+                # list is rebuilt rather than mutated - the caller's history
+                # stays untouched either way.
+                stripped.append(replace(message, parts=kept))
+                continue
+        stripped.append(message)
+    return stripped
+
+
+def _deferred_from_body(body: bytes) -> DeferredToolResults | None:
+    """Build the resume payload from a request's answered deferred calls.
 
     Uses the adapter's own parsing so approval semantics (edited args,
-    denial reasons) stay in one place. The agent is never run from here:
+    denial reasons) and question answer semantics (validated results)
+    stay in one place. The agent is never run from here:
     only the answered parts are read.
 
     The batch is passed through whole: pydantic-ai requires results for every
@@ -711,7 +889,7 @@ def _approvals_from_body(body: bytes) -> DeferredToolResults | None:
         answered = BergVercelAIAdapter(agent=None, run_input=adapter)
         return answered.deferred_tool_results
     except Exception as exc:
-        logger.warning("approval parse skipped: %s", exc)
+        logger.warning("deferred parse skipped: %s", exc)
         return None
 
 
@@ -1042,10 +1220,10 @@ def register_chat_routes(
                 conversation=conversation,
                 on_finish=_on_run_finish,
             )
-        except StaleApprovalError as exc:
+        except StaleAnswerError as exc:
             # Nothing is running to answer: say so plainly instead of failing
             # the request, so the client can expire the card and move on.
-            logger.info("approval answered after its run ended: %s", exc)
+            logger.info("deferred answer after its run ended: %s", exc)
             return JSONResponse(
                 status_code=409, content={"detail": str(exc), "stale": True}
             )

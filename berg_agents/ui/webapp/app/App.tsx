@@ -40,6 +40,7 @@ import InputBar from "./components/InputBar.tsx";
 import SteeringStrip from "./components/SteeringStrip.tsx";
 import ContextGauge from "./components/ContextGauge.tsx";
 import ApprovalItem from "./components/ApprovalItem";
+import QuestionItem from "./components/QuestionItem";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
 import AgentPanel from "./components/AgentPanel.tsx";
@@ -127,6 +128,9 @@ function ChatContent() {
     respondToAllApprovals,
     editApprovalArgs,
     revertApproval,
+    questionBatch,
+    respondToQuestion,
+    declineAllQuestions,
     systemNotice,
     dismissSystemNotice,
     sessionId,
@@ -228,6 +232,13 @@ function ChatContent() {
     if (pending.length === 0) return;
     void respondToAllApprovals(true);
   }, [autoApproveEdits, approvalBatch, respondToAllApprovals]);
+
+  // Total questions across the active question batch (one call can carry
+  // several), for the question card's header copy.
+  const questionCount = questionBatch.reduce(
+    (n, q) => n + Math.max(q.questions.length, 1),
+    0,
+  );
 
   // Slash-command result cards: processSlashCommand answers locally
   // (help, agents, stats, /memory, tool runs, ...) and the answer
@@ -1012,6 +1023,47 @@ function ChatContent() {
                   ❌ Reject all
                 </Button>
               </div>
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* HITL questions - the agent paused to ask the user something.
+            Mirrors the approval card: one item per ask_user_question
+            call (a call may carry several questions, answered
+            together), per-call decline, and a decline-all convenience.
+            The questions come from the model, so the card reads as the
+            model asking - never like a system gate. */}
+        {questionBatch.length > 0 && (
+          <Card className="mb-1.5 shrink-0 border-warning" variant="default">
+            <Card.Header>
+              <Card.Title>❓ The model is asking</Card.Title>
+              <Card.Description>
+                The agent paused to ask you {questionCount}{" "}
+                {questionCount > 1 ? "questions" : "question"}. Answer or
+                decline each call — the run continues once all are answered.
+              </Card.Description>
+            </Card.Header>
+            <Card.Content className="flex flex-col gap-1.5">
+              {questionBatch.map((question) => (
+                <QuestionItem
+                  key={question.id}
+                  question={question}
+                  isStreaming={isStreaming}
+                  onAnswer={respondToQuestion}
+                />
+              ))}
+              {questionBatch.some((q) => !q.answered) && (
+                <div className="flex gap-2">
+                  <Button
+                    isDisabled={isStreaming}
+                    size="sm"
+                    variant="secondary"
+                    onPress={declineAllQuestions}
+                  >
+                    🚫 Decline all
+                  </Button>
+                </div>
+              )}
             </Card.Content>
           </Card>
         )}

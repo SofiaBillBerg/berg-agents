@@ -132,6 +132,49 @@ function messageToolCalls(msg: UIMessage): ChatMessage["toolCalls"] {
     return calls.length > 0 ? calls : undefined;
 }
 
+/**
+ * The wire tool name of the harness's ask-user call. A question pauses
+ * the run exactly like an approval does; every card, marker and trigger
+ * below branches on this name to keep the two surfaces separate.
+ */
+const ASK_USER_TOOL_NAME = "ask_user_question";
+
+export interface PendingQuestionOption {
+    /** One offered choice, kept verbatim - the answer is keyed by label. */
+    label: string;
+    /** What choosing this option means, when the model provided it. */
+    description?: string;
+}
+
+export interface PendingQuestionData {
+    /** Short label naming the question; the answer is keyed by it. */
+    header: string;
+    /** The full question text. */
+    question: string;
+    /** Whether the user may pick more than one option. */
+    multiSelect: boolean;
+    options: PendingQuestionOption[];
+}
+
+/** One answer inside a submitted response (wire keys are snake_case). */
+export interface PendingQuestionAnswer {
+    header: string;
+    selected: string[];
+    customAnswer?: string;
+}
+
+export interface PendingQuestion {
+    /** Tool call id - pass back to respondToQuestion. */
+    id: string;
+    /** The call's questions, parsed from its args; empty when unreadable. */
+    questions: PendingQuestionData[];
+    /** True once an answer payload is written (badge until the resume
+     fires and the server overwrites the output with the result). */
+    answered: boolean;
+    /** True when the written payload declines the questions. */
+    declined: boolean;
+}
+
 export interface PendingApproval {
     /** Approval id - pass back to respondToApproval */
     id: string;
@@ -186,6 +229,19 @@ export interface UseAISDKChatReturn {
     editApprovalArgs: (id: string, args: unknown) => void;
     /** Withdraw a per-item decision before the batch resumes. */
     revertApproval: (id: string) => void;
+    /** Full active question batch from the last assistant message:
+     pending calls plus already-answered ones (answered calls show a
+     badge until the resume fires and the server overwrites their
+     outputs with the rendered results). */
+    questionBatch: PendingQuestion[];
+    /** Answer one ask_user_question call: its answers, or a decline. */
+    respondToQuestion: (
+        id: string,
+        answers: PendingQuestionAnswer[],
+        declined: boolean,
+    ) => void;
+    /** Decline every pending question in the batch at once. */
+    declineAllQuestions: () => void;
     /** Visible system-recovery notice (failed-send auto-rejects). */
     systemNotice: string | null;
     /** Dismiss the system notice. */
@@ -198,6 +254,80 @@ export interface UseAISDKChatReturn {
     newServerChat: () => Promise<void>;
     /** Open a server-side session by id (loads its transcript). */
     openSession: (id: string) => Promise<void>;
+}
+
+/**
+ * Read a tool part's wire name. Typed parts carry it in the `type` prefix
+ * (`tool-<name>`); a part the client normalized to a dynamic tool carries a
+ * separate `toolName` field instead. One derivation for every call site.
+ */
+function partToolName(p: Record<string, unknown>): string {
+    const type = typeof p.type === "string" ? p.type : "";
+    return (
+        (typeof p.toolName === "string" && p.toolName) ||
+        (type.startsWith("tool-") ? type.slice("tool-".length) : "tool")
+    );
+}
+
+/**
+ * Whether a part's output is a canonical question-answer payload - the
+ * `{answers: [{header, ...}], cancelled}` shape respondToQuestion writes
+ * and the server's adapter expects. Once the resume lands, the server
+ * overwrites the output with the RENDERED result (`{header: [labels]}` or
+ * the DECLINED sentence), which never matches this shape - so spent
+ * answers cannot re-arm a resume and completed turns stay completed.
+ */
+function isQuestionAnswerPayload(output: unknown): boolean {
+    if (typeof output !== "object" || output === null) return false;
+    const o = output as Record<string, unknown>;
+    if (typeof o.cancelled !== "boolean") return false;
+    if (!Array.isArray(o.answers)) return false;
+    return o.answers.every(
+        (entry) =>
+            typeof entry === "object" &&
+            entry !== null &&
+            typeof (entry as Record<string, unknown>).header === "string",
+    );
+}
+
+/**
+ * Parse one ask_user_question call's questions from its input args
+ * (`{questions: [{header, question, multi_select, options}]}`). The
+ * harness validates the same shape before the model's call is accepted,
+ * so anything malformed here is a dead-run ghost: it renders as a raw
+ * call, never as an answerable card.
+ */
+function parseQuestionCall(input: unknown): PendingQuestionData[] {
+    if (typeof input !== "object" || input === null) return [];
+    if (!Array.isArray((input as Record<string, unknown>).questions)) {
+        return [];
+    }
+    const out: PendingQuestionData[] = [];
+    for (const raw of (input as Record<string, unknown>)
+        .questions as unknown[]) {
+        if (typeof raw !== "object" || raw === null) return [];
+        const q = raw as Record<string, unknown>;
+        if (typeof q.header !== "string" || typeof q.question !== "string") {
+            return [];
+        }
+        if (!Array.isArray(q.options)) return [];
+        const options: PendingQuestionOption[] = [];
+        for (const opt of q.options) {
+            if (typeof opt !== "object" || opt === null) return [];
+            const o = opt as Record<string, unknown>;
+            if (typeof o.label !== "string") return [];
+            options.push({
+                label: o.label,
+                description:
+                    typeof o.description === "string" ? o.description : undefined});
+        }
+        out.push({
+            header: q.header,
+            question: q.question,
+            multiSelect: q.multi_select === true,
+            options});
+    }
+    return out;
 }
 
 /**
@@ -271,9 +401,7 @@ function messageText(msg: UIMessage): string {
         const p = part as unknown as Record<string, unknown>;
         const pType = typeof p.type === "string" ? p.type : "";
         if (pType === "dynamic-tool" || pType.startsWith("tool-")) {
-            const name =
-                (typeof p.toolName === "string" && p.toolName) ||
-                (pType.startsWith("tool-") ? pType.slice("tool-".length) : "tool");
+            const name = partToolName(p);
             let args = "";
             if (p.input != null && typeof p.input === "object") {
                 try {
@@ -295,18 +423,23 @@ function messageText(msg: UIMessage): string {
             const output = (p as { output?: unknown }).output;
             const hasOutput = output !== undefined && output !== null;
             if (!hasOutput) {
-                // A paused tool call renders as an approval prompt, not a plain call.
-                // Parts without an approval id are ghosts from dead runs (see
-                // sanitizeHistory): shown as expired, and the approval card
-                // correctly ignores them since there is nothing to answer.
+                // A paused tool call renders by kind: questions get their
+                // own marker so a pause reads as "the model is asking",
+                // never like a system gate. Parts without an approval id
+                // are ghosts from dead runs (see sanitizeHistory): shown
+                // as expired, and the cards correctly ignore them since
+                // there is nothing to answer.
                 const approval = (p as { approval?: unknown }).approval as
                     { id?: unknown } | undefined;
                 const marker =
-                    (p as { state?: unknown }).state === "approval-requested"
-                        ? typeof approval?.id === "string"
-                            ? "⏳ needs approval"
-                            : "⏳ approval expired"
-                        : "🔧";
+                    name === ASK_USER_TOOL_NAME
+                        ? "❓ question pending"
+                        : (p as { state?: unknown }).state ===
+                              "approval-requested"
+                            ? typeof approval?.id === "string"
+                                ? "⏳ needs approval"
+                                : "⏳ approval expired"
+                            : "🔧";
                 chunks.push(`${marker} ${name}${args}`);
             }
         }
@@ -320,7 +453,10 @@ function messageText(msg: UIMessage): string {
  * an old `approval-responded` part makes the backend try to resume a
  * dead run (observed as cryptic failures). Parts answered but never
  * executed revert to `approval-requested` so the user is asked again;
- * malformed parts are dropped.
+ * malformed parts are dropped. A question answer payload sitting in an
+ * earlier message is the same nonce problem in a different shape, so it
+ * is expired to an honest sentence (only the live last message may
+ * carry answers to the backend).
  *
  * Restores (`preserveLatest === false`) go further: the backend is
  * stateless, so EVERY restored approval id belongs to a dead run.
@@ -419,6 +555,33 @@ function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
                         >;
                         return [{...rest, state: "output-denied"}];
                     }
+                    if (
+                        isTool &&
+                        part.state === "output-available" &&
+                        partToolName(part as unknown as Record<string, unknown>) ===
+                            ASK_USER_TOOL_NAME &&
+                        isQuestionAnswerPayload(
+                            (part as { output?: unknown }).output,
+                        )
+                    ) {
+                        // A raw answer payload in an EARLIER message belongs
+                        // to a dead run - only the live last message may
+                        // carry answers. Left in place, the backend's
+                        // resume detection would misread the next send as
+                        // an answer to a run that no longer exists, so the
+                        // payload is expired to an honest sentence (the
+                        // model never saw this answer). This runs for every
+                        // flatMap'd message in both modes: sends strip all
+                        // but the preserved latest, restores strip all of
+                        // them (a paused restore preserves its last message
+                        // whole, above).
+                        return [
+                            {
+                                ...part,
+                                output:
+                                    "The run ended before this answer was " +
+                                    "applied; the question went unanswered."}];
+                    }
                     return [{...part}];
                 })};
         });
@@ -478,6 +641,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
         setMessages: setUIMessages,
         stop,
         addToolApprovalResponse,
+        // Writes a question answer into a tool part's output (matches by
+        // toolCallId in any state, rewrites to output-available, then
+        // re-evaluates sendAutomaticallyWhen - which resumes the run once
+        // every pending part is answered).
+        addToolOutput,
         // Follow a run that is still going without sending anything: the GET
         // stream replays the run's journal, so a reload or a second tab
         // rebuilds the same turn.
@@ -532,11 +700,20 @@ export function useAISDKChat(): UseAISDKChatReturn {
                 }
                 return resp;
             }}),
-        // Resume a paused run after approvals. Per-item answers mark parts
-        // one at a time; the resend fires once every pending part in the
-        // paused message is answered (stepwise decisions never fire a
-        // partial resume, which the backend rejects). Normal finished
-        // turns never match.
+        // Resume a paused run after approvals or question answers. Both
+        // kinds mark their parts one at a time; the resend fires once
+        // every pending part in the paused message is answered (stepwise
+        // decisions never fire a partial resume, which the backend
+        // rejects). Normal finished turns never match:
+        // - approvals count as answered in "approval-responded";
+        // - a question counts as answered in "output-available" with the
+        //   canonical answer payload in its output (see
+        //   isQuestionAnswerPayload) - after the resume the server
+        //   overwrites that output with the rendered result, which the
+        //   shape check rejects, so a completed turn cannot re-fire;
+        // - a question counts as waiting in "input-available" (live
+        //   wire) and "approval-requested" (a reload's dump marks every
+        //   deferred call that way).
         sendAutomaticallyWhen: ({messages}) => {
             const last = messages[messages.length - 1] as
                 { role?: unknown; parts?: unknown } | undefined;
@@ -547,11 +724,25 @@ export function useAISDKChat(): UseAISDKChatReturn {
             let waiting = 0;
             for (const part of last.parts) {
                 if (typeof part !== "object" || part === null) continue;
-                const p = part as { type?: unknown; state?: unknown };
+                const p = part as unknown as Record<string, unknown>;
                 const t = typeof p.type === "string" ? p.type : "";
                 if (t !== "dynamic-tool" && !t.startsWith("tool-")) continue;
-                if (p.state === "approval-responded") answered += 1;
-                else if (p.state === "approval-requested") waiting += 1;
+                if (partToolName(p) === ASK_USER_TOOL_NAME) {
+                    if (
+                        p.state === "output-available" &&
+                        isQuestionAnswerPayload(p.output)
+                    ) {
+                        answered += 1;
+                    } else if (
+                        p.state === "input-available" ||
+                        p.state === "approval-requested"
+                    ) {
+                        waiting += 1;
+                    }
+                } else {
+                    if (p.state === "approval-responded") answered += 1;
+                    else if (p.state === "approval-requested") waiting += 1;
+                }
             }
             return answered > 0 && waiting === 0;
         }});
@@ -623,10 +814,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
                 { id?: unknown } | undefined;
             const approvalId = typeof approval?.id === "string" ? approval.id : null;
             if (!approvalId) continue;
-            const pType = typeof p.type === "string" ? (p.type as string) : "";
-            const toolName =
-                (typeof p.toolName === "string" && (p.toolName as string)) ||
-                (pType.startsWith("tool-") ? pType.slice("tool-".length) : "tool");
+            const toolName = partToolName(p);
+            // Questions have their own card and are answered by tool call
+            // id, not approval id; a reloaded run renders them as
+            // approval-requested, so they must not leak into this batch.
+            if (toolName === ASK_USER_TOOL_NAME) continue;
             let args = "";
             if (p.input != null && typeof p.input === "object") {
                 try {
@@ -664,10 +856,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
                 { id?: unknown; approved?: unknown; reason?: unknown } | undefined;
             const approvalId = typeof approval?.id === "string" ? approval.id : null;
             if (!approvalId) continue;
-            const pType = typeof p.type === "string" ? (p.type as string) : "";
-            const toolName =
-                (typeof p.toolName === "string" && (p.toolName as string)) ||
-                (pType.startsWith("tool-") ? pType.slice("tool-".length) : "tool");
+            const toolName = partToolName(p);
+            // Same exclusion as pendingApprovals: a question answered
+            // before a reload comes back as approval-requested and would
+            // otherwise masquerade as an approval in this batch.
+            if (toolName === ASK_USER_TOOL_NAME) continue;
             let args = "";
             if (p.input != null && typeof p.input === "object") {
                 try {
@@ -681,6 +874,50 @@ export function useAISDKChat(): UseAISDKChatReturn {
                 typeof approval?.reason === "string" ? approval.reason : undefined;
             if (!approvalBatch.some((a) => a?.id === approvalId)) {
                 approvalBatch.push({id: approvalId, toolName, args, decided, reason});
+            }
+        }
+        // Only the last assistant message carries the live batch.
+        break;
+    }
+
+    // Full active question batch, mirroring approvalBatch: the LAST
+    // assistant message's ask_user_question calls, both pending
+    // ("input-available" on the live wire, "approval-requested" after a
+    // reload - the dump marks every deferred call that way) and answered
+    // (their output holds the canonical payload until the resume fires
+    // and the server overwrites it with the rendered result).
+    const questionBatch: PendingQuestion[] = [];
+    for (let i = uiMessages.length - 1; i >= 0; i--) {
+        const msg = uiMessages[i];
+        if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
+        for (const part of msg.parts) {
+            const p = part as unknown as Record<string, unknown>;
+            if (typeof p !== "object" || p === null) continue;
+            if (partToolName(p) !== ASK_USER_TOOL_NAME) continue;
+            const id = typeof p.toolCallId === "string" ? p.toolCallId : null;
+            if (!id) continue;
+            const answered =
+                p.state === "output-available" &&
+                isQuestionAnswerPayload(p.output);
+            if (
+                !answered &&
+                p.state !== "input-available" &&
+                p.state !== "approval-requested"
+            ) {
+                // Completed turns hold rendered results (no payload shape)
+                // and dead-run ghosts were expired by sanitizeHistory;
+                // neither is answerable, so neither belongs in the batch.
+                continue;
+            }
+            const declined =
+                answered &&
+                (p.output as { cancelled?: unknown }).cancelled === true;
+            if (!questionBatch.some((q) => q.id === id)) {
+                questionBatch.push({
+                    id,
+                    questions: parseQuestionCall(p.input),
+                    answered,
+                    declined});
             }
         }
         // Only the last assistant message carries the live batch.
@@ -797,6 +1034,72 @@ export function useAISDKChat(): UseAISDKChatReturn {
                     return changed ? {...msg, parts: nextParts} : msg;
                 }) as unknown as UIMessage[],
         );
+    };
+
+    // Answer ONE ask_user_question call. The payload written into the
+    // part's output is the canonical wire shape the server's adapter
+    // validates against the question that was asked (the harness's
+    // check_response): every question answered with labels it offered
+    // or a nonblank custom answer, or a bare decline. addToolOutput
+    // rewrites the part to output-available and re-evaluates
+    // sendAutomaticallyWhen, which resumes the run once every pending
+    // part in the paused message is answered.
+    const questionResolvable = (id: string) =>
+        uiMessages.some((msg) =>
+            (msg.parts ?? []).some(
+                (part) =>
+                    typeof part === "object" &&
+                    part !== null &&
+                    partToolName(part as unknown as Record<string, unknown>) ===
+                        ASK_USER_TOOL_NAME &&
+                    (part as unknown as { toolCallId?: unknown }).toolCallId ===
+                        id &&
+                    !(
+                        (part as unknown as { state?: unknown }).state ===
+                            "output-available" &&
+                        isQuestionAnswerPayload(
+                            (part as unknown as { output?: unknown }).output,
+                        )
+                    ),
+            ),
+        );
+
+    const respondToQuestion = (
+        id: string,
+        answers: PendingQuestionAnswer[],
+        declined: boolean,
+    ) => {
+        if (!questionResolvable(id)) {
+            console.warn(
+                `[useAISDKChat] Question ${id} is not answerable in this ` +
+                    `message state (stale or restored run) - ignoring the click.`,
+            );
+            return;
+        }
+        // Canonical payload: wire keys are the harness's (snake_case), and
+        // a decline carries no answers - exactly what check_response
+        // demands. Whether the SDK can still resolve a toolCallId is
+        // guarded above for the same reason as approvals: addToolOutput
+        // throws on an unknown id and wedges the run.
+        const payload = {
+            answers: declined
+                ? []
+                : answers.map((a) => ({
+                      header: a.header,
+                      selected: a.selected,
+                      custom_answer: a.customAnswer ?? null})),
+            cancelled: declined};
+        void addToolOutput({
+            tool: "dynamic-tool",
+            toolCallId: id,
+            output: payload});
+    };
+
+    // Decline every pending question in the batch (batch convenience).
+    const declineAllQuestions = () => {
+        for (const q of questionBatch) {
+            if (!q.answered) respondToQuestion(q.id, [], true);
+        }
     };
 
     // Convert AI SDK UIMessage[] to the simpler ChatMessage[] our UI expects.
@@ -1262,6 +1565,9 @@ export function useAISDKChat(): UseAISDKChatReturn {
         respondToAllApprovals,
         editApprovalArgs,
         revertApproval,
+        questionBatch,
+        respondToQuestion,
+        declineAllQuestions,
         systemNotice,
         dismissSystemNotice: () => setSystemNotice(null),
         sessionId,

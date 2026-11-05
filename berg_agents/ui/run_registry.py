@@ -71,8 +71,8 @@ JOURNAL_MAX_CHUNKS = 20000
 SDK_VERSION = 6
 
 
-class StaleApprovalError(RuntimeError):
-    """Raised when an approval answers a run that has already ended."""
+class StaleAnswerError(RuntimeError):
+    """Raised when a deferred answer (approval or question) answers a run that has already ended or was already applied."""
 
 
 @dataclass(slots=True)

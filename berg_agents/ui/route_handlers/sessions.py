@@ -216,7 +216,16 @@ def register_session_routes(
         )
         return {
             "session": session_store.summary_to_dict(saved.summary),
-            "messages": [m.model_dump(mode="json") for m in ui_messages]}
+            # The live SSE stream serializes these same models with
+            # by_alias + exclude_none (the AI SDK wire shape is
+            # camelCase: toolCallId, not tool_call_id). A restore that
+            # deviated from it left question/approval parts without
+            # their ids, so the HITL cards could not render after a
+            # reload. Mirror the stream's serialization exactly.
+            "messages": [
+                m.model_dump(mode="json", by_alias=True, exclude_none=True)
+                for m in ui_messages
+            ]}
 
     @router.patch("/api/sessions/{session_id}")
     async def rename_session(

@@ -38,4 +38,8 @@ export {useAISDKChat} from "./useAISDKChat";
 export type {
     ChatMessage,
     PendingApproval,
+    PendingQuestion,
+    PendingQuestionAnswer,
+    PendingQuestionData,
+    PendingQuestionOption,
     UseAISDKChatReturn} from "./useAISDKChat";
