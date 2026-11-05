@@ -437,8 +437,16 @@ async def _persist_turn(
             resolve_project(root),
             [*agent_run.new_messages(), *unread, *failure_note],
         )
-        conversation_obj = session_store.load_conversation(session_id)
-        if conversation_obj is not None:
+        # The run's own Conversation is the state the next turn carries on
+        # from: messages, running usage, the conversation id, and — critical
+        # for paused runs — the deferred tool requests an approval resume
+        # answers. Persisting it (not a re-dump of what the store already
+        # held) is what makes a session's *first* save possible: loading the
+        # store and writing it back unchanged could never create the row,
+        # which stranded every session's history in the transcript only.
+        run_result = agent_run.result
+        if run_result is not None:
+            conversation_obj = run_result.conversation
             payload = ConversationTypeAdapter.dump_json(conversation_obj)
             await asyncio.to_thread(
                 session_store.save_conversation,

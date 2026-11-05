@@ -63,6 +63,9 @@
         "apiKey": "${env:BERG_AGENT_UNSLOTH_API_KEY}",
         "timeout": 120000},
       "models": {
+        "mudler/Qwen3.8-27B-APEX-GGUF:Qwen3.8-27B-APEX-I-Nano": {
+          "name":"mudler/Qwen3.8-27B-APEX-GGUF:Qwen3.8-27B-APEX-I-Nano"
+        },
         "sigmanih/mistralai-Devstral-Small-2-24B-Instruct-2512-GGUF-Q4_K_M:Q4_K_M": {
           "name": "sigmanih/mistralai-Devstral-Small-2-24B-Instruct-2512-GGUF-Q4_K_M:Q4_K_M"
         },
@@ -162,16 +165,16 @@
   "model_routing": {
     "models": {
       "trivial": {
-        "models": ["bonsai-2:9b"],
-        "max_tokens": 16000},
+        "models": ["bonsai-2:9b", "ornith:9b-q4_K_M"],
+        "max_tokens": 64000},
       "standard": {
-        "models": ["sigmanih/mistralai-Devstral-Small-2-24B-Instruct-2512-GGUF-Q4_K_M:Q4_K_M"],
+        "models": ["sigmanih/mistralai-Devstral-Small-2-24B-Instruct-2512-GGUF-Q4_K_M:Q4_K_M", "mudler/Qwen3.8-27B-APEX-GGUF:Qwen3.8-27B-APEX-I-Nano", "auto/best-free"],
         "max_tokens": 90000},
       "complex": {
-        "models": ["logfare/logfare/auto"],
+        "models": ["logfare/logfare/auto", "auto/free-combo","base-free-stack", "auto/best-free"],
         "max_tokens": 230000},
       "critical": {
-        "models": ["logfare/logfare/auto"],
+        "models": ["auto/free-combo", "logfare/logfare/auto","base-free-stack", "auto/best-free"],
         "max_tokens": 230000}}},
   // HITL rules: Guardian decides when to ask human
   "hitl_rules": {
@@ -192,7 +195,7 @@
   // Agent overrides (optional)
   "agents": {
     "guardian": {
-      "preferred_complexity": "standard"},
+      "preferred_complexity": "trivial"},
     "planner": {
       "preferred_complexity": "complex"},
     "implementation": {

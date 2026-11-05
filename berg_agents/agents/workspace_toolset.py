@@ -45,7 +45,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, override
 
 from pydantic_ai.toolsets.wrapper import WrapperToolset
 
@@ -140,7 +140,21 @@ class WorkspaceToolset(WrapperToolset[None]):
         from berg_agents.agents.factory import create_tools
         from pydantic_ai.toolsets import FunctionToolset
 
+        # Sink for subagent progress, set by the web layer once the run
+        # exists (the run is created after the agent, so this cannot be a
+        # constructor argument). A holder dict rather than a plain
+        # attribute: the delegate reads it at call time, so it always sees
+        # the sink attached to the run that is currently streaming. No
+        # sink means "nothing is watching" - a CLI or harness caller
+        # simply gets no progress relay.
+        self.progress_holder: dict[str, Any] = {"sink": None}
         inner: FunctionToolset[None] = FunctionToolset()
+        # The planner subagent's read-only tool set: it may ground a plan
+        # in the repo it plans for, but the plan itself is written by the
+        # plan_task delegate alone. Store write tools are withheld here
+        # on purpose — a planner with store tools created its own todo,
+        # and the delegate then created a second from its text output.
+        read_tools: list[Any] = []
         for spec in create_tools(root_dir):
             if spec.execute is None:
                 logger.warning(
@@ -152,6 +166,8 @@ class WorkspaceToolset(WrapperToolset[None]):
                 continue
             if not allow_shell and spec.name == "bash":
                 continue
+            if risk == "low":
+                read_tools.append(spec.execute)
             inner.add_function(
                 spec.execute,
                 name=spec.name,
@@ -165,7 +181,7 @@ class WorkspaceToolset(WrapperToolset[None]):
             # back by id. The human sees and edits that same list, so the
             # three views never diverge.
             inner.add_function(
-                _make_plan_task(plan_tools),
+                _make_plan_task(plan_tools, read_tools),
                 name="plan_task",
                 description=(
                     "Decompose a task into an ordered step plan and write "
@@ -176,15 +192,20 @@ class WorkspaceToolset(WrapperToolset[None]):
                 timeout=240.0,
             )
             inner.add_function(
-                _make_implement_task(str(root_dir), plan_tools),
+                _make_implement_task(
+                    str(root_dir), plan_tools, self.progress_holder
+                ),
+                takes_ctx=True,
                 name="implement_task",
                 description=(
                     "Execute a plan from this session's todo list, by id, "
                     "via the implementation subagent (workspace-rooted "
                     "file tools). Reads the list as the user left it."
                 ),
+                # No timeout: the subagent is a real run that keeps writing
+                # after the tool call returns, so a cap reported failure over
+                # live work. Stop is the way to end it.
                 requires_approval=True,
-                timeout=600.0,
             )
         elif not read_only:
             # Say so rather than registering a planner that cannot store
@@ -206,6 +227,11 @@ class WorkspaceToolset(WrapperToolset[None]):
         """
         return WORKSPACE_TOOLSET_ID
 
+    # Overrides the framework toolset extension point
+    # (WrapperToolset/AbstractToolset.get_instructions), so it stays an
+    # instance method even though it ignores ``self``; ``@override``
+    # declares that contract instead of a static-method rewrite.
+    @override
     async def get_instructions(self, ctx: Any) -> str:
         """Workspace usage guide, injected once per run.
 
@@ -277,35 +303,122 @@ async def _call_plan_tool(
     return result
 
 
+async def _resolve_todo_id(
+    plan_tools: dict[str, Any], todo_id: str
+) -> tuple[str | None, list[str]]:
+    """Resolve a possibly truncated todo id against the store.
+
+    Models re-type ids between stages and routinely drop edge
+    characters (observed: a 50-char slug ending in ``"alpha",`` was
+    sent twice without the trailing comma, and an exact-only lookup
+    misdiagnosed it as "no steps to execute"). Exact match wins;
+    failing that, a single unique prefix match is accepted in either
+    direction — the model usually *drops* characters (its id is then a
+    prefix of the stored one), but the stored id can also be the
+    prefix if it was truncated at creation. Anything ambiguous is left
+    unresolved with the full id list, so the caller can point the
+    model at the real id instead of guessing.
+
+    :param plan_tools: Session-bound tools keyed by name.
+    :param todo_id: The id as the model typed it.
+    :return: ``(resolved id or None, all stored todo ids)``.
+    """
+    available: list[str] = []
+    if "list_todo_items" not in plan_tools:
+        # Store without the structured listing (older plugin): exact
+        # match is all that can be checked.
+        return todo_id, available
+    try:
+        items = await _call_plan_tool(plan_tools, "list_todo_items")
+    except Exception as exc:
+        # A broken listing must not kill the exact-match path: fall
+        # back to treating the typed id as authoritative.
+        logger.warning("todo id resolution failed: %s", exc)
+        return todo_id, available
+    for item in items or []:
+        item_id = str(item.get("id") or "")
+        if item_id:
+            available.append(item_id)
+    if todo_id in available:
+        return todo_id, available
+    candidates = [
+        stored
+        for stored in available
+        if stored.startswith(todo_id) or todo_id.startswith(stored)
+    ]
+    if len(candidates) == 1:
+        logger.info(
+            "todo id %r resolved by unique prefix to %r", todo_id, candidates[0]
+        )
+        return candidates[0], available
+    return None, available
+
+
+def _brief(value: Any, limit: int = 160) -> str:
+    """Collapse a tool argument or result into one short log line.
+
+    The subagent's progress notes ride the chat's own SSE stream, so a
+    full file body or a 200-line bash result would flood the transcript.
+    This keeps the *shape* of the activity (which tool, on what) without
+    the payload.
+
+    :param value: Any tool argument or result.
+    :param limit: Maximum characters kept.
+    :return: Single-line, truncated text.
+    """
+    text = " ".join(str(value).split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _brief_args(args: Any) -> str:
+    """Render a tool call's arguments compactly for a progress note.
+
+    :param args: The call's arguments (mapping, string, or None).
+    :return: ``key=value`` pairs, or a plain string, clipped for display.
+    """
+    if isinstance(args, dict):
+        pairs = [f"{key}={_brief(val, 60)}" for key, val in args.items()]
+        return _brief(", ".join(pairs))
+    return _brief("" if args is None else args)
+
+
 def _plan_items_to_text(items: list[dict[str, Any]], title: str) -> str:
     """Render stored plan items as the step list an implementer reads.
 
     Completed steps stay in the list, marked done: the implementer needs
     to know what is already finished, and dropping them would let it redo
-    work the user already checked off.
+    work the user already checked off. Each line carries the step's store
+    index, which is what ``set_subtask_done`` takes - without it the
+    implementer could not check progress off even when told to.
 
     :param items: Subtask dicts from the store, in order.
     :param title: The plan's title, used as a heading.
     :return: A Markdown step list; empty string when there are no items.
     """
     lines: list[str] = []
-    for item in items:
+    for position, item in enumerate(items):
         text = str(item.get("text") or "").strip()
         if not text:
             continue
         done = str(item.get("status") or "") == "done"
-        lines.append(f"{len(lines) + 1}. {'[done] ' if done else ''}{text}")
+        # Prefer the store's own index: it is the key set_subtask_done
+        # resolves, and a skipped blank subtask would shift a
+        # position-based number away from it.
+        index = item.get("index", position)
+        lines.append(f"[{index}] {'[done] ' if done else ''}{text}")
     if not lines:
         return ""
     body = "\n".join(lines)
     return (
-        f"Plan: {title}\n\n{body}\n\n"
-        "Steps marked [done] are already finished — do not redo them."
+        f"Plan: {title}\n"
+        f"Todo id (use as todo_id): {title}\n\n{body}\n\n"
+        "Check each step off with set_subtask_done(todo_id, index) as you "
+        "finish it. Steps marked [done] are already finished — do not redo them."
     )
 
 
-def _make_plan_task(plan_tools: dict[str, Any]) -> Any:
-    """Build the ``plan_task`` delegate (planner writes the todo list)."""
+def _make_plan_task(plan_tools: dict[str, Any], read_tools: list[Any]) -> Any:
+    """Build the ``plan_task`` delegate (the delegate writes the plan)."""
 
     async def _plan_task(description: str) -> str:
         """Decompose a task into an ordered step plan, stored as a todo.
@@ -318,12 +431,21 @@ def _make_plan_task(plan_tools: dict[str, Any]) -> Any:
         :return: The plan's todo id and its steps, or an explicit failure
             message when the planner produced no usable plan.
         """
-        from berg_agents.agents.planner import PlannerDeps, build_planner_agent
+        from berg_agents.agents.planner import (
+            PLANNER_PLAN_INSTRUCTIONS,
+            PlannerDeps,
+            build_planner_agent,
+        )
 
-        # Hand the planner the same session-bound store tools the delegate
-        # uses. Without them the planner is blind to the repo and can only
-        # answer "I have no tools" - which is a refusal, not a plan.
-        agent = build_planner_agent(plugin_tools=list(plan_tools.values()))
+        # The planner subagent is read-only: it gets the workspace's read
+        # tools so it is not blind to the repo, and never the plan-store
+        # tools. This delegate is the single writer of the plan into the
+        # session's todo list — a planner with store tools created its
+        # own todo, and the delegate then created a second from its text
+        # output, so one plan arrived as two diverging todos.
+        agent = build_planner_agent(
+            plugin_tools=read_tools, instructions=PLANNER_PLAN_INSTRUCTIONS
+        )
         # A plan is a short list, never an essay. Without a cap a looping
         # planner produced 65 MB of output, which then exceeded the
         # model's 50 MB request limit when the tool result was echoed
@@ -475,7 +597,7 @@ def _plan_steps_from_text(plan: str, limit: int = 0) -> list[str]:
         if not numbered:
             # Bullet item: "- " / "* ". Anything else is narration, a
             # heading, or a sign-off - never a step.
-            if line[:2] in ("- ", "* "):
+            if line[:2] in {"- ", "* "}:
                 line = line[2:].strip()
             else:
                 continue
@@ -555,22 +677,40 @@ def _is_commentary(step: str) -> bool:
         return True
     # "Step 6 has no review gate" - refers to another step by number and
     # therefore is about the plan, not an instruction of its own.
-    if re.search(r"\bstep[s]?\s+\d", lowered):
-        return True
-    return False
+    return bool(re.search(r"\bstep[s]?\s+\d", lowered))
 
 
-def _make_implement_task(root_dir: str, plan_tools: dict[str, Any]) -> Any:
-    """Build the ``implement_task`` delegate (reads the stored plan)."""
+def _make_implement_task(
+    root_dir: str,
+    plan_tools: dict[str, Any],
+    sink_owner: dict[str, Any] | None = None,
+) -> Any:
+    """Build the ``implement_task`` delegate (reads the stored plan).
 
-    async def _implement_task(todo_id: str, task_type: str = "generic") -> str:
+    :param root_dir: Workspace root the implementer's file tools are bound to.
+    :param plan_tools: Session-bound plan-store tools.
+    :param sink_owner: Mutable holder whose ``"sink"`` entry is read at
+        call time. The web layer sets it once the run exists (the run is
+        built after the agent), so a captured value would always be the
+        stale ``None``.
+    """
+
+    async def _implement_task(
+        ctx: RunContext[Any], todo_id: str, task_type: str = "generic"
+    ) -> str:
         """Execute a stored step plan via the implementation subagent.
 
         Reads the plan from this session's todo list at call time, so a
         plan the user edited is the plan that runs. Reports what was
         actually written. Execution needs human approval first.
 
+        :param ctx: Parent run context - carries the sink that relays the
+            subagent's activity to the web UI.
         :param todo_id: Id of the todo whose subtasks form the plan.
+            Resolved exactly first, then by unique prefix, so a re-typed
+            id that lost edge punctuation still finds the plan; when
+            several or no todos match, the real ids are reported back
+            instead of a guess.
         :param task_type: Task type label for model routing.
         :return: Execution summary naming the files really changed.
         """
@@ -579,6 +719,21 @@ def _make_implement_task(root_dir: str, plan_tools: dict[str, Any]) -> Any:
             build_implementation_agent,
             summarize_changes,
         )
+
+        # Resolve the id the model typed: exact first, then unique
+        # prefix. The model re-types ids between stages and drops edge
+        # punctuation (one plan id lost its trailing comma twice in a
+        # single session); an exact-only lookup turned that into "no
+        # steps to execute" — the wrong diagnosis for a wrong id.
+        typed_id = todo_id.strip()
+        resolved, available = await _resolve_todo_id(plan_tools, typed_id)
+        if resolved is None:
+            listing = ", ".join(available) if available else "(no todos stored)"
+            return (
+                f"implement_task: no todo matches the id {typed_id!r}. "
+                f"Available todo ids: {listing}. Call again with one of them."
+            )
+        todo_id = resolved
 
         # Read the plan from the store at call time: a subtask the user
         # added, reworded, or checked off between planning and executing
@@ -608,7 +763,45 @@ def _make_implement_task(root_dir: str, plan_tools: dict[str, Any]) -> Any:
             plugin_tools=list(plan_tools.values())
         )
         deps = ImplementationDeps(workspace_root=root_dir, task_type=task_type)
-        result = await agent.run(plan_text, deps=deps)
+
+        # Live progress: forward each tool call the implementer makes into
+        # the parent run's journal. Without this the web UI showed the chat
+        # model "Thinking…" for the whole subagent run and the activity was
+        # only visible in the provider log. Read from the holder at call
+        # time: the sink is attached by the web layer after this delegate
+        # is built.
+        reporter = (sink_owner or {}).get("sink")
+
+        async def _on_event(_sub_ctx: Any, event_stream: Any) -> None:
+            """Relay the implementer's tool activity to the parent run.
+
+            :param _sub_ctx: The subagent's own run context (unused here;
+                the parent sink must be the one that journals).
+            :param event_stream: The subagent's native event stream.
+            """
+            from pydantic_ai import (
+                FunctionToolCallEvent,
+                FunctionToolResultEvent,
+            )
+
+            async for event in event_stream:
+                if reporter is None:
+                    continue
+                if isinstance(event, FunctionToolCallEvent):
+                    part = event.part
+                    args = _brief_args(part.args)
+                    reporter(f"step: {part.tool_name}({args})")
+                elif isinstance(event, FunctionToolResultEvent):
+                    content = str(getattr(event.part, "content", ""))
+                    reporter(f"done: {event.tool_call_id} → {_brief(content)}")
+
+        # No timeout: the old 600 s cap returned "Timed out" to the model
+        # while the subagent kept working, so the UI reported failure over a
+        # run that was still writing files. Ending the run is now the human's
+        # explicit Stop (which cancels the parent, and with it this call).
+        result = await agent.run(
+            plan_text, deps=deps, event_stream_handler=_on_event
+        )
         # The model's own text is narration: it can say "Task completed"
         # while having written nothing, or to a path it invented. Report
         # from the run's recorded writes so the caller (and the human

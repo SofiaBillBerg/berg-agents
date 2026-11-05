@@ -705,6 +705,38 @@ class LiveRun:
             task = asyncio.create_task(self._on_consumed(frozenset({text})))
             task.add_done_callback(_log_task_error)
 
+    def subagent_reporter(self) -> Callable[[str], None] | None:
+        """Return a sink that journals a tool call made by a SUBAGENT.
+
+        The staged delegates (``implement_task``) run their own agent —
+        a separate pydantic-ai graph whose events never pass through
+        this run's encoder. Without a channel the web UI showed the
+        chat model "Thinking…" for the whole subagent run and the
+        activity was only visible in the provider log.
+
+        This sink carries one-line progress notes into the same SSE
+        journal, tagged with the parent tool call's id so the client
+        can nest them under the ``implement_task`` card. Notes are plain
+        text chunks, the same encoding the time-limit notice uses; they
+        are deliberately not tool parts, because the subagent's tool
+        calls belong to a different graph and must not resolve approvals
+        or message identities here.
+
+        :return: A thread-safe-enough sink, or ``None`` once the run has
+            finished (a subagent that outlives its parent must not
+            append to a closed journal).
+        """
+        if self._done:
+            return None
+
+        def _report(line: str) -> None:
+            """Journal one subagent progress line, if the run is still live."""
+            if self._done or not line.strip():
+                return
+            self._append_text(f"\n🤖 {line.strip()}")
+
+        return _report
+
     def _append_text(self, text: str) -> None:
         """Journal a plain assistant text chunk (the time-limit notice)."""
         from pydantic_ai.ui.vercel_ai.response_types import (

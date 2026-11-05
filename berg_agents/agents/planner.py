@@ -47,7 +47,7 @@ from berg_agents.core.interface import (
 )
 from berg_agents.providers.models import resolve_model_instance
 from berg_agents.providers.tiers import model_for_complexity
-from pydantic_ai import Agent, RunContext, Tool
+from pydantic_ai import Agent, RunContext
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,21 @@ _PLANNER_INSTRUCTIONS = (
     "the estimate_task_complexity tool to grade complexity. "
     "Complex and critical work needs larger models and human "
     "review; trivial work stays on small models."
+)
+
+#: System instructions for the read-only planner subagent that the
+#: ``plan_task`` delegate runs. Unlike the harness planner above, this
+#: instance has no decompose/estimate tools: it returns the plan as
+#: plain text, and its caller (the delegate) stores it as the session's
+#: todo. Write tools are withheld on purpose — one plan, one writer.
+PLANNER_PLAN_INSTRUCTIONS = (
+    "You are a planning subagent. Break the requested task into an "
+    "ordered list of concrete steps. You may inspect the repository "
+    "with the read-only tools (list_files, read_file, search_code) to "
+    "ground the plan in what actually exists, but never create, edit, "
+    "or write anything: you have no write tools, and your caller "
+    "stores the plan. Reply with only the plan — one numbered step "
+    "per line, in execution order, no commentary before or after."
 )
 
 
@@ -388,7 +403,8 @@ def build_planner_agent(
     model_id: str | None = None,
     cfg: dict[str, Any] | None = None,
     *,
-    plugin_tools: list[Tool[PlannerDeps]] | None = None,
+    plugin_tools: list[Any] | None = None,
+    instructions: str | None = None,
 ) -> Agent[PlannerDeps, str]:
     """Build the planner Pydantic AI agent.
 
@@ -398,12 +414,14 @@ def build_planner_agent(
 
     :param model_id: Model id override; the complexity default when None.
     :param cfg: Plain configuration override.
-    :param plugin_tools: Tools the ``planner`` role may use, already
-        resolved and session-bound by the caller via
-        :func:`plugin_system.get_plugin_tools_for`. The planner is what
-        *writes* the plan into a plugin store (shared-todo), so these
-        must be the same session-bound tools the chat agent and the
-        implementer read.
+    :param plugin_tools: Tools the planner may use. The ``plan_task``
+        delegate passes the workspace's read-only tools so the planner
+        can ground its plan in the repo; plan-store write tools are
+        withheld on purpose — the delegate that runs the planner is the
+        single writer of the plan into the session's todo list, and a
+        planner with write tools made a second, diverging plan.
+    :param instructions: Instruction override for this agent; the
+        harness planner's default instructions when None.
     :return: Configured planner agent.
     """
     # Fall back to the planner complexity model so explicit ids
@@ -417,7 +435,7 @@ def build_planner_agent(
         resolve_model_instance(model_id, cfg),
         name=PLANNER_NAME,
         deps_type=PlannerDeps,
-        instructions=_PLANNER_INSTRUCTIONS,
+        instructions=instructions or _PLANNER_INSTRUCTIONS,
         # Empty by default, so the module-level instance below still
         # builds without a plugin system; role callers pass the bound
         # plan tools in.

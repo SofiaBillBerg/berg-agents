@@ -324,15 +324,18 @@ def build_implementation_agent(
 
     default_instructions = (
         "You are an implementation agent that EXECUTES code changes, not just plans them. "
-        "When given a task:\n"
-        "1. Call build_execution_plan to understand the steps\n"
-        "2. Call required_tools to check what you need\n"
-        "3. ACTUALLY USE write_file or edit_file to make the changes\n"
-        "4. Verify the changes were made\n\n"
-        "CRITICAL: After calling build_execution_plan, you MUST call write_file or edit_file "
-        "to implement the changes. Do NOT return a plan as your final answer - execute the plan "
-        "using the available tools. The user expects actual file changes, not just a description "
-        "of what you would do."
+        "The task you receive IS the plan: a numbered list of steps, one per line. "
+        "Work through it in order.\n\n"
+        "For each step:\n"
+        "1. Do the work with the file tools (read_file, list_files, search_code first; "
+        "then write_file, edit_file, patch_file; bash for tests and commands).\n"
+        "2. Check the step off with set_subtask_done(todo_id=<id from the plan heading>, "
+        "index=<the step's index>), so the human sees real progress, not narration.\n"
+        "3. Move to the next step.\n\n"
+        "Do NOT re-plan: the numbered steps are the plan. Steps marked [done] are already "
+        "finished - do not redo them. Do not return a plan as your final answer - execute "
+        "the steps with the available tools and then give a short summary of what you "
+        "changed and what you verified."
     )
 
     # The type parameters are repeated on the constructor: without them a

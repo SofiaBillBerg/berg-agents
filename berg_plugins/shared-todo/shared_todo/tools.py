@@ -128,8 +128,16 @@ def create_todo(
     Returns:
         Success message with todo ID
     """
-    # Generate ID from title
-    todo_id = title.lower().replace(" ", "_").replace("/", "_")[:50]
+    # Generate ID from title. The id is re-typed by models into later
+    # calls (plan_task's reply → implement_task's todo_id argument), and
+    # trailing punctuation is routinely dropped or re-quoted there
+    # (observed: a plan id ending in `"alpha",` was sent twice without
+    # the comma, and the plan looked empty). The slug therefore ends on
+    # a safe character: strip the trailing punctuation edge after
+    # truncation, and never return an empty id for a punctuation-only
+    # title.
+    slug = title.lower().replace(" ", "_").replace("/", "_")[:50]
+    todo_id = slug.rstrip(".,;:!?\"'()[]{}-_") or "todo"
     timestamp = datetime.now().isoformat()
 
     # Ensure directory exists
