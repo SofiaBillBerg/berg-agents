@@ -641,10 +641,21 @@ def _run_status(registry: Any, session_id: str | None) -> dict[str, Any]:
     :param session_id: Session to describe.
     :return: Run status dict, or ``{"live": False}`` when idle.
     """
+    # Identity of the server process that produced this status. Settled-run
+    # fingerprints on the client include it: ``generation`` restarts with
+    # every process, so without the boot id a fresh process's first run
+    # could collide with an already-handled run of the previous one.
+    boot = getattr(registry, "boot_id", "")
     runtime = registry.get(session_id) if session_id else None
     if runtime is None or runtime.run is None:
-        return {"live": False, "generation": 0, "steering": [], "outcome": None}
+        return {
+            "live": False,
+            "boot": boot,
+            "generation": 0,
+            "steering": [],
+            "outcome": None}
     status = runtime.run.status()
+    status["boot"] = boot
     # A failed run's status carries the actionable hint so the client's
     # failure dialog never duplicates the provider-failure matching
     # rules - this is _chat_error_hint's single live caller.

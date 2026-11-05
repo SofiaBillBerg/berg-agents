@@ -752,6 +752,11 @@ class RunRegistry:
         """Create an empty registry (one per app, on ``app.state``)."""
         self._runtimes: dict[str, SessionRuntime] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        # Identity of this server process. The status payload carries it so
+        # clients can fingerprint a settled run: run #1 of a fresh process
+        # must never be mistaken for an already-handled run #1 of a previous
+        # one (generations reset with the process).
+        self.boot_id = uuid.uuid4().hex[:12]
 
     def get(self, session_id: str) -> SessionRuntime | None:
         """Return a session's runtime, or ``None`` when it has none."""
