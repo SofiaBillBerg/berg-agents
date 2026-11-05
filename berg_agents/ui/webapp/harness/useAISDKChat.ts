@@ -139,6 +139,17 @@ function messageToolCalls(msg: UIMessage): ChatMessage["toolCalls"] {
  */
 const ASK_USER_TOOL_NAME = "ask_user_question";
 
+// Client-side hint for transport failures - the one failure class whose
+// cause the client can see better than the server (it never reached the
+// backend). Provider-level diagnosis stays server-side and arrives on the
+// run's status; the client never duplicates that matching logic.
+function clientFailureHint(detail: string): string | undefined {
+    if (/fetch|network|econn|connection|refused|timeout/i.test(detail)) {
+        return "The chat backend could not be reached — is the server running?";
+    }
+    return undefined;
+}
+
 export interface PendingQuestionOption {
     /** One offered choice, kept verbatim - the answer is keyed by label. */
     label: string;
@@ -187,6 +198,25 @@ export interface PendingApproval {
     decided?: boolean;
     /** User's denial reason, when rejected with one. */
     reason?: string;
+}
+
+/**
+ * One failure the failure dialog presents. The dialog is the ONE
+ * surface for fatal failures (a warning toast + a hidden debug line
+ * used to duplicate it); the journal text in the transcript is the
+ * separate durable record and stays.
+ */
+export interface FailureNotice {
+    /** Which class of failure this is - the dialog titles on it. */
+    kind: "send" | "run" | "recovery";
+    /** The raw error text, truncated for display. */
+    detail: string;
+    /**
+     * Actionable hint, when one is known. Server-side failures carry the
+     * backend's hint (one hint logic, no client duplication); client-side
+     * failures derive a network hint from the error text.
+     */
+    hint?: string;
 }
 
 export interface UseAISDKChatReturn {
@@ -242,10 +272,14 @@ export interface UseAISDKChatReturn {
     ) => void;
     /** Decline every pending question in the batch at once. */
     declineAllQuestions: () => void;
-    /** Visible system-recovery notice (failed-send auto-rejects). */
-    systemNotice: string | null;
-    /** Dismiss the system notice. */
-    dismissSystemNotice: () => void;
+    /** The active failure notice, or null: the one input to the
+     * failure dialog. Replaces the old systemNotice alert - its
+     * recovery content is now the "recovery" kind here. */
+    failureNotice: FailureNotice | null;
+    /** Dismiss the failure dialog (read and acknowledged). */
+    dismissFailureNotice: () => void;
+    /** Retry the last failed user send (send-kind failures only). */
+    retryLast: () => void;
     /** Active server-side session id (source of truth across browsers). */
     sessionId: string | null;
     /** Active session title for the chrome row. */
@@ -1225,10 +1259,17 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // conversation (this is what erased chats on tab switches).
     const restoredRef = useRef(false);
 
-    // Visible notice for system-initiated recovery (failed sends, see
-    // below). Rendered as an Alert by App — never smuggled into the
-    // message list, so it can never poison a future send.
-    const [systemNotice, setSystemNotice] = useState<string | null>(null);
+    // Visible notice for the failure dialog. A failure is transient UI on
+    // top of the durable record: the journal text in the transcript is
+    // what survives (and reloads); the dialog demands to be read once.
+    // Recovery actions the system took (auto-rejected approvals) ride in
+    // the notice too, so there is exactly one failure surface.
+    const [failureNotice, setFailureNotice] = useState<FailureNotice | null>(
+        null,
+    );
+    // The last user text that was sent, for "Retry last" on a failed
+    // send. Updated on every manual send; the retry re-sends it verbatim.
+    const lastSentTextRef = useRef<string | null>(null);
 
     // Failed-send recovery: the backend is stateless, so any approval
     // parts pending when a send errors belong to a run that can never
@@ -1254,11 +1295,15 @@ export function useAISDKChat(): UseAISDKChatReturn {
         }
         if (handledErrorRef.current === error) return;
         handledErrorRef.current = error;
+        // A stale deferred answer (HTTP 409) is the designed card-expiry
+        // path, not a failure: the run being answered already ended, so
+        // there is nothing to diagnose. It must never open the dialog.
+        if ((error as {statusCode?: number}).statusCode === 409) return;
         if (recoveryRoundsRef.current >= 1) {
-            setSystemNotice(
-                `Send keeps failing (${String(error).slice(0, 160)}). ` +
-                    "Automatic recovery stopped after one round — send a new message to try again.",
-            );
+            setFailureNotice({
+                kind: "recovery",
+                detail: `Send keeps failing (${String(error).slice(0, 160)}).`,
+                hint: "Automatic recovery stopped after one round — send a new message to try again."});
             return;
         }
         recoveryRoundsRef.current += 1;
@@ -1283,7 +1328,16 @@ export function useAISDKChat(): UseAISDKChatReturn {
                 }
             }
         }
-        if (ids.length === 0) return;
+        if (ids.length === 0) {
+            // The failed send had no approvals to reject. The old behavior
+            // silently dropped the error here (nothing surfaced at all);
+            // this is exactly the class of failure the dialog is for.
+            setFailureNotice({
+                kind: "send",
+                detail: String(error).slice(0, 300),
+                hint: clientFailureHint(String(error))});
+            return;
+        }
         for (const id of ids) autoRejectedIds.current.add(id);
         const stopped =
             /abort|cancel/i.test(String(error)) || status === "streaming";
@@ -1296,10 +1350,16 @@ export function useAISDKChat(): UseAISDKChatReturn {
                     "This rejection is automatic cleanup — you may retry on request."
                     : SYSTEM_RETRY_REASON});
         }
-        setSystemNotice(
+        setFailureNotice(
             stopped
-                ? "Run stopped — pending tool approvals were rejected as cleanup. Send a message to continue."
-                : `A tool run failed (${String(error).slice(0, 200)}). Its pending approvals were auto-rejected so the conversation can continue — ask the model to retry.`,
+                ? {
+                      kind: "recovery",
+                      detail: "Run stopped — the pending tool approvals were rejected as cleanup.",
+                      hint: "Send a message to continue."}
+                : {
+                      kind: "send",
+                      detail: String(error).slice(0, 300),
+                      hint: "Its pending approvals were auto-rejected so the conversation can continue — ask the model to retry."},
         );
     }, [error, uiMessages, status]);
 
@@ -1422,7 +1482,12 @@ export function useAISDKChat(): UseAISDKChatReturn {
                     `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
                 );
                 if (cancelled || !resp.ok) return;
-                const status = (await resp.json()) as {live?: unknown};
+                const status = (await resp.json()) as {
+                    live?: unknown;
+                    outcome?: unknown;
+                    detail?: unknown;
+                    hint?: unknown;
+                };
                 if (cancelled) return;
                 if (status.live === true) {
                     // The GET stream replays the run's journal from the
@@ -1448,6 +1513,22 @@ export function useAISDKChat(): UseAISDKChatReturn {
                     isFollowingRef.current = false;
                     setPendingSteering([]);
                     await reloadSession(sessionId);
+                    // A run this client watched end must also report its
+                    // death: the journal's failure text is the record, the
+                    // dialog is the read-me-once notice. The hint comes
+                    // from the server (one hint logic, never copied here).
+                    if (status.outcome === "failed") {
+                        setFailureNotice({
+                            kind: "run",
+                            detail:
+                                typeof status.detail === "string"
+                                    ? status.detail
+                                    : "",
+                            hint:
+                                typeof status.hint === "string" && status.hint
+                                    ? status.hint
+                                    : undefined});
+                    }
                 }
             } catch {
                 // Backend unreachable - the next watch retries.
@@ -1459,6 +1540,51 @@ export function useAISDKChat(): UseAISDKChatReturn {
             clearTimeout(timer);
         };
     }, [sessionId, isStreaming, sdkResumeStream, reloadSession]);
+
+    // When a run this client SENT ends, check how it ended. A failed run
+    // streams its failure text and then closes the SSE stream "cleanly" -
+    // the wire never errors - so the browser's own turn can only learn the
+    // outcome from the run's status. Without this check the failure would
+    // ride the journal text alone and never open the dialog.
+    // Fires on the streaming→idle transition only: an old failure seen on
+    // mount never pops a modal for a run this browser never watched.
+    const ranHereRef = useRef(false);
+    useEffect(() => {
+        if (isStreaming) {
+            ranHereRef.current = true;
+            return;
+        }
+        if (!ranHereRef.current || !sessionId) return;
+        ranHereRef.current = false;
+        let cancelled = false;
+        void (async () => {
+            try {
+                const resp = await fetch(
+                    `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
+                );
+                if (!resp.ok || cancelled) return;
+                const s = (await resp.json()) as {
+                    outcome?: unknown;
+                    detail?: unknown;
+                    hint?: unknown;
+                };
+                if (cancelled || s.outcome !== "failed") return;
+                setFailureNotice({
+                    kind: "run",
+                    detail: typeof s.detail === "string" ? s.detail : "",
+                    hint:
+                        typeof s.hint === "string" && s.hint
+                            ? s.hint
+                            : undefined});
+            } catch {
+                // Status unreachable - the journal text in the transcript
+                // is the durable record; the dialog is the transient notice.
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isStreaming, sessionId]);
 
     // handleInputChange for a textarea/input - reads e.target.value.
     const handleInputChange = (
@@ -1474,7 +1600,8 @@ export function useAISDKChat(): UseAISDKChatReturn {
         if (!input.trim() || isStreaming) return;
         const text = input;
         setInput("");
-        setSystemNotice(null);
+        setFailureNotice(null);
+        lastSentTextRef.current = text;
         autoRejectedIds.current.clear();
         void sdkSendMessage({text});
     };
@@ -1484,9 +1611,22 @@ export function useAISDKChat(): UseAISDKChatReturn {
     const sendMessage = async (content: string) => {
         if (!content.trim() || isStreaming) return;
         setInput((prev) => (prev.trim() === content.trim() ? "" : prev));
-        setSystemNotice(null);
+        setFailureNotice(null);
+        lastSentTextRef.current = content;
         autoRejectedIds.current.clear();
         await sdkSendMessage({text: content});
+    };
+
+    // Retry the last user text after a failed send: the words are what
+    // the user last chose to say, so "Retry last" must not re-type them
+    // by hand. No new failure clears (the next failure replaces), and a
+    // retry resets recovery so the auto-reject round is available again.
+    const retryLast = () => {
+        const text = lastSentTextRef.current;
+        if (!text || isStreaming) return;
+        setFailureNotice(null);
+        autoRejectedIds.current.clear();
+        void sdkSendMessage({text});
     };
 
     // Steer, never interrupt. A message sent while the agent is working joins
@@ -1496,7 +1636,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     const steer = async (content: string) => {
         if (!content.trim()) return;
         setInput("");
-        setSystemNotice(null);
+        setFailureNotice(null);
         await sdkSendMessage({text: content});
     };
 
@@ -1568,8 +1708,9 @@ export function useAISDKChat(): UseAISDKChatReturn {
         questionBatch,
         respondToQuestion,
         declineAllQuestions,
-        systemNotice,
-        dismissSystemNotice: () => setSystemNotice(null),
+        failureNotice,
+        dismissFailureNotice: () => setFailureNotice(null),
+        retryLast,
         sessionId,
         sessionTitle,
         newServerChat,

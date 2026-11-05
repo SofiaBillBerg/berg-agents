@@ -32,7 +32,7 @@ import type { Command } from "./components/SlashCommandAutocomplete";
 import type { ToolResult } from "./components/ChatTranscript";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Card, Toast, toast } from "@heroui/react";
+import { Button, Card, Toast, toast } from "@heroui/react";
 import { useRouter } from "next/navigation";
 
 import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
@@ -48,6 +48,7 @@ import AgentSelector from "./components/AgentSelector.tsx";
 import RouterStatsPanel from "./components/RouterStatsPanel.tsx";
 import ChatTranscript, {
   CHAT_SCROLL_ID} from "./components/ChatTranscript.tsx";
+import FailureDialog from "./components/FailureDialog";
 import { PluginUISurface } from "./plugins/PluginUISurface.tsx";
 import { PluginCatalog } from "./components/PluginCatalog.tsx";
 import Navbar from "./components/Navbar.tsx";
@@ -131,8 +132,9 @@ function ChatContent() {
     questionBatch,
     respondToQuestion,
     declineAllQuestions,
-    systemNotice,
-    dismissSystemNotice,
+    failureNotice,
+    dismissFailureNotice,
+    retryLast,
     sessionId,
     sessionTitle,
     newServerChat} = aiChat;
@@ -726,27 +728,10 @@ function ChatContent() {
     [handleSendWrapper],
   );
 
-  // Surface backend/stream errors as a persistent toast (stays until
-  // the user dismisses it) in addition to the inline status record.
-  const lastToastedError = useRef<string | null>(null);
-  useEffect(() => {
-    if (chatError && chatError !== lastToastedError.current) {
-      lastToastedError.current = chatError;
-      const toastId = toast.danger("Request failed", {
-        description:
-          chatError.length > 300 ? `${chatError.slice(0, 300)}…` : chatError,
-        timeout: 0,
-        actionProps: {
-          children: "Dismiss",
-          onPress: () => {
-            lastToastedError.current = null;
-            toast.close(toastId);
-          }}});
-    }
-    if (!chatError) {
-      lastToastedError.current = null;
-    }
-  }, [chatError]);
+  // Client send failures no longer toast: the FailureDialog is the one
+  // failure surface (modal, dismiss-when-read, with hint + Retry). The
+  // raw error text stays visible in the Details panel below, so a
+  // dismissed dialog never loses the information.
 
   // -------------------------------------------------------------------------
   // Status determination (error / streaming / idle)
@@ -1074,25 +1059,16 @@ function ChatContent() {
             let the user approve/reject/edit; the decision re-invokes
             run_task with hitl_decision. */}
 
-        {/* System recovery notice - a failed send auto-rejected its
-            orphaned approvals (see the hook). Visible, dismissible,
-            and never part of the message list, so it cannot poison
-            future sends. Cleared on the next send. */}
-        {systemNotice && (
-          <Alert className="mb-1.5 shrink-0" status="warning">
-            <Alert.Indicator />
-            <Alert.Title>⚠️ Tool run recovered</Alert.Title>
-            <Alert.Description>{systemNotice}</Alert.Description>
-            <Button
-              aria-label="Dismiss recovery notice"
-              size="sm"
-              variant="secondary"
-              onPress={dismissSystemNotice}
-            >
-              Dismiss
-            </Button>
-          </Alert>
-        )}
+        {/* The failure dialog - the ONE failure surface. A failed send,
+            a failed run (the server's outcome, hint attached), or the
+            system's recovery of one. Modal and dismiss-when-read; the
+            journal text in the transcript is the durable record. Cleared
+            on the next send. */}
+        <FailureDialog
+          failure={failureNotice}
+          onDismiss={dismissFailureNotice}
+          onRetry={retryLast}
+        />
 
         {/* Slash-command answer cards - newest last, dismissible. */}
         {cmdCards.length > 0 && (

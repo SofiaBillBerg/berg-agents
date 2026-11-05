@@ -37,6 +37,7 @@ export type {
 export {useAISDKChat} from "./useAISDKChat";
 export type {
     ChatMessage,
+    FailureNotice,
     PendingApproval,
     PendingQuestion,
     PendingQuestionAnswer,

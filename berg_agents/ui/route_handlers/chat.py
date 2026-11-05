@@ -622,7 +622,13 @@ def _run_status(registry: Any, session_id: str | None) -> dict[str, Any]:
     runtime = registry.get(session_id) if session_id else None
     if runtime is None or runtime.run is None:
         return {"live": False, "generation": 0, "steering": [], "outcome": None}
-    return runtime.run.status()
+    status = runtime.run.status()
+    # A failed run's status carries the actionable hint so the client's
+    # failure dialog never duplicates the provider-failure matching
+    # rules - this is _chat_error_hint's single live caller.
+    if status.get("outcome") == "failed":
+        status["hint"] = _chat_error_hint(str(status.get("detail") or ""))
+    return status
 
 
 def _follow_response(run: Any, session_id: str | None = None) -> Response:
