@@ -195,7 +195,6 @@ class WorkspaceToolset(WrapperToolset[None]):
                 _make_implement_task(
                     str(root_dir), plan_tools, self.progress_holder
                 ),
-                takes_ctx=True,
                 name="implement_task",
                 description=(
                     "Execute a plan from this session's todo list, by id, "
@@ -695,17 +694,13 @@ def _make_implement_task(
         stale ``None``.
     """
 
-    async def _implement_task(
-        ctx: RunContext[Any], todo_id: str, task_type: str = "generic"
-    ) -> str:
+    async def _implement_task(todo_id: str, task_type: str = "generic") -> str:
         """Execute a stored step plan via the implementation subagent.
 
         Reads the plan from this session's todo list at call time, so a
         plan the user edited is the plan that runs. Reports what was
         actually written. Execution needs human approval first.
 
-        :param ctx: Parent run context - carries the sink that relays the
-            subagent's activity to the web UI.
         :param todo_id: Id of the todo whose subtasks form the plan.
             Resolved exactly first, then by unique prefix, so a re-typed
             id that lost edge punctuation still finds the plan; when
@@ -808,10 +803,29 @@ def _make_implement_task(
         # reading the chat) sees what actually happened on disk.
         summary = summarize_changes(deps.changes)
         narration = str(result.output).strip()
-        if not deps.changes:
-            return (
-                f"{summary}\n\nThe implementation agent reported:\n{narration}"
+
+        # Progress is reported from the store, not from the run: the
+        # implementer is told to check each step off, but a model that skips
+        # that must not leave the human believing nothing ran. Re-reading the
+        # list makes the count honest either way.
+        try:
+            after = await _call_plan_tool(
+                plan_tools, "list_subtasks", todo_id=todo_id
             )
-        return f"{summary}\n\nAgent report:\n{narration}"
+        except Exception as exc:  # noqa: BLE001 - reporting must not fail the run
+            logger.warning("implement_task progress read failed: %s", exc)
+            after = []
+        done = [i for i in after if str(i.get("status")) == "done"]
+        progress = (
+            f"Progress: {len(done)}/{len(after)} steps checked off."
+            if after
+            else ""
+        )
+        body = (
+            f"{summary}\n\nThe implementation agent reported:\n{narration}"
+            if not deps.changes
+            else f"{summary}\n\nAgent report:\n{narration}"
+        )
+        return f"{body}\n\n{progress}" if progress else body
 
     return _implement_task
