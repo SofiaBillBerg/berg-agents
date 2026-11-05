@@ -636,6 +636,14 @@ async def _start_run(
             max_duration=get_settings().run_max_duration_minutes * 60,
             on_finish=on_finish,
         )
+        # Attach the live run's progress sink to the workspace toolset so
+        # the implement_task delegate can relay the subagent's activity.
+        # The sink is read at call time, so setting it here (before the
+        # graph task starts) is enough.
+        for ts in getattr(agent, "_user_toolsets", []):
+            if type(ts).__name__ == "WorkspaceToolset":
+                ts.progress_holder["sink"] = live.subagent_reporter()
+                break
         if runtime is not None:
             runtime.run = live
         live.start()
@@ -1238,6 +1246,10 @@ def register_chat_routes(
             :param run: The finished ``LiveRun``.
             :param outcome: How it ended.
             """
+            for ts in getattr(agent, "_user_toolsets", []):
+                if type(ts).__name__ == "WorkspaceToolset":
+                    ts.progress_holder["sink"] = None
+                    break
             logger.info(
                 "chat run finished: %s (%s)", outcome.kind, outcome.detail
             )

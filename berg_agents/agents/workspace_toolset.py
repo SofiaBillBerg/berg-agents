@@ -812,7 +812,7 @@ def _make_implement_task(
             after = await _call_plan_tool(
                 plan_tools, "list_subtasks", todo_id=todo_id
             )
-        except Exception as exc:  # noqa: BLE001 - reporting must not fail the run
+        except Exception as exc:  # ruff: ignore[blind-except] - reporting must not fail the run
             logger.warning("implement_task progress read failed: %s", exc)
             after = []
         done = [i for i in after if str(i.get("status")) == "done"]
