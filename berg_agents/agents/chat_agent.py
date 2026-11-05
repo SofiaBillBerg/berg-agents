@@ -94,6 +94,7 @@ def build_chat_agent(
     from berg_agents.capabilities.mcp_toolsets import build_mcp_toolsets
     from berg_agents.capabilities.runaway_guard import RunawayGuard
     from berg_agents.capabilities.skills import load_skill_capabilities
+    from berg_agents.capabilities.wall_clock_guard import WallClockGuard
     from berg_agents.capabilities.web_backends import (
         make_web_fetch,
         make_web_search,
@@ -312,6 +313,15 @@ def build_chat_agent(
             # request) and is reset only when the agent yields control.
             RunawayGuard(
                 limit=settings.runaway_tool_call_limit, session_id=session_id
+            ),
+            # Wall-clock ceiling: a run that has been executing past the
+            # configured duration pauses on the next tool call, through the
+            # same approval card as every other human decision. The count
+            # guard above bounds *unattended tool calls*; this bounds *time*
+            # (a slow provider, a tool that waits). Approving restarts the
+            # clock, so a long session continues one stretch at a time.
+            WallClockGuard(
+                limit_seconds=settings.run_max_duration_minutes * 60
             )],
     )
 

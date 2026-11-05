@@ -120,7 +120,7 @@ function ChatContent() {
     stop,
     clearMessages,
     restoreMessages,
-    interruptWith,
+    steer,
     pendingSteering,
     approvalBatch,
     respondToApproval,
@@ -648,18 +648,19 @@ function ChatContent() {
 
   // -------------------------------------------------------------------------
   // Send handler - intercepts slash commands, otherwise forwards to AI SDK.
-  // While streaming, sending interrupts the in-flight response and
-  // redirects with the new message (steering); otherwise it sends.
+  // While a run is live, sending steers it: the message reaches the model at
+  // its next request and nothing in flight is aborted. Otherwise it sends a
+  // fresh turn.
   // -------------------------------------------------------------------------
   const forwardToModel = useCallback(
     (text: string) => {
       if (isStreaming) {
-        void interruptWith(text);
+        void steer(text);
       } else {
         void sendMessage(text);
       }
     },
-    [isStreaming, interruptWith, sendMessage],
+    [isStreaming, steer, sendMessage],
   );
 
   // Guards double submits (fast double-Enter / Enter+click fired two

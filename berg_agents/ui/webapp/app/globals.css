@@ -26,13 +26,18 @@
  * so Tailwind's theme + preflight + utilities layers are dropped
  * entirely — the app falls back to block layout with no utilities
  * (the exact "fixed / can't scroll" regression). Keep this as a string.
+ *
+ * Every @import must stay above every other rule, and all of them must
+ * use the same bare form: `tailwindcss` expands to real rules, so a
+ * `url()` import after it is illegal and gets dropped, silently taking
+ * styles.css and theme.css with it.
  * Order matters: tailwindcss, then @heroui/styles, then local theme.
  * https://heroui.com/en/themes?chroma=0.13&hue=336.3409276429381&lightness=0.77&formRadius=small&fontFamily=public-sans&base=0.0154 
  */
-@import url("tailwindcss");
-@import url("@heroui/styles");
-@import url("./styles.css");
-@import url("./theme.css");
+@import "tailwindcss";
+@import "@heroui/styles";
+@import "./styles.css";
+@import "./theme.css";
 
 
 :root,

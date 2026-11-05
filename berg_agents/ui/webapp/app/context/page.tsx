@@ -316,7 +316,9 @@ export default function ContextPage() {
                                                             size="sm"
                                                             variant="soft"
                                                         >
-                                                            {plugin.state}
+                                                            {plugin.state === "enabled"
+                                                                ? "Enabled"
+                                                                : "Disabled"}
                                                         </Chip>
                                                     )}
                                                 </div>

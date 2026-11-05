@@ -45,7 +45,12 @@ from berg_agents.ui.transcripts import append_new_messages, ensure_transcript
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic_ai import DeferredToolRequests, DeferredToolResults
-from pydantic_ai.messages import ModelRequest, UserPromptPart
+from pydantic_ai.messages import (
+    ModelRequest,
+    ToolCallPart,
+    UserPromptPart,
+    repair_messages,
+)
 from pydantic_ai.tools import ToolApproved, ToolDenied
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter
 from pydantic_ai.ui.vercel_ai.request_types import (
@@ -426,6 +431,14 @@ async def _start_run(
         # An approval resume carries no user text: the model continues from
         # the deferred batch. Anything else is a fresh turn with a prompt.
         approvals = _approvals_from_body(body)
+        # A resume whose history has no unfinished call has nothing to answer:
+        # the client re-sent an approval the server already applied. Sending it
+        # makes pydantic-ai reject the whole request, so drop it and report the
+        # approval as spent instead of starting a doomed run.
+        if approvals is not None and not _has_pending_tool_call(body):
+            raise StaleApprovalError(
+                "this approval was already applied; nothing is left to answer"
+            )
         prompt = None if approvals is not None else _latest_user_content(body)
 
         # A resume continues from the client's own message list: that is where
@@ -434,10 +447,12 @@ async def _start_run(
         # fresh turn uses the session's conversation, so usage and the
         # conversation id carry across turns.
         start_args: dict[str, Any] = (
-            {"message_history": _history_from_body(body)}
+            {"message_history": _history_from_body(body, announce=True)}
             if approvals is not None
             else {"conversation": conversation}
         )
+        if "message_history" not in start_args and conversation is not None:
+            _heal_conversation(conversation)
 
         def _request() -> Any:
             """Create the graph run inside the run's own task."""
@@ -585,22 +600,96 @@ def _latest_user_content(body: bytes) -> str | list[dict[str, Any]] | None:
     return texts[0] if len(parts) == 1 and texts else parts
 
 
-def _history_from_body(body: bytes) -> list[Any] | None:
+def _heal_conversation(conversation: Any) -> None:
+    """Close dangling tool calls in a session conversation before a new turn.
+
+    A run that ends between a tool call and its result leaves the history
+    with an unanswered call. pydantic-ai refuses a new prompt on that
+    history ("unprocessed tool calls"), and because the refusal happens
+    before inference the turn produces no output at all - the browser sees
+    a run that spins and dies silently. Repairing is deterministic and
+    idempotent, so a healthy conversation passes through untouched.
+
+    :param conversation: The session's conversation, mutated in place when
+        a repair was needed.
+    """
+    try:
+        history = list(conversation.messages)
+    except Exception as exc:
+        logger.warning("conversation repair skipped: %s", exc)
+        return
+    if not history:
+        return
+    try:
+        repaired = repair_messages(history)
+    except Exception as exc:
+        logger.warning("conversation repair failed: %s", exc)
+        return
+    if repaired == history:
+        return
+    conversation.messages[:] = repaired
+    logger.warning(
+        "Repaired session history: closed %d dangling tool call part(s)",
+        sum(len(m.parts) for m in repaired)
+        - sum(len(m.parts) for m in history),
+    )
+
+
+def _history_from_body(body: bytes, announce: bool = False) -> list[Any] | None:
     """Load the model history a resume continues from, out of the request body.
 
     The paused tool call lives in the client's message list - the model's own
     history only holds what it already saw - so a resume is built from the
     body, the same way the adapter's own dispatch built it.
 
+    The final response is deliberately left unrepaired: its tool calls are the
+    pending approvals this request is about to answer. ``repair_messages``
+    would synthesize a result for them, and the approval payload then collides
+    with it ("already executed and its result cannot be overridden").
+
     :param body: Raw request body (Vercel AI protocol).
+    :param announce: Log a line when the history needed repair.
     :return: The model messages, or ``None`` when the body cannot be read.
     """
     try:
         adapter = BergVercelAIAdapter.build_run_input(body)
-        return BergVercelAIAdapter(agent=None, run_input=adapter).messages
+        messages = BergVercelAIAdapter(agent=None, run_input=adapter).messages
     except Exception as exc:
         logger.warning("resume history skipped: %s", exc)
         return None
+    if not messages:
+        return messages
+    try:
+        repaired = repair_messages(messages, repair_last_response=False)
+    except Exception as exc:
+        logger.warning("resume history repair failed: %s", exc)
+        return messages
+    if announce and repaired != messages:
+        logger.warning("Repaired resume history from the request body")
+    return repaired
+
+
+def _has_pending_tool_call(body: bytes) -> bool:
+    """Whether the request's final response still has an unanswered tool call.
+
+    pydantic-ai only accepts deferred results against an unprocessed call. A
+    client that resends an already-applied approval is answered here instead
+    of failing the whole request.
+
+    :param body: Raw request body (Vercel AI protocol).
+    :return: ``True`` when at least one tool call still awaits a result.
+    """
+    try:
+        adapter = BergVercelAIAdapter.build_run_input(body)
+        messages = BergVercelAIAdapter(agent=None, run_input=adapter).messages
+    except Exception:
+        # Unreadable body: let the run decide, its error is the honest one.
+        return True
+    for message in reversed(messages):
+        for part in getattr(message, "parts", ()):
+            if isinstance(part, ToolCallPart):
+                return True
+    return False
 
 
 def _approvals_from_body(body: bytes) -> DeferredToolResults | None:
@@ -609,6 +698,10 @@ def _approvals_from_body(body: bytes) -> DeferredToolResults | None:
     Uses the adapter's own parsing so approval semantics (edited args,
     denial reasons) stay in one place. The agent is never run from here:
     only the answered parts are read.
+
+    The batch is passed through whole: pydantic-ai requires results for every
+    pending call, so filtering individual ids produces a partial batch it
+    rejects outright.
 
     :param body: Raw request body (Vercel AI protocol).
     :return: Deferred results, or ``None`` when the body carries no answers.

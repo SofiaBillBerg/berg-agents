@@ -51,6 +51,11 @@ JOURNAL_GRACE_SECONDS = 120.0
 #: that a released journal is invisible, long enough to cost nothing.
 SWEEP_INTERVAL_SECONDS = 30.0
 
+#: How long the encoder gets to flush a turn's closing frames after the graph
+#: driver stops. Past this it is cancelled: a wedged stream must never keep a
+#: run reported ``live`` forever.
+ENCODER_CLOSE_GRACE_SECONDS = 10.0
+
 #: How long a session keeps a warm agent with no traffic. The plan wanted
 #: "keep warm for the life of the process, evict only under pressure"; a bound
 #: is cheaper to reason about and the rebuild is one fingerprint check away.
@@ -76,13 +81,20 @@ class RunOutcome:
 
     kind: Literal["completed", "paused", "cancelled", "failed"]
     detail: str = ""
-    #: Tools paused waiting for the human, when the run paused on approval.
+    #: Tools paused waiting for an approve/reject decision.
     approvals: tuple[str, ...] = ()
+    #: Tools paused waiting for an answer the human must produce
+    #: (``ask_user_question`` defers as an external call, not an approval).
+    questions: tuple[str, ...] = ()
 
     @property
-    def paused_for_approval(self) -> bool:
-        """Whether the human now needs to answer something."""
-        return self.kind == "paused" and bool(self.approvals)
+    def paused_for_answer(self) -> bool:
+        """Whether the human now needs to answer something.
+
+        A pause is a pause whether the run wants a decision or an answer -
+        one HITL surface answers both.
+        """
+        return self.kind == "paused" and bool(self.approvals or self.questions)
 
 
 @dataclass(slots=True)
@@ -118,8 +130,11 @@ class LiveRun:
         and guard resets live there, so they never depend on a browser.
     :param generation: Per-run counter. Clients echo it so a late approval for
         an older run cannot land on a newer one.
-    :param max_duration: Wall-clock ceiling in seconds. On expiry the run
-        PAUSES for approval instead of being cancelled, so work is never lost.
+    :param max_duration: Wall-clock ceiling in seconds for the no-tool-call
+        backstop in :meth:`_walk` (see
+        :class:`~berg_agents.capabilities.wall_clock_guard.WallClockGuard` for
+        the approval-card path). On expiry the run PAUSES, not cancels, so
+        work is never lost.
     :param on_consumed: Called with texts the model has now received, so the
         steering strip can move them into the transcript.
     """
@@ -248,6 +263,7 @@ class LiveRun:
             "outcome": self.outcome.kind if self.outcome else None,
             "detail": self.outcome.detail if self.outcome else "",
             "approvals": list(self.outcome.approvals) if self.outcome else [],
+            "questions": list(self.outcome.questions) if self.outcome else [],
             "steering": list(self._pending_steering.values())}
 
     @property
@@ -339,6 +355,13 @@ class LiveRun:
         except Exception as exc:  # broad-exception-caught: one bad turn must not kill the chat surface
             logger.exception("agent run failed")
             self._failure = exc
+            # Journal the failure as visible text. Without it the stream
+            # simply stops: the browser keeps its spinner over an empty turn
+            # and never learns the run died.
+            self._append_text(f"\n\n❌ This turn failed: {str(exc)[:500]}")
+            # Any node the encoder is still parked on will never complete:
+            # release its ticket or the wait below deadlocks.
+            self._abandon_tickets()
             outcome = RunOutcome(kind="failed", detail=str(exc)[:500])
 
         # The outcome is published only after the encoder has closed the turn
@@ -352,7 +375,12 @@ class LiveRun:
             self._publish(outcome)
 
     async def _wait_for_encoder(self) -> None:
-        """Release the encoder so it flushes the turn's closing frames."""
+        """Release the encoder so it flushes the turn's closing frames.
+
+        Bounded: an encoder that cannot close within the grace period is
+        cancelled rather than awaited forever, so a wedged protocol stream can
+        never leave the run ``live`` with no way back to idle.
+        """
         self._driver_finished = True
         self._queue_changed.set()
         for task in self._tasks:
@@ -360,10 +388,27 @@ class LiveRun:
                 task.get_name() == "live-run.encoder"
                 and task is not asyncio.current_task()
             ):
-                await asyncio.wait({task})
+                done, _pending = await asyncio.wait(
+                    {task}, timeout=ENCODER_CLOSE_GRACE_SECONDS
+                )
+                if not done:
+                    logger.warning(
+                        "Encoder did not close within %.0fs; cancelling it",
+                        ENCODER_CLOSE_GRACE_SECONDS,
+                    )
+                    task.cancel()
 
     async def _walk(self, agent_run: Any) -> RunOutcome:
         """Advance the graph to its end, or to the time limit.
+
+        The time limit normally reaches the human through
+        :class:`~berg_agents.capabilities.wall_clock_guard.WallClockGuard`,
+        which defers the next tool call so the run pauses on a real approval
+        card. This walk's check is the backstop for the one case a capability
+        cannot cover: no tool call comes up before the clock runs out (a single
+        very long model request, or a tool that never returns). The human then
+        gets plain text instead of a card - the honest fallback, because there
+        is no call to attach a decision to.
 
         :param agent_run: The started ``AgentRun``.
         :return: How the run ended.
@@ -375,8 +420,9 @@ class LiveRun:
                 # The limit PAUSES rather than cancels: the work so far is
                 # kept and the human decides what happens next.
                 self._append_text(
-                    "\n\n⏸️ This run reached its time limit. Everything "
-                    "done so far is saved — tell me how to continue."
+                    "\n\n⏸️ This run reached its time limit without reaching "
+                    "a tool call to ask about. Everything done so far is "
+                    "saved — tell me how to continue."
                 )
                 return RunOutcome(
                     kind="paused",
@@ -387,14 +433,51 @@ class LiveRun:
                 self._queue.append(ticket)
                 self._queue_changed.set()
                 # The encoder must finish this node before the graph advances
-                # under it: a half-streamed node cannot be re-entered.
-                await ticket.done.wait()
+                # under it: a half-streamed node cannot be re-entered. This
+                # wait is deliberately UNBOUNDED: a node streams for exactly
+                # as long as the model or tool takes, so any timeout here
+                # would advance the graph under a live stream and corrupt the
+                # run. Deadlock is prevented at the source instead - every
+                # encoder death path releases queued tickets (see _encode).
+                await self._wait_ticket(ticket)
             node = await agent_run.next(node)
         if not _is_end(node):
             return RunOutcome("failed")
         outcome = self._classify_end(node)
         await self._deliver_result(agent_run)
         return outcome
+
+    @staticmethod
+    async def _wait_ticket(ticket: Any, *, bounded: bool = False) -> None:
+        """Wait for the encoder to finish a ticket.
+
+        Unbounded for a node ticket: the node streams for exactly as long as
+        the model or tool takes - minutes for a long response - and a timeout
+        here would advance the graph under a live stream, which pydantic-ai
+        rejects ("You must finish streaming before calling run()"). The wait
+        cannot deadlock: every encoder death path releases queued tickets
+        (see :meth:`_encode`), and a wedged run is recoverable with Stop.
+
+        Bounded for the run's closing result: the graph has already finished,
+        so a wedged encoder must not hold the run ``live`` forever.
+        :meth:`_wait_for_encoder` cancels it past the same grace anyway.
+
+        :param ticket: The queued :class:`_NodeTicket` to wait on.
+        :param bounded: Grace-bound the wait; used only for the closing
+            result, never for a node.
+        """
+        if not bounded:
+            await ticket.done.wait()
+            return
+        try:
+            await asyncio.wait_for(
+                ticket.done.wait(), timeout=ENCODER_CLOSE_GRACE_SECONDS
+            )
+        except TimeoutError:
+            logger.warning(
+                "Encoder did not take the closing result within %.0fs",
+                ENCODER_CLOSE_GRACE_SECONDS,
+            )
 
     async def _deliver_result(self, agent_run: Any) -> None:
         """Hand the run's final result to the encoder before finishing.
@@ -406,11 +489,31 @@ class LiveRun:
         ticket = _NodeTicket(result=agent_run.result)
         self._queue.append(ticket)
         self._queue_changed.set()
-        await ticket.done.wait()
+        await self._wait_ticket(ticket, bounded=True)
+
+    def _abandon_tickets(self) -> None:
+        """Release every queued ticket after the graph died under the encoder.
+
+        The encoder may be parked on ``ticket.done`` for a node the graph will
+        never finish streaming. Without this the two tasks deadlock forever:
+        the driver waits for the encoder to close the turn, the encoder waits
+        for a node that no longer exists, and the run stays ``live`` for the
+        life of the process (the browser's spinner never clears).
+        """
+        for ticket in self._queue:
+            ticket.done.set()
 
     @staticmethod
     def _classify_end(node: Any) -> RunOutcome:
-        """Decide completed vs paused from the run's terminal node."""
+        """Decide completed vs paused from the run's terminal node.
+
+        A deferral is not always an approval: ``requires_approval`` tools
+        wait in ``approvals``, while externally-executed calls
+        (``ask_user_question``) wait in ``calls``. The outcome reports what
+        the human actually owes an answer for - a blanket "awaiting
+        approval" over a question pause is how the webapp ended up with an
+        unanswerable session and a status that lied about why.
+        """
         data = getattr(node, "data", None)
         output = getattr(data, "output", None)
         if type(output).__name__ == "DeferredToolRequests":
@@ -418,8 +521,23 @@ class LiveRun:
                 str(getattr(call, "tool_name", ""))
                 for call in getattr(output, "approvals", ()) or ()
             )
+            questions = tuple(
+                str(getattr(call, "tool_name", ""))
+                for call in getattr(output, "calls", ()) or ()
+            )
+            owed = " and ".join(
+                what
+                for what, names in (
+                    ("approval", approvals),
+                    ("answers", questions),
+                )
+                if names
+            )
             return RunOutcome(
-                kind="paused", detail="awaiting approval", approvals=approvals
+                kind="paused",
+                detail=f"awaiting {owed}",
+                approvals=approvals,
+                questions=questions,
             )
         return RunOutcome(kind="completed")
 
@@ -455,13 +573,30 @@ class LiveRun:
         """Own the turn's single protocol encoder and journal its output."""
         from berg_agents.ui.route_handlers.chat import encode_run_stream
 
+        events = self._native_events()
         try:
             async for chunk in encode_run_stream(
-                self._native_events(), on_cancel=self._note_cancel
+                events, on_cancel=self._note_cancel
             ):
                 self._append(chunk)
+        except asyncio.CancelledError:
+            # Shutdown or a wedged stream. First close the native-events
+            # generator: it may be suspended inside a node's stream context,
+            # and unwinding that is what lets the graph advance past the
+            # node. Then release anything the driver is parked on, or that
+            # await never returns and the run stays live for the life of the
+            # process. Last, let the cancellation propagate.
+            with contextlib.suppress(Exception):
+                await events.aclose()
+            self._abandon_tickets()
+            raise
         except Exception:
             logger.exception("run encoder failed")
+            # Same two-step as the cancel branch: unwind any half-streamed
+            # node, then release the driver's tickets.
+            with contextlib.suppress(Exception):
+                await events.aclose()
+            self._abandon_tickets()
 
     async def _note_cancel(self, cancelled: Any) -> None:
         """Record that the run ended in a first-party cancellation."""
@@ -475,6 +610,10 @@ class LiveRun:
                 ticket = self._queue[index]
                 index += 1
                 if ticket.cancel:
+                    # The driver may already be parked on this ticket. Release
+                    # it before leaving, or that await never returns and the
+                    # run stays live for the life of the process.
+                    ticket.done.set()
                     return
                 if ticket.result is not None:
                     yield _run_result_event(ticket.result)
@@ -525,7 +664,7 @@ class LiveRun:
 
     def _append_text(self, text: str) -> None:
         """Journal a plain assistant text chunk (the time-limit notice)."""
-        from pydantic_ai.ui.vercel_ai.request_types import (
+        from pydantic_ai.ui.vercel_ai.response_types import (
             TextDeltaChunk,
             TextEndChunk,
             TextStartChunk,

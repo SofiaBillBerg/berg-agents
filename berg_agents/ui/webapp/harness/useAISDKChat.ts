@@ -165,7 +165,7 @@ export interface UseAISDKChatReturn {
     stop: () => void;
     sendMessage: (content: string) => Promise<void>;
     /** Stop the current response, then send (mid-stream steering). */
-    interruptWith: (content: string) => Promise<void>;
+    steer: (content: string) => Promise<void>;
     /** Messages the agent has not read yet (the steering strip above the
      * input). An entry here is queued on the server's run; once the model
      * receives it, it moves into the transcript and leaves this list. */
@@ -819,30 +819,52 @@ export function useAISDKChat(): UseAISDKChatReturn {
     };
 
     // Restore server-session messages into the live chat.
-    // Stored snapshots predate this load, so no paused run can be live.
+    // A stored snapshot does NOT imply no live run: a reload while the run
+    // is paused on an approval restores exactly that. Expiring the pending
+    // approval then leaves a paused run the browser can never answer - the
+    // card has no Approve button and the turn is wedged. So the server is
+    // asked first, and a live pause preserves the approval.
     // Duplicate message ids (e.g. one request dumped to two UI messages)
     // are suffixed — React keys must be unique and ids are otherwise opaque.
-    const restoreMessages = useCallback((msgs: unknown[]) => {
-        if (!Array.isArray(msgs)) return;
-        const clean = sanitizeHistory(msgs, false) as unknown as Array<{
-            id?: unknown;
-        }>;
-        const seen = new Set<string>();
-        for (const m of clean) {
-            if (typeof m !== "object" || m === null || typeof m.id !== "string") {
-                continue;
+    const restoreMessages = useCallback(
+        async (msgs: unknown[], sessionId?: string | null) => {
+            if (!Array.isArray(msgs)) return;
+            let paused = false;
+            if (sessionId) {
+                try {
+                    const resp = await fetch(
+                        `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
+                    );
+                    if (resp.ok) {
+                        const state = await resp.json();
+                        paused = state?.outcome === "paused";
+                    }
+                } catch {
+                    // Status unreachable: fall back to the conservative
+                    // "no live run" assumption rather than blocking restore.
+                }
             }
-            let id: string = m.id;
-            if (seen.has(id)) {
-                let n = 2;
-                while (seen.has(`${id}-dup${n}`)) n += 1;
-                id = `${id}-dup${n}`;
-                m.id = id;
+            const clean = sanitizeHistory(msgs, paused) as unknown as Array<{
+                id?: unknown;
+            }>;
+            const seen = new Set<string>();
+            for (const m of clean) {
+                if (typeof m !== "object" || m === null || typeof m.id !== "string") {
+                    continue;
+                }
+                let id: string = m.id;
+                if (seen.has(id)) {
+                    let n = 2;
+                    while (seen.has(`${id}-dup${n}`)) n += 1;
+                    id = `${id}-dup${n}`;
+                    m.id = id;
+                }
+                seen.add(id);
             }
-            seen.add(id);
-        }
-        setUIMessages(clean as unknown as UIMessage[]);
-    }, [setUIMessages]);
+            setUIMessages(clean as unknown as UIMessage[]);
+        },
+        [setUIMessages],
+    );
 
     // Replace the transcript with the server's saved copy of a session.
     // The server owns the conversation, so this is what any client shows
@@ -854,7 +876,10 @@ export function useAISDKChat(): UseAISDKChatReturn {
             );
             if (!resp.ok) throw new Error(`Session ${id}: HTTP ${resp.status}`);
             const data = await resp.json();
-            restoreMessages(Array.isArray(data.messages) ? data.messages : []);
+            await restoreMessages(
+                Array.isArray(data.messages) ? data.messages : [],
+                id,
+            );
             return data;
         },
         [restoreMessages],
@@ -912,9 +937,28 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // failing backend cannot loop sends forever.
     const handledErrorRef = useRef<unknown>(null);
     const autoRejectedIds = useRef<Set<string>>(new Set());
+    // Hard stop on the recovery loop itself. Each auto-reject mints NEW
+    // approval ids, so an id set can never bound this: reject → auto-resume →
+    // fail → reject again is an unbounded message storm (observed: ~100
+    // messages in seconds). After one failed recovery round the loop is
+    // disarmed and the next step needs a human send.
+    const recoveryRoundsRef = useRef(0);
     useEffect(() => {
-        if (!error || handledErrorRef.current === error) return;
+        if (!error) {
+            // A clean turn in between proves the pipeline works again.
+            recoveryRoundsRef.current = 0;
+            return;
+        }
+        if (handledErrorRef.current === error) return;
         handledErrorRef.current = error;
+        if (recoveryRoundsRef.current >= 1) {
+            setSystemNotice(
+                `Send keeps failing (${String(error).slice(0, 160)}). ` +
+                    "Automatic recovery stopped after one round — send a new message to try again.",
+            );
+            return;
+        }
+        recoveryRoundsRef.current += 1;
         const ids: string[] = [];
         for (const msg of uiMessages) {
             if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
@@ -1007,11 +1051,9 @@ export function useAISDKChat(): UseAISDKChatReturn {
                         if (resp.ok && !cancelled) {
                             const data = await resp.json();
                             if (Array.isArray(data.messages) && data.messages.length > 0) {
-                                setUIMessages(
-                                    sanitizeHistory(
-                                        data.messages,
-                                        false,
-                                    ) as unknown as UIMessage[],
+                                await restoreMessages(
+                                    data.messages,
+                                    storedId,
                                 );
                             }
                             adoptSession(storedId);
@@ -1144,11 +1186,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
         await sdkSendMessage({text: content});
     };
 
-    // Interrupt nothing, steer instead. A message sent while the agent is
-    // working joins the run and reaches the model at its NEXT request; the
-    // in-flight tool is never aborted. The server decides which of the two
-    // this is (it owns the run), so one send path covers both cases.
-    const interruptWith = async (content: string) => {
+    // Steer, never interrupt. A message sent while the agent is working joins
+    // the run and reaches the model at its NEXT request; the in-flight tool is
+    // never aborted. The server decides whether the run is live (it owns the
+    // run), so one send path covers both the steer and the fresh turn.
+    const steer = async (content: string) => {
         if (!content.trim()) return;
         setInput("");
         setSystemNotice(null);
@@ -1211,7 +1253,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
         clearMessages,
         stop: stopRun,
         sendMessage,
-        interruptWith,
+        steer,
         pendingSteering,
         restoreMessages,
         pendingApprovals,
