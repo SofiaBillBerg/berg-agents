@@ -75,7 +75,6 @@ agent-deps = [
     "pydantic-ai>=2.64.0",
     "pydantic-ai-harness[acp,code-mode,coder,anthropic,researcher,dynamic-workflow]==0.64.0",
     "pydantic-ai-slim[duckduckgo,web-fetch,openai]==2.64.0",
-    "chromadb>=1.5.9",
     "agent-client-protocol>=0.11.1",
     "prompt-toolkit>=3.0.53"]
 docs = ["pydoctor>=25.10.1", "quarto>=0.1.0"]
