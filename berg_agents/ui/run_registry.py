@@ -705,47 +705,34 @@ class LiveRun:
             task = asyncio.create_task(self._on_consumed(frozenset({text})))
             task.add_done_callback(_log_task_error)
 
-    def subagent_reporter(self) -> Callable[[str], None] | None:
-        """Return a sink that journals a tool call made by a SUBAGENT.
+    def subagent_relay(self) -> Any | None:
+        """Return the relay that streams a SUBAGENT's run into this journal.
 
-        The staged delegates (``implement_task``) run their own agent —
-        a separate pydantic-ai graph whose events never pass through
-        this run's encoder. Without a channel the web UI showed the
-        chat model "Thinking…" for the whole subagent run and the
-        activity was only visible in the provider log.
+        The staged delegates (``implement_task``) run their own agent — a
+        separate pydantic-ai graph whose events never pass through this
+        run's encoder. Without a channel the web UI showed the chat model
+        "Thinking…" for the whole subagent run and the activity was only
+        visible in the provider log.
 
-        This sink carries one-line progress notes into the same SSE
-        journal, tagged with the parent tool call's id so the client
-        can nest them under the ``implement_task`` card. Notes are plain
-        text chunks, the same encoding the time-limit notice uses; they
-        are deliberately not tool parts, because the subagent's tool
-        calls belong to a different graph and must not resolve approvals
-        or message identities here.
+        The relay gives the subagent its own protocol encoder and journals
+        its frames into this journal, so its text, reasoning and tool
+        calls stream into the same assistant message, under the
+        ``implement_task`` card. What it may *not* carry is anything the
+        parent's encoder owns - turn boundaries and approval identity -
+        which is enforced inside the relay.
 
-        :return: A thread-safe-enough sink, or ``None`` once the run has
-            finished (a subagent that outlives its parent must not
-            append to a closed journal).
+        :return: A relay bound to this run, or ``None`` once the run has
+            finished (a subagent that outlives its parent must not append
+            to a closed journal).
         """
         if self._done:
             return None
 
-        def _report(line: str) -> None:
-            """Journal one subagent progress line, if the run is still live.
+        from berg_agents.ui.subagent_relay import SubagentRelay
 
-            Each call is its own text part, so the leading newline is not
-            needed (and a single ``\\n`` would only render as a space in
-            Markdown). Formatting each line as a bullet keeps the activity
-            readable in the same renderer as normal chat text.
-            """
-            if self._done or not line.strip():
-                return
-            # Each progress line is its own text part, so it renders as a
-            # separate paragraph in the same renderer as normal chat text.
-            # No leading newline: react-markdown treats a lone \\n as a
-            # space, and the frontend joins parts with \\n\\n.
-            self._append_text(f"🤖 {line.strip()}")
-
-        return _report
+        return SubagentRelay(
+            append=self._append, note=self._append_text, sdk_version=SDK_VERSION
+        )
 
     def _append_text(self, text: str) -> None:
         """Journal a plain assistant text chunk (the time-limit notice)."""

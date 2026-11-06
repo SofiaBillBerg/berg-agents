@@ -253,7 +253,7 @@ def _ask_user_answer_from_output(
         return None
 
 
-async def _cap_tool_results(events: Any) -> Any:
+async def cap_tool_results(events: Any) -> Any:
     """Cap every tool result before it is sent back to the model.
 
     Tool results accumulate in the conversation and are re-sent with each
@@ -265,8 +265,11 @@ async def _cap_tool_results(events: Any) -> Any:
 
     This sits on the event stream rather than in any one tool because the
     cap must hold for every tool, including plugin tools written later
-    that know nothing about it. Truncation is marked in the text so the
-    model can tell its view is partial and narrow the call, rather than
+    that know nothing about it. It serves both streams the server writes:
+    the chat turn's own events, and the subagent events the relay carries
+    into the same journal, where an uncapped read would put a whole file
+    into a journalled chunk. Truncation is marked in the text so the model
+    can tell its view is partial and narrow the call, rather than
     reasoning from a silently gutted result.
 
     :param events: Async iterator of pydantic-ai native events.
@@ -285,7 +288,7 @@ async def _cap_tool_results(events: Any) -> Any:
             name = str(getattr(part, "tool_name", "") or "tool")
             dropped = len(content) - MAX_TOOL_RESULT_CHARS
             logger.warning(
-                "tool %s returned %d chars; capped to %d for the model",
+                "tool %s returned %d chars; capped to %d before streaming",
                 name,
                 len(content),
                 MAX_TOOL_RESULT_CHARS,
@@ -346,7 +349,7 @@ async def encode_run_stream(
 
     stream = VercelAIEventStream(sdk_version=6)
     async for frame in stream.encode_stream(
-        stream.transform_stream(_cap_tool_results(events), on_cancel=_on_cancel)
+        stream.transform_stream(cap_tool_results(events), on_cancel=_on_cancel)
     ):
         yield frame
 
@@ -643,13 +646,14 @@ async def _start_run(
             max_duration=get_settings().run_max_duration_minutes * 60,
             on_finish=on_finish,
         )
-        # Attach the live run's progress sink to the workspace toolset so
-        # the implement_task delegate can relay the subagent's activity.
-        # The sink is read at call time, so setting it here (before the
-        # graph task starts) is enough.
+        # Attach the live run's subagent relay to the workspace toolset so
+        # the implement_task delegate can stream the subagent's own run -
+        # its text, reasoning and tool calls - into this journal. The relay
+        # is read at call time, so setting it here (before the graph task
+        # starts) is enough.
         for ts in getattr(agent, "_user_toolsets", []):
             if type(ts).__name__ == "WorkspaceToolset":
-                ts.progress_holder["sink"] = live.subagent_reporter()
+                ts.progress_holder["relay"] = live.subagent_relay()
                 break
         if runtime is not None:
             runtime.run = live
@@ -1387,7 +1391,7 @@ def register_chat_routes(
             """
             for ts in getattr(agent, "_user_toolsets", []):
                 if type(ts).__name__ == "WorkspaceToolset":
-                    ts.progress_holder["sink"] = None
+                    ts.progress_holder["relay"] = None
                     break
             logger.info(
                 "chat run finished: %s (%s)", outcome.kind, outcome.detail

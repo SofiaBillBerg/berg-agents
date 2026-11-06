@@ -140,14 +140,14 @@ class WorkspaceToolset(WrapperToolset[None]):
         from berg_agents.agents.factory import create_tools
         from pydantic_ai.toolsets import FunctionToolset
 
-        # Sink for subagent progress, set by the web layer once the run
-        # exists (the run is created after the agent, so this cannot be a
-        # constructor argument). A holder dict rather than a plain
+        # Relay for the subagent's streamed run, set by the web layer once
+        # the run exists (the run is created after the agent, so this cannot
+        # be a constructor argument). A holder dict rather than a plain
         # attribute: the delegate reads it at call time, so it always sees
-        # the sink attached to the run that is currently streaming. No
-        # sink means "nothing is watching" - a CLI or harness caller
-        # simply gets no progress relay.
-        self.progress_holder: dict[str, Any] = {"sink": None}
+        # the relay attached to the run that is currently streaming. No
+        # relay means "nothing is watching" - a CLI or harness caller
+        # simply gets no live stream.
+        self.progress_holder: dict[str, Any] = {"relay": None}
         inner: FunctionToolset[None] = FunctionToolset()
         # The planner subagent's read-only tool set: it may ground a plan
         # in the repo it plans for, but the plan itself is written by the
@@ -351,34 +351,6 @@ async def _resolve_todo_id(
         )
         return candidates[0], available
     return None, available
-
-
-def _brief(value: Any, limit: int = 160) -> str:
-    """Collapse a tool argument or result into one short log line.
-
-    The subagent's progress notes ride the chat's own SSE stream, so a
-    full file body or a 200-line bash result would flood the transcript.
-    This keeps the *shape* of the activity (which tool, on what) without
-    the payload.
-
-    :param value: Any tool argument or result.
-    :param limit: Maximum characters kept.
-    :return: Single-line, truncated text.
-    """
-    text = " ".join(str(value).split())
-    return text if len(text) <= limit else text[: limit - 1] + "…"
-
-
-def _brief_args(args: Any) -> str:
-    """Render a tool call's arguments compactly for a progress note.
-
-    :param args: The call's arguments (mapping, string, or None).
-    :return: ``key=value`` pairs, or a plain string, clipped for display.
-    """
-    if isinstance(args, dict):
-        pairs = [f"{key}={_brief(val, 60)}" for key, val in args.items()]
-        return _brief(", ".join(pairs))
-    return _brief("" if args is None else args)
 
 
 def _plan_items_to_text(items: list[dict[str, Any]], title: str) -> str:
@@ -682,13 +654,13 @@ def _is_commentary(step: str) -> bool:
 def _make_implement_task(
     root_dir: str,
     plan_tools: dict[str, Any],
-    sink_owner: dict[str, Any] | None = None,
+    relay_holder: dict[str, Any] | None = None,
 ) -> Any:
     """Build the ``implement_task`` delegate (reads the stored plan).
 
     :param root_dir: Workspace root the implementer's file tools are bound to.
     :param plan_tools: Session-bound plan-store tools.
-    :param sink_owner: Mutable holder whose ``"sink"`` entry is read at
+    :param relay_holder: Mutable holder whose ``"relay"`` entry is read at
         call time. The web layer sets it once the run exists (the run is
         built after the agent), so a captured value would always be the
         stale ``None``.
@@ -714,6 +686,7 @@ def _make_implement_task(
             build_implementation_agent,
             summarize_changes,
         )
+        from pydantic_ai.tools import DeferredToolRequests
         from pydantic_ai.usage import UsageLimits
 
         # prefix. The model re-types ids between stages and drops edge
@@ -758,33 +731,26 @@ def _make_implement_task(
         )
         deps = ImplementationDeps(workspace_root=root_dir, task_type=task_type)
 
-        # Progress relay to the parent run's journal so the web UI shows
-        # the subagent's activity instead of a silent wait. The sink is
-        # read from the holder at call time: it is attached by the web
-        # layer after this delegate is built.
-        reporter = (sink_owner or {}).get("sink")
+        # Live stream of the subagent's own run into the parent's journal,
+        # so the web UI shows what the implementer is doing instead of a
+        # silent wait. The relay is read from the holder at call time: it
+        # is attached by the web layer after this delegate is built.
+        relay = (relay_holder or {}).get("relay")
 
         async def _on_event(_sub_ctx: Any, event_stream: Any) -> None:
-            """Relay the subagent's streamed activity to the parent run.
+            """Stream the subagent's run to the parent run's journal.
+
+            pydantic-ai awaits this inline with each node of the
+            subagent's graph, so the relay sees every event in run order.
+            With no relay attached (CLI or harness callers) the events are
+            simply not observed - the run itself is unaffected.
 
             :param _sub_ctx: The subagent's own run context (unused).
             :param event_stream: The subagent's native event stream.
             """
-            from pydantic_ai import (
-                FunctionToolCallEvent,
-                FunctionToolResultEvent,
-            )
-
-            async for event in event_stream:
-                if reporter is None:
-                    continue
-                if isinstance(event, FunctionToolCallEvent):
-                    part = event.part
-                    args = _brief_args(part.args)
-                    reporter(f"**{part.tool_name}** {args}")
-                elif isinstance(event, FunctionToolResultEvent):
-                    content = str(getattr(event.part, "content", ""))
-                    reporter(f"{_brief(content, 120)}")
+            if relay is None:
+                return
+            await relay.drive(_sub_ctx, event_stream)
 
         # No timeout: a cap on the delegate reported failure to the model
         # while the subagent was still working. Ending the run is the
@@ -795,6 +761,30 @@ def _make_implement_task(
             event_stream_handler=_on_event,
             usage_limits=UsageLimits(request_limit=None),
         )
+
+        # A subagent whose own tool needs approval ends on deferred
+        # requests rather than a summary, and nothing in this delegate
+        # resumes it. Report that plainly: "no files were changed" reads
+        # as "nothing to do", which is the wrong diagnosis for a run that
+        # stopped waiting for a decision.
+        deferred = getattr(result, "output", None)
+        if isinstance(deferred, DeferredToolRequests):
+            waiting = ", ".join(
+                sorted({
+                    str(getattr(call, "tool_name", "") or "tool")
+                    for call in deferred.approvals
+                })
+            )
+            if relay is not None:
+                relay.note(
+                    f"⏸ The implementer paused waiting for approval: {waiting}"
+                )
+            return (
+                f"implement_task: the implementer paused waiting for approval "
+                f"for {waiting} and did not finish the plan. It wrote no "
+                "files yet. Tell the user the run needs its approval, and "
+                "do not report the plan as done."
+            )
 
         # The model's own text is narration; report from the run's
         # recorded writes so the caller sees what happened on disk.
