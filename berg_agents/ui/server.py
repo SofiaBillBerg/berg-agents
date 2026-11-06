@@ -93,6 +93,22 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # up with plugins loaded. Never raise — the server must start.
         tools = await get_plugin_tools_for("chat")
         logger.info("Plugin tools warmed: %d tools", len(tools))
+        # Declarative agents (.berg-agents/agents/*.yaml) join the harness
+        # registry so /api/agents lists them and /api/agents/active selects
+        # them. Failure-isolated by design: a malformed spec is logged and
+        # skipped, never allowed to stop the server.
+        from berg_agents.agents.specs import register_spec_agents
+
+        register_spec_agents(app.state.harness)
+        # Runtime capability authoring: the chat endpoint needs the live
+        # instance to inject store.load_active() into every run, so it is
+        # held on app state rather than rebuilt per request.
+        from berg_agents.agents.chat_agent import authored_capabilities_dir
+        from pydantic_ai_harness.capability_creation import CapabilityCreation
+
+        app.state.authored_capabilities = CapabilityCreation(
+            directory=authored_capabilities_dir()
+        )
     except Exception as exc:
         logger.warning("Plugin warmup skipped: %s", exc)
     # Without this task nothing ever calls prune_finished, so finished

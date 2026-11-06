@@ -58,6 +58,7 @@ from typing import Any
 
 from pydantic_ai import ModelMessage, ModelRequest, UserPromptPart
 from pydantic_ai.capabilities import ProcessHistory
+from pydantic_ai.messages import ToolReturnPart
 
 logger = logging.getLogger(__name__)
 
@@ -155,9 +156,8 @@ def _fold_user_into_tool_results(message: ModelRequest) -> ModelRequest:
     # The user turn itself goes: its text now travels with the result.
     parts = [
         part
-        for index, part in enumerate(parts)
-        if index != target
-        and not (
+        for part in parts
+        if not (
             isinstance(part, UserPromptPart) and _prompt_text(part) is not None
         )
     ]

@@ -545,6 +545,7 @@ async def _start_run(
     agent: Any,
     conversation: Any,
     on_finish: Callable[[Any, Any], Awaitable[None]],
+    app_state: Any = None,
 ) -> Any:
     """Start the session's next run and return it.
 
@@ -626,6 +627,12 @@ async def _start_run(
                 output_type=[str, DeferredToolRequests],
                 usage_limits=_CHAT_USAGE_LIMITS,
                 deferred_tool_results=deferred,
+                # Runtime-authored capabilities activate on the run AFTER
+                # they were written and approved, never the one that wrote
+                # them - pydantic-ai fixes the capability set when a run
+                # starts. Reading the store per run is what makes them live
+                # without a restart.
+                capabilities=_authored_capabilities(app_state),
                 **start_args,
             )
 
@@ -1008,6 +1015,136 @@ async def _track_chat_session(
     return session_id, conversation
 
 
+def _spec_agent_source(harness: Any, active_agent: str | None) -> str | None:
+    """Source file of the active spec agent, or ``None``.
+
+    Feeds the agent fingerprint so editing a spec file changes the
+    session's agent identity (and rebuilds it), while a built-in or
+    absent agent leaves the fingerprint untouched.
+
+    :param harness: Shared harness (holds the agent registry).
+    :param active_agent: Selected agent name, or ``None``.
+    :return: The spec's file path, or ``None``.
+    """
+    if not active_agent:
+        return None
+    try:
+        agent = harness.get_agent(active_agent)
+    except KeyError:
+        return None
+    source = getattr(agent, "source", None)
+    return str(source) if source is not None else None
+
+
+def _spec_agent_builder(harness: Any, active_agent: str | None) -> Any:
+    """The spec agent's builder, or ``None`` when the selection is not one.
+
+    :param harness: Shared harness (holds the agent registry).
+    :param active_agent: Selected agent name, or ``None``.
+    :return: ``build_agent`` of a spec agent, or ``None``.
+    """
+    if not active_agent:
+        return None
+    try:
+        agent = harness.get_agent(active_agent)
+    except KeyError:
+        return None
+    builder = getattr(agent, "build_agent", None)
+    return builder if callable(builder) else None
+
+
+def _authored_capabilities(app_state: Any) -> list[Any]:
+    """Active runtime-authored capabilities, for injection into a run.
+
+    Failure-isolated: an unreadable or half-written authored file must not
+    stop the turn, so a store failure yields no capabilities at all (the
+    pre-feature behavior) rather than an error.
+
+    :param app_state: The running request's ``app.state``.
+    :return: Capability instances to activate for this run; empty when
+        there are none or the store cannot be read.
+    """
+    creation = getattr(app_state, "authored_capabilities", None)
+    loader = getattr(creation, "store", None)
+    if loader is None:
+        return []
+    try:
+        return list(loader.load_active())
+    except Exception as exc:  # ruff: ignore[blind-except] - a broken authored file is not a dead chat
+        logger.warning("Authored capabilities not loaded: %s", exc)
+        return []
+
+
+def _resolve_session_agent(
+    *,
+    harness: Any,
+    sessions: SessionManager,
+    session_id: str | None,
+    registry: Any,
+    fingerprint: tuple[Any, ...],
+    model_id: str,
+    plugin_tools: Any,
+    disabled_mcp: Any,
+    disabled_skills: Any,
+    active_agent: str | None,
+    active_agent_description: str | None,
+) -> Any:
+    """Return the agent this session runs, spec-defined or built-in.
+
+    One decision point for the whole chat path: a spec agent
+    (``.berg-agents/agents/*.yaml``) is assembled from its spec, and
+    everything else from the built-in builder. Both keep the same
+    toolset, plan store and capabilities - the spec only swaps the model
+    and the instructions.
+
+    :param harness: Shared harness (holds the agent registry).
+    :param sessions: Session store (workspace root).
+    :param session_id: Session the agent belongs to.
+    :param registry: Process-wide run registry (holds session runtimes).
+    :param fingerprint: Identity of this agent for the session.
+    :param model_id: Active model id, for the built-in builder.
+    :param plugin_tools: Plugin-contributed tools for the chat role.
+    :param disabled_mcp: MCP server keys withheld this turn.
+    :param disabled_skills: Skill ids withheld this turn.
+    :param active_agent: Persona/spec agent selected via the API.
+    :param active_agent_description: That selection's description.
+    :return: The built agent, cached in the session's runtime.
+    """
+    spec_builder = _spec_agent_builder(harness, active_agent)
+    if spec_builder is not None:
+        agent = spec_builder(
+            root_dir=sessions._harness_root_dir(),
+            plugin_tools=plugin_tools,
+            disabled_mcp=disabled_mcp,
+            disabled_skills=disabled_skills,
+            session_id=session_id,
+        )
+        logger.info(
+            "spec agent %r built for %s",
+            active_agent,
+            session_id or "(no session)",
+        )
+    else:
+        agent = build_chat_agent(
+            model_id,
+            root_dir=sessions._harness_root_dir(),
+            plugin_tools=plugin_tools,
+            disabled_mcp=disabled_mcp,
+            disabled_skills=disabled_skills,
+            active_agent=active_agent,
+            active_agent_description=active_agent_description,
+            session_id=session_id,
+        )
+    _track_context_usage(agent, session_id)
+    if session_id:
+        registry.put(
+            SessionRuntime(
+                session_id=session_id, agent=agent, fingerprint=fingerprint
+            )
+        )
+    return agent
+
+
 def _resolve_active_agent(
     harness: Harness, sessions: SessionManager
 ) -> tuple[str | None, str | None]:
@@ -1119,32 +1256,34 @@ def register_chat_routes(
             frozenset(disabled_skills),
             active_agent,
             active_agent_description or "",
+            # A spec agent is rebuilt when its file changes: the source
+            # path is part of its identity, so editing the YAML is a
+            # different agent and the session picks the new one up.
+            _spec_agent_source(harness, active_agent),
         )
         runtime = registry.get(session_id) if session_id else None
         if runtime is not None and runtime.fingerprint == fingerprint:
             return runtime.agent
 
-        agent = build_chat_agent(
-            model_id,
-            root_dir=sessions._harness_root_dir(),
+        # A spec agent (.berg-agents/agents/*.yaml) is assembled from its
+        # spec, not from the built-in chat builder: same toolset, same
+        # plan store, same capabilities, but the model and instructions
+        # the spec declares.
+        return _resolve_session_agent(
+            harness=harness,
+            sessions=sessions,
+            session_id=session_id,
+            registry=registry,
+            fingerprint=fingerprint,
+            model_id=model_id,
             plugin_tools=plugin_tools,
             disabled_mcp=disabled_mcp,
             disabled_skills=disabled_skills,
             active_agent=active_agent,
             active_agent_description=active_agent_description,
-            # Scopes the plan store to this session so a plan written
-            # in one turn is still there in the next.
-            session_id=session_id,
         )
-        _track_context_usage(agent, session_id)
-        if session_id:
-            registry.put(
-                SessionRuntime(
-                    session_id=session_id, agent=agent, fingerprint=fingerprint
-                )
-            )
+
         logger.info("chat agent built for %s", session_id or "(no session)")
-        return agent
 
     @router.post("/api/chat/stream")
     async def chat_stream(request: Request) -> Response:
@@ -1278,6 +1417,7 @@ def register_chat_routes(
                 agent=agent,
                 conversation=conversation,
                 on_finish=_on_run_finish,
+                app_state=request.app.state,
             )
         except StaleAnswerError as exc:
             # Nothing is running to answer: say so plainly instead of failing

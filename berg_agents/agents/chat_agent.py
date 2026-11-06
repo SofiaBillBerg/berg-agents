@@ -51,6 +51,23 @@ def _shell_allowed() -> bool:
         "off"}
 
 
+def authored_capabilities_dir() -> Path:
+    """Directory holding runtime-authored capabilities.
+
+    Deliberately the **global** config dir, not the project one: the
+    harness requires the authored files to sit outside the workspace, or
+    the model could rewrite them (and ``manifest.json``) with its own
+    file tools and skip the validation ``author_capability`` performs. A
+    project-local directory would be inside the workspace by definition.
+
+    :return: ``~/.berg-agents/authored`` (``BERG_AGENTS_CONFIG_DIR``
+        overrides the root).
+    """
+    from berg_agents.config.paths import global_config_dir
+
+    return global_config_dir() / "authored"
+
+
 def build_chat_agent(
     model_id: str | None = None,
     *,
@@ -61,6 +78,8 @@ def build_chat_agent(
     active_agent: str | None = None,
     active_agent_description: str | None = None,
     session_id: str | None = None,
+    instructions: str | None = None,
+    spec: Any | None = None,
 ) -> Any:
     """Build a pydantic_ai ``Agent`` for the streaming chat endpoint.
 
@@ -87,6 +106,8 @@ def build_chat_agent(
     :param disabled_skills: Chat skill ids (``skill-<name>``) to withhold.
     :return: A configured ``Agent`` ready for ``VercelAIAdapter``.
     """
+    from pathlib import Path
+
     from berg_agents.agents.workspace_toolset import WorkspaceToolset
     from berg_agents.capabilities.context_capabilities import (
         build_context_capabilities,
@@ -107,8 +128,10 @@ def build_chat_agent(
         resolve_model_request_settings,
     )
     from pydantic_ai import Agent
-    from pydantic_ai.capabilities import WebFetch, WebSearch
+    from pydantic_ai.capabilities import LocalWorkspace, WebFetch, WebSearch
     from pydantic_ai_harness.ask_user import AskUser
+    from pydantic_ai_harness.capability_creation import CapabilityCreation
+    from pydantic_ai_harness.guardrails import GuardrailResult, ToolGuardrail
 
     # Resolve the model from .berg-agents - resolve_model_instance reads
     # bergagents.jsonc and returns a fully-configured OpenAIChatModel.
@@ -120,10 +143,17 @@ def build_chat_agent(
 
     # Build the system prompt from settings (config-driven, not hardcoded).
     settings = get_settings()
+    # An explicit instructions string replaces the configured base prompt:
+    # a spec-defined agent carries its own, and the operational blocks
+    # below (shared context, ask_user contract) still apply to it.
     system_prompt = (
-        settings.system_prompt.format(root_dir=root_dir)
-        if f"{root_dir}" in settings.system_prompt
-        else settings.system_prompt
+        instructions
+        if instructions is not None
+        else (
+            settings.system_prompt.format(root_dir=root_dir)
+            if f"{root_dir}" in settings.system_prompt
+            else settings.system_prompt
+        )
     )
 
     # Active agent routing: when the user has chosen an agent (via
@@ -252,10 +282,20 @@ def build_chat_agent(
         root_dir, allow_shell=_shell_allowed(), plan_tools=plan_tools
     )
 
-    agent = Agent(
-        model,
-        system_prompt=system_prompt,
-        tool_timeout=30,
+    # A spec agent is assembled by pydantic-ai's own from_spec, so its
+    # declared capabilities (WebSearch, Thinking, an MCP server, ...) are
+    # built by the library and MERGED with berg's list below - one
+    # assembly path, with the spec as the source of the agent's own
+    # choices. Everything berg needs stays identical: the model always
+    # comes from berg's provider registry, never a provider-name string
+    # pydantic-ai would have to guess.
+    # ``output_type``, ``usage_limits`` and the deferred-tool output are
+    # NOT set here: the chat endpoint passes them per run, and from_spec
+    # accepts no such keyword.
+    agent_kwargs: dict[str, Any] = {
+        "model": model,
+        "system_prompt": system_prompt,
+        "tool_timeout": 30,
         # Two output retries so one malformed tool call gets a
         # recovery chance instead of failing the whole turn.
         # NOTE: no approval-handling capability here on purpose.
@@ -269,16 +309,16 @@ def build_chat_agent(
         # their own, larger budget: a wrong tool call is usually a schema
         # mistake the model can fix when it sees the validation error, and
         # the library default of 1 kills the whole run on the first miss.
-        retries={"output": 3, "tools": 3},
+        "retries": {"output": 3, "tools": 3},
         # Per-model request options as extra_body (e.g. a strict chat
         # template override). None when the model declares none, so the
         # provider's own defaults apply byte-for-byte.
-        model_settings={"extra_body": extra_body} if extra_body else None,
+        "model_settings": {"extra_body": extra_body} if extra_body else None,
         # NOTE: Enabled plugin tools (shared-todo pilot). Empty by
         # default — low-risk tools need no HITL approval.
-        tools=[*shared_context_tools, *(plugin_tools or [])],
-        toolsets=[toolset, *build_mcp_toolsets(exclude=disabled_mcp)],
-        capabilities=[
+        "tools": [*shared_context_tools, *(plugin_tools or [])],
+        "toolsets": [toolset, *build_mcp_toolsets(exclude=disabled_mcp)],
+        "capabilities": [
             # Turn-shape normalizer: one user turn per request. Strict
             # chat templates (Mistral/Devstral's Unsloth template) reject
             # two user turns in a row with a Jinja 500, and the memory
@@ -341,7 +381,37 @@ def build_chat_agent(
             # clock, so a long session continues one stretch at a time.
             WallClockGuard(
                 limit_seconds=settings.run_max_duration_minutes * 60
-            )],
+            )]}
+    # Runtime capability authoring. Three pieces, in this order:
+    #   1. a writable LocalWorkspace, without which the harness refuses to
+    #      start the run at all (it must know the code runs on this
+    #      machine, not in a sandbox the model could escape);
+    #   2. CapabilityCreation itself, whose tools let the model write,
+    #      list and disable capabilities for the NEXT run;
+    #   3. a guardrail that sends every authoring and disabling call
+    #      through the human approval batch - model-written Python runs
+    #      in this process, so nothing executes unseen.
+    # The authored directory lives in the GLOBAL config dir on purpose:
+    # it must sit outside the workspace, or the model could edit the
+    # authored files and manifest with its own file tools and bypass
+    # validation entirely.
+    agent_kwargs["capabilities"].extend([
+        LocalWorkspace(root_dir),
+        CapabilityCreation(directory=authored_capabilities_dir()),
+        ToolGuardrail(
+            guard=lambda _call: GuardrailResult.approve(),
+            tools=[
+                "author_capability",
+                "list_authored_capabilities",
+                "disable_authored_capability"],
+        )])
+    # from_spec takes the spec first and merges the spec's own
+    # capabilities with berg's list above; the model is always berg's
+    # provider-registry instance, never a provider-name string.
+    agent = (
+        Agent.from_spec(spec, **agent_kwargs)
+        if spec is not None
+        else Agent(**agent_kwargs)
     )
 
     return agent
