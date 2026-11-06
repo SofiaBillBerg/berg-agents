@@ -36,8 +36,10 @@ import logging
 from typing import Any, Literal
 
 from berg_agents.capabilities.registry import ToolCatalog
+from berg_agents.capabilities.turn_shape import build_turn_shape_capability
 from berg_agents.providers.models import (
     resolve_model_instance,
+    resolve_model_request_settings,
     resolve_model_string,
 )
 from berg_agents.providers.tiers import model_for_complexity
@@ -321,6 +323,9 @@ def build_implementation_agent(
     if model_id is None:
         model_id = model_for_complexity(complexity, cfg)
     model = resolve_model_instance(model_id, cfg)
+    # Per-model request options (e.g. a strict chat_template override)
+    # ride in extra_body; None when the model declares none.
+    extra_body = resolve_model_request_settings(model_id, cfg)
 
     default_instructions = (
         "You are an implementation agent that EXECUTES code changes, not just plans them. "
@@ -350,11 +355,19 @@ def build_implementation_agent(
         # this one; ReinjectSystemPrompt keeps this agent's own system
         # prompt at the head (otherwise a non-empty history suppresses
         # it). See pydantic-ai message-history sharing.
-        capabilities=[ReinjectSystemPrompt()],
+        capabilities=[
+            ReinjectSystemPrompt(),
+            # One user turn per request: the plan handed to this agent is
+            # a user message, and a strict template (Mistral/Devstral)
+            # rejects two user turns in a row. Harmless elsewhere.
+            *([cap] if (cap := build_turn_shape_capability()) else [])],
         # Plugin tools for this role (e.g. the plan store the planner
         # wrote into). Empty by default, so the agent still runs with no
         # plugins — the same rule the chat agent follows.
         tools=list(plugin_tools or []),
+        # Per-model request options as extra_body (a strict chat template
+        # override, for example). None when the model declares none.
+        model_settings={"extra_body": extra_body} if extra_body else None,
         # Plain-text output so the model can freely call tools
         # and return a final answer string. A structured output
         # schema would risk `UnexpectedModelBehavior` retry

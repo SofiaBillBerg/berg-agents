@@ -61,20 +61,29 @@
       "options": {
         "baseURL": "${env:BERG_AGENT_UNSLOTH_BASE_URL}",
         "apiKey": "${env:BERG_AGENT_UNSLOTH_API_KEY}",
-        "timeout": 120000},
+        "timeout": 120000
+      },
       "models": {
+        "unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF:UD-IQ3_XXS": {
+          "name": "unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF:UD-IQ3_XXS"
+        },
+        "unsloth/LFM2.5-24B-A2B-GGUF:UD-Q3_K_XL": {
+          "name": "unsloth/LFM2.5-24B-A2B-GGUF:UD-Q3_K_XL"
+        },
+        "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K": {
+          "name": "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K"
+        },
         "mudler/Qwen3.8-27B-APEX-GGUF:Qwen3.8-27B-APEX-I-Nano": {
-          "name":"mudler/Qwen3.8-27B-APEX-GGUF:Qwen3.8-27B-APEX-I-Nano"
+          "name": "mudler/Qwen3.8-27B-APEX-GGUF:Qwen3.8-27B-APEX-I-Nano"
         },
         "sigmanih/mistralai-Devstral-Small-2-24B-Instruct-2512-GGUF-Q4_K_M:Q4_K_M": {
           "name": "sigmanih/mistralai-Devstral-Small-2-24B-Instruct-2512-GGUF-Q4_K_M:Q4_K_M"
         },
-        
-        "mradermacher/Muse-Glimmer-30B-Hermes-Agentic-i1-GGUF:Q4_K_M": {
-          "name": "mradermacher/Muse-Glimmer-30B-Hermes-Agentic-i1-GGUF:Q4_K_M"
+        "mradermacher/Muse-Glimmer-30B-Hermes-Agentic-i1-GGUF:IQ3_M": {
+          "name": "mradermacher/Muse-Glimmer-30B-Hermes-Agentic-i1-GGUF:IQ3_M"
         },
-        "unsloth/Qwen-AgentWorld-35B-A3B-GGUF:UD-IQ3_XXS": {
-          "name": "unsloth/Qwen-AgentWorld-35B-A3B-GGUF:UD-IQ3_XXS"},
+        "unsloth/Qwen-AgentWorld-35B-A3B-GGUF:UD-IQ2_M": {
+          "name": "unsloth/Qwen-AgentWorld-35B-A3B-GGUF:UD-IQ2_M"},
         //        "unsloth/Jan-nano-128k-GGUF:Q8_0S": {
         //          "name": "unsloth/Jan-nano-128k-GGUF:Q8_0"
         //        },
@@ -89,7 +98,6 @@
         "timeout": 120000,
         "apiKey": "${env:BERG_AGENT_OLLAMA_API_KEY}"},
       "models": {
-      
         "bonsai-2:9b": {
           "name": "bonsai-2:9b"},
         "ornith:9b-q4_K_M": {
@@ -101,7 +109,7 @@
           "name": "hf.co/IsValorum/Qwen3.8-27B-VAL-APEX-I-MiniPlus-V3-GGUF"},
         "hf.co/JackAgentLead/Jack-3.8-27B-Coder-16GB-VRAM:latest": {
           "name": "Jack-3.8-27B-Coder"},
-          "gemma3:12b": {
+        "gemma3:12b": {
           "name": "gemma3:12b"},
         "gemma4:cloud": {
           "name": "gemma4:cloud"},
@@ -165,20 +173,44 @@
   "model_routing": {
     "models": {
       "trivial": {
-        "models": ["bonsai-2:9b", "ornith:9b-q4_K_M"],
+        "models": [
+          "bonsai-2:9b",
+          "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
+          "ornith:9b-q4_K_M"
+        ],
         "max_tokens": 64000},
       "standard": {
-        "models": ["sigmanih/mistralai-Devstral-Small-2-24B-Instruct-2512-GGUF-Q4_K_M:Q4_K_M", "mudler/Qwen3.8-27B-APEX-GGUF:Qwen3.8-27B-APEX-I-Nano", "auto/best-free"],
-        "max_tokens": 90000},
+        "models": [
+          "unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF:UD-IQ3_XXS",
+          "mradermacher/Muse-Glimmer-30B-Hermes-Agentic-i1-GGUF:IQ3_M",
+          "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
+          "mudler/Qwen3.8-27B-APEX-GGUF:Qwen3.8-27B-APEX-I-Nano",
+          "auto/best-free"
+        ],
+        "max_tokens": 80000},
       "complex": {
-        "models": ["logfare/logfare/auto", "auto/free-combo","base-free-stack", "auto/best-free"],
+        "models": [
+          "logfare/logfare/auto",
+          "auto/free-combo",
+          "base-free-stack",
+          "auto/best-free"
+        ],
         "max_tokens": 230000},
       "critical": {
-        "models": ["auto/free-combo", "logfare/logfare/auto","base-free-stack", "auto/best-free"],
+        "models": [
+          "auto/free-combo",
+          "logfare/logfare/auto",
+          "base-free-stack",
+          "auto/best-free"
+        ],
         "max_tokens": 230000}}},
   // HITL rules: Guardian decides when to ask human
   "hitl_rules": {
-    "auto_execute": ["read_file", "list_files", "search_code"],
+    "auto_execute": [
+      "read_file",
+      "list_files",
+      "search_code"
+    ],
     "notify_after": [
       "edit_file",
       "new_file",
@@ -191,7 +223,11 @@
       "refactor",
       "edit_file",
       "new_file"],
-    "human_leads": ["security_change", "production_deploy", "data_migration"]},
+    "human_leads": [
+      "security_change",
+      "production_deploy",
+      "data_migration"
+    ]},
   // Agent overrides (optional)
   "agents": {
     "guardian": {

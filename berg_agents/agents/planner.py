@@ -39,13 +39,17 @@ import json
 import logging
 from typing import Any, ClassVar
 
+from berg_agents.capabilities.turn_shape import build_turn_shape_capability
 from berg_agents.core.interface import (
     AbstractAgent,
     AgentResult,
     TaskComplexity,
     TaskContext,
 )
-from berg_agents.providers.models import resolve_model_instance
+from berg_agents.providers.models import (
+    resolve_model_instance,
+    resolve_model_request_settings,
+)
 from berg_agents.providers.tiers import model_for_complexity
 from pydantic_ai import Agent, RunContext
 
@@ -428,6 +432,9 @@ def build_planner_agent(
     # stay optional while the complexity preference is kept.
     if model_id is None:
         model_id = model_for_complexity(PLANNER_COMPLEXITY, cfg)
+    # Per-model request options as extra_body (a strict chat template
+    # override, for example). Empty when the model declares none.
+    extra_body = resolve_model_request_settings(model_id, cfg)
     # Specialized on the constructor for the same reason as the
     # implementation agent: an unparameterized call infers `object` for
     # the deps slot and contradicts the declared return type.
@@ -440,6 +447,16 @@ def build_planner_agent(
         # builds without a plugin system; role callers pass the bound
         # plan tools in.
         tools=list(plugin_tools or []),
+        # Per-model request options (a strict chat template override,
+        # for example) ride in extra_body; None when none are declared.
+        model_settings=({"extra_body": extra_body} if extra_body else None),
+        # One user turn per request: a strict chat template
+        # (Mistral/Devstral) rejects two user turns in a row, and the
+        # plan text plus any enqueued context produce exactly that
+        # shape. Harmless on permissive backends.
+        capabilities=[
+            *([cap] if (cap := build_turn_shape_capability()) else [])
+        ],
     )
     return agent
 

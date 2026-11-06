@@ -94,6 +94,7 @@ def build_chat_agent(
     from berg_agents.capabilities.mcp_toolsets import build_mcp_toolsets
     from berg_agents.capabilities.runaway_guard import RunawayGuard
     from berg_agents.capabilities.skills import load_skill_capabilities
+    from berg_agents.capabilities.turn_shape import build_turn_shape_capability
     from berg_agents.capabilities.wall_clock_guard import WallClockGuard
     from berg_agents.capabilities.web_backends import (
         make_web_fetch,
@@ -101,7 +102,10 @@ def build_chat_agent(
     )
     from berg_agents.config.settings import get_settings
     from berg_agents.core.shared_context import SECTIONS, SharedContext
-    from berg_agents.providers.models import resolve_model_instance
+    from berg_agents.providers.models import (
+        resolve_model_instance,
+        resolve_model_request_settings,
+    )
     from pydantic_ai import Agent
     from pydantic_ai.capabilities import WebFetch, WebSearch
     from pydantic_ai_harness.ask_user import AskUser
@@ -109,6 +113,10 @@ def build_chat_agent(
     # Resolve the model from .berg-agents - resolve_model_instance reads
     # bergagents.jsonc and returns a fully-configured OpenAIChatModel.
     model = resolve_model_instance(model_id or "")
+    # Per-model request options (a chat_template override for strict
+    # templates, for example) ride in extra_body: they are request
+    # payload, not client construction, so they cannot live on the model.
+    extra_body = resolve_model_request_settings(model_id or "")
 
     # Build the system prompt from settings (config-driven, not hardcoded).
     settings = get_settings()
@@ -262,11 +270,22 @@ def build_chat_agent(
         # mistake the model can fix when it sees the validation error, and
         # the library default of 1 kills the whole run on the first miss.
         retries={"output": 3, "tools": 3},
+        # Per-model request options as extra_body (e.g. a strict chat
+        # template override). None when the model declares none, so the
+        # provider's own defaults apply byte-for-byte.
+        model_settings={"extra_body": extra_body} if extra_body else None,
         # NOTE: Enabled plugin tools (shared-todo pilot). Empty by
         # default — low-risk tools need no HITL approval.
         tools=[*shared_context_tools, *(plugin_tools or [])],
         toolsets=[toolset, *build_mcp_toolsets(exclude=disabled_mcp)],
         capabilities=[
+            # Turn-shape normalizer: one user turn per request. Strict
+            # chat templates (Mistral/Devstral's Unsloth template) reject
+            # two user turns in a row with a Jinja 500, and the memory
+            # snapshot plus steering text produce exactly that shape.
+            # Registered first so every later capability — compaction
+            # included — sees the normalized history.
+            *([cap] if (cap := build_turn_shape_capability()) else []),
             # Provider-adaptive web tools: provider-native first where
             # the model supports it, local implementation otherwise.
             # The local side tries the configured web backends in

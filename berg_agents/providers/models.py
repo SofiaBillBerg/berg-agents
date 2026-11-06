@@ -47,13 +47,17 @@ environment variables) from the prefix.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from berg_agents.providers.registry import resolve_model
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-__all__ = ["resolve_model_instance", "resolve_model_string"]
+__all__ = [
+    "resolve_model_instance",
+    "resolve_model_request_settings",
+    "resolve_model_string"]
 
 
 def resolve_model_string(
@@ -132,6 +136,68 @@ def resolve_model_string(
             "model string."
         )
     return f"{provider}:{model}"
+
+
+def resolve_model_request_settings(
+    model_id: str | None = None, cfg: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Build per-model request options for a chat model.
+
+    The registry already normalizes every option declared under a
+    provider's ``models`` entry, but :func:`resolve_model_instance` reads
+    only the four keys it needs to construct the client. Everything else
+    used to be dropped silently — so a model whose chat template must be
+    overridden (Mistral/Devstral enforce a strict one) had no way to say
+    so from configuration.
+
+    This returns the request-time options as an OpenAI-compatible
+    ``extra_body`` payload. Keys are an explicit allowlist: forwarding
+    every unknown key would send berg's own configuration
+    (``context_window``, ``complexity``, ...) to the provider.
+
+    Supported today:
+
+    ``chat_template``
+        Overrides the server's chat template for this model. A value that
+        names an existing file is read as a template file (a Jinja
+        string is usually too long to inline in JSONC); anything else is
+        sent verbatim. This is what llama-server's ``/v1/chat/completions``
+        accepts to override the GGUF's embedded template per request.
+    ``chat_template_kwargs``
+        Passed through unchanged (llama-server renders the template with
+        these as the Jinja context).
+
+    :param model_id: Model id as declared under a provider's ``models``.
+    :param cfg: Optional configuration dictionary override.
+    :return: Options ready to merge into a model-settings ``extra_body``;
+        empty when the model declares none of them.
+    """
+    if model_id is not None and not isinstance(model_id, str):
+        raise TypeError(
+            f"model_id must be a string or None, got {type(model_id).__name__}."
+        )
+    if cfg is not None and not isinstance(cfg, dict):
+        raise TypeError(
+            f"cfg must be a dict or None, got {type(cfg).__name__}."
+        )
+
+    key = model_id if model_id and model_id.strip() else None
+    resolved = resolve_model(key, cfg)
+    extra: dict[str, Any] = {}
+    template = resolved.get("chat_template")
+    if isinstance(template, str) and template.strip():
+        # A path to a template file is the usable spelling: the Jinja
+        # source is far too long to paste into JSONC, and a multi-line
+        # value in a config file is unreadable.
+        candidate = Path(template.strip()).expanduser()
+        try:
+            extra["chat_template"] = candidate.read_text(encoding="utf-8")
+        except OSError:
+            extra["chat_template"] = template.strip()
+    kwargs = resolved.get("chat_template_kwargs")
+    if isinstance(kwargs, dict) and kwargs:
+        extra["chat_template_kwargs"] = kwargs
+    return extra
 
 
 def resolve_model_instance(
