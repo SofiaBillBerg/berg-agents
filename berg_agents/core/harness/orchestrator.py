@@ -309,10 +309,10 @@ class Harness:
         # Guard against non-mapping metadata from callers.
         if not isinstance(metadata, dict):
             metadata = {}
-        # A recorded human approval survives re-execution:
+        # A recorded user approval survives re-execution:
         # resumes carry identical inputs, so the gate must
         # not fire again on them. "edit" counts as approval
-        # (the human edited the arguments, then approved).
+        # (the user edited the arguments, then approved).
         approved = metadata.get("hitl_decision") in HITL_APPROVAL_DECISIONS
         resolved_id = (
             task_id or str(task.get("task_id", "") or "") or self._new_id()
@@ -349,7 +349,7 @@ class Harness:
         if bypassed is not None:
             return {"gated": False, "bypassed": bypassed}
         # Plan-then-gate: before pausing a mutating task for
-        # human review, ask the model (read-only, nothing is
+        # user review, ask the model (read-only, nothing is
         # executed) to declare the concrete actions it intends -
         # real file paths instead of the ToolCatalog placeholder
         # echo. The HITL card then shows what will truly happen,
@@ -394,7 +394,7 @@ class Harness:
                 for tool in ToolCatalog.tools_for(task_type, description)
                 if _tool_is_mutating(tool)
             ]
-        # Early return: a human must review before anything
+        # Early return: a user must review before anything
         # else runs (see _review_gate_result); approved resumes
         # and read-only low-confidence verdicts proceed.
         gated = _review_gate_result(
@@ -474,7 +474,7 @@ class Harness:
         verdict = plan["verdict"]
         confidence = plan["confidence"]
         plan_messages = plan["plan_messages"]
-        # Human edit on a gated plan (Z2): captured for the trace and
+        # user edit on a gated plan (Z2): captured for the trace and
         # injected into the inference prompt so the model sees it.
         edited_action = metadata.get("edited_action")
         plan_obj = plan["plan"]
@@ -488,7 +488,7 @@ class Harness:
         turn: Any = None
         requested_override: str | None = None
         if inference_attempted:
-            # On an edited resume, surface the human's edit to the model.
+            # On an edited resume, surface the user's edit to the model.
             inference_description = description
             if edited_action is not None:
                 inference_description = (
@@ -645,7 +645,7 @@ class Harness:
         Runs a planning inference with no mutating tools registered:
         the model declares its concrete tool calls - real file paths
         and a one-line summary - as a JSON array. The caller shows
-        these on the HITL card so the human approves the *actual*
+        these on the HITL card so the user approves the *actual*
         plan, not a placeholder echo of their request. On any
         failure this returns None and the gate falls back to the
         deterministic placeholder actions.

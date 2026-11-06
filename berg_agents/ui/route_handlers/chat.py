@@ -379,7 +379,7 @@ async def _persist_turn(
         success=outcome.kind == "completed",
         model_id=model_id,
     )
-    # The run has yielded control back to the human: the turn finished, or it
+    # The run has yielded control back to the user: the turn finished, or it
     # paused on a deferred approval (the runaway guard's hard stop, or any
     # requires_approval tool), or it was stopped. All end unattended work, so
     # the runaway guard's count restarts either way.
@@ -394,9 +394,9 @@ async def _persist_turn(
 
         root = sessions._harness_root_dir()
         store = session_store.get_store(root)
-        # A steer the run ended before reading is still the human's message:
+        # A steer the run ended before reading is still a real user turn:
         # it joins the turn's record as a user prompt, so the transcript
-        # never drops something Sofia actually typed.
+        # keeps text that never reached the model.
         unread = [
             ModelRequest(parts=[UserPromptPart(content=text)])
             for text in run.unread_steering
@@ -490,7 +490,7 @@ def _record_chat_outcome(
 def _reset_runaway_guard(session_id: str | None) -> None:
     """Restart the runaway guard's count when the agent yields control.
 
-    The guard counts tool calls since the human last had a say. It resets when
+    The guard counts tool calls since the user last had a say. It resets when
     the agent YIELDS control - the turn finished, the run paused for approval,
     or the user stopped it. It does not reset because the user typed: a message
     sent while the agent keeps working is steering, not an intervention.
@@ -517,7 +517,7 @@ def _steer_live_run(
     Nothing in flight is aborted.
 
     A steer that cannot land (the run ended meanwhile) is not an error to the
-    human: it returns ``None`` so the same request starts a fresh run instead,
+    user: it returns ``None`` so the same request starts a fresh run instead,
     and the message is answered rather than swallowed.
 
     :param registry: The process-wide ``RunRegistry``.
@@ -1377,7 +1377,7 @@ def register_chat_routes(
         # it explicitly.)
 
         async def _on_run_finish(run: Any, outcome: Any) -> None:
-            """Persist the turn, then hand control back to the human.
+            """Persist the turn, then hand control back to the user.
 
             Called by the run itself, so persistence never depends on a
             browser still being connected.
@@ -1444,7 +1444,7 @@ def register_chat_routes(
         instant before it subscribes; that race is normal, and 204 is the
         protocol's way of saying so (the client's reconnect returns ``null``
         and simply stops). An error status would surface a failure to the
-        human for a turn that actually finished correctly.
+        user for a turn that actually finished correctly.
 
         :param request: FastAPI request (``?session=`` names the session).
         :return: SSE stream, or 204 when there is no live run to follow.
@@ -1467,7 +1467,7 @@ def register_chat_routes(
 
         This is the only thing that cancels a run. Closing a stream, reloading
         a page or switching tabs does not: those are readers leaving. What the
-        run already completed stays in history and is saved, and the human
+        run already completed stays in history and is saved, and the user
         gets control back (the runaway guard restarts).
 
         :param request: FastAPI request (``?session=`` names the session).

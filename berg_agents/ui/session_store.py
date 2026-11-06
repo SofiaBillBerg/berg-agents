@@ -240,9 +240,9 @@ def load_conversation(session_id: str) -> Any:
 
 
 # ---------------------------------------------------------------------------
-# Runaway-guard progress (tool calls since the human last intervened)
+# Runaway-guard progress (tool calls since the user last intervened)
 #
-# The guard counts tool calls the agent executes without the human getting a
+# The guard counts tool calls the agent executes without the user getting a
 # say. The count must outlive the agent object, which is rebuilt per request,
 # so it lives here beside the conversation record. It is reset when the agent
 # *yields control* (turn finished, run paused, HITL decision, Stop) and not
@@ -276,7 +276,7 @@ def _guard_connection() -> Any:
 
 
 def read_guard_progress(session_id: str) -> tuple[int, bool]:
-    """Read how far a session has run without human intervention.
+    """Read how far a session has run without user intervention.
 
     :param session_id: Session identifier.
     :return: ``(tool_calls, nudged)`` - the current count and whether the
@@ -308,7 +308,7 @@ def write_guard_progress(
     """Persist a session's guard progress (upsert, best-effort).
 
     :param session_id: Session identifier.
-    :param tool_calls: Tool calls executed since the human last intervened.
+    :param tool_calls: Tool calls executed since the user last intervened.
     :param nudged: Whether the advisory reminder has fired for this stretch.
     :return: None.
     """

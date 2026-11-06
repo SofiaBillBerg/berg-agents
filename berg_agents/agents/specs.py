@@ -245,19 +245,141 @@ def load_specs(directory: Path | None = None) -> list[SpecAgent]:
     return specs
 
 
+def _spec_from_profile_entry(
+    profile_key: str, raw_name: str, spec_dict: Any
+) -> SpecAgent | None:
+    """Turn one profile-declared agent mapping into a :class:`SpecAgent`.
+
+    :param profile_key: The profile key the agent was declared under.
+    :param raw_name: The name given by the profile (or a generated one).
+    :param spec_dict: The agent's spec-shaped mapping.
+    :return: A :class:`SpecAgent`, or ``None`` on any failure.
+    """
+    if not isinstance(spec_dict, dict):
+        return None
+    spec_mapping = dict(spec_dict)
+    spec_mapping.setdefault("name", raw_name)
+    try:
+        from pydantic_ai import AgentSpec
+
+        spec = AgentSpec.from_dict(spec_mapping)
+    except Exception as exc:
+        logger.warning(
+            "profile %r agent %r skipped: %s", profile_key, raw_name, exc
+        )
+        return None
+    name = (getattr(spec, "name", None) or raw_name or "").strip()
+    if not name:
+        logger.warning("profile %r agent skipped: no name", profile_key)
+        return None
+    model_id = getattr(spec, "model", None)
+    if model_id:
+        try:
+            from berg_agents.providers.registry import resolve_model
+
+            resolve_model(str(model_id))
+        except KeyError:
+            logger.warning(
+                "profile %r agent %r: model %r is not declared; "
+                "the default model will be used.",
+                profile_key,
+                name,
+                model_id,
+            )
+            model_id = None
+    instructions = getattr(spec, "instructions", None)
+    settings = getattr(spec, "model_settings", None)
+    settings = settings if isinstance(settings, dict) else {}
+    return SpecAgent(
+        name=name,
+        description=str(getattr(spec, "description", "") or "").strip(),
+        model_id=str(model_id) if model_id else None,
+        instructions=str(instructions) if instructions is not None else None,
+        source=Path("profiles.yaml"),
+        spec=spec,
+        settings=settings,
+    )
+
+
+def load_profile_specs(profiles: Any | None = None) -> list[SpecAgent]:
+    """Read agent specs declared inside ``profiles.yaml``.
+
+    A profile entry may carry an ``agents`` block: a list (or mapping) of
+    the same spec-shaped mappings ``.berg-agents/agents/*.yaml`` holds.
+    This keeps one agent-definition vocabulary across both sources, so a
+    provider's profile (its excluded tools, its default model) and the
+    agents it ships travel together instead of in two places.
+
+    File specs always win on a name collision: they are the explicit,
+    user-edited source, and a profile that happens to declare the same
+    name should never shadow a file the user wrote.
+
+    :param profiles: Profiles mapping; defaults to
+        :func:`load_profiles_from_config_file`.
+    :return: Valid spec agents, sorted by name.
+    """
+    if profiles is None:
+        try:
+            from berg_agents.profiles.router import (
+                load_profiles_from_config_file,
+            )
+
+            profiles = load_profiles_from_config_file()
+        except Exception as exc:  # pragma: no cover - profiles optional
+            logger.warning("profiles.yaml unreadable: %s", exc)
+            return []
+    if not isinstance(profiles, dict):
+        return []
+
+    out: list[SpecAgent] = []
+    for profile_key, entry in profiles.items():
+        if not isinstance(entry, dict):
+            continue
+        agents = entry.get("agents")
+        if not agents:
+            continue
+        if isinstance(agents, dict):
+            items = list(agents.items())
+        elif isinstance(agents, list):
+            items = []
+            for index, spec in enumerate(agents):
+                if not isinstance(spec, dict):
+                    continue
+                name = spec.get("name") or f"{profile_key}-agent-{index}"
+                items.append((name, spec))
+        else:
+            continue
+
+        for raw_name, spec_dict in items:
+            agent = _spec_from_profile_entry(
+                profile_key, str(raw_name), spec_dict
+            )
+            if agent is not None:
+                out.append(agent)
+
+    out.sort(key=lambda spec_agent: spec_agent.name)
+    return out
+
+
 def register_spec_agents(harness: Any, directory: Path | None = None) -> int:
     """Register every spec agent into the harness registry.
 
-    A name a built-in agent already owns is skipped rather than
-    shadowed: the built-in is code someone tested, and a file silently
-    replacing it would be surprising.
+    File specs are registered first, so a file that names the same agent
+    a profile declares wins — the file is the explicit, user-edited
+    source and should never be shadowed by a profile. A name a built-in
+    agent already owns is skipped rather than shadowed too: the built-in
+    is code someone tested, and a file silently replacing it would be
+    surprising.
 
     :param harness: The harness to register into.
-    :param directory: Directory to read; defaults to :func:`spec_dir`.
+    :param directory: Directory of file specs; defaults to
+        :func:`spec_dir`.
     :return: How many agents were registered.
     """
     registered = 0
-    for spec_agent in load_specs(directory):
+    # Files first, profiles second — see the docstring.
+    all_specs = load_specs(directory) + load_profile_specs()
+    for spec_agent in all_specs:
         existing = getattr(harness, "get_agent", None)
         if callable(existing):
             try:

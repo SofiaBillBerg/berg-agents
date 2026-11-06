@@ -193,7 +193,7 @@ TOOL SELECTION (complete inventory - the agent has exactly these tools):
   alternative to rewriting the whole file)
 - plan_task: decompose a task into an ordered step plan via the
   planner subagent. Read-only. Call this before implement_task on
-  any multi-step work so progress stays visible.
+  any multistep work so progress stays visible.
 - implement_task: execute an approved step plan via the
   implementation subagent. Only call with a plan the user has seen;
   execution needs human approval.
@@ -203,10 +203,10 @@ cannot be done with the available tools. Calls to unknown tool
 names fail; on failure, continue with a tool from the list above.
 
 WORKFLOW:
-1. If the request names a directory or you don't know exact paths, call list_files first.
+1. If the request names a directory, or you don't know exact paths, call list_files first.
 2. Call read_file on the files you need (use the exact paths from list_files).
 3. For writes, call write_file (new) or edit_file (existing); for surgical changes use patch_file.
-4. For multi-step work: plan_task first, present the plan briefly,
+4. For multistep work: plan_task first, present the plan briefly,
    then implement_task once the user agrees. Never implement without
    a plan the user has seen.
 5. Use the tool results to answer. If a tool returns a "not found" or
@@ -564,10 +564,10 @@ class Settings(BaseSettings):
     summarization_keep: list[Any] | None = None
 
     #: --- Runaway guard ------------------------------------------------------
-    #: How many tool calls the agent may execute in a row without the human
+    #: How many tool calls the agent may execute in a row without the user
     #: intervening before it is asked to check in. At this number a fixed
     #: advisory reminder is added to the next model request; at twice this
-    #: number the run pauses with a HITL approval the human must answer.
+    #: number the run pauses with a HITL approval the user must answer.
     #: A message the user sends while the agent is working does NOT reset the
     #: count - only the agent yielding control does (a finished turn, a paused
     #: run, a HITL decision or a Stop). Maps to
@@ -592,7 +592,7 @@ class Settings(BaseSettings):
     #: Maps to ``model_routing`` in bergagents.jsonc.
     model_routing: dict[str, Any] | None = None
 
-    #: HITL rules: when Guardian asks human (auto_execute/notify_after/ask_before/human_leads).
+    #: HITL rules: when Guardian asks user (auto_execute/notify_after/ask_before/human_leads).
     #: Maps to ``hitl_rules`` in bergagents.jsonc.
     hitl_rules: dict[str, Any] | None = None
 

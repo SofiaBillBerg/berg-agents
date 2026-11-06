@@ -24,7 +24,7 @@ any checkout, per ADR-0001):
     ``~/.berg-agents/projects/<project_id>/transcripts/<session>.jsonl``
     ``~/.berg-agents/projects/<project_id>/...``  (future concerns)
 
-The project **id** is a readable slug of the project's name, so a human
+The project **id** is a readable slug of the project's name, so a user
 can browse and filter without opening anything. The authoritative
 record (``project.json``) is written once, on first use, and never
 rewritten — so a project keeps its id and its ``created_at`` across

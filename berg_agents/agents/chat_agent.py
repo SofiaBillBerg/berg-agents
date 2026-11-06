@@ -335,7 +335,7 @@ def build_chat_agent(
             WebFetch(local=make_web_fetch(settings.web_search_backends)),
             # NOTE: There is deliberately no ``Planning`` capability here.
             # The plan is owned by shared-todo, whose tools arrive in
-            # ``plugin_tools`` and whose list the human can edit. A
+            # ``plugin_tools`` and whose list the user can edit. A
             # second, model-only plan store would give the session two
             # plans that can disagree — one the user can see and change,
             # one they cannot.
@@ -362,7 +362,7 @@ def build_chat_agent(
             # Let the model ask the user a question mid-run. With no
             # answerer the call defers, so the run pauses as a
             # DeferredToolRequests and the answer comes back through the
-            # same approval batch as every other human decision - one
+            # same approval batch as every other user decision - one
             # HITL surface, not a second one.
             AskUser(answerer=None),
             # Two-stage check-in so a run cannot go on indefinitely
@@ -375,7 +375,7 @@ def build_chat_agent(
             ),
             # Wall-clock ceiling: a run that has been executing past the
             # configured duration pauses on the next tool call, through the
-            # same approval card as every other human decision. The count
+            # same approval card as every other user decision. The count
             # guard above bounds *unattended tool calls*; this bounds *time*
             # (a slow provider, a tool that waits). Approving restarts the
             # clock, so a long session continues one stretch at a time.
@@ -389,7 +389,7 @@ def build_chat_agent(
     #   2. CapabilityCreation itself, whose tools let the model write,
     #      list and disable capabilities for the NEXT run;
     #   3. a guardrail that sends every authoring and disabling call
-    #      through the human approval batch - model-written Python runs
+    #      through the user approval batch - model-written Python runs
     #      in this process, so nothing executes unseen.
     # The authored directory lives in the GLOBAL config dir on purpose:
     # it must sit outside the workspace, or the model could edit the

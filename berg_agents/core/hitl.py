@@ -53,12 +53,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
-#: The three actions a human can take on a paused tool call.
+#: The three actions a user can take on a paused tool call.
 #: ``edit`` requires :attr:`HitlDecision.edited_args`; ``approve`` and
 #: ``reject`` ignore it.
 HitlAction = Literal["approve", "reject", "edit"]
 
-#: Decisions that count as "approved" (the human accepted the action).
+#: Decisions that count as "approved" (the user accepted the action).
 #: ``approve`` and ``edit`` both resume execution; ``reject`` does not.
 #: Shared vocabulary for the orchestrator gate AND the chat approval
 #: batch, so both layers reason about the same decision set.
@@ -122,12 +122,12 @@ class HitlRequest:
 # noinspection unresolved-references
 @dataclass(frozen=True)
 class HitlDecision:
-    """The human's answer to a paused call.
+    """The user's answer to a paused call.
 
     :var tool_call_id: The id of the :class:`HitlRequest` being answered.  Must match a request in the snapshot.
     :var action: One of :data:`HitlAction`.
     :var edited_args: Required when ``action == "edit"``; ignored otherwise.  Replaces :attr:`HitlRequest.tool_args`.
-    :var note: Optional human note (shown in audit logs).
+    :var note: Optional user note (shown in audit logs).
     """
 
     tool_call_id: str
@@ -234,7 +234,7 @@ def apply_decision(
     applies decisions that were validated on the original pause).
 
     :param request: The paused request.
-    :param decision: The human's answer.
+    :param decision: The user's answer.
     :return: Mapping of args to pass to the tool, or ``None`` if
         rejected.
     """

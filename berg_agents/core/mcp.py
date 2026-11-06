@@ -82,7 +82,7 @@ MCP_TOOL_PREFIX = "mcp"
 SERVER_SEP = "__"
 
 #: Servers whose tools can mutate external state or persisted memory.  Every
-#: tool from one of these servers is interrupted for explicit human
+#: tool from one of these servers is interrupted for explicit user
 #: approval.
 SENSITIVE_SERVERS: frozenset[str] = frozenset({"github", "memory"})
 
@@ -126,7 +126,7 @@ def is_sensitive_server(
     :param server_name: MCP server key.
     :param enabled_servers: Optional set of server names that are configured
         and enabled. When provided, classification respects configuration.
-    :return: Whether every tool from this server must be approved by a human.
+    :return: Whether every tool from this server must be approved by a user.
     """
     if enabled_servers is not None and server_name not in enabled_servers:
         return False
@@ -145,7 +145,7 @@ def is_readonly_server(
     :param enabled_servers: Optional set of server names that are configured
         and enabled. When provided, classification respects configuration file in .berg-agents directory.
     :return: Whether every tool from this server is safe to call without
-        human approval.
+        user approval.
     """
     if enabled_servers is not None and server_name not in enabled_servers:
         return False

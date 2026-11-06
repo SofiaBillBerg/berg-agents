@@ -21,7 +21,7 @@
 This is the persistent foundation that individual sessions (and agents)
 leverage; a session is not the shared context, it is a transient instance
 that reads from and contributes to this. Self-hosted under the config
-dir, plain files so the human owns and edits it in any editor.
+dir, plain files so the user owns and edits it in any editor.
 
 Two orthogonal structures, kept deliberately separate:
 
@@ -32,14 +32,14 @@ global when present, otherwise the global shows. Writes default to the
 project layer; pass ``scope="global"`` to author shared context.
 
 **Within a layer.** The current state is plain Markdown at
-``<root>/<section>.md`` (what the human edits and the agent renders), and
+``<root>/<section>.md`` (what the user edits and the agent renders), and
 the history is an append-only `JSONL` journal at
 ``<root>/.history/<section>.jsonl`` where every change records
 who/what/when/**why**. The why is the point: learning here is what-and-why,
 never bare outcome counters.
 
 See ``notes/session-model.md`` and the session-model baseline note
-under ``notes/`` (the Human/Berg Collaborative Session doc).
+under ``notes/`` (the user/Berg Collaborative Session doc).
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import Any
 
 #: Canonical human-authored sections, in render order. One plain file each
-#: so the human edits them independently; the names are the vocabulary.
+#: so the user edits them independently; the names are the vocabulary.
 SECTIONS: tuple[str, ...] = (
     "preferences",  # likes/dislikes; how work should be done
     "knowledge",  # durable facts about project/framework (avoid re-research)

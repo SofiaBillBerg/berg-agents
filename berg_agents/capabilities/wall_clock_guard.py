@@ -16,26 +16,26 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
-"""Wall-clock guard - a run that has gone on too long asks the human.
+"""Wall-clock guard - a run that has gone on too long asks the user.
 
 A session here runs for weeks and is resumable, so there is no per-run
 budget in the sense of "this turn may take N minutes and then it dies".
 What a collaborative session does need is a guarantee that a run cannot keep
-working for an unbounded stretch of wall-clock time without the human getting
+working for an unbounded stretch of wall-clock time without the user getting
 a say - a slow model, a provider that never answers, a tool that waits.
 
 The pause is raised from ``before_tool_execute`` as
 :class:`~pydantic_ai.exceptions.ApprovalRequired`, exactly like the runaway
 guard's hard stop, so the protocol already knows how to render it: the next
 tool call becomes a deferred approval and the run pauses on a real approval
-card. That is the whole point - the human answers the same card they answer
+card. That is the whole point - the user answers the same card they answer
 for every other gated action, and an approved "continue" simply lets the call
 run. The deadline is then re-armed from that answer, so approving means "the
 next stretch of work", not "forever".
 
 The deadline is per run, armed in ``before_run``. It deliberately does not
 count time the run spent paused: the run is not executing while it waits for
-a human, and a pause that expired the limit would fire the instant the human
+a user, and a pause that expired the limit would fire the instant the user
 answered.
 """
 
@@ -58,7 +58,7 @@ class WallClockGuard(AbstractCapability[Any]):
     """Pause a run for approval once it has been executing too long.
 
     :param limit_seconds: How long a run may keep working before the next tool
-        call is deferred for a human decision. ``0`` or less disables the
+        call is deferred for a user decision. ``0`` or less disables the
         guard.
     """
 
@@ -70,7 +70,7 @@ class WallClockGuard(AbstractCapability[Any]):
         super().__init__()
         self.limit_seconds = float(limit_seconds)
         #: Monotonic time the current stretch began. ``None`` until the run
-        #: starts (and again after the human has answered a pause).
+        #: starts (and again after the user has answered a pause).
         self._stretch_started: float | None = None
 
     async def before_run(self, ctx: RunContext[Any]) -> None:
@@ -112,7 +112,7 @@ class WallClockGuard(AbstractCapability[Any]):
 
         from pydantic_ai.exceptions import ApprovalRequired
 
-        # Restart the clock before raising: if the human approves, the tool
+        # Restart the clock before raising: if the user approves, the tool
         # runs and the run gets a fresh stretch. Without this the next call
         # would trip the same expired limit and the pause would repeat
         # forever.

@@ -31,7 +31,7 @@ The Guardian's behavior is defined here, in this module:
 - Deterministic HITL decision matrix (critical
   complexity, high risk, low confidence, and
   human-leads / ask-before task types force review).
-- Early human-review return: the harness calls
+- Early user-review return: the harness calls
   :func:`guard_review` first and returns its decision
   without invoking the model when review is needed.
 
@@ -105,7 +105,7 @@ HUMAN_LEADS: list[str] = [
     "production_deploy",
     "data_migration"]
 
-# Confidence below this score forces human review, whatever
+# Confidence below this score forces user review, whatever
 # the risk level says.
 LOW_CONFIDENCE_THRESHOLD = 0.6
 
@@ -130,7 +130,7 @@ class GuardianDeps:
 
 
 class GuardianDecision(BaseModel):
-    """Structured human-review verdict from the Guardian."""
+    """Structured user-review verdict from the Guardian."""
 
     needs_human_review: bool = PydField(
         description="True when a human must review/approve."

@@ -52,10 +52,10 @@ import FailureDialog from "./components/FailureDialog";
 import { PluginUISurface } from "./plugins/PluginUISurface.tsx";
 import { PluginCatalog } from "./components/PluginCatalog.tsx";
 import Navbar from "./components/Navbar.tsx";
+import { setRuntimeSessionId } from "./runtime/berg-runtime.ts";
 
 import { buildExportMarkdown } from "@/utils/utils";
 import { API_BASE } from "@/envConfig";
-import { setRuntimeSessionId } from "./runtime/berg-runtime.ts";
 import { useAISDKChat } from "@/harness";
 
 /*
@@ -945,7 +945,7 @@ function ChatContent() {
           />
         )}
 
-        {/* HITL approval requests - the agent paused and needs a human
+        {/* HITL approval requests - the agent paused and needs a user
             decision per action: approve one, reject another, edit the
             next. The batch stays on screen (pending + decided items
             with undo) until every item is answered, then the backend
@@ -1032,8 +1032,8 @@ function ChatContent() {
               {questionBatch.map((question) => (
                 <QuestionItem
                   key={question.id}
-                  question={question}
                   isStreaming={isStreaming}
+                  question={question}
                   onAnswer={respondToQuestion}
                 />
               ))}

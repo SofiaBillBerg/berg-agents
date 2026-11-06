@@ -178,7 +178,7 @@ class WorkspaceToolset(WrapperToolset[None]):
         if not read_only and not missing and plan_tools is not None:
             # Staged delegation over ONE plan store: plan_task writes the
             # plan into the session's todo list, implement_task reads it
-            # back by id. The human sees and edits that same list, so the
+            # back by id. The user sees and edits that same list, so the
             # three views never diverge.
             inner.add_function(
                 _make_plan_task(plan_tools, read_tools),
@@ -613,7 +613,7 @@ def _is_commentary(step: str) -> bool:
     notes on what happened:", "Complexity is low-to-moderate", "Step 6
     has no human review gate". Stored verbatim those appear in the todo
     panel as if they were work to do, which is exactly the kind of
-    noise a human then has to clean up by hand.
+    noise a user then has to clean up by hand.
 
     The test is about what the text *is*, not what words it uses: a
     step tells someone to do something. Commentary describes the plan,
@@ -633,7 +633,7 @@ def _is_commentary(step: str) -> bool:
         return True
     # Declining to do the work is not a step. "Enable file access. Give me
     # a tool..." is the planner pushing back on the user; executing it
-    # would ask a human to hand over tools mid-plan.
+    # would ask a user to hand over tools mid-plan.
     refusal_markers = (
         "paste the",
         "give me",
@@ -699,7 +699,7 @@ def _make_implement_task(
 
         Reads the plan from this session's todo list at call time, so a
         plan the user edited is the plan that runs. Reports what was
-        actually written. Execution needs human approval first.
+        actually written. Execution needs user approval first.
 
         :param todo_id: Id of the todo whose subtasks form the plan.
             Resolved exactly first, then by unique prefix, so a re-typed
@@ -714,8 +714,8 @@ def _make_implement_task(
             build_implementation_agent,
             summarize_changes,
         )
+        from pydantic_ai.usage import UsageLimits
 
-        # Resolve the id the model typed: exact first, then unique
         # prefix. The model re-types ids between stages and drops edge
         # punctuation (one plan id lost its trailing comma twice in a
         # single session); an exact-only lookup turned that into "no
@@ -751,27 +751,23 @@ def _make_implement_task(
         if completed and len(completed) == len(steps):
             return f"implement_task: every step of {todo_id} is already done."
 
-        # Same session-bound store tools: the implementer can check off a
-        # step as it finishes, so the panel reflects real progress rather
-        # than the model's narration.
+        # The implementation subagent executes the stored plan: the plan
+        # text is read from the store and handed to it as one run.
         agent = build_implementation_agent(
             plugin_tools=list(plan_tools.values())
         )
         deps = ImplementationDeps(workspace_root=root_dir, task_type=task_type)
 
-        # Live progress: forward each tool call the implementer makes into
-        # the parent run's journal. Without this the web UI showed the chat
-        # model "Thinking…" for the whole subagent run and the activity was
-        # only visible in the provider log. Read from the holder at call
-        # time: the sink is attached by the web layer after this delegate
-        # is built.
+        # Progress relay to the parent run's journal so the web UI shows
+        # the subagent's activity instead of a silent wait. The sink is
+        # read from the holder at call time: it is attached by the web
+        # layer after this delegate is built.
         reporter = (sink_owner or {}).get("sink")
 
         async def _on_event(_sub_ctx: Any, event_stream: Any) -> None:
-            """Relay the implementer's tool activity to the parent run.
+            """Relay the subagent's streamed activity to the parent run.
 
-            :param _sub_ctx: The subagent's own run context (unused here;
-                the parent sink must be the one that journals).
+            :param _sub_ctx: The subagent's own run context (unused).
             :param event_stream: The subagent's native event stream.
             """
             from pydantic_ai import (
@@ -785,47 +781,29 @@ def _make_implement_task(
                 if isinstance(event, FunctionToolCallEvent):
                     part = event.part
                     args = _brief_args(part.args)
-                    reporter(f"step: {part.tool_name}({args})")
+                    reporter(f"**{part.tool_name}** {args}")
                 elif isinstance(event, FunctionToolResultEvent):
                     content = str(getattr(event.part, "content", ""))
-                    reporter(f"done: {event.tool_call_id} → {_brief(content)}")
+                    reporter(f"{_brief(content, 120)}")
 
-        # No timeout: the old 600 s cap returned "Timed out" to the model
-        # while the subagent kept working, so the UI reported failure over a
-        # run that was still writing files. Ending the run is now the human's
-        # explicit Stop (which cancels the parent, and with it this call).
+        # No timeout: a cap on the delegate reported failure to the model
+        # while the subagent was still working. Ending the run is the
+        # explicit Stop.
         result = await agent.run(
-            plan_text, deps=deps, event_stream_handler=_on_event
+            plan_text,
+            deps=deps,
+            event_stream_handler=_on_event,
+            usage_limits=UsageLimits(request_limit=None),
         )
-        # The model's own text is narration: it can say "Task completed"
-        # while having written nothing, or to a path it invented. Report
-        # from the run's recorded writes so the caller (and the human
-        # reading the chat) sees what actually happened on disk.
+
+        # The model's own text is narration; report from the run's
+        # recorded writes so the caller sees what happened on disk.
         summary = summarize_changes(deps.changes)
         narration = str(result.output).strip()
-
-        # Progress is reported from the store, not from the run: the
-        # implementer is told to check each step off, but a model that skips
-        # that must not leave the human believing nothing ran. Re-reading the
-        # list makes the count honest either way.
-        try:
-            after = await _call_plan_tool(
-                plan_tools, "list_subtasks", todo_id=todo_id
+        if not deps.changes:
+            return (
+                f"{summary}\n\nThe implementation agent reported:\n{narration}"
             )
-        except Exception as exc:  # ruff: ignore[blind-except] - reporting must not fail the run
-            logger.warning("implement_task progress read failed: %s", exc)
-            after = []
-        done = [i for i in after if str(i.get("status")) == "done"]
-        progress = (
-            f"Progress: {len(done)}/{len(after)} steps checked off."
-            if after
-            else ""
-        )
-        body = (
-            f"{summary}\n\nThe implementation agent reported:\n{narration}"
-            if not deps.changes
-            else f"{summary}\n\nAgent report:\n{narration}"
-        )
-        return f"{body}\n\n{progress}" if progress else body
+        return f"{summary}\n\nAgent report:\n{narration}"
 
     return _implement_task

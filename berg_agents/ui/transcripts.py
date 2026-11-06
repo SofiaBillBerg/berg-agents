@@ -23,7 +23,7 @@ a transcript survives the database, is greppable, and can be diffed or
 read with no tooling at all.
 
 Layout (project-scoped, so one project's sessions group together and a
-human can browse by project without knowing any session id):
+user can browse by project without knowing any session id):
 
     ``~/.berg-agents/projects/<project_id>/transcripts/<session_id>.jsonl``
 

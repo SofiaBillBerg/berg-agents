@@ -139,7 +139,7 @@ def _task_plans_mutation(task_type: str, description: str = "") -> bool:
 def _confidence_gate_bypassed(
     verdict: GuardianDecision, task_type: str, description: str = ""
 ) -> bool:
-    """Check whether a review verdict skips the human gate.
+    """Check whether a review verdict skips the user gate.
 
     A verdict never gates tasks whose planned tools are all
     read-only, so conversation and lookup work proceeds
@@ -317,7 +317,7 @@ def _review_gate_result(
     :param description: Human-readable task description.
     :param resolved_id: Caller thread id for log lines.
     :param confidence: Routing confidence score.
-    :param approved: True when metadata records a human approval.
+    :param approved: True when metadata records a user approval.
     :param action_requests: Pre-planned concrete mutating actions,
         if planning inference ran, else None.
 

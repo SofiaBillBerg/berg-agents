@@ -294,12 +294,12 @@ class ToolError:
 class HitlRequired:
     """Pause the loop.  Caller must call :meth:`BergLoop.resume`.
 
-    The loop yields this event when a tool call is flagged for human review.  The caller must persist the snapshot and then call :meth:`BergLoop.resume` with a :class:`HitlDecision` to continue the cycle.
+    The loop yields this event when a tool call is flagged for user review.  The caller must persist the snapshot and then call :meth:`BergLoop.resume` with a :class:`HitlDecision` to continue the cycle.
 
-    :attr:`HitlRequest` is the concrete request for human review, including the tool call ID, name, arguments, risk class, allowed decisions, and a reason string.  The caller can use this information to present a UI or CLI prompt to the human operator.
-    :attr:`HitlDecision` is the human's decision on the pending request, which must be passed to :meth:`BergLoop.resume` to continue the cycle.
+    :attr:`HitlRequest` is the concrete request for user review, including the tool call ID, name, arguments, risk class, allowed decisions, and a reason string.  The caller can use this information to present a UI or CLI prompt to the user operator.
+    :attr:`HitlDecision` is the user's decision on the pending request, which must be passed to :meth:`BergLoop.resume` to continue the cycle.
     :attr:`HitlResolved` is emitted at the top of :meth:`BergLoop.resume` to indicate that the paused call has been answered and the loop is continuing.
-    :attr:`HitlRequired` is emitted at the top of :meth:`BergLoop.run` when a tool call is flagged for human review.  The caller must persist the snapshot and then call :meth:`BergLoop.resume` with a :class:`HitlDecision` to continue the cycle.
+    :attr:`HitlRequired` is emitted at the top of :meth:`BergLoop.run` when a tool call is flagged for user review.  The caller must persist the snapshot and then call :meth:`BergLoop.resume` with a :class:`HitlDecision` to continue the cycle.
     :param call_id: The tool call ID.
     :param tool_name: The name of the tool.
     :param tool_args: The arguments for the tool call.
@@ -317,7 +317,7 @@ class HitlResolved:
     """The paused call has been answered.  Emitted at the top of :meth:`BergLoop.resume`.
 
     :param call_id: The tool call ID.
-    :param decision: The human's decision.
+    :param decision: The user's decision.
     """
 
     call_id: str
@@ -467,7 +467,7 @@ class BergLoop:
         :meth:`resume`).
 
         :param thread_id: The thread to resume.
-        :param decision: The human's decision on the pending HITL request.
+        :param decision: The user's decision on the pending HITL request.
         :return: Yields :class:`LoopEvent` values until the cycle ends.
         """
         if not isinstance(thread_id, str) or not thread_id:
@@ -546,7 +546,7 @@ class BergLoop:
                     )
 
                     if self._interrupt.get(name, False):
-                        # Pause for human review.
+                        # Pause for user review.
                         risk = self._risk_for(name)
 
                         # Build a concrete action declaration for HITL visibility.
@@ -676,7 +676,7 @@ class BergLoop:
         lets a different process pick up the resume.
 
         :param thread_id: The thread to resume.
-        :param decision: The human's decision on the pending HITL request.
+        :param decision: The user's decision on the pending HITL request.
         :return: Yields :class:`LoopEvent` values until the cycle ends.
         """
         if not isinstance(thread_id, str) or not thread_id:

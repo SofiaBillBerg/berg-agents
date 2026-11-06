@@ -127,3 +127,5 @@ entities.json
 /.envrc
 /.editorconfig
 /**/*.lock
+/feat_dev/agentspec-create.ipynb
+/feat_dev/workingontemp.jinja

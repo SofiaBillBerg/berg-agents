@@ -32,7 +32,7 @@ is why that file was previously configured but consumed by nothing):
 Every toolset is renamed to ``mcp_<server>__<tool>`` to match the
 documented tool contract the system prompt teaches, and tools from
 sensitive servers (see :func:`~berg_agents.core.mcp.is_sensitive_server`)
-are wrapped to require human approval — read-only servers stay
+are wrapped to require user approval — read-only servers stay
 approval-free. Toolsets are cached process-wide and built
 best-effort: a dead server logs a warning and is skipped, never
 breaking chat.

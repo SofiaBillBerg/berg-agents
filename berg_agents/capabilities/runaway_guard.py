@@ -21,7 +21,7 @@
 A session here runs for weeks and is resumable, so there is no per-run
 budget: nothing should end a turn with an error because a conversation is old.
 What a collaborative session does need is a guarantee that the agent cannot
-work indefinitely without the human getting a say.
+work indefinitely without the user getting a say.
 
 Stage one (soft, at ``limit`` tool calls) adds a fixed advisory system prompt
 to the next model request: the agent is told how long it has been working
@@ -31,7 +31,7 @@ the wording of the check-in to the model (reply, or call ``ask_user``).
 Stage two (hard, at ``2 * limit``) raises
 :class:`~pydantic_ai.exceptions.ApprovalRequired` from
 ``before_tool_execute``, so the next call becomes a deferred approval and the
-run pauses until the human answers. That cannot be ignored, which is what
+run pauses until the user answers. That cannot be ignored, which is what
 stage one deliberately can.
 
 The count is per session and lives in the session store
@@ -69,7 +69,7 @@ _CHECK_IN_REMINDER = (
 class RunawayGuard(AbstractCapability[Any]):
     """Ask the agent to check in, then force a pause if it does not.
 
-    :param limit: Tool calls allowed without human intervention before the
+    :param limit: Tool calls allowed without user intervention before the
         advisory reminder fires. The hard pause follows at ``2 * limit``.
     :param session_id: Session whose counter is tracked; ``None`` disables the
         capability for this run (there is nowhere to persist the count).
@@ -131,10 +131,10 @@ class RunawayGuard(AbstractCapability[Any]):
 
         Counting happens here rather than after execution so a tool that
         fails still counts towards "has been working unattended": the point
-        is the human's absence, not the tool's success.
+        is the user's absence, not the tool's success.
 
         :raises ApprovalRequired: At ``2 * limit`` calls, deferring this call
-            so the run pauses for the human through the approval batch.
+            so the run pauses for the user through the approval batch.
         """
         if not self.session_id:
             return args

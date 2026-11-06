@@ -83,13 +83,13 @@ class RunOutcome:
     detail: str = ""
     #: Tools paused waiting for an approve/reject decision.
     approvals: tuple[str, ...] = ()
-    #: Tools paused waiting for an answer the human must produce
+    #: Tools paused waiting for an answer the user must produce
     #: (``ask_user_question`` defers as an external call, not an approval).
     questions: tuple[str, ...] = ()
 
     @property
     def paused_for_answer(self) -> bool:
-        """Whether the human now needs to answer something.
+        """Whether the user now needs to answer something.
 
         A pause is a pause whether the run wants a decision or an answer -
         one HITL surface answers both.
@@ -106,7 +106,7 @@ class _NodeTicket:
     the item, so the driver never advances the graph under a half-streamed
     node, and never finishes the run before its result has been encoded.
 
-    The closing result is what makes a pause visible to the human: the
+    The closing result is what makes a pause visible to the user: the
     protocol's approval chunk is derived from the run's final
     ``DeferredToolRequests`` output, so a run that paused without sending its
     result would show as merely "tool input available" and no approve/reject
@@ -240,7 +240,7 @@ class LiveRun:
 
     @property
     def paused(self) -> bool:
-        """Whether the run ended waiting for the human (approval or time)."""
+        """Whether the run ended waiting for the user (approval or time)."""
         outcome = self._outcome
         return outcome is not None and outcome.kind == "paused"
 
@@ -311,7 +311,7 @@ class LiveRun:
         either joins the run's pending queue or the run has gone, which the
         return value reports.
 
-        :param text: The human's message.
+        :param text: The user's message.
         :return: The enqueue id, or ``None`` when the run has already ended
             (the caller then starts a fresh run rather than losing the text).
         """
@@ -405,12 +405,12 @@ class LiveRun:
     async def _walk(self, agent_run: Any) -> RunOutcome:
         """Advance the graph to its end, or to the time limit.
 
-        The time limit normally reaches the human through
+        The time limit normally reaches the user through
         :class:`~berg_agents.capabilities.wall_clock_guard.WallClockGuard`,
         which defers the next tool call so the run pauses on a real approval
         card. This walk's check is the backstop for the one case a capability
         cannot cover: no tool call comes up before the clock runs out (a single
-        very long model request, or a tool that never returns). The human then
+        very long model request, or a tool that never returns). The user then
         gets plain text instead of a card - the honest fallback, because there
         is no call to attach a decision to.
 
@@ -422,7 +422,7 @@ class LiveRun:
         while not _is_end(node):
             if time.monotonic() > deadline:
                 # The limit PAUSES rather than cancels: the work so far is
-                # kept and the human decides what happens next.
+                # kept and the user decides what happens next.
                 self._append_text(
                     "\n\n⏸️ This run reached its time limit without reaching "
                     "a tool call to ask about. Everything done so far is "
@@ -535,7 +535,7 @@ class LiveRun:
         A deferral is not always an approval: ``requires_approval`` tools
         wait in ``approvals``, while externally-executed calls
         (``ask_user_question``) wait in ``calls``. The outcome reports what
-        the human actually owes an answer for - a blanket "awaiting
+        the user actually owes an answer for - a blanket "awaiting
         approval" over a question pause is how the webapp ended up with an
         unanswerable session and a status that lied about why.
         """
@@ -730,10 +730,20 @@ class LiveRun:
             return None
 
         def _report(line: str) -> None:
-            """Journal one subagent progress line, if the run is still live."""
+            """Journal one subagent progress line, if the run is still live.
+
+            Each call is its own text part, so the leading newline is not
+            needed (and a single ``\\n`` would only render as a space in
+            Markdown). Formatting each line as a bullet keeps the activity
+            readable in the same renderer as normal chat text.
+            """
             if self._done or not line.strip():
                 return
-            self._append_text(f"\n🤖 {line.strip()}")
+            # Each progress line is its own text part, so it renders as a
+            # separate paragraph in the same renderer as normal chat text.
+            # No leading newline: react-markdown treats a lone \\n as a
+            # space, and the frontend joins parts with \\n\\n.
+            self._append_text(f"🤖 {line.strip()}")
 
         return _report
 
