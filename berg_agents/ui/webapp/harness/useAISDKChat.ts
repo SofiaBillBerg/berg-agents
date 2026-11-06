@@ -30,114 +30,28 @@
  * tool calls (file operations + run_task), which run the full BergAgents harness.
  */
 
-import type { TextUIPart, UIMessage } from "ai";
-import type { SetStateAction } from "react";
+import type {UIMessage} from "ai";
+import type {SetStateAction} from "react";
+import type {PendingQuestion, PendingQuestionAnswer} from "./askUser";
+import type {ChatMessage} from "./messageParts";
 
-import { DefaultChatTransport } from "ai";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useChat } from "@ai-sdk/react";
+import {DefaultChatTransport} from "ai";
+import {useCallback, useEffect, useRef, useState} from "react";
+import {useChat} from "@ai-sdk/react";
 
-import { API_BASE } from "@/envConfig";
+import {
+    ASK_USER_TOOL_NAME,
+    isQuestionAnswerPayload,
+    parseQuestionCall} from "./askUser";
+import {partToolName, toChatMessage} from "./messageParts";
 
-/** localStorage key for the live conversation (shared with History). */
+import {API_BASE} from "@/envConfig";
+
+
+export type {ChatMessage} from "./messageParts";
 
 /** localStorage key for the active server-side session id. */
 export const SESSION_ID_KEY = "berg_session_id";
-
-/** Max messages persisted (keeps quota usage bounded). */
-
-/** Max chars kept per tool input/output in storage (display caps lower). */
-const MAX_STORED_PART_CHARS = 2000;
-
-/** Soft budget for the whole persisted payload (well under quota). */
-
-/**
- * Slim a UIMessage list for localStorage: tool inputs/outputs are
- * truncated, so one big `read_file` can never blow the quota and
- * silently leave stale state behind (the restore "lottery").
- * Approval flow needs no old outputs, only part identities.
- *
- * @param msgs - Raw UI messages.
- * @returns JSON-safe slimmed copies.
- */
-/**
- * Serialize messages to a quota-safe JSON string: slim first, then
- * drop oldest messages until under budget. Deterministic — the newest
- * turn always survives, so restores stop being a lottery.
- *
- * @param msgs - Raw UI messages (newest last).
- * @returns JSON string, or null when nothing serializable remains.
- */
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  parts?: Array<Record<string, unknown>>;
-  /** Model's private reasoning trace (omitted when empty). */
-  reasoning?: string;
-  /** Completed tool calls, rendered as collapsible cards. */
-  toolCalls?: Array<{
-    tool: string;
-    input?: string;
-    output?: string;
-    state?: string;
-  }>;
-}
-
-/** Max output chars kept per tool call for display/export. */
-const MAX_TOOL_OUTPUT_CHARS = 4000;
-
-/**
- * Extract completed tool calls from a UIMessage for card rendering.
- * Output text is capped so one giant result cannot flood the chat.
- */
-function messageToolCalls(msg: UIMessage): ChatMessage["toolCalls"] {
-  const calls: NonNullable<ChatMessage["toolCalls"]> = [];
-  for (const part of msg.parts) {
-    const p = part as unknown as Record<string, unknown>;
-    const pType = typeof p.type === "string" ? p.type : "";
-    if (pType !== "dynamic-tool" && !pType.startsWith("tool-")) continue;
-    const name =
-      (typeof p.toolName === "string" && p.toolName) ||
-      (pType.startsWith("tool-") ? pType.slice("tool-".length) : "tool");
-    let input = "";
-    if (p.input != null) {
-      try {
-        input =
-          typeof p.input === "string"
-            ? p.input
-            : JSON.stringify(p.input, null, 2);
-      } catch {
-        input = "";
-      }
-    }
-    let output: string | undefined;
-    const raw = (p as { output?: unknown }).output;
-    if (raw !== undefined && raw !== null) {
-      try {
-        output = typeof raw === "string" ? raw : JSON.stringify(raw, null, 2);
-      } catch {
-        output = String(raw);
-      }
-      if (output.length > MAX_TOOL_OUTPUT_CHARS) {
-        output = `${output.slice(0, MAX_TOOL_OUTPUT_CHARS)}\n… (output truncated)`;
-      }
-    }
-    calls.push({
-      tool: name,
-      input: input || undefined,
-      output,
-      state: typeof p.state === "string" ? (p.state as string) : undefined});
-  }
-  return calls.length > 0 ? calls : undefined;
-}
-
-/**
- * The wire tool name of the harness's ask-user call. A question pauses
- * the run exactly like an approval does; every card, marker and trigger
- * below branches on this name to keep the two surfaces separate.
- */
-const ASK_USER_TOOL_NAME = "ask_user_question";
 
 // Client-side hint for transport failures - the one failure class whose
 // cause the client can see better than the server (it never reached the
@@ -148,42 +62,6 @@ function clientFailureHint(detail: string): string | undefined {
     return "The chat backend could not be reached — is the server running?";
   }
   return undefined;
-}
-
-export interface PendingQuestionOption {
-  /** One offered choice, kept verbatim - the answer is keyed by label. */
-  label: string;
-  /** What choosing this option means, when the model provided it. */
-  description?: string;
-}
-
-export interface PendingQuestionData {
-  /** Short label naming the question; the answer is keyed by it. */
-  header: string;
-  /** The full question text. */
-  question: string;
-  /** Whether the user may pick more than one option. */
-  multiSelect: boolean;
-  options: PendingQuestionOption[];
-}
-
-/** One answer inside a submitted response (wire keys are snake_case). */
-export interface PendingQuestionAnswer {
-  header: string;
-  selected: string[];
-  customAnswer?: string;
-}
-
-export interface PendingQuestion {
-  /** Tool call id - pass back to respondToQuestion. */
-  id: string;
-  /** The call's questions, parsed from its args; empty when unreadable. */
-  questions: PendingQuestionData[];
-  /** True once an answer payload is written (badge until the resume
-     fires and the server overwrites the output with the result). */
-  answered: boolean;
-  /** True when the written payload declines the questions. */
-  declined: boolean;
 }
 
 export interface PendingApproval {
@@ -290,215 +168,10 @@ export interface UseAISDKChatReturn {
   openSession: (id: string) => Promise<void>;
 }
 
-/**
- * Read a tool part's wire name. Typed parts carry it in the `type` prefix
- * (`tool-<name>`); a part the client normalized to a dynamic tool carries a
- * separate `toolName` field instead. One derivation for every call site.
- */
-function partToolName(p: Record<string, unknown>): string {
-  const type = typeof p.type === "string" ? p.type : "";
-  return (
-    (typeof p.toolName === "string" && p.toolName) ||
-    (type.startsWith("tool-") ? type.slice("tool-".length) : "tool")
-  );
-}
-
-/**
- * Whether a part's output is a canonical question-answer payload - the
- * `{answers: [{header, ...}], cancelled}` shape respondToQuestion writes
- * and the server's adapter expects. Once the resume lands, the server
- * overwrites the output with the RENDERED result (`{header: [labels]}` or
- * the DECLINED sentence), which never matches this shape - so spent
- * answers cannot re-arm a resume and completed turns stay completed.
- */
-function isQuestionAnswerPayload(output: unknown): boolean {
-  if (typeof output !== "object" || output === null) return false;
-  const o = output as Record<string, unknown>;
-  if (typeof o.cancelled !== "boolean") return false;
-  if (!Array.isArray(o.answers)) return false;
-  return o.answers.every(
-    (entry) =>
-      typeof entry === "object" &&
-      entry !== null &&
-      typeof (entry as Record<string, unknown>).header === "string",
-  );
-}
-
-/**
- * Parse one ask_user_question call's questions from its input args
- * (`{questions: [{header, question, multi_select, options}]}`). The
- * harness validates the same shape before the model's call is accepted,
- * so anything malformed here is a dead-run ghost: it renders as a raw
- * call, never as an answerable card.
- */
-function parseQuestionCall(input: unknown): PendingQuestionData[] {
-  if (typeof input !== "object" || input === null) return [];
-  if (!Array.isArray((input as Record<string, unknown>).questions)) {
-    return [];
-  }
-  const out: PendingQuestionData[] = [];
-  for (const raw of (input as Record<string, unknown>).questions as unknown[]) {
-    if (typeof raw !== "object" || raw === null) return [];
-    const q = raw as Record<string, unknown>;
-    if (typeof q.header !== "string" || typeof q.question !== "string") {
-      return [];
-    }
-    if (!Array.isArray(q.options)) return [];
-    const options: PendingQuestionOption[] = [];
-    for (const opt of q.options) {
-      if (typeof opt !== "object" || opt === null) return [];
-      const o = opt as Record<string, unknown>;
-      if (typeof o.label !== "string") return [];
-      options.push({
-        label: o.label,
-        description:
-          typeof o.description === "string" ? o.description : undefined});
-    }
-    out.push({
-      header: q.header,
-      question: q.question,
-      multiSelect: q.multi_select === true,
-      options});
-  }
-  return out;
-}
-
-/**
- * Extract the model's private reasoning trace from a UIMessage.
- * Reasoning parts (`type: "reasoning"` from the adapter's ThinkingPart,
- * or "thinking"/"thinking-delta" variants from other providers) carry
- * the chain-of-thought the model streamed before acting - shown
- * collapsed in the UI. Some models (qwen-style) emit thinking inline
- * as `<think>...</think>` text instead of a typed part; those blocks
- * are lifted out of the text here too, so both flavors render.
- */
-function extractReasoning(msg: UIMessage): string | undefined {
-  const bits: string[] = [];
-  for (const part of msg.parts) {
-    const p = part as unknown as Record<string, unknown>;
-    if (typeof p !== "object" || p === null) continue;
-    const pType = typeof p.type === "string" ? p.type : "";
-    if (
-      pType === "reasoning" ||
-      pType.startsWith("thinking") ||
-      pType.startsWith("reasoning")
-    ) {
-      const text =
-        (typeof p.text === "string" && p.text) ||
-        (typeof p.reasoning === "string" && (p.reasoning as string)) ||
-        "";
-      if (text.trim() !== "") bits.push(text);
-      continue;
-    }
-    // Inline <think> blocks inside regular text parts.
-    if (pType === "text") {
-      const text = typeof p.text === "string" ? (p.text as string) : "";
-      const matches = text.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi);
-      if (matches) {
-        for (const m of matches) {
-          const inner = m
-            .replace(/<\/?think>/i, "")
-            .replace(/<\/think>/i, "")
-            .trim();
-          if (inner) bits.push(inner);
-        }
-      }
-    }
-  }
-  return bits.length > 0 ? bits.join("\n") : undefined;
-}
-
-/**
- * Extract displayable text from a UIMessage's parts (v7 API).
- * In v7, UIMessage has `parts` instead of `content`.
- *
- * Tool-call-only turns carry no text parts, which used to render as
- * empty bubbles. Tool invocations are summarized as `🔧 name(args...)`
- * lines so activity stays visible instead of blank. Inline <think>
- * blocks are moved into `reasoning` (see extractReasoning), not shown.
- */
-function messageText(msg: UIMessage): string {
-  const chunks: string[] = [];
-  for (const part of msg.parts) {
-    if (part.type === "text") {
-      const raw = (part as unknown as TextUIPart).text;
-      // Strip inline thinking blocks - they live in `reasoning` now.
-      const cleaned = raw
-        .replace(/<think>[\s\S]*?<\/think>/gi, "")
-        .replace(/<\/?think>/gi, "")
-        .trim();
-      if (cleaned) chunks.push(cleaned);
-      continue;
-    }
-    // Tool parts: `dynamic-tool` or `tool-<name>` shapes (v7).
-    const p = part as unknown as Record<string, unknown>;
-    const pType = typeof p.type === "string" ? p.type : "";
-    if (pType === "dynamic-tool" || pType.startsWith("tool-")) {
-      const name = partToolName(p);
-      let args = "";
-      if (p.input != null && typeof p.input === "object") {
-        try {
-          const entries = Object.entries(
-            p.input as Record<string, unknown>,
-          ).map(([k, v]) => {
-            const s = typeof v === "string" ? v : JSON.stringify(v);
-            return `${k}=${s}`;
-          });
-          args = entries.length > 0 ? `(${entries.join(", ")})` : "";
-        } catch {
-          args = "";
-        }
-      }
-      // Completed calls render as collapsible ToolCards downstream
-      // (see messageToolCalls), so the text transcript keeps only a
-      // marker for calls still in flight or awaiting approval.
-      // (Exports re-attach outputs from `toolCalls` — see utils.)
-      const output = (p as { output?: unknown }).output;
-      const hasOutput = output !== undefined && output !== null;
-      if (!hasOutput) {
-        // A paused tool call renders by kind: questions get their
-        // own marker so a pause reads as "the model is asking",
-        // never like a system gate. Parts without an approval id
-        // are ghosts from dead runs (see sanitizeHistory): shown
-        // as expired, and the cards correctly ignore them since
-        // there is nothing to answer.
-        const approval = (p as { approval?: unknown }).approval as
-          { id?: unknown } | undefined;
-        const marker =
-          name === ASK_USER_TOOL_NAME
-            ? "❓ question pending"
-            : (p as { state?: unknown }).state === "approval-requested"
-              ? typeof approval?.id === "string"
-                ? "⏳ needs approval"
-                : "⏳ approval expired"
-              : "🔧";
-        chunks.push(`${marker} ${name}${args}`);
-      }
-    }
-  }
-  // Double newline: react-markdown renders a single \n as a space,
-  // so separate text parts (e.g. the implementer's progress lines)
-  // would otherwise collapse onto one line.
-  return chunks.filter(Boolean).join("\n\n");
-}
-
-/**
- * Sanitize a restored conversation so stale single-use state can never
- * poison a fresh run. Approval responses are per-run nonces: replaying
- * an old `approval-responded` part makes the backend try to resume a
- * dead run (observed as cryptic failures). Parts answered but never
- * executed revert to `approval-requested` so the user is asked again;
- * malformed parts are dropped. A question answer payload sitting in an
- * earlier message is the same nonce problem in a different shape, so it
- * is expired to an honest sentence (only the live last message may
- * carry answers to the backend).
- *
- * Restores (`preserveLatest === false`) go further: the backend is
- * stateless, so EVERY restored approval id belongs to a dead run.
- * Their ids are stripped, which renders them as expired and makes
- * them unanswerable — a reload can never resurrect a blocking
- * approval card again.
- */
+/* Part decoding (tool calls, reasoning, text, tool names) lives in
+ * ./messageParts; the ask_user decoders live in ./askUser. One walk
+ * over a message's parts for all three renderings - see
+ * readMessageParts. */
 function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
   return msgs
     .filter(
@@ -1141,15 +814,9 @@ export function useAISDKChat(): UseAISDKChatReturn {
   };
 
   // Convert AI SDK UIMessage[] to the simpler ChatMessage[] our UI expects.
-  // Reasoning traces and tool calls ride along separately so the UI can
-  // collapse them (reasoning block, ToolCards).
-  const messages: ChatMessage[] = uiMessages.map((msg) => ({
-    id: msg.id,
-    role: msg.role as "user" | "assistant" | "system",
-    content: messageText(msg),
-    parts: [],
-    reasoning: extractReasoning(msg),
-    toolCalls: messageToolCalls(msg)}));
+  // One walk per message fills all three renderings (text, reasoning,
+  // tool calls) - the parts shapes live in ./messageParts.
+  const messages: ChatMessage[] = uiMessages.map(toChatMessage);
 
   const setMessages = (msgs: ChatMessage[]) => {
     setUIMessages(msgs as unknown as UIMessage[]);

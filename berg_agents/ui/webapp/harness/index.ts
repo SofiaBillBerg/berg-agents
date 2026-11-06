@@ -39,8 +39,12 @@ export type {
     ChatMessage,
     FailureNotice,
     PendingApproval,
+    UseAISDKChatReturn} from "./useAISDKChat";
+
+// The ask_user vocabulary and the message-parts walker live in their own
+// modules; components keep importing them from the harness barrel.
+export type {
     PendingQuestion,
     PendingQuestionAnswer,
     PendingQuestionData,
-    PendingQuestionOption,
-    UseAISDKChatReturn} from "./useAISDKChat";
+    PendingQuestionOption} from "./askUser";
