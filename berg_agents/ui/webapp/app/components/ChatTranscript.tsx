@@ -19,6 +19,8 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
+import type {ChatMessage} from "@/harness";
+
 import React, {useEffect, useRef} from "react";
 import {Alert, Card, Spinner, Surface} from "@heroui/react";
 
@@ -26,7 +28,7 @@ import {MessageList} from "./MessageList.tsx";
 import {ToolCard} from "./ToolCard";
 
 export interface ChatTranscriptProps {
-    transcript: Array<{ role: string; content: string }>;
+    transcript: ChatMessage[];
     isExecuting: boolean;
     hitlRequest: unknown;
     onExport?: () => void;

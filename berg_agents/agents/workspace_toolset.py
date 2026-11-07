@@ -47,6 +47,7 @@ from pathlib import Path
 import re
 from typing import Any, override
 
+from pydantic_ai import RunContext
 from pydantic_ai.toolsets.wrapper import WrapperToolset
 
 logger = logging.getLogger(__name__)
@@ -666,13 +667,18 @@ def _make_implement_task(
         stale ``None``.
     """
 
-    async def _implement_task(todo_id: str, task_type: str = "generic") -> str:
+    async def _implement_task(
+        ctx: RunContext[None], todo_id: str, task_type: str = "generic"
+    ) -> str:
         """Execute a stored step plan via the implementation subagent.
 
         Reads the plan from this session's todo list at call time, so a
         plan the user edited is the plan that runs. Reports what was
         actually written. Execution needs user approval first.
 
+        :param ctx: The run context; its ``tool_call_id`` names this
+            delegate's own call, which is what the subagent's streamed
+            parts are grouped under in the UI.
         :param todo_id: Id of the todo whose subtasks form the plan.
             Resolved exactly first, then by unique prefix, so a re-typed
             id that lost edge punctuation still finds the plan; when
@@ -736,6 +742,9 @@ def _make_implement_task(
         # silent wait. The relay is read from the holder at call time: it
         # is attached by the web layer after this delegate is built.
         relay = (relay_holder or {}).get("relay")
+        # This delegate's own call id: the subagent's streamed parts are
+        # grouped under it in the UI, so the brackets must name it.
+        parent_call_id = str(getattr(ctx, "tool_call_id", "") or "")
 
         async def _on_event(_sub_ctx: Any, event_stream: Any) -> None:
             """Stream the subagent's run to the parent run's journal.
@@ -750,7 +759,13 @@ def _make_implement_task(
             """
             if relay is None:
                 return
-            await relay.drive(_sub_ctx, event_stream)
+            # Bracket the stream: everything between these two markers is
+            # the subagent's work, and belongs to this tool call.
+            relay.start(parent_call_id)
+            try:
+                await relay.drive(_sub_ctx, event_stream)
+            finally:
+                relay.end(parent_call_id)
 
         # No timeout: a cap on the delegate reported failure to the model
         # while the subagent was still working. Ending the run is the

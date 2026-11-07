@@ -57,6 +57,11 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+#: Chunk type carrying a subagent stream's bracket. The client groups the
+#: parts arriving between a ``start`` and its matching ``end`` under the
+#: parent tool call the bracket names.
+SUBAGENT_MARKER_TYPE = "data-subagent"
+
 
 @cache
 def _content_chunk_types() -> tuple[type, ...]:
@@ -165,6 +170,50 @@ class SubagentRelay:
         """
         if text.strip():
             self._note(text.strip())
+
+    def start(self, parent_tool_call_id: str) -> None:
+        """Announce that a subagent's stream begins, and whose it is.
+
+        The bracket is what lets the UI nest the subagent's parts under
+        the parent tool call: the client keeps these data parts on the
+        assistant message and groups what arrives between them. Without
+        it the parts still stream, but they land as loose siblings of
+        the ``implement_task`` card rather than inside it.
+
+        :param parent_tool_call_id: The parent tool call the subagent
+            belongs to (``implement_task``'s own call id).
+        """
+        if not parent_tool_call_id:
+            return
+        self._emit_data(
+            "data-subagent",
+            {"phase": "start", "parentToolCallId": parent_tool_call_id},
+        )
+
+    def end(self, parent_tool_call_id: str) -> None:
+        """Announce that a subagent's stream has finished.
+
+        :param parent_tool_call_id: The parent tool call, matching the
+            :meth:`start` bracket.
+        """
+        if not parent_tool_call_id:
+            return
+        self._emit_data(
+            "data-subagent",
+            {"phase": "end", "parentToolCallId": parent_tool_call_id},
+        )
+
+    def _emit_data(self, kind: str, data: dict[str, Any]) -> None:
+        """Journal one data-carrying protocol chunk.
+
+        :param kind: Chunk type; must start with ``data-`` for the client
+            to keep it on the assistant message.
+        :param data: The payload the client reads.
+        """
+        from pydantic_ai.ui.vercel_ai.response_types import DataChunk
+
+        chunk = DataChunk(type=kind, data=data)
+        self._append(f"data: {chunk.encode(self._sdk_version)}\n\n")
 
     async def drive(self, _sub_ctx: Any, event_stream: Any) -> None:
         """Stream one subagent run's events into the parent's journal.

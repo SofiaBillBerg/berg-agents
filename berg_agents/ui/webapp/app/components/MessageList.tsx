@@ -19,6 +19,8 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
+import type {ChatMessage, MessageToolCall} from "@/harness";
+
 import {useEffect, useState} from "react";
 import {Surface} from "@heroui/react";
 
@@ -61,24 +63,14 @@ export function usePluginSurfaceTools(): void {
     }, []);
 }
 
-export interface MessageToolCall {
-    tool: string;
-    input?: string;
-    output?: string;
-    state?: string;
-}
-
-export interface MessageItem {
-    id?: string;
-    role?: string;
-    content?: string;
-    text?: string;
-    reasoning?: string;
-    toolCalls?: MessageToolCall[];
-}
-
+/**
+ * The transcript this component renders. The shape is the harness's own
+ * `ChatMessage` — the copy that used to live here had already drifted
+ * from it (it knew nothing of a tool call's `children`), and one shape
+ * for one message is the rule.
+ */
 export interface MessageListProps {
-    history?: MessageItem[];
+    history?: ChatMessage[];
 }
 
 /**
@@ -114,7 +106,7 @@ function ReasoningBlock({text}: { text: string }) {
  */
 function ToolCallGroup({
                            calls}: {
-    calls: NonNullable<MessageItem["toolCalls"]>;
+    calls: NonNullable<ChatMessage["toolCalls"]>;
 }) {
     const [open, setOpen] = useState(calls.length <= 3);
     // NOTE: Plugin tool calls render under their own marker so todo
@@ -146,16 +138,50 @@ function ToolCallGroup({
             {open && (
                 <div className="flex flex-col gap-1">
                     {calls.map((call, callIdx) => (
-                        <ToolCard
-                            key={`tool-${callIdx}-${call.tool}`}
-                            expanded={false}
-                            input={call.input}
-                            output={call.output}
-                            state={call.state}
-                            tool={call.tool}
-                        />
+                        <div key={`tool-${callIdx}-${call.tool}`} className="flex flex-col gap-1">
+                            <ToolCard
+                                expanded={false}
+                                input={call.input}
+                                output={call.output}
+                                state={call.state}
+                                tool={call.tool}
+                            />
+                            {/* A delegated subagent's own streamed work:
+                                its text and tool calls, nested inside the
+                                call they ran under rather than beside it. */}
+                            {call.children && (
+                                <SubagentWork parts={call.children}/>
+                            )}
+                        </div>
                     ))}
                 </div>
+            )}
+        </div>
+    );
+}
+
+/**
+ * One subagent's streamed work, rendered under the tool call it ran in.
+ *
+ * The relay brackets a delegated run so these parts can be attributed to
+ * that call; this is what makes a delegate inspectable - the implementer's
+ * own file reads, writes and text, inside the `implement_task` card.
+ */
+function SubagentWork({parts}: {parts: NonNullable<MessageToolCall["children"]>}) {
+    return (
+        <div
+            aria-label="Work done inside this tool call"
+            className="ml-2 flex flex-col gap-1 border-l-2 border-accent/40 pl-2"
+            role="group"
+        >
+            {parts.reasoning && <ReasoningBlock text={parts.reasoning}/>}
+            {parts.text && (
+                <div className="text-xs text-muted-foreground">
+                    <MarkdownRenderer content={parts.text}/>
+                </div>
+            )}
+            {parts.toolCalls && parts.toolCalls.length > 0 && (
+                <ToolCallGroup calls={parts.toolCalls}/>
             )}
         </div>
     );
@@ -189,7 +215,7 @@ export function MessageList({history = []}: MessageListProps) {
                         : msg.role === "system"
                             ? "System"
                             : "Agent";
-                const text = msg.content || msg.text || "";
+                const text = msg.content;
                 return (
                     <Surface
                         key={msg.id || `msg-${idx}`}

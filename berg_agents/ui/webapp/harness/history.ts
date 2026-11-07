@@ -33,6 +33,8 @@
 import {ASK_USER_TOOL_NAME, isQuestionAnswerPayload} from "./askUser";
 import {partToolName} from "./messageParts";
 
+export const SUBAGENT_MARKER_TYPE = "data-subagent";
+
 
 /**
  * Sanitize a restored conversation so stale single-use state can never
@@ -72,6 +74,11 @@ export function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unkno
             state?: unknown;
             approval?: unknown;
           };
+          // A subagent bracket is a grouping marker for the live stream,
+          // not conversation content: the backend neither stores nor
+          // understands it, and `load_messages` skips only what it knows.
+          // Leaving it in would risk the whole request.
+          if (part.type === SUBAGENT_MARKER_TYPE) return [];
           // Malformed parts can never resume — drop them.
           if (typeof part.type !== "string") return [];
           const isTool =
