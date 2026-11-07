@@ -29,7 +29,11 @@
  * chrome down with it.
  */
 
+import type {AgentInfo} from "@/harness";
+
 import {useEffect, useState} from "react";
+
+import {fetchAgents, fetchRouterStats} from "@/lib/backendCatalog";
 
 /** What the hook needs. */
 export interface UseBackendCatalogDeps {
@@ -81,29 +85,18 @@ export function useBackendCatalog(
     }, [apiBase]);
 
     // Local agent list (fetched from /api/agents)
-    const [agents, setAgents] = useState<
-        Array<{
-            name: string;
-            description?: string;
-            preferred_complexity?: string;
-            capabilities?: string[];
-        }>
-    >([]);
+    const [agents, setAgents] = useState<AgentInfo[]>([]);
     useEffect(() => {
-        fetch(`${apiBase}/api/agents`)
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data) => setAgents(data || []))
-            .catch(() => setAgents([]));
-    }, [apiBase]);
+        void fetchAgents().then(setAgents);
+         
+    }, []);
 
     // Fetch Router stats on mount
     const [routerStats, setRouterStats] = useState<unknown>(null);
     useEffect(() => {
-        fetch(`${apiBase}/api/router-stats`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => setRouterStats(data))
-            .catch(() => {});
-    }, [apiBase]);
+        void fetchRouterStats().then(setRouterStats);
+         
+    }, []);
 
     return {backendTools, agents, routerStats};
 }

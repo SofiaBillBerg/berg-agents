@@ -28,7 +28,7 @@
 
 "use client";
 
-import type { PluginInfo } from "../components/PluginCatalog.tsx";
+import type {PluginInfo} from "@/lib/backendCatalog";
 
 import { useEffect, useState } from "react";
 import { Card, Chip, Spinner } from "@heroui/react";
@@ -37,6 +37,7 @@ import { RouterStatsPanel } from "../components/RouterStatsPanel.tsx";
 import { SharedContextEditor } from "../components/SharedContextEditor.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 
+import {fetchPlugins, fetchRouterStats} from "@/lib/backendCatalog";
 import { API_BASE } from "@/envConfig";
 
 interface MemoryEntry {
@@ -116,17 +117,14 @@ export default function ContextPage() {
       try {
         // NOTE: /api/plugins is best-effort — the config-driven
         // catalog below still renders when the plugin system is down.
-        const [ctxRes, statsRes, pluginsRes] = await Promise.all([
+        const [ctxRes, stats, plugins] = await Promise.all([
           fetch(`${API_BASE}/api/context`),
-          fetch(`${API_BASE}/api/router-stats`),
-          fetch(`${API_BASE}/api/plugins`)]);
+          fetchRouterStats(),
+          fetchPlugins()]);
         if (!ctxRes.ok) throw new Error(`HTTP ${ctxRes.status}`);
         setData(await ctxRes.json());
-        if (statsRes.ok) setStats(await statsRes.json());
-        if (pluginsRes.ok) {
-          const body = await pluginsRes.json();
-          if (Array.isArray(body.plugins)) setPlugins(body.plugins);
-        }
+        if (stats) setStats(stats);
+        if (plugins.length > 0) setPlugins(plugins);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Network error");
       } finally {

@@ -34,7 +34,7 @@ import {Card, Spinner} from "@heroui/react";
 import {RouterStatsPanel} from "../components/RouterStatsPanel.tsx";
 import {Navbar} from "../components/Navbar.tsx";
 
-import {API_BASE} from "@/envConfig";
+import {fetchRouterStats} from "@/lib/backendCatalog";
 
 /**
  * StatsPage - client component that fetches and displays router statistics.
@@ -48,10 +48,7 @@ export default function StatsPage() {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await fetch(`${API_BASE}/api/router-stats`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                setStats(data);
+                setStats(await fetchRouterStats());
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Network error");
             } finally {

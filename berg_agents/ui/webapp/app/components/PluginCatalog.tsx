@@ -21,29 +21,13 @@
 
 "use client";
 
+import type {PluginInfo} from "@/lib/backendCatalog";
+
 import {useCallback, useEffect, useState} from "react";
 import {Button, Card, Chip} from "@heroui/react";
 
 import {API_BASE} from "@/envConfig";
-
-export interface PluginCapabilityInfo {
-    type: string;
-    id?: string;
-    name?: string;
-    server_type?: string;
-    enabled?: boolean;
-    sensitive?: boolean;
-}
-
-export interface PluginInfo {
-    id: string;
-    name: string;
-    version: string;
-    state: string;
-    description: string;
-    tools: string[];
-    capabilities: PluginCapabilityInfo[];
-}
+import {fetchPlugins, invalidateCatalog} from "@/lib/backendCatalog";
 
 export interface PluginCatalogProps {
     /** Close the surface. */
@@ -88,12 +72,10 @@ export function PluginCatalog({
     const [loading, setLoading] = useState(true);
     const [toggling, setToggling] = useState<string | null>(null);
 
-    const fetchPlugins = useCallback(async () => {
+    const reloadPlugins = useCallback(async () => {
         try {
-            const resp = await fetch(`${API_BASE}/api/plugins`);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const data = await resp.json();
-            setPlugins(Array.isArray(data.plugins) ? data.plugins : []);
+            invalidateCatalog();
+            setPlugins(await fetchPlugins());
             setError(null);
         } catch (e) {
             setError(String(e));
@@ -117,7 +99,7 @@ export function PluginCatalog({
                 {method: "POST"},
             );
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            await fetchPlugins();
+            await reloadPlugins();
         } catch (e) {
             setError(String(e));
         } finally {

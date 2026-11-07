@@ -25,7 +25,7 @@ import {Surface} from "@heroui/react";
 import {MarkdownRenderer} from "./MarkdownRenderer.tsx";
 import {ToolCard} from "./ToolCard.tsx";
 
-import {API_BASE} from "@/envConfig";
+import {fetchPlugins} from "@/lib/backendCatalog";
 
 /** Plugin tool names, supplied by the backend (see usePluginSurfaceTools). */
 const PLUGIN_SURFACE_TOOLS = new Set<string>();
@@ -40,23 +40,24 @@ const PLUGIN_SURFACE_TOOLS = new Set<string>();
 export function usePluginSurfaceTools(): void {
     useEffect(() => {
         let cancelled = false;
-        void fetch(`${API_BASE}/api/plugins`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-                if (cancelled || !data || !Array.isArray(data.plugins)) return;
-                PLUGIN_SURFACE_TOOLS.clear();
-                for (const p of data.plugins) {
-                    if (p && Array.isArray(p.tools)) {
-                        for (const t of p.tools) {
-                            if (typeof t === "string") PLUGIN_SURFACE_TOOLS.add(t);
-                        }
+        // The backend is the only place that knows which tools belong to a
+        // plugin surface, and it is asked through the shared catalog client
+        // (one request for every reader in the app).
+        void fetchPlugins().then((plugins) => {
+            if (cancelled) return;
+            PLUGIN_SURFACE_TOOLS.clear();
+            for (const p of plugins) {
+                if (p && Array.isArray(p.tools)) {
+                    for (const t of p.tools) {
+                        if (typeof t === "string") PLUGIN_SURFACE_TOOLS.add(t);
                     }
                 }
-            })
-            .catch(() => undefined);
+            }
+        });
         return () => {
             cancelled = true;
         };
+         
     }, []);
 }
 

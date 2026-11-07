@@ -34,6 +34,9 @@ import type {ChatMessage} from "@/harness";
 
 import {useCallback, useEffect, useRef, useState} from "react";
 
+import {fetchPlugins} from "@/lib/backendCatalog";
+
+
 /** What the hook needs from the layout component. */
 export interface UsePluginSurfaceDeps {
     /** Base URL of the Berg Agents API. */
@@ -112,32 +115,27 @@ export function usePluginSurface(deps: UsePluginSurfaceDeps): PluginSurface {
     useEffect(() => {
         let cancelled = false;
         const load = async () => {
-            try {
-                const resp = await fetch(`${apiBase}/api/plugins`);
-                if (!resp.ok) return;
-                const data = await resp.json();
-                if (cancelled || !Array.isArray(data.plugins)) return;
-                const found: PluginSurfaceEntry[] = [];
-                for (const p of data.plugins) {
-                    if (!p || typeof p.id !== "string" || !p.ui) continue;
-                    // NOTE: the manifest is the only filter — any plugin that
-                    // declares a `ui:` block is offered. Whether its bundle loads
-                    // is the bridge's problem, reported on the surface itself.
-                    found.push({
-                        pluginId: p.id,
-                        ui: p.ui as Record<string, unknown> | null,
-                        tools: Array.isArray(p.tools) ? (p.tools as string[]) : []});
-                }
-                setPluginSurfaces(found);
-            } catch {
-                // Backend unreachable - no plugin surfaces offered.
+            const plugins = await fetchPlugins();
+            if (cancelled) return;
+            const found: PluginSurfaceEntry[] = [];
+            for (const p of plugins) {
+                if (!p || typeof p.id !== "string" || !p.ui) continue;
+                // NOTE: the manifest is the only filter — any plugin that
+                // declares a `ui:` block is offered. Whether its bundle loads
+                // is the bridge's problem, reported on the surface itself.
+                found.push({
+                    pluginId: p.id,
+                    ui: p.ui as Record<string, unknown> | null,
+                    tools: Array.isArray(p.tools) ? (p.tools as string[]) : []});
             }
+            setPluginSurfaces(found);
         };
         void load();
         return () => {
             cancelled = true;
         };
-    }, [apiBase]);
+         
+    }, []);
 
     const activeSurface = pluginSurfaces.find((s) => s.pluginId === sidePluginId);
 

@@ -39,6 +39,8 @@
 
 "use client";
 
+import type { PluginInfo } from "@/lib/backendCatalog";
+
 import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Chip, Spinner } from "@heroui/react";
 
@@ -47,44 +49,14 @@ import { PluginUISurface } from "../../plugins/PluginUISurface.tsx";
 import { Navbar } from "../../components/Navbar.tsx";
 
 import { API_BASE } from "@/envConfig";
-
-/** `ui:` block a plugin's manifest declares, as served by /api/plugins. */
-interface PluginUiDeclaration {
-  entry?: string;
-  export?: string;
-  entry_url?: string;
-  entry_built?: boolean;
-  placement?: string;
-  label?: string;
-  width?: number;
-}
-
-/** One capability descriptor from /api/plugins. */
-interface PluginCapabilityInfo {
-  type: string;
-  id?: string;
-  name?: string;
-  sensitive?: boolean;
-}
-
-/** Plugin descriptor from /api/plugins (superset of the chat-side shape). */
-interface PluginDescriptor {
-  id: string;
-  name: string;
-  version: string;
-  state: string;
-  description: string;
-  tools: string[];
-  capabilities: PluginCapabilityInfo[];
-  ui?: PluginUiDeclaration | null;
-}
+import { fetchPlugins, invalidateCatalog } from "@/lib/backendCatalog";
 
 /**
  * Plugin dev page — mount any plugin's surface and call its tools
  * directly, without a live agent run.
  */
 export default function PluginDevPage() {
-  const [plugins, setPlugins] = useState<PluginDescriptor[]>([]);
+  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,12 +78,10 @@ export default function PluginDevPage() {
     installBergRuntime();
   }, []);
 
-  const fetchPlugins = useCallback(async () => {
+  const reloadPlugins = useCallback(async () => {
     try {
-      const resp = await fetch(`${API_BASE}/api/plugins`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      setPlugins(Array.isArray(data.plugins) ? data.plugins : []);
+      invalidateCatalog();
+      setPlugins(await fetchPlugins());
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
@@ -121,8 +91,8 @@ export default function PluginDevPage() {
   }, []);
 
   useEffect(() => {
-    void fetchPlugins();
-  }, [fetchPlugins]);
+    void reloadPlugins();
+  }, [reloadPlugins]);
 
   // Auto-select the first plugin once the catalog arrives; explicit
   // selections (setSelectedId + reset) override afterwards.
@@ -145,7 +115,7 @@ export default function PluginDevPage() {
   };
 
   /** Enable/disable the selected plugin through the host endpoints. */
-  const togglePlugin = async (plugin: PluginDescriptor) => {
+  const togglePlugin = async (plugin: PluginInfo) => {
     const enabled = plugin.state === "enabled";
     setToggling(true);
     try {
@@ -154,7 +124,9 @@ export default function PluginDevPage() {
         { method: "POST" },
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      await fetchPlugins();
+      // The toggle changed what the catalog reports: reload through the
+      // loader, which invalidates the shared cache first.
+      await reloadPlugins();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Toggle failed");
     } finally {
@@ -166,7 +138,7 @@ export default function PluginDevPage() {
    * Run one of the selected plugin's tools exactly like the chat does.
    * The body is the tool's own kwargs (host strips sessionId/tool/args).
    */
-  const runTool = async (plugin: PluginDescriptor, toolName: string) => {
+  const runTool = async (plugin: PluginInfo, toolName: string) => {
     setRunning(true);
     setResult(null);
     setToolError(null);
