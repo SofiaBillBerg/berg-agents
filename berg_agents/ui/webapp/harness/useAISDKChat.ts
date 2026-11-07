@@ -35,6 +35,7 @@ import type { SetStateAction } from "react";
 import type { PendingQuestion, PendingQuestionAnswer } from "./askUser";
 import type { ChatMessage } from "./messageParts";
 import type { PendingApproval } from "./hitl";
+import type { FailureNotice } from "./recovery";
 
 import { DefaultChatTransport } from "ai";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -42,8 +43,11 @@ import { useChat } from "@ai-sdk/react";
 
 import { ASK_USER_TOOL_NAME, isQuestionAnswerPayload } from "./askUser";
 import { partToolName, toChatMessage } from "./messageParts";
-import { sanitizeHistory, SYSTEM_RETRY_REASON } from "./history";
+import { sanitizeHistory } from "./history";
+import { useSendRecovery } from "./recovery";
+import { useRunWatch } from "./runWatch";
 import { useServerSessions } from "./sessions";
+import { usePendingSteering } from "./steering";
 import {
   approvalBatchFrom,
   createHitlResponders,
@@ -57,36 +61,6 @@ import { API_BASE } from "@/envConfig";
 export type { ChatMessage } from "./messageParts";
 
 /* The active session id and its storage live in ./sessionIdentity. */
-
-// Client-side hint for transport failures - the one failure class whose
-// cause the client can see better than the server (it never reached the
-// backend). Provider-level diagnosis stays server-side and arrives on the
-// run's status; the client never duplicates that matching logic.
-function clientFailureHint(detail: string): string | undefined {
-  if (/fetch|network|econn|connection|refused|timeout/i.test(detail)) {
-    return "The chat backend could not be reached — is the server running?";
-  }
-  return undefined;
-}
-
-/**
- * One failure the failure dialog presents. The dialog is the ONE
- * surface for fatal failures (a warning toast + a hidden debug line
- * used to duplicate it); the journal text in the transcript is the
- * separate durable record and stays.
- */
-export interface FailureNotice {
-  /** Which class of failure this is - the dialog titles on it. */
-  kind: "send" | "run" | "recovery";
-  /** The raw error text, truncated for display. */
-  detail: string;
-  /**
-   * Actionable hint, when one is known. Server-side failures carry the
-   * backend's hint (one hint logic, no client duplication); client-side
-   * failures derive a network hint from the error text.
-   */
-  hint?: string;
-}
 
 export interface UseAISDKChatReturn {
   messages: ChatMessage[];
@@ -187,18 +161,6 @@ export function useAISDKChat(): UseAISDKChatReturn {
   );
   const sessionIdHolderRef = useRef<{ current: string | null }>({
     current: null});
-  // Whether this client is currently subscribed to a run it did not start
-  // (after a reload, a tab switch, or a second browser).
-  const isFollowingRef = useRef(false);
-  // The last settled run this tab has accounted for (reloaded its
-  // transcript, reported its failure once): a session key plus a
-  // fingerprint of the settled status. ``null`` means the tab has not
-  // looked yet; ``fingerprint: ""`` means it has looked and the session
-  // was idle-clean at that moment, so any settled run seen later is
-  // unambiguously news.
-  const settledRunRef = useRef<{ session: string; fingerprint: string } | null>(
-    null,
-  );
 
   const {
     messages: uiMessages,
@@ -330,52 +292,13 @@ export function useAISDKChat(): UseAISDKChatReturn {
 
   const isStreaming = status === "streaming" || status === "submitted";
 
-  // Steering the agent has not read yet. This is the queue the transcript
-  // cannot show: a message that exists on the server's run but not in the
-  // model's view. The server owns the answer, so it is sampled rather than
-  // guessed from optimistic sends, and it is empty whenever that is true.
-  const [pendingSteering, setPendingSteering] = useState<string[]>([]);
-  useEffect(() => {
-    if (!sessionId) {
-      setPendingSteering([]);
-      return;
-    }
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const resp = await fetch(
-          `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
-        );
-        if (!resp.ok || cancelled) return;
-        const data = (await resp.json()) as {
-          live?: unknown;
-          steering?: unknown;
-        };
-        // The strip means "the agent is about to read this". Once the
-        // run is over nothing will be read in this turn, so the strip
-        // empties rather than outliving the run that gave it meaning.
-        const queued =
-          data.live === true && Array.isArray(data.steering)
-            ? data.steering.filter((t): t is string => typeof t === "string")
-            : [];
-        if (!cancelled) setPendingSteering(queued);
-      } catch {
-        // Backend unreachable - keep showing what we know.
-      }
-    };
-    void poll();
-    // Nothing to poll when no run is live; the strip is only ever
-    // non-empty inside a run.
-    if (!isStreaming)
-      return () => {
-        cancelled = true;
-      };
-    const timer = setInterval(() => void poll(), 1200);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [sessionId, isStreaming]);
+  // Steering the agent has not read yet - the queue the transcript
+  // cannot show. Sampled from the server, because the server owns the
+  // answer (see ./steering).
+  const {pendingSteering, setPendingSteering} = usePendingSteering({
+    sessionId,
+    isStreaming,
+    apiBase: API_BASE});
 
   // Tool calls paused for human approval (HITL), and the answers that
   // release them. The derivations and responders live in ./hitl; the
@@ -411,110 +334,18 @@ export function useAISDKChat(): UseAISDKChatReturn {
 
 
 
-  // Visible notice for the failure dialog. A failure is transient UI on
-  // top of the durable record: the journal text in the transcript is
-  // what survives (and reloads); the dialog demands to be read once.
-  // Recovery actions the system took (auto-rejected approvals) ride in
-  // the notice too, so there is exactly one failure surface.
-  const [failureNotice, setFailureNotice] = useState<FailureNotice | null>(
-    null,
-  );
-  // The last user text that was sent, for "Retry last" on a failed
-  // send. Updated on every manual send; the retry re-sends it verbatim.
-  const lastSentTextRef = useRef<string | null>(null);
-
-  // Failed-send recovery: the backend is stateless, so any approval
-  // parts pending when a send errors belong to a run that can never
-  // resume — replaying them only reproduces the mismatch error
-  // forever. Auto-reject them with the retry-friendly system reason
-  // (NOT the firm user-rejection text) and tell the user visibly;
-  // sendAutomaticallyWhen then resumes and the model may retry.
-  // Already-handled ids are never touched twice, so a persistently
-  // failing backend cannot loop sends forever.
-  const handledErrorRef = useRef<unknown>(null);
-  const autoRejectedIds = useRef<Set<string>>(new Set());
-  // Hard stop on the recovery loop itself. Each auto-reject mints NEW
-  // approval ids, so an id set can never bound this: reject → auto-resume →
-  // fail → reject again is an unbounded message storm (observed: ~100
-  // messages in seconds). After one failed recovery round the loop is
-  // disarmed and the next step needs a human send.
-  const recoveryRoundsRef = useRef(0);
-  useEffect(() => {
-    if (!error) {
-      // A clean turn in between proves the pipeline works again.
-      recoveryRoundsRef.current = 0;
-      return;
-    }
-    if (handledErrorRef.current === error) return;
-    handledErrorRef.current = error;
-    // A stale deferred answer (HTTP 409) is the designed card-expiry
-    // path, not a failure: the run being answered already ended, so
-    // there is nothing to diagnose. It must never open the dialog.
-    if ((error as { statusCode?: number }).statusCode === 409) return;
-    if (recoveryRoundsRef.current >= 1) {
-      setFailureNotice({
-        kind: "recovery",
-        detail: `Send keeps failing (${String(error).slice(0, 160)}).`,
-        hint: "Automatic recovery stopped after one round — send a new message to try again."});
-      return;
-    }
-    recoveryRoundsRef.current += 1;
-    const ids: string[] = [];
-    for (const msg of uiMessages) {
-      if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
-      for (const part of msg.parts) {
-        const p = part as unknown as Record<string, unknown>;
-        if (
-          typeof p !== "object" ||
-          p === null ||
-          (p.state !== "approval-requested" && p.state !== "approval-responded")
-        ) {
-          continue;
-        }
-        const approval = p.approval as { id?: unknown } | undefined;
-        if (
-          typeof approval?.id === "string" &&
-          !autoRejectedIds.current.has(approval.id)
-        ) {
-          ids.push(approval.id);
-        }
-      }
-    }
-    if (ids.length === 0) {
-      // The failed send had no approvals to reject. The old behavior
-      // silently dropped the error here (nothing surfaced at all);
-      // this is exactly the class of failure the dialog is for.
-      setFailureNotice({
-        kind: "send",
-        detail: String(error).slice(0, 300),
-        hint: clientFailureHint(String(error))});
-      return;
-    }
-    for (const id of ids) autoRejectedIds.current.add(id);
-    const stopped =
-      /abort|cancel/i.test(String(error)) || status === "streaming";
-    for (const id of ids) {
-      void addToolApprovalResponse({
-        id,
-        approved: false,
-        reason: stopped
-          ? "System: the run was stopped by the user before completing. " +
-            "This rejection is automatic cleanup — you may retry on request."
-          : SYSTEM_RETRY_REASON});
-    }
-    setFailureNotice(
-      stopped
-        ? {
-            kind: "recovery",
-            detail:
-              "Run stopped — the pending tool approvals were rejected as cleanup.",
-            hint: "Send a message to continue."}
-        : {
-            kind: "send",
-            detail: String(error).slice(0, 300),
-            hint: "Its pending approvals were auto-rejected so the conversation can continue — ask the model to retry."},
-    );
-  }, [error, uiMessages, status]);
+  // Failed-send recovery and the one failure surface - both live in
+  // ./recovery. resetRecovery is what a new send calls: the user is
+  // driving again, so the ids auto-rejected by the previous failure
+  // are forgotten.
+  const {
+    failureNotice,
+    setFailureNotice,
+    resetRecovery} = useSendRecovery({
+    error,
+    uiMessages,
+    status,
+    addToolApprovalResponse});
 
   // The backend refines a generated title once the first real user
   // message arrives (a greeting leaves it as "#N · date"), so the
@@ -550,212 +381,24 @@ export function useAISDKChat(): UseAISDKChatReturn {
   }, [sessionId, sessionTitle, isStreaming]);
 
 
-  // A run can outlive this tab (reload, tab switch, second browser) — or
-  // start in one while this tab sits idle. While the server reports a
-  // run live, this client stays subscribed to it at a tight cadence;
-  // when it is not live the watch does NOT stop — it keeps re-asking at
-  // a wider cadence, so a run opened in another tab is noticed within
-  // one idle poll, and one that started and settled entirely between
-  // two polls is still caught: a finished run stays readable for the
-  // journal grace window (JOURNAL_GRACE_SECONDS), and its settled
-  // status is fingerprinted (boot|generation|outcome|detail). boot is
-  // the server process identity — generation restarts with the process,
-  // so without boot a fresh process's run #1 could collide with an
-  // already-handled run #1 of the previous process and be missed.
-  //
-  // A settled run is handled exactly once per tab: reload the saved
-  // turn, and if it failed open the dialog. The one exception is a
-  // settled run that predates this tab's watch of the session — seen on
-  // the very first poll, with the tab not following anything — which is
-  // adopted silently: a failure that aged in before the tab loaded is
-  // history, the transcript already carries the durable ❌ note, and a
-  // load must never pop a modal for a run this browser never watched.
-  const FOLLOW_POLL_IDLE_MS = 15000;
-  const FOLLOW_POLL_LIVE_MS = 3000;
-  useEffect(() => {
-    if (!sessionId || isStreaming) return;
-    // A session switch must not inherit the previous session's watch
-    // memory: this tab has not watched anything in the new session yet.
-    if (settledRunRef.current && settledRunRef.current.session !== sessionId) {
-      settledRunRef.current = null;
-      isFollowingRef.current = false;
-    }
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const watch = async () => {
-      if (cancelled) return;
-      let sawLive = false;
-      try {
-        const resp = await fetch(
-          `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
-        );
-        if (cancelled) return;
-        if (resp.ok) {
-          const status = (await resp.json()) as {
-            live?: unknown;
-            boot?: unknown;
-            generation?: unknown;
-            outcome?: unknown;
-            detail?: unknown;
-            hint?: unknown;
-          };
-          if (cancelled) return;
-          if (status.live === true) {
-            // The GET stream replays the run's journal from the
-            // start, so the turn rebuilds exactly as it happened.
-            // A follow that fails must not strand the page: the run
-            // is still live, so the next watch subscribes again.
-            isFollowingRef.current = true;
-            sawLive = true;
-            void sdkResumeStream().catch(() => {
-              // A run can end in the instant between the status
-              // check and the subscribe. The backend answers that
-              // with 204 ("nothing to follow"), which is not an
-              // error; anything else is retried by the next watch,
-              // and the saved transcript is the fallback either way.
-            });
-          } else {
-            // Not live. Two shapes reach here: plain idle (the run
-            // was pruned, or none settled in this server process) or
-            // a settled run still inside the journal grace window,
-            // which carries an outcome.
-            const generation =
-              typeof status.generation === "number" ? status.generation : 0;
-            const outcome =
-              typeof status.outcome === "string" ? status.outcome : null;
-            if (generation === 0 && outcome === null) {
-              if (isFollowingRef.current) {
-                // A followed run whose settled status is gone
-                // entirely: a throttled background tab slept
-                // through the whole grace window. Reload the
-                // transcript it missed.
-                isFollowingRef.current = false;
-                setPendingSteering([]);
-                await reloadSession(sessionId);
-              } else if (settledRunRef.current === null) {
-                // First look at a session with nothing settled:
-                // prime the sentinel so any run that settles
-                // while this tab is open is unmistakably new.
-                settledRunRef.current = {
-                  session: sessionId,
-                  fingerprint: ""};
-              }
-            } else if (outcome !== null) {
-              // A run's settled fingerprint.
-              const fingerprint = [
-                String(status.boot ?? ""),
-                String(status.generation ?? ""),
-                String(status.outcome ?? ""),
-                String(status.detail ?? "").slice(0, 160)].join("|");
-              const known = settledRunRef.current;
-              if (known === null && !isFollowingRef.current) {
-                // The settled run predates this tab's watch of
-                // the session — adopt it without acting.
-                settledRunRef.current = {
-                  session: sessionId,
-                  fingerprint};
-              } else if (
-                known === null ||
-                known.session !== sessionId ||
-                known.fingerprint !== fingerprint
-              ) {
-                // A settled run this tab has not accounted for:
-                // it either followed it to the end or the whole
-                // run happened between two polls. Take the
-                // server's saved turn as the transcript of what
-                // happened — that turn is also where an unread
-                // steer now lives, so the strip empties with
-                // the run it belonged to. A failure is reported
-                // once, here: the journal's failure text is the
-                // record, the dialog is the read-me-once
-                // notice, and the hint comes from the server
-                // (one hint logic, never copied here).
-                if (isFollowingRef.current) {
-                  isFollowingRef.current = false;
-                  setPendingSteering([]);
-                }
-                await reloadSession(sessionId);
-                if (!cancelled) {
-                  settledRunRef.current = {
-                    session: sessionId,
-                    fingerprint};
-                  if (outcome === "failed") {
-                    setFailureNotice({
-                      kind: "run",
-                      detail:
-                        typeof status.detail === "string" ? status.detail : "",
-                      hint:
-                        typeof status.hint === "string" && status.hint
-                          ? status.hint
-                          : undefined});
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch {
-        // Backend unreachable - the next watch retries.
-      }
-      // Every non-live path (idle, settled, unreadable status) re-arms:
-      // the watch is exactly the mechanism that notices a run opened
-      // in another tab, and one that stops when no run is live never
-      // starts following.
-      if (!cancelled) {
-        timer = setTimeout(
-          () => void watch(),
-          sawLive ? FOLLOW_POLL_LIVE_MS : FOLLOW_POLL_IDLE_MS,
-        );
-      }
-    };
-    void watch();
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [sessionId, isStreaming, sdkResumeStream, reloadSession]);
 
-  // When a run this client SENT ends, check how it ended. A failed run
-  // streams its failure text and then closes the SSE stream "cleanly" -
-  // the wire never errors - so the browser's own turn can only learn the
-  // outcome from the run's status. Without this check the failure would
-  // ride the journal text alone and never open the dialog.
-  // Fires on the streaming→idle transition only: an old failure seen on
-  // mount never pops a modal for a run this browser never watched.
-  const ranHereRef = useRef(false);
-  useEffect(() => {
-    if (isStreaming) {
-      ranHereRef.current = true;
-      return;
-    }
-    if (!ranHereRef.current || !sessionId) return;
-    ranHereRef.current = false;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const resp = await fetch(
-          `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
-        );
-        if (!resp.ok || cancelled) return;
-        const s = (await resp.json()) as {
-          outcome?: unknown;
-          detail?: unknown;
-          hint?: unknown;
-        };
-        if (cancelled || s.outcome !== "failed") return;
-        setFailureNotice({
-          kind: "run",
-          detail: typeof s.detail === "string" ? s.detail : "",
-          hint: typeof s.hint === "string" && s.hint ? s.hint : undefined});
-      } catch {
-        // Status unreachable - the journal text in the transcript
-        // is the durable record; the dialog is the transient notice.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isStreaming, sessionId]);
+  // Follow and account for this session's runs from any tab, and check
+  // how a run this client SENT ended - both in ./runWatch. stopFollowing
+  // is what an explicit Stop calls: the run ended for good.
+  const {stopFollowing} = useRunWatch({
+    sessionId,
+    isStreaming,
+    apiBase: API_BASE,
+    resumeStream: sdkResumeStream,
+    reloadSession,
+    setFailureNotice,
+    setPendingSteering});
+
+  // The last user text that was sent, for "Retry last" on a failed
+  // send. Updated on every manual send; the retry re-sends it verbatim.
+  // It belongs to the send paths here, not to ./recovery: the recovery
+  // effect only ever rejects approvals, it never re-sends.
+  const lastSentTextRef = useRef<string | null>(null);
 
   // handleInputChange for a textarea/input - reads e.target.value.
   const handleInputChange = (
@@ -773,7 +416,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     setInput("");
     setFailureNotice(null);
     lastSentTextRef.current = text;
-    autoRejectedIds.current.clear();
+    resetRecovery();
     void sdkSendMessage({ text });
   };
 
@@ -784,7 +427,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     setInput((prev) => (prev.trim() === content.trim() ? "" : prev));
     setFailureNotice(null);
     lastSentTextRef.current = content;
-    autoRejectedIds.current.clear();
+    resetRecovery();
     await sdkSendMessage({ text: content });
   };
 
@@ -796,7 +439,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     const text = lastSentTextRef.current;
     if (!text || isStreaming) return;
     setFailureNotice(null);
-    autoRejectedIds.current.clear();
+    resetRecovery();
     void sdkSendMessage({ text });
   };
 
@@ -820,7 +463,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // current NOW, not the one that existed when it was created.
     const id = sessionIdRef.current;
     // An explicit Stop ends the run for good: nothing left to follow.
-    isFollowingRef.current = false;
+    stopFollowing();
     // And nothing will be read in this turn, so the strip goes with the
     // run. The steer itself is not lost: the server persists it into the
     // turn's record, where the reloaded transcript shows it.

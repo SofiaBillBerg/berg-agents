@@ -35,10 +35,7 @@ export type {
 
 // Main chat hook - wraps AI SDK v7's useChat.
 export {useAISDKChat} from "./useAISDKChat";
-export type {
-    ChatMessage,
-    FailureNotice,
-    UseAISDKChatReturn} from "./useAISDKChat";
+export type {ChatMessage, UseAISDKChatReturn} from "./useAISDKChat";
 
 // The ask_user vocabulary and the message-parts walker live in their own
 // modules; components keep importing them from the harness barrel.
@@ -50,6 +47,9 @@ export type {
 
 // HITL: the approval/question card vocabulary.
 export type {PendingApproval} from "./hitl";
+
+// The failure dialog's notice, built by ./recovery.
+export type {FailureNotice} from "./recovery";
 
 // The active session id and its storage: one path for every reader and
 // writer of that key (chat hook, history page, transport adoption).
