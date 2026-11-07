@@ -27,7 +27,6 @@
  * @ai-sdk/react to consume it.
  */
 
-import type { AgentInfo } from "@/harness/webhook";
 import type { Command } from "./components/SlashCommandAutocomplete";
 import type { ToolResult } from "./components/ChatTranscript";
 
@@ -53,6 +52,8 @@ import { PluginUISurface } from "./plugins/PluginUISurface.tsx";
 import { PluginCatalog } from "./components/PluginCatalog.tsx";
 import Navbar from "./components/Navbar.tsx";
 import { setRuntimeSessionId } from "./runtime/berg-runtime.ts";
+import { useBackendCatalog } from "./hooks/useBackendCatalog";
+import { usePluginSurface } from "./hooks/usePluginSurface";
 
 import { buildExportMarkdown } from "@/utils/utils";
 import { API_BASE } from "@/envConfig";
@@ -138,21 +139,10 @@ function ChatContent() {
     sessionId,
     sessionTitle,
     newServerChat} = aiChat;
-  // Backend tool catalog (powers the slash palette + execution).
-  // Fetched once, before the palette below reads it: workspace file
-  // tools, run_task, and the delegated plan/implement entries, each
-  // with a one-line description.
-  const [backendTools, setBackendTools] = useState<
-    Array<{ name: string; description: string; source: string }>
-  >([]);
-  useEffect(() => {
-    fetch(`${API_BASE}/api/tools`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && Array.isArray(data.tools)) setBackendTools(data.tools);
-      })
-      .catch(() => setBackendTools([]));
-  }, []);
+  // The backend's three catalogs (tools, agents, router stats) - one
+  // reader each, in ./hooks/useBackendCatalog.
+  const {backendTools, agents, routerStats} = useBackendCatalog({
+    apiBase: API_BASE});
 
   // Publish the active session to plugin surfaces (via window.BergRuntime).
   // A plugin whose storage is per session reads this to name the store it
@@ -167,34 +157,16 @@ function ChatContent() {
     ...backendTools.map((t) => ({
       name: `/${t.name}`,
       description: t.description})),
-    { name: "/help", description: "Show help info" },
-    { name: "/agents", description: "List available agents" },
-    { name: "/stats", description: "Show stats" },
-    { name: "/clear", description: "Clear chat history" },
-    { name: "/memory", description: "Show shared memory files" },
-    { name: "/skills", description: "List agent skills" },
-    { name: "/mcps", description: "Show MCP server status" },
-    { name: "/exit", description: "Exit chat" },
-    { name: "/read_file", description: "Read a file via the backend" },
-    { name: "/list_files", description: "List a directory via the backend" }];
-
-  // Local agent list (fetched from /api/agents)
-  const [agents, setAgents] = useState<AgentInfo[]>([]);
-  useEffect(() => {
-    fetch(`${API_BASE}/api/agents`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: AgentInfo[]) => setAgents(data || []))
-      .catch(() => setAgents([]));
-  }, []);
-
-  // Fetch Router stats on mount
-  const [routerStats, setRouterStats] = useState<unknown>(null);
-  useEffect(() => {
-    fetch(`${API_BASE}/api/router-stats`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setRouterStats(data))
-      .catch(() => {});
-  }, []);
+    {name: "/help", description: "Show help info"},
+    {name: "/agents", description: "List available agents"},
+    {name: "/stats", description: "Show stats"},
+    {name: "/clear", description: "Clear chat history"},
+    {name: "/memory", description: "Show shared memory files"},
+    {name: "/skills", description: "List agent skills"},
+    {name: "/mcps", description: "Show MCP server status"},
+    {name: "/exit", description: "Exit chat"},
+    {name: "/read_file", description: "Read a file via the backend"},
+    {name: "/list_files", description: "List a directory via the backend"}];
 
   // -------------------------------------------------------------------------
   // Tool-result handling (used by ChatTranscript)
@@ -256,133 +228,25 @@ function ChatContent() {
   /** Show/hide the inline Details & Activity panel. */
   const [showDetails, setShowDetails] = useState(false);
 
-  // -------------------------------------------------------------------------
-  // Plugin surfaces (side-panel + canvas views), driven entirely by
-  // what the plugins declare in their manifests. The host holds no
-  // knowledge of any plugin's domain: it learns "this plugin has a
-  // surface, here is how to mount it" from GET /api/plugins.
-  // -------------------------------------------------------------------------
-  /** Plugin id whose surface is open, or the catalog. */
-  const [sidePluginId, setSidePluginId] = useState<string | null>(null);
-  /** Show the host's plugin catalog (enable/disable, no plugin UI). */
-  const [showCatalog, setShowCatalog] = useState(false);
-  /** Panel (narrow) vs canvas (wide) presentation. */
-  const [pluginView, setPluginView] = useState<"panel" | "canvas">("panel");
-  /**
-   * Width (px) of the docked side surface. Draggable via the handle
-   * between the transcript and the surface — the fixed 340px clipped
-   * the MCP/skill descriptions so toggles were unreadable.
-   */
-  const [sideWidth, setSideWidth] = useState(340);
-  /** True while the divider is being dragged (drives the cursor). */
-  const [sideDragging, setSideDragging] = useState(false);
-  /** Bump to force the open surface to refetch after agent calls. */
-  const [pluginRefreshKey, setPluginRefreshKey] = useState(0);
-  /** Headline count reported by the open surface (badge). */
-  const [pluginCount, setPluginCount] = useState(0);
-  /** Registry entries for plugins that shipped a surface. */
-  const [pluginSurfaces, setPluginSurfaces] = useState<
-    Array<{
-      pluginId: string;
-      ui: Record<string, unknown> | null;
-      tools: string[];
-    }>
-  >([]);
-
-  // Discover which plugins have a registered surface.
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const resp = await fetch(`${API_BASE}/api/plugins`);
-        if (!resp.ok) return;
-        const data = await resp.json();
-        if (cancelled || !Array.isArray(data.plugins)) return;
-        const found: Array<{
-          pluginId: string;
-          ui: Record<string, unknown> | null;
-          tools: string[];
-        }> = [];
-        for (const p of data.plugins) {
-          if (!p || typeof p.id !== "string" || !p.ui) continue;
-          // NOTE: the manifest is the only filter M-bM-^@M-^T any plugin that —
-          // declares a `ui:` block is offered. Whether its bundle loads
-          // is the bridge's problem, reported on the surface itself.
-          found.push({ pluginId: p.id, ui: p.ui, tools: p.tools ?? [] });
-        }
-        setPluginSurfaces(found);
-      } catch {
-        // Backend unreachable - no plugin surfaces offered.
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const activeSurface = pluginSurfaces.find((s) => s.pluginId === sidePluginId);
-  const activeDecl = activeSurface?.ui as
-    { label?: unknown; placement?: unknown } | null | undefined;
-  const activeLabel =
-    typeof activeDecl?.label === "string" ? activeDecl.label : "Plugin";
-  // NOTE: `width` used to come from the manifest; the docked surface is
-  // now user-resizable (sideWidth), so the manifest value is ignored.
-
-  // Completed tool calls anywhere in the transcript refresh the open
-  // surface, so agent edits appear without manual reloads.
-  const activeTools =
-    pluginSurfaces.find((s) => s.pluginId === sidePluginId)?.tools ?? [];
-  const pluginActivity = messages.reduce(
-    (n, m) =>
-      n +
-      (m.toolCalls?.filter((c) => activeTools.includes(c.tool)).length ?? 0),
-    0,
-  );
-  const seenPluginActivity = useRef(0);
-  useEffect(() => {
-    if (pluginActivity > seenPluginActivity.current) {
-      seenPluginActivity.current = pluginActivity;
-      setPluginRefreshKey((k) => k + 1);
-    }
-  }, [pluginActivity]);
-
-  // -------------------------------------------------------------------------
-  // Side-surface resize: pointer-capture divider between the transcript
-  // and the docked surface. Width is clamped so the transcript always
-  // keeps a usable column, and reset when the surface closes.
-  // -------------------------------------------------------------------------
-  const sideDragStart = useRef<{ x: number; w: number } | null>(null);
-
-  const onSideDragMove = useCallback((e: PointerEvent) => {
-    const start = sideDragStart.current;
-    if (!start) return;
-    // Dragging left grows the surface (it sits to the right of the
-    // divider), so the delta is inverted.
-    const next = start.w - (e.clientX - start.x);
-    const max = Math.max(320, window.innerWidth - 420);
-    setSideWidth(Math.min(max, Math.max(280, next)));
-  }, []);
-
-  const onSideDragEnd = useCallback(() => {
-    sideDragStart.current = null;
-    setSideDragging(false);
-  }, []);
-
-  useEffect(() => {
-    if (!sideDragging) return;
-    window.addEventListener("pointermove", onSideDragMove);
-    window.addEventListener("pointerup", onSideDragEnd);
-    return () => {
-      window.removeEventListener("pointermove", onSideDragMove);
-      window.removeEventListener("pointerup", onSideDragEnd);
-    };
-  }, [sideDragging, onSideDragMove, onSideDragEnd]);
-
-  const startSideDrag = (e: React.PointerEvent) => {
-    sideDragStart.current = { x: e.clientX, w: sideWidth };
-    setSideDragging(true);
-  };
+  // Plugin surfaces: the whole machine - which surface is open, how it
+  // is presented, how wide, when it re-fetches - lives in
+  // ./hooks/usePluginSurface.
+  const {
+    sidePluginId,
+    setSidePluginId,
+    showCatalog,
+    setShowCatalog,
+    pluginView,
+    setPluginView,
+    sideWidth,
+    setSideWidth,
+    sideDragging,
+    startSideDrag,
+    pluginSurfaces,
+    activeSurface,
+    pluginRefreshKey,
+    pluginCount,
+    setPluginCount} = usePluginSurface({apiBase: API_BASE, messages});
 
   /** Scroll the transcript (the page itself never scrolls). */
   const scrollChatTo = (where: "top" | "bottom") => {

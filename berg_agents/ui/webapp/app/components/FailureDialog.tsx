@@ -21,9 +21,10 @@
 
 "use client";
 
+import type { FailureNotice } from "@/harness";
+
 import { Button, Modal } from "@heroui/react";
 
-import type { FailureNotice } from "@/harness";
 
 /**
  * FailureDialog - the ONE surface a failure is read on.

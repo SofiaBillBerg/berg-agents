@@ -135,19 +135,19 @@ export function QuestionItem({
                 return (
                   <label
                     key={opt.label}
-                    htmlFor={inputId}
                     className="hover:bg-surface-soft flex cursor-pointer items-start gap-2 rounded px-1 py-0.5"
+                    htmlFor={inputId}
                   >
                     <input
+                      checked={checked}
+                      className="mt-1"
                       id={inputId}
-                      type={q.multiSelect ? "checkbox" : "radio"}
                       name={
                         q.multiSelect
                           ? undefined
                           : `${question.id}-${q.header}`
                       }
-                      className="mt-1"
-                      checked={checked}
+                      type={q.multiSelect ? "checkbox" : "radio"}
                       onChange={() =>
                         toggleOption(q.header, opt.label, q.multiSelect)
                       }
@@ -166,9 +166,9 @@ export function QuestionItem({
             </div>
             <textarea
               aria-label={`Custom answer for ${q.header}`}
+              className="bg-surface-soft min-h-12 w-full rounded p-2 text-xs"
               maxLength={MAX_CUSTOM_ANSWER_CHARS}
               placeholder="Or write your own answer…"
-              className="bg-surface-soft min-h-12 w-full rounded p-2 text-xs"
               value={customs[q.header] ?? ""}
               onChange={(e) => setCustom(q.header, e.target.value)}
             />
