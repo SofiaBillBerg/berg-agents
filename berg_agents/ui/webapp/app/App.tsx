@@ -28,7 +28,6 @@
  */
 
 import type { Command } from "./components/SlashCommandAutocomplete";
-import type { ToolResult } from "./components/ChatTranscript";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card, Toast, toast } from "@heroui/react";
@@ -54,6 +53,7 @@ import Navbar from "./components/Navbar.tsx";
 import { setRuntimeSessionId } from "./runtime/berg-runtime.ts";
 import { useBackendCatalog } from "./hooks/useBackendCatalog";
 import { usePluginSurface } from "./hooks/usePluginSurface";
+import { useSlashCommands } from "./hooks/useSlashCommands";
 
 import { buildExportMarkdown } from "@/utils/utils";
 import { API_BASE } from "@/envConfig";
@@ -138,7 +138,8 @@ function ChatContent() {
     retryLast,
     sessionId,
     sessionTitle,
-    newServerChat} = aiChat;
+    newServerChat,
+    openSession} = aiChat;
   // The backend's three catalogs (tools, agents, router stats) - one
   // reader each, in ./hooks/useBackendCatalog.
   const {backendTools, agents, routerStats} = useBackendCatalog({
@@ -168,45 +169,6 @@ function ChatContent() {
     {name: "/read_file", description: "Read a file via the backend"},
     {name: "/list_files", description: "List a directory via the backend"}];
 
-  // -------------------------------------------------------------------------
-  // Tool-result handling (used by ChatTranscript)
-  // -------------------------------------------------------------------------
-  const [toolResults, setToolResults] = useState<ToolResult[]>([]);
-
-  // Session-scoped opt-in: when on, mutating tool calls / gated plans are
-  // auto-approved without pausing. Per-tool approval stays the default;
-  // this is a convenience for users who want to be lazy. Persisted so it
-  // survives reloads within the same browser.
-  const [autoApproveEdits, setAutoApproveEdits] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("berg_auto_approve_edits") === "1";
-    } catch {
-      return false;
-    }
-  });
-  const toggleAutoApproveEdits = () => {
-    setAutoApproveEdits((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("berg_auto_approve_edits", next ? "1" : "0");
-      } catch {
-        /* private mode */
-      }
-      return next;
-    });
-  };
-
-  // Session-scoped opt-in: when auto-approve is on, approve all pending
-  // chat tool calls without showing the card. Per-tool approval stays
-  // the default when the toggle is off.
-  useEffect(() => {
-    if (!autoApproveEdits) return;
-    if (!approvalBatch || approvalBatch.length === 0) return;
-    const pending = approvalBatch.filter((a) => !a.decided);
-    if (pending.length === 0) return;
-    void respondToAllApprovals(true);
-  }, [autoApproveEdits, approvalBatch, respondToAllApprovals]);
-
   // Total questions across the active question batch (one call can carry
   // several), for the question card's header copy.
   const questionCount = questionBatch.reduce(
@@ -214,13 +176,28 @@ function ChatContent() {
     0,
   );
 
-  // Slash-command result cards: processSlashCommand answers locally
-  // (help, agents, stats, /memory, tool runs, ...) and the answer
-  // lands here as a dismissible card above the transcript instead
-  // of vanishing into the promise chain.
-  const [cmdCards, setCmdCards] = useState<Array<{ id: number; text: string }>>(
-    [],
-  );
+  // Slash commands - the local answers, the cards they land in, and the
+  // auto-approve opt-in - live in ./hooks/useSlashCommands.
+  const {
+    autoApproveEdits,
+    toggleAutoApproveEdits,
+    toolResults,
+    cmdCards,
+    addCmdCard,
+    dismissCmdCard,
+    processSlashCommand} = useSlashCommands({
+    apiBase: API_BASE,
+    backendTools,
+    agents,
+    routerStats,
+    sendMessage,
+    clearMessages,
+    sessionId,
+    openSession,
+    messages,
+    input,
+    approvalBatch,
+    respondToAllApprovals});
 
   // -------------------------------------------------------------------------
   // Sessions + conversation navigation
@@ -272,256 +249,6 @@ function ChatContent() {
    * (the result of the tool).  Adjust the URL / payload shape to match your
    * actual API.
    */
-  const executeTool = async (tool: string, args: any): Promise<ToolResult> => {
-    const resp = await fetch(`${API_BASE}/api/tool/execute`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tool, args })});
-
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`Tool ${tool} failed: ${err}`);
-    }
-
-    // The exact shape of the response depends on your backend implementation.
-    // We expect an object like { output: <serialisable result> }.
-    const data = await resp.json();
-
-    // Build the result object that ChatTranscript will render.
-    const result: ToolResult = {
-      tool,
-      input: JSON.stringify(args),
-      output: data.output,
-      expanded: false,
-      onToggle: () => {
-        // Toggle the expanded state of the just-added result.
-        setToolResults((prev) => {
-          const newPrev = [...prev];
-          const last = newPrev[newPrev.length - 1];
-          return [
-            ...newPrev.slice(0, newPrev.length - 1),
-            { ...last, expanded: !last.expanded }];
-        });
-      }};
-    return result;
-  };
-
-  // -------------------------------------------------------------------------
-  // Slash-command handling - including backend-backed tool commands
-  // -------------------------------------------------------------------------
-  const processSlashCommand = useCallback(
-    async (text: string) => {
-      if (!text.startsWith("/")) return { handled: false };
-
-      // Split into command token and the rest of the line. The
-      // leading slash is stripped so "/read_file" matches the
-      // backend tool "read_file" (it stayed on before, and every
-      // tool command silently fell through to the model).
-      const [cmd, ...rest] = text.trim().split(/\s+/);
-      const cmdLower = cmd.toLowerCase().replace(/^\//, "");
-      const args = rest.join(" ");
-
-      // -----------------------------------------------------------------
-      // Plan / implement: these run inside a chat turn through the chat
-      // agent's own plan_task / implement_task tools, so their mutating
-      // steps flow through the SAME approval batch as every other tool
-      // call. One approval system, no separate orchestrator gate.
-      // -----------------------------------------------------------------
-      if (cmdLower === "plan" || cmdLower === "implement") {
-        const prompt =
-          cmdLower === "plan"
-            ? `Plan this task and return a numbered step plan: ${args}`
-            : `Implement this task: ${args}`;
-        try {
-          await sendMessage(prompt);
-          return { handled: true, card: "" };
-        } catch (e) {
-          console.error(e);
-          return { handled: true, card: `❌ ${cmdLower} failed` };
-        }
-      }
-
-      // -----------------------------------------------------------------
-      // Backend-backed tool commands - these hit /api/tool/execute.
-      // -----------------------------------------------------------------
-      const tool = backendTools.find((t) => t.name.toLowerCase() === cmdLower);
-      if (tool && tool.source !== "delegate") {
-        try {
-          // Parse the argument string as JSON.  If parsing fails we fall back
-          // to sending the raw string as a single-property argument.
-          let parsedArgs: any;
-          try {
-            parsedArgs = JSON.parse(args);
-          } catch {
-            parsedArgs = args;
-          }
-          await executeTool(tool.name, parsedArgs);
-          return { handled: true, card: `✅ ${tool.name} executed` };
-        } catch (e) {
-          console.error(e);
-          return { handled: true, card: `❌ ${tool.name} failed` };
-        }
-      }
-      if (tool && tool.source === "delegate") {
-        // Z3 unification: /plan and /implement run inside a chat turn
-        // through the chat agent's own plan_task/implement_task tools,
-        // so their mutating steps flow through the SAME approval batch
-        // as every other tool call. No second orchestrator gate.
-        const prompt =
-          tool.name === "plan_task"
-            ? `Plan this task and return a numbered step plan: ${args || tool.name}`
-            : `Implement this task: ${args || tool.name}`;
-        try {
-          await sendMessage(prompt);
-          return { handled: true, card: "" };
-        } catch (e) {
-          console.error(e);
-          return { handled: true, card: `❌ ${tool.name} failed` };
-        }
-      }
-
-      // -----------------------------------------------------------------
-      // Context catalog - memory files, skills, MCP servers via
-      // /api/context (mirrors the TUI /memory /skills /mcps).
-      // -----------------------------------------------------------------
-      if (
-        cmdLower === "memory" ||
-        cmdLower === "skills" ||
-        cmdLower === "mcps"
-      ) {
-        try {
-          const res = await fetch(`${API_BASE}/api/context`);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const ctx = await res.json();
-          let card = "";
-          if (cmdLower === "memory") {
-            const mem = ctx.memory || [];
-            card =
-              "/memory\n\n" +
-              (mem.length > 0
-                ? mem
-                    .map((m: any) => `${m.exists ? "✅" : "❌"} ${m.path}`)
-                    .join("\n")
-                : "No memory files configured.");
-          } else if (cmdLower === "skills") {
-            const sk = ctx.skills || [];
-            card =
-              "/skills\n\n" +
-              (sk.length > 0
-                ? sk
-                    .map((s: any) => `${s.name} - ${s.description || ""}`)
-                    .join("\n")
-                : "No skills found.");
-          } else {
-            const servers = ctx.mcp_servers || [];
-            card =
-              "/mcps\n\n" +
-              (servers.length > 0
-                ? servers
-                    .map((s: any) => `${s.enabled ? "✅" : "⛔"} ${s.name}`)
-                    .join("\n")
-                : "No MCP servers configured.");
-          }
-          return { handled: true, card };
-        } catch (e) {
-          console.error(e);
-          return { handled: true, card: `❌ /${cmdLower} failed` };
-        }
-      }
-
-      // -----------------------------------------------------------------
-      // /compact [optional focus] — shrink this session's history.
-      // The client owns the transcript (every turn re-sends it), so
-      // compaction has to end in a reload or the next turn undoes it.
-      // -----------------------------------------------------------------
-      if (cmdLower === "compact") {
-        const session = aiChat.sessionId;
-        if (!session) {
-          return { handled: true, card: "No session to compact yet." };
-        }
-        try {
-          const res = await fetch(
-            `${API_BASE}/api/sessions/${encodeURIComponent(session)}/compact`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ focus: args || null })},
-          );
-          if (!res.ok) {
-            const err = await res.text();
-            return { handled: true, card: `❌ /compact failed: ${err}` };
-          }
-          const data = await res.json();
-          // Reload from the server so the client's copy matches
-          // what was just stored. Without this the next turn
-          // re-sends the full history and undoes the compaction.
-          await aiChat.openSession(session);
-          const saved =
-            data.tokens_before && data.tokens_after
-              ? `\n~${Math.round(data.tokens_before / 1000)}k → ~${Math.round(data.tokens_after / 1000)}k tokens`
-              : "";
-          return {
-            handled: true,
-            card: `/compact\n${data.before} → ${data.after} messages${saved}`};
-        } catch (e) {
-          console.error(e);
-          return { handled: true, card: `❌ /compact failed: ${e}` };
-        }
-      }
-
-      // -----------------------------------------------------------------
-      // Local UI commands - these do NOT hit the backend.
-      // -----------------------------------------------------------------
-      if (cmdLower === "help") {
-        return {
-          handled: true,
-          card: `Type a message to chat with Berg, the AI agent.\nFor complex tasks, the agent will automatically use tools (read_file, write_file, edit_file, run_task).\nUse /task <description> to explicitly trigger the full harness pipeline.`};
-      }
-      if (cmdLower === "clear") {
-        clearMessages();
-        return { handled: true, card: null };
-      }
-      if (cmdLower === "exit" || cmdLower === "quit") {
-        return { handled: true, card: null };
-      }
-      if (cmdLower === "agents") {
-        return {
-          handled: true,
-          card: `/agents\n\n${agents.map((a) => `${a.name} - ${a.description || ""}`).join("\n") || "No agents"}`};
-      }
-      if (cmdLower === "stats") {
-        return {
-          handled: true,
-          card: `/stats\n\n${JSON.stringify(routerStats, null, 2)}`};
-      }
-      if (cmdLower === "health") {
-        return {
-          handled: true,
-          card: `/health\nOK . ${messages.length} messages`};
-      }
-      if (cmdLower === "models") {
-        return {
-          handled: true,
-          card: "/models\nSwitch via the header selector"};
-      }
-      if (cmdLower === "tools") {
-        return {
-          handled: true,
-          card: "/tools\nFile tools + run_task. Use naturally in conversation."};
-      }
-
-      // -----------------------------------------------------------------
-      // Anything else: a slash-prefixed token that is not a recognised
-      // command. Do NOT forward it to the model - that produced the
-      // confused "Thinking..." + wasted tool calls (e.g. /agent). Surface
-      // a clear "unknown command" instead and keep the turn cheap.
-      // -----------------------------------------------------------------
-      return {
-        handled: true,
-        card: `Unknown command: ${cmd}\nType /help for the available commands.`};
-    },
-    [agents, backendTools, clearMessages, input, routerStats, messages],
-  );
 
   // -------------------------------------------------------------------------
   // Send handler - intercepts slash commands, otherwise forwards to AI SDK.
@@ -567,10 +294,7 @@ function ChatContent() {
         // above the transcript. Without this the card is dropped and
         // every slash command looks like a no-op.
         setInput("");
-        if (outcome.card) {
-          const text = outcome.card;
-          setCmdCards((prev) => [...prev, { id: Date.now(), text }]);
-        }
+        if (outcome.card) addCmdCard(outcome.card);
       });
       return;
     }
@@ -947,11 +671,7 @@ function ChatContent() {
                     aria-label="Dismiss answer"
                     size="sm"
                     variant="secondary"
-                    onPress={() =>
-                      setCmdCards((prev) =>
-                        prev.filter((c) => c.id !== card.id),
-                      )
-                    }
+                    onPress={() => dismissCmdCard(card.id)}
                   >
                     ✕
                   </Button>
