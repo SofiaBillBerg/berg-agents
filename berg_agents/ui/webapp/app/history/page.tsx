@@ -36,7 +36,7 @@ import {Button, Card, Chip} from "@heroui/react";
 import {Navbar} from "../components/Navbar.tsx";
 
 import {API_BASE} from "@/envConfig";
-import {SESSION_ID_KEY} from "@/harness/useAISDKChat";
+import {storeSessionId} from "@/harness/sessionIdentity";
 
 
 interface ServerSession {
@@ -113,11 +113,7 @@ export default function HistoryPage() {
         setRestoredMessages(
             Array.isArray(data.messages) ? data.messages : [],
         );
-        try {
-            localStorage.setItem(SESSION_ID_KEY, session.id);
-        } catch {
-            // Private mode - session id stays in memory only.
-        }
+        storeSessionId(session.id);
         // NOTE: Restoring adopts project-wide, so other windows converge.
         await fetch(`${API_BASE}/api/sessions/current`, {
             method: "POST",

@@ -30,28 +30,33 @@
  * tool calls (file operations + run_task), which run the full BergAgents harness.
  */
 
-import type {UIMessage} from "ai";
-import type {SetStateAction} from "react";
-import type {PendingQuestion, PendingQuestionAnswer} from "./askUser";
-import type {ChatMessage} from "./messageParts";
+import type { UIMessage } from "ai";
+import type { SetStateAction } from "react";
+import type { PendingQuestion, PendingQuestionAnswer } from "./askUser";
+import type { ChatMessage } from "./messageParts";
+import type { PendingApproval } from "./hitl";
 
-import {DefaultChatTransport} from "ai";
-import {useCallback, useEffect, useRef, useState} from "react";
-import {useChat} from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useChat } from "@ai-sdk/react";
 
+import { ASK_USER_TOOL_NAME, isQuestionAnswerPayload } from "./askUser";
+import { partToolName, toChatMessage } from "./messageParts";
+import { sanitizeHistory, SYSTEM_RETRY_REASON } from "./history";
+import { useServerSessions } from "./sessions";
 import {
-    ASK_USER_TOOL_NAME,
-    isQuestionAnswerPayload,
-    parseQuestionCall} from "./askUser";
-import {partToolName, toChatMessage} from "./messageParts";
+  approvalBatchFrom,
+  createHitlResponders,
+  pendingApprovalsFrom,
+  questionBatchFrom} from "./hitl";
+import {
+  storeSessionId} from "./sessionIdentity";
 
-import {API_BASE} from "@/envConfig";
+import { API_BASE } from "@/envConfig";
 
+export type { ChatMessage } from "./messageParts";
 
-export type {ChatMessage} from "./messageParts";
-
-/** localStorage key for the active server-side session id. */
-export const SESSION_ID_KEY = "berg_session_id";
+/* The active session id and its storage live in ./sessionIdentity. */
 
 // Client-side hint for transport failures - the one failure class whose
 // cause the client can see better than the server (it never reached the
@@ -62,20 +67,6 @@ function clientFailureHint(detail: string): string | undefined {
     return "The chat backend could not be reached — is the server running?";
   }
   return undefined;
-}
-
-export interface PendingApproval {
-  /** Approval id - pass back to respondToApproval */
-  id: string;
-  /** Tool the model wants to run (e.g. "write_file") */
-  toolName: string;
-  /** Human-readable argument summary */
-  args: string;
-  /** True once the user decided this item (decided items stay in the
-     batch list so they can be retracted before the resume fires). */
-  decided?: boolean;
-  /** User's denial reason, when rejected with one. */
-  reason?: string;
 }
 
 /**
@@ -168,139 +159,8 @@ export interface UseAISDKChatReturn {
   openSession: (id: string) => Promise<void>;
 }
 
-/* Part decoding (tool calls, reasoning, text, tool names) lives in
- * ./messageParts; the ask_user decoders live in ./askUser. One walk
- * over a message's parts for all three renderings - see
- * readMessageParts. */
-function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
-  return msgs
-    .filter(
-      (m): m is Record<string, unknown> =>
-        typeof m === "object" &&
-        m !== null &&
-        typeof (m as { id?: unknown }).id === "string" &&
-        typeof (m as { role?: unknown }).role === "string" &&
-        Array.isArray((m as { parts?: unknown }).parts),
-    )
-    .map((m, index, all) => {
-      if (preserveLatest && index === all.length - 1) return m;
-      return {
-        ...m,
-        parts: (m.parts as unknown[]).flatMap((p) => {
-          if (typeof p !== "object" || p === null) return [];
-          const part = p as {
-            type?: unknown;
-            state?: unknown;
-            approval?: unknown;
-          };
-          // Malformed parts can never resume — drop them.
-          if (typeof part.type !== "string") return [];
-          const isTool =
-            part.type === "dynamic-tool" || part.type.startsWith("tool-");
-          // Non-restore: the client never owns the system prompt
-          // (the backend builds it), so replayed system parts from a
-          // restored session are what triggers its strip warning.
-          if (!preserveLatest && (m as { role?: unknown }).role === "system") {
-            return [];
-          }
-          if (
-            isTool &&
-            part.state === "approval-responded" &&
-            (part as { output?: unknown }).output === undefined
-          ) {
-            // Answered but never executed: re-ask instead of replaying.
-            // `approval` must stay a real object AND carry an `id`:
-            // the AI SDK's addToolApprovalResponse reads
-            // `part.approval.id` with no optional chaining, so both
-            // an undefined approval and a missing id leave an
-            // unanswerable card that throws on the next click.
-            // Without an id there is nothing to ask again, so the
-            // part expires like any other dead-run approval.
-            const previous =
-              typeof part.approval === "object" && part.approval !== null
-                ? (part.approval as { id?: unknown })
-                : undefined;
-            const approvalId =
-              typeof previous?.id === "string" ? previous.id : undefined;
-            if (!approvalId) {
-              const { approval: _dropped, ...rest } = part as Record<
-                string,
-                unknown
-              >;
-              return [{ ...rest, state: "output-denied" }];
-            }
-            return [
-              {
-                ...part,
-                state: "approval-requested",
-                approval: {
-                  ...previous,
-                  id: approvalId,
-                  approved: undefined,
-                  reason: undefined}}];
-          }
-          if (
-            !preserveLatest &&
-            isTool &&
-            part.state === "approval-requested"
-          ) {
-            // Dead run (see docstring): expire instead of replaying.
-            //
-            // The state MUST leave "approval-requested" here. The
-            // AI SDK's addToolApprovalResponse filters with
-            // `state === "approval-requested" && part.approval.id`
-            // and does not guard `approval`, so a requested part
-            // with the approval object stripped throws on the next
-            // approve click and wedges the run. "output-denied" is
-            // the SDK's terminal state for a call that never got
-            // approval, and it keeps `approval` absent on purpose.
-            const { approval: _dropped, ...rest } = part as Record<
-              string,
-              unknown
-            >;
-            return [{ ...rest, state: "output-denied" }];
-          }
-          if (
-            isTool &&
-            part.state === "output-available" &&
-            partToolName(part as unknown as Record<string, unknown>) ===
-              ASK_USER_TOOL_NAME &&
-            isQuestionAnswerPayload((part as { output?: unknown }).output)
-          ) {
-            // A raw answer payload in an EARLIER message belongs
-            // to a dead run - only the live last message may
-            // carry answers. Left in place, the backend's
-            // resume detection would misread the next send as
-            // an answer to a run that no longer exists, so the
-            // payload is expired to an honest sentence (the
-            // model never saw this answer). This runs for every
-            // flatMap'd message in both modes: sends strip all
-            // but the preserved latest, restores strip all of
-            // them (a paused restore preserves its last message
-            // whole, above).
-            return [
-              {
-                ...part,
-                output:
-                  "The run ended before this answer was " +
-                  "applied; the question went unanswered."}];
-          }
-          return [{ ...part }];
-        })};
-    });
-}
-
-/**
- * Reason used for system-initiated rejections (failed sends, see the
- * error effect below). Deliberately retry-friendly: unlike an
- * explicit user rejection, a dead run says nothing about the action
- * itself, so the model should feel free to try again.
- */
-const SYSTEM_RETRY_REASON =
-  "System: the previous tool run failed before completing " +
-  "(mismatched or interrupted approval state). This rejection is " +
-  "automatic cleanup, NOT a human decision — you may retry the same " +
-  "action with corrected arguments.";
+/* History hygiene (what a restore or a send may echo back)
+ * lives in ./history - see sanitizeHistory. */
 
 /**
  * Main chat hook - wraps AI SDK v7's useChat to talk to /api/chat/stream.
@@ -316,22 +176,17 @@ export function useAISDKChat(): UseAISDKChatReturn {
   // state separately and call sendMessage directly.
   const [input, setInput] = useState("");
 
-  // Server-side session: the authoritative conversation record shared
-  // by every browser. Declared before useChat so the transport body
-  // below always carries the current id.
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [sessionTitle, setSessionTitle] = useState<string | null>(null);
-
-  // Callbacks that fire outside React's render (Stop, follow, reconnect)
-  // need the current session id without re-subscribing on every session
-  // switch. It is written by `adoptSession` at the same moment as the
-  // state, never by a later effect: a Stop clicked right after a session
-  // switch would otherwise address the previous session's run.
-  const sessionIdRef = useRef<string | null>(null);
-  const adoptSession = useCallback((id: string | null) => {
-    sessionIdRef.current = id;
-    setSessionId(id);
-  }, []);
+  // The transport's callbacks fire outside React's render - a minted
+  // session id arrives on a fetch, a reconnect happens later - so they
+  // reach the session handle through refs refreshed each render instead
+  // of capturing one render's closures. The handle itself lives in
+  // ./sessions and is created after useChat, because it needs the SDK's
+  // message setter.
+  const adoptSessionRef = useRef<(id: string | null) => void>(
+    () => {},
+  );
+  const sessionIdHolderRef = useRef<{ current: string | null }>({
+    current: null});
   // Whether this client is currently subscribed to a run it did not start
   // (after a reload, a tab switch, or a second browser).
   const isFollowingRef = useRef(false);
@@ -391,7 +246,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
       // re-send of the last message.
       prepareReconnectToStreamRequest: () => ({
         api: `${API_BASE}/api/chat/stream?session=${encodeURIComponent(
-          sessionIdRef.current ?? "",
+          sessionIdHolderRef.current.current ?? "",
         )}`}),
       // A fresh chat sends no id and the server mints one; the id comes
       // back as a response header, and this is where the client adopts
@@ -402,13 +257,9 @@ export function useAISDKChat(): UseAISDKChatReturn {
       fetch: async (input, init) => {
         const resp = await fetch(input, init);
         const minted = resp.headers.get("x-berg-session-id");
-        if (minted && minted !== sessionIdRef.current) {
-          adoptSession(minted);
-          try {
-            localStorage.setItem(SESSION_ID_KEY, minted);
-          } catch {
-            // Private mode - id stays in memory only.
-          }
+        if (minted && minted !== sessionIdHolderRef.current.current) {
+          adoptSessionRef.current(minted);
+          storeSessionId(minted);
         }
         return resp;
       }}),
@@ -459,6 +310,24 @@ export function useAISDKChat(): UseAISDKChatReturn {
       return answered > 0 && waiting === 0;
     }});
 
+  // The session this chat belongs to - its identity and the four ways it
+  // changes. Created here because it needs the SDK's message setter;
+  // the transport above reaches it through the refs it was given.
+  const {
+    sessionId,
+    sessionTitle,
+    setSessionTitle,
+    sessionIdRef,
+    adoptSession,
+    restoreMessages,
+    reloadSession,
+    openSession,
+    newServerChat} = useServerSessions({
+    apiBase: API_BASE,
+    setUIMessages});
+  adoptSessionRef.current = adoptSession;
+  sessionIdHolderRef.current = sessionIdRef;
+
   const isStreaming = status === "streaming" || status === "submitted";
 
   // Steering the agent has not read yet. This is the queue the transcript
@@ -508,310 +377,24 @@ export function useAISDKChat(): UseAISDKChatReturn {
     };
   }, [sessionId, isStreaming]);
 
-  // Tool calls paused for human approval (HITL). Derived from the raw
-  // UI messages: any tool part in state "approval-requested".
-  const pendingApprovals: PendingApproval[] = [];
-  for (const msg of uiMessages) {
-    for (const part of msg.parts) {
-      const p = part as unknown as Record<string, unknown>;
-      if (
-        typeof p !== "object" ||
-        p === null ||
-        (p as { state?: unknown }).state !== "approval-requested"
-      ) {
-        continue;
-      }
-      const approval = (p as { approval?: unknown }).approval as
-        { id?: unknown } | undefined;
-      const approvalId = typeof approval?.id === "string" ? approval.id : null;
-      if (!approvalId) continue;
-      const toolName = partToolName(p);
-      // Questions have their own card and are answered by tool call
-      // id, not approval id; a reloaded run renders them as
-      // approval-requested, so they must not leak into this batch.
-      if (toolName === ASK_USER_TOOL_NAME) continue;
-      let args = "";
-      if (p.input != null && typeof p.input === "object") {
-        try {
-          args = JSON.stringify(p.input);
-        } catch {
-          args = "";
-        }
-      }
-      if (!pendingApprovals.some((a) => a?.id === approvalId)) {
-        pendingApprovals.push({ id: approvalId, toolName, args });
-      }
-    }
-  }
-
-  // Full active batch for the per-item approval card: derived from the
-  // LAST assistant message only, including both pending
-  // ("approval-requested") and already-decided ("approval-responded")
-  // parts. Decided items stay visible with badges + undo until the
-  // resume fires and parts transition to output state (at which point
-  // the batch empties and the card disappears).
-  const approvalBatch: PendingApproval[] = [];
-  for (let i = uiMessages.length - 1; i >= 0; i--) {
-    const msg = uiMessages[i];
-    if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
-    for (const part of msg.parts) {
-      // A part can be a hole (undefined) after the SDK rewrites
-      // the array mid-stream; every field read below is guarded so a
-      // sparse entry can never throw inside the render pass.
-      const p = part as unknown as Record<string, unknown>;
-      if (typeof p !== "object" || p === null) continue;
-      if (
-        p.state !== "approval-requested" &&
-        p.state !== "approval-responded"
-      ) {
-        continue;
-      }
-      const approval = p.approval as
-        { id?: unknown; approved?: unknown; reason?: unknown } | undefined;
-      const approvalId = typeof approval?.id === "string" ? approval.id : null;
-      if (!approvalId) continue;
-      const toolName = partToolName(p);
-      // Same exclusion as pendingApprovals: a question answered
-      // before a reload comes back as approval-requested and would
-      // otherwise masquerade as an approval in this batch.
-      if (toolName === ASK_USER_TOOL_NAME) continue;
-      let args = "";
-      if (p.input != null && typeof p.input === "object") {
-        try {
-          args = JSON.stringify(p.input);
-        } catch {
-          args = "";
-        }
-      }
-      const decided = p.state === "approval-responded";
-      const reason =
-        typeof approval?.reason === "string" ? approval.reason : undefined;
-      if (!approvalBatch.some((a) => a?.id === approvalId)) {
-        approvalBatch.push({ id: approvalId, toolName, args, decided, reason });
-      }
-    }
-    // Only the last assistant message carries the live batch.
-    break;
-  }
-
-  // Full active question batch, mirroring approvalBatch: the LAST
-  // assistant message's ask_user_question calls, both pending
-  // ("input-available" on the live wire, "approval-requested" after a
-  // reload - the dump marks every deferred call that way) and answered
-  // (their output holds the canonical payload until the resume fires
-  // and the server overwrites it with the rendered result).
-  const questionBatch: PendingQuestion[] = [];
-  for (let i = uiMessages.length - 1; i >= 0; i--) {
-    const msg = uiMessages[i];
-    if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
-    for (const part of msg.parts) {
-      const p = part as unknown as Record<string, unknown>;
-      if (typeof p !== "object" || p === null) continue;
-      if (partToolName(p) !== ASK_USER_TOOL_NAME) continue;
-      const id = typeof p.toolCallId === "string" ? p.toolCallId : null;
-      if (!id) continue;
-      const answered =
-        p.state === "output-available" && isQuestionAnswerPayload(p.output);
-      if (
-        !answered &&
-        p.state !== "input-available" &&
-        p.state !== "approval-requested"
-      ) {
-        // Completed turns hold rendered results (no payload shape)
-        // and dead-run ghosts were expired by sanitizeHistory;
-        // neither is answerable, so neither belongs in the batch.
-        continue;
-      }
-      const declined =
-        answered && (p.output as { cancelled?: unknown }).cancelled === true;
-      if (!questionBatch.some((q) => q.id === id)) {
-        questionBatch.push({
-          id,
-          questions: parseQuestionCall(p.input),
-          answered,
-          declined});
-      }
-    }
-    // Only the last assistant message carries the live batch.
-    break;
-  }
-
-  // Answer ONE approval (per-item stepwise decision). The SDK marks
-  // that single part as responded; the resume only fires once EVERY
-  // pending part in the paused message is answered (see
-  // sendAutomaticallyWhen), so partial decisions never trigger a
-  // partial resume — the backend requires a complete answer set.
-  // Whether the SDK can still resolve an approval id: addToolApprovalResponse
-  // matches on a part in state "approval-requested" whose `approval.id`
-  // equals the id, and it does not guard `approval` - an id with no such
-  // part throws inside the SDK and wedges the run. Every approve path goes
-  // through this so the client never asks the SDK to resolve a ghost.
-  const approvalResolvable = (id: string) =>
-    uiMessages.some((msg) =>
-      msg.parts?.some(
-        (part) =>
-          typeof part === "object" &&
-          part !== null &&
-          (part as { state?: unknown }).state === "approval-requested" &&
-          (part as { approval?: { id?: unknown } }).approval?.id === id,
-      ),
-    );
-
-  const respondToApproval = (
-    id: string,
-    approved: boolean,
-    reason?: string,
-  ) => {
-    if (!approvalResolvable(id)) {
-      console.warn(
-        `[useAISDKChat] Approval ${id} is not answerable in this message ` +
-          `state (stale or restored run) - ignoring the click.`,
-      );
-      return;
-    }
-    void addToolApprovalResponse({ id, approved, reason });
-  };
-
-  // Answer EVERY pending approval at once (batch convenience).
-  const respondToAllApprovals = async (approved: boolean, reason?: string) => {
-    const ids = pendingApprovals
-      .map((a) => a?.id)
-      .filter((id): id is string => Boolean(id) && approvalResolvable(id));
-    for (const id of ids) {
-      await addToolApprovalResponse({ id, approved, reason });
-    }
-  };
-
-  // Replace a paused call's args before approving (edit). Updates the
-  // part's input in place; the backend adapter maps an approved call's
-  // part input to ToolApproved(override_args=...), so the edited args
-  // reach the actual tool execution. Allowed in both states: the
-  // resume only fires once EVERY pending part is answered, so editing
-  // still lands in time until the last decision is made.
-  const editApprovalArgs = (id: string, args: unknown) => {
-    setUIMessages(
-      (prev) =>
-        prev.map((msg) => {
-          const parts = msg.parts as unknown as Array<Record<string, unknown>>;
-          if (!Array.isArray(parts)) return msg;
-          let changed = false;
-          const nextParts = parts.map((p) => {
-            if (
-              typeof p !== "object" ||
-              p === null ||
-              (p.state !== "approval-requested" &&
-                p.state !== "approval-responded")
-            ) {
-              return p;
-            }
-            const approval = p.approval as { id?: unknown } | undefined;
-            if (approval?.id !== id) return p;
-            changed = true;
-            return { ...p, input: args };
-          });
-          return changed ? { ...msg, parts: nextParts } : msg;
-        }) as unknown as UIMessage[],
-    );
-  };
-
-  // Withdraw a per-item decision before the batch resumes: flip the
-  // part back to approval-requested so the user can reconsider. The
-  // part reappears in the approval card and no longer counts as
-  // answered, so the resume is held back again.
-  const revertApproval = (id: string) => {
-    setUIMessages(
-      (prev) =>
-        prev.map((msg) => {
-          const parts = msg.parts as unknown as Array<Record<string, unknown>>;
-          if (!Array.isArray(parts)) return msg;
-          let changed = false;
-          const nextParts = parts.map((p) => {
-            if (
-              typeof p !== "object" ||
-              p === null ||
-              p.state !== "approval-responded"
-            ) {
-              return p;
-            }
-            const approval = p.approval as { id?: unknown } | undefined;
-            if (approval?.id !== id) return p;
-            changed = true;
-            return {
-              ...p,
-              state: "approval-requested",
-              // Drop the answer so the wire payload carries a clean
-              // requested-state approval again.
-              approval: { ...approval, approved: undefined, reason: undefined }};
-          });
-          return changed ? { ...msg, parts: nextParts } : msg;
-        }) as unknown as UIMessage[],
-    );
-  };
-
-  // Answer ONE ask_user_question call. The payload written into the
-  // part's output is the canonical wire shape the server's adapter
-  // validates against the question that was asked (the harness's
-  // check_response): every question answered with labels it offered
-  // or a nonblank custom answer, or a bare decline. addToolOutput
-  // rewrites the part to output-available and re-evaluates
-  // sendAutomaticallyWhen, which resumes the run once every pending
-  // part in the paused message is answered.
-  const questionResolvable = (id: string) =>
-    uiMessages.some((msg) =>
-      (msg.parts ?? []).some(
-        (part) =>
-          typeof part === "object" &&
-          part !== null &&
-          partToolName(part as unknown as Record<string, unknown>) ===
-            ASK_USER_TOOL_NAME &&
-          (part as unknown as { toolCallId?: unknown }).toolCallId === id &&
-          !(
-            (part as unknown as { state?: unknown }).state ===
-              "output-available" &&
-            isQuestionAnswerPayload(
-              (part as unknown as { output?: unknown }).output,
-            )
-          ),
-      ),
-    );
-
-  const respondToQuestion = (
-    id: string,
-    answers: PendingQuestionAnswer[],
-    declined: boolean,
-  ) => {
-    if (!questionResolvable(id)) {
-      console.warn(
-        `[useAISDKChat] Question ${id} is not answerable in this ` +
-          `message state (stale or restored run) - ignoring the click.`,
-      );
-      return;
-    }
-    // Canonical payload: wire keys are the harness's (snake_case), and
-    // a decline carries no answers - exactly what check_response
-    // demands. Whether the SDK can still resolve a toolCallId is
-    // guarded above for the same reason as approvals: addToolOutput
-    // throws on an unknown id and wedges the run.
-    const payload = {
-      answers: declined
-        ? []
-        : answers.map((a) => ({
-            header: a.header,
-            selected: a.selected,
-            custom_answer: a.customAnswer ?? null})),
-      cancelled: declined};
-    void addToolOutput({
-      tool: "dynamic-tool",
-      toolCallId: id,
-      output: payload});
-  };
-
-  // Decline every pending question in the batch (batch convenience).
-  const declineAllQuestions = () => {
-    for (const q of questionBatch) {
-      if (!q.answered) respondToQuestion(q.id, [], true);
-    }
-  };
+  // Tool calls paused for human approval (HITL), and the answers that
+  // release them. The derivations and responders live in ./hitl; the
+  // factory is rebuilt per render so the responders read the messages
+  // the user is looking at.
+  const pendingApprovals = pendingApprovalsFrom(uiMessages);
+  const approvalBatch = approvalBatchFrom(uiMessages);
+  const questionBatch = questionBatchFrom(uiMessages);
+  const {
+    respondToApproval,
+    respondToAllApprovals,
+    editApprovalArgs,
+    revertApproval,
+    respondToQuestion,
+    declineAllQuestions} = createHitlResponders({
+    messages: uiMessages,
+    addToolApprovalResponse,
+    addToolOutput,
+    setMessages: setUIMessages});
 
   // Convert AI SDK UIMessage[] to the simpler ChatMessage[] our UI expects.
   // One walk per message fills all three renderings (text, reasoning,
@@ -826,109 +409,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     setUIMessages([]);
   };
 
-  // Restore server-session messages into the live chat.
-  // A stored snapshot does NOT imply no live run: a reload while the run
-  // is paused on an approval restores exactly that. Expiring the pending
-  // approval then leaves a paused run the browser can never answer - the
-  // card has no Approve button and the turn is wedged. So the server is
-  // asked first, and a live pause preserves the approval.
-  // Duplicate message ids (e.g. one request dumped to two UI messages)
-  // are suffixed — React keys must be unique and ids are otherwise opaque.
-  const restoreMessages = useCallback(
-    async (msgs: unknown[], sessionId?: string | null) => {
-      if (!Array.isArray(msgs)) return;
-      let paused = false;
-      if (sessionId) {
-        try {
-          const resp = await fetch(
-            `${API_BASE}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
-          );
-          if (resp.ok) {
-            const state = await resp.json();
-            paused = state?.outcome === "paused";
-          }
-        } catch {
-          // Status unreachable: fall back to the conservative
-          // "no live run" assumption rather than blocking restore.
-        }
-      }
-      const clean = sanitizeHistory(msgs, paused) as unknown as Array<{
-        id?: unknown;
-      }>;
-      const seen = new Set<string>();
-      for (const m of clean) {
-        if (typeof m !== "object" || m === null || typeof m.id !== "string") {
-          continue;
-        }
-        let id: string = m.id;
-        if (seen.has(id)) {
-          let n = 2;
-          while (seen.has(`${id}-dup${n}`)) n += 1;
-          id = `${id}-dup${n}`;
-          m.id = id;
-        }
-        seen.add(id);
-      }
-      setUIMessages(clean as unknown as UIMessage[]);
-    },
-    [setUIMessages],
-  );
 
-  // Replace the transcript with the server's saved copy of a session.
-  // The server owns the conversation, so this is what any client shows
-  // once it has stopped following a run: the turn exactly as saved.
-  const reloadSession = useCallback(
-    async (id: string) => {
-      const resp = await fetch(
-        `${API_BASE}/api/sessions/${encodeURIComponent(id)}`,
-      );
-      if (!resp.ok) throw new Error(`Session ${id}: HTTP ${resp.status}`);
-      const data = await resp.json();
-      await restoreMessages(
-        Array.isArray(data.messages) ? data.messages : [],
-        id,
-      );
-      return data;
-    },
-    [restoreMessages],
-  );
-
-  // Open a server-side session: load its transcript, adopt its id.
-  const openSession = async (id: string) => {
-    const data = await reloadSession(id);
-    adoptSession(id);
-    if (data.session && typeof data.session.title === "string") {
-      setSessionTitle(data.session.title);
-    }
-    try {
-      localStorage.setItem(SESSION_ID_KEY, id);
-    } catch {
-      // Private mode - session id stays in memory only.
-    }
-  };
-
-  // Start a new server-side session (numbered title from the backend).
-  const newServerChat = async () => {
-    const resp = await fetch(`${API_BASE}/api/sessions`, { method: "POST" });
-    if (!resp.ok) throw new Error(`New session: HTTP ${resp.status}`);
-    const data = await resp.json();
-    setUIMessages([]);
-    adoptSession(typeof data.id === "string" ? data.id : null);
-    setSessionTitle(typeof data.title === "string" ? data.title : null);
-    try {
-      if (typeof data.id === "string") {
-        localStorage.setItem(SESSION_ID_KEY, data.id);
-      }
-    } catch {
-      // Private mode - chat still works in memory.
-    }
-  };
-
-  // Tracks whether the mount-restore below has run. The persist effect
-  // must stay quiet until then: on a fresh mount uiMessages is empty,
-  // and persisting that emptiness first would wipe the stored
-  // conversation (this is what erased chats on tab switches).
-  const restoredRef = useRef(false);
 
   // Visible notice for the failure dialog. A failure is transient UI on
   // top of the durable record: the journal text in the transcript is
@@ -1068,72 +549,6 @@ export function useAISDKChat(): UseAISDKChatReturn {
     };
   }, [sessionId, sessionTitle, isStreaming]);
 
-  // Restore the persisted conversation once, after mount. Server
-  // first (shared across browsers), localStorage as offline fallback.
-  // With no stored session id, mint one for this chat — the backend
-  // creates the row lazily on the first send, so empty mounts never
-  // spam numbered sessions.
-  useEffect(() => {
-    let cancelled = false;
-    const restore = async () => {
-      try {
-        const storedId = localStorage.getItem(SESSION_ID_KEY);
-        if (storedId) {
-          try {
-            const resp = await fetch(
-              `${API_BASE}/api/sessions/${encodeURIComponent(storedId)}`,
-            );
-            if (resp.ok && !cancelled) {
-              const data = await resp.json();
-              if (Array.isArray(data.messages) && data.messages.length > 0) {
-                await restoreMessages(data.messages, storedId);
-              }
-              adoptSession(storedId);
-              if (data.session && typeof data.session.title === "string") {
-                setSessionTitle(data.session.title);
-              }
-              return;
-            }
-            if (resp.status === 404) {
-              // The stored session is gone (deleted server-side).
-              // Forget it rather than retrying a dead id on every
-              // mount - and so a later send never resurrects it
-              // through the lazy row-create on first message.
-              localStorage.removeItem(SESSION_ID_KEY);
-            }
-          } catch {
-            // Server unreachable - fall through to local cache.
-          }
-        } else {
-          // No session yet: adopt the project's active session when one
-          // exists, so every window converges on the same conversation.
-          // With none, the page holds NO id at all and the first send
-          // carries an empty one — the server mints the canonical,
-          // project-suffixed id. A client-side id is the one place a
-          // second id format could reappear, so there is none.
-          try {
-            const currentResp = await fetch(`${API_BASE}/api/sessions/current`);
-            if (currentResp.ok && !cancelled) {
-              const current = await currentResp.json();
-              if (typeof current.id === "string" && current.id) {
-                await openSession(current.id);
-                return;
-              }
-            }
-          } catch {
-            // Server unreachable - the first send retries.
-          }
-        }
-      } finally {
-        if (!cancelled) restoredRef.current = true;
-      }
-      // No local copy: the server session is the only source.
-    };
-    void restore();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // A run can outlive this tab (reload, tab switch, second browser) — or
   // start in one while this tab sits idle. While the server reports a

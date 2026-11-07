@@ -38,7 +38,6 @@ export {useAISDKChat} from "./useAISDKChat";
 export type {
     ChatMessage,
     FailureNotice,
-    PendingApproval,
     UseAISDKChatReturn} from "./useAISDKChat";
 
 // The ask_user vocabulary and the message-parts walker live in their own
@@ -48,3 +47,14 @@ export type {
     PendingQuestionAnswer,
     PendingQuestionData,
     PendingQuestionOption} from "./askUser";
+
+// HITL: the approval/question card vocabulary.
+export type {PendingApproval} from "./hitl";
+
+// The active session id and its storage: one path for every reader and
+// writer of that key (chat hook, history page, transport adoption).
+export {
+    SESSION_ID_KEY,
+    forgetStoredSessionId,
+    readStoredSessionId,
+    storeSessionId} from "./sessionIdentity";
