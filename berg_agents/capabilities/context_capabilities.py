@@ -538,7 +538,16 @@ def build_file_store(config_dir: Path) -> Any:
     from pydantic_ai_harness.memory import FileStore
 
     return FileStore(
-        "../../plugin_system", workspace=LocalWorkspaceBackend(str(config_dir))
+        # The documented shape: the directory resolves inside the
+        # workspace the store is given, so ``'.'`` is the config dir
+        # itself and the capability's scope adds the ``memory``
+        # segment — the notebook lands at ``<config>/memory/MEMORY.md``.
+        # (A relative path with ``..`` escapes the workspace instead:
+        # ``"../../plugin_system"`` once put the store in a sibling of
+        # the project, where nothing reads it, and every write reported
+        # success.)
+        ".",
+        workspace=LocalWorkspaceBackend(str(config_dir)),
     )
 
 
