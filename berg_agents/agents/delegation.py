@@ -30,16 +30,37 @@ handed to the chat agent alongside the staged delegates. Phase 1 of the
 migration is deliberately additive: both paths exist until the new one is
 verified live, then the hand-rolled delegate is retired.
 
-What phase 1 does NOT yet carry is the nested stream. The hand-rolled
-delegate drives the implementer's own events through
-:class:`~berg_agents.ui.subagent_relay.SubagentRelay` because it holds
-the relay in a holder the web layer fills per run, and the bracket it
-emits must name the parent tool call the child belongs to. Under
-``SubAgents`` the handler is fixed at build time and the child's run
-context carries no reference to the ``delegate_task`` call
-(``tool_call_id`` is ``None`` there), so there is nothing to label the
-bracket with yet. The child's stream is drained either way, so a
-delegated run is silent rather than broken; wiring it is its own step.
+``sub_agents`` events arrive on the parent's own node stream, with no
+relay at all.
+
+What phase 1 does NOT yet carry is the nested stream, because the
+harness's own events were arriving and being dropped silently by the
+encoder: a delegated run showed the ``delegate_task`` card and nothing
+inside it. Two facts settled that (probes
+``/tmp/opencode/parent-stream-probe.py`` and
+``/tmp/opencode/forward-events-probe.py``):
+
+1. **Without forwarding, the child is invisible.** The parent's
+   ``CallToolsNode`` yields ``FunctionToolCallEvent``, ``TaskAssigned``,
+   ``TaskStarted``, ``DelegationStart``, ``DelegationEnd``,
+   ``TaskCompleted`` and the tool result — and none of the child's own
+   parts. The hand-rolled relay worked around this by driving the
+   child's stream itself, but under ``SubAgents`` the handler is fixed
+   at build time while the relay attaches per run, and the context
+   handed to it is the *child's*, whose ``tool_call_id`` is ``None``:
+   there was nothing to label the bracket with.
+2. **With ``TaskControl(forward_events=True)`` the child's whole stream
+   arrives on the parent's** as ``TaskProgressEvent(task_id, agent_name,
+   event=<the child's native event>)``, bracketed by
+   ``DelegationStartEvent`` and ``DelegationEndEvent``. The forwarded
+   events are the very ``PartStartEvent`` / ``PartEndEvent`` /
+   ``FunctionToolCallEvent`` / ``FunctionToolResultEvent`` /
+   ``FinalResultEvent`` the relay's ``drive`` re-encodes, so the bracket
+   and its content come from one mechanism.
+
+So the roster is built with forwarding on, and the encoder learns to
+read those events — which retires the hand-rolled relay instead of
+side-channelling it. Sofia chose that direction on 2026-11-08.
 """
 
 from __future__ import annotations
@@ -54,7 +75,7 @@ DELEGATE_NAME = "implementation"
 
 
 def build_delegation_capabilities(
-    root_dir: str, plan_tools: dict[str, Any] | None = None
+    plan_tools: dict[str, Any] | None = None,
 ) -> list[Any]:
     """Build the delegation capabilities for the chat agent.
 
@@ -63,9 +84,10 @@ def build_delegation_capabilities(
     store's tools so a delegated run reads and checks off the same plan
     the user sees.
 
-    :param root_dir: Workspace root the implementer's file tools bind to.
-        It is also what the shared deps carry, so a delegated run works
-        in the same workspace as the chat.
+    No workspace root is taken here: the implementer's file tools read
+    ``ctx.deps.workspace_root``, so the root a delegated run works in is
+    the one the chat run's deps carry, not one bound at build time.
+
     :param plan_tools: Session-bound plan-store tools, forwarded to the
         implementer exactly as ``_make_implement_task`` forwards them.
     :return: The capability list, or an empty list when delegation is
@@ -106,6 +128,6 @@ def build_delegation_capabilities(
                     can_ask_questions=True,
                 )
             ],
-            task_control=TaskControl(),
+            task_control=TaskControl(forward_events=True),
         )
     ]

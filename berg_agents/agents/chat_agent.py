@@ -414,7 +414,7 @@ def build_chat_agent(
     # delegates on purpose (phase 1 of the migration): the hand-rolled
     # implement_task is retired only once this path is verified live.
     agent_kwargs["capabilities"].extend(
-        build_delegation_capabilities(root_dir, plan_tools)
+        build_delegation_capabilities(plan_tools)
     )
     # from_spec takes the spec first and merges the spec's own
     # capabilities with berg's list above; the model is always berg's
