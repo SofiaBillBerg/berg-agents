@@ -110,6 +110,7 @@ def build_chat_agent(
     """
     from pathlib import Path
 
+    from berg_agents.agents.delegation import build_delegation_capabilities
     from berg_agents.agents.workspace_toolset import WorkspaceToolset
     from berg_agents.capabilities.context_capabilities import (
         build_context_capabilities,
@@ -408,6 +409,13 @@ def build_chat_agent(
                 "list_authored_capabilities",
                 "disable_authored_capability"],
         )])
+    # Delegation, with task control: the implementer runs as a task the
+    # parent can steer, ask, and stop. It sits beside the staged
+    # delegates on purpose (phase 1 of the migration): the hand-rolled
+    # implement_task is retired only once this path is verified live.
+    agent_kwargs["capabilities"].extend(
+        build_delegation_capabilities(root_dir, plan_tools)
+    )
     # from_spec takes the spec first and merges the spec's own
     # capabilities with berg's list above; the model is always berg's
     # provider-registry instance, never a provider-name string.
