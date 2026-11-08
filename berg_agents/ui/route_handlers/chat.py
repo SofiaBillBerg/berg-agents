@@ -36,6 +36,7 @@ from berg_agents.agents.deps import AgentDeps
 from berg_agents.config.settings import get_settings
 from berg_agents.core.harness import Harness
 from berg_agents.core.turn import record_turn_outcome
+from berg_agents.ui.delegation_stream import build_delegation_event_stream
 from berg_agents.ui.projects import resolve_project
 from berg_agents.ui.run_registry import (
     LiveRun,
@@ -339,7 +340,6 @@ async def encode_run_stream(
         cancellation, so the run can record why it stopped.
     :return: Async iterator of ``data: {...}`` frames.
     """
-    from pydantic_ai.ui.vercel_ai import VercelAIEventStream
 
     async def _on_cancel(cancelled: Any) -> Any:
         """Forward the first-party cancellation to the run, then yield nothing."""
@@ -348,7 +348,13 @@ async def encode_run_stream(
         return
         yield  # pragma: no cover - makes this an async generator
 
-    stream = VercelAIEventStream(sdk_version=6)
+    # The encoder is the delegation-aware one: the harness's `sub_agents`
+    # events (a delegated task's own stream, bracketed by its start and
+    # end) fall through a plain VercelAIEventStream's `handle_event`
+    # match silently, so without this a delegated run shows an empty
+    # delegate_task card. Reading them here also means the subagent's
+    # frames come from one encoder in run order - no side channel.
+    stream = build_delegation_event_stream(sdk_version=6)
     async for frame in stream.encode_stream(
         stream.transform_stream(cap_tool_results(events), on_cancel=_on_cancel)
     ):

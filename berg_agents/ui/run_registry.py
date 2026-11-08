@@ -188,6 +188,13 @@ class LiveRun:
         self._tasks: list[asyncio.Task[None]] = []
         self._loop: asyncio.AbstractEventLoop | None = None
         self._cancelled_reason: str | None = None
+        # The harness's delegation owner, bound by a contextvar inside the
+        # graph task's `SubAgents.wrap_run`. Node tools run in the encoder
+        # task, which never sees it - so the graph task reads it here and
+        # the encoder binds it around each node (see _native_events).
+        # Without this a delegated task takes no task record, streams no
+        # progress, and none of the task-control tools do anything.
+        self._delegation_owner: Any = None
 
         # -- steering ------------------------------------------------------
         self._pending_steering: dict[str, str] = {}
@@ -351,6 +358,9 @@ class LiveRun:
         try:
             async with self._request() as agent_run:
                 self._agent_run = agent_run
+                # The owner is bound for the whole run, so reading it in the
+                # task wrap_run ran in is enough for the encoder to bind it.
+                self._delegation_owner = _delegation_owner()
                 outcome = await self._walk(agent_run)
         except asyncio.CancelledError:
             outcome = RunOutcome(
@@ -644,8 +654,19 @@ class LiveRun:
                     yield _run_result_event(ticket.result)
                 else:
                     try:
-                        async for event in _node_events(
-                            ticket.node, self._agent_run.ctx
+                        # The delegation owner is bound here, in the task
+                        # that actually runs the tools. `SubAgents` binds it
+                        # inside the graph task's `wrap_run`, which a
+                        # contextvar cannot cross into this one, and without
+                        # it `delegate_task` takes the plain path: no task
+                        # record, no forwarded child events, and no working
+                        # `answer_task`/`message_task`/`cancel_task`.
+                        # `bind()` is the library's own API for routing a
+                        # run's delegations to an owner it did not open.
+                        async for event in _node_events_bound(
+                            ticket.node,
+                            self._agent_run.ctx,
+                            self._delegation_owner,
                         ):
                             yield event
                     except Exception as exc:
@@ -903,6 +924,47 @@ async def _node_events(node: Any, ctx: Any) -> AsyncIterator[Any]:
     """Stream one node's native events."""
     async with node.stream(ctx) as node_stream:
         async for event in node_stream:
+            yield event
+
+
+def _delegation_owner() -> Any:
+    """The harness's delegation owner bound to this execution context.
+
+    ``SubAgents.wrap_run`` binds it by contextvar for the whole run, so a
+    caller inside the graph task sees it and a caller in another task does
+    not. ``None`` when the agent has no delegation capability, or the
+    harness is not installed - both mean "nothing to bind".
+
+    :return: The owner, or ``None``.
+    """
+    try:
+        from pydantic_ai_harness.subagents import DelegationTasks
+    except ImportError:  # pragma: no cover - older harness
+        return None
+    return DelegationTasks.current()
+
+
+async def _node_events_bound(
+    node: Any, ctx: Any, owner: Any
+) -> AsyncIterator[Any]:
+    """Stream one node's events with the delegation owner bound.
+
+    The owner is a contextvar the graph task sets; this task runs the
+    tools, so it binds the owner around the node. Binding is the library's
+    own "route this run's delegations to that owner" operation, and it is
+    a no-op for a run with no delegation capability.
+
+    :param node: The graph node to stream.
+    :param ctx: The run context to stream it with.
+    :param owner: The owner to bind, or ``None`` to stream unchanged.
+    :return: Async iterator of the node's native events.
+    """
+    if owner is None:
+        async for event in _node_events(node, ctx):
+            yield event
+        return
+    with owner.bind():
+        async for event in _node_events(node, ctx):
             yield event
 
 
