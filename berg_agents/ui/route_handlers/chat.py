@@ -32,6 +32,7 @@ import logging
 from typing import Any
 
 from berg_agents.agents.chat_agent import build_chat_agent
+from berg_agents.agents.deps import AgentDeps
 from berg_agents.config.settings import get_settings
 from berg_agents.core.harness import Harness
 from berg_agents.core.turn import record_turn_outcome
@@ -547,6 +548,7 @@ async def _start_run(
     body: bytes,
     agent: Any,
     conversation: Any,
+    root_dir: str,
     on_finish: Callable[[Any, Any], Awaitable[None]],
     app_state: Any = None,
 ) -> Any:
@@ -561,6 +563,9 @@ async def _start_run(
     :param body: Raw request body (its approvals decide resume vs fresh).
     :param agent: The session's agent.
     :param conversation: The session's ``Conversation`` (usage + id carry).
+    :param root_dir: Workspace root the agent's tools are bound to. It is
+        part of the run's shared deps, so a delegated sub-agent works in
+        the same workspace as the chat.
     :param on_finish: Persistence hook, called once when the run ends.
     :return: The started ``LiveRun``, or the live run this text was steered
         into when one appeared while this request was resolving its session.
@@ -630,6 +635,11 @@ async def _start_run(
                 output_type=[str, DeferredToolRequests],
                 usage_limits=_CHAT_USAGE_LIMITS,
                 deferred_tool_results=deferred,
+                # The workspace root is part of the shared run context: a
+                # delegated sub-agent runs with the parent's deps, so this
+                # is what puts it in the same workspace as the chat. The
+                # agent itself was built against this same root.
+                deps=AgentDeps(workspace_root=str(root_dir)),
                 # Runtime-authored capabilities activate on the run AFTER
                 # they were written and approved, never the one that wrote
                 # them - pydantic-ai fixes the capability set when a run
@@ -1420,6 +1430,7 @@ def register_chat_routes(
                 body=body,
                 agent=agent,
                 conversation=conversation,
+                root_dir=str(sessions._harness_root_dir()),
                 on_finish=_on_run_finish,
                 app_state=request.app.state,
             )

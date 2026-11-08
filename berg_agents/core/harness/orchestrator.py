@@ -39,7 +39,7 @@ from berg_agents.agents.guardian import (
 )
 from berg_agents.agents.implementation import (
     OUTPUT_RETRIES,
-    ImplementationDeps,
+    AgentDeps,
     build_implementation_agent,
     estimate_confidence,
     plan_steps_for,
@@ -678,7 +678,7 @@ class Harness:
                 f"Task: {description}\n\nDeclare the exact mutating "
                 "tool actions for this task. JSON array only."
             )
-            deps = ImplementationDeps(
+            deps = AgentDeps(
                 task_type=task_type, complexity=complexity.value
             )
             run_result = asyncio.run(
@@ -786,7 +786,7 @@ class Harness:
             plan=plan,
             steps=steps,
         )
-        deps = ImplementationDeps(
+        deps = AgentDeps(
             task_type=task_type, complexity=complexity.value
         )
         start = time.perf_counter()

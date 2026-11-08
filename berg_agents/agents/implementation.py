@@ -31,10 +31,10 @@ as a ``provider:model`` string via
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import logging
 from typing import Any, Literal
 
+from berg_agents.agents.deps import AgentDeps, FileChange
 from berg_agents.capabilities.registry import ToolCatalog
 from berg_agents.capabilities.turn_shape import build_turn_shape_capability
 from berg_agents.providers.models import (
@@ -55,8 +55,8 @@ __all__ = [
     "EXECUTABLE_TASK_TYPES",
     "IMPLEMENTATION_AGENT_NAME",
     "OUTPUT_RETRIES",
+    "AgentDeps",
     "ComplexityLevel",
-    "ImplementationDeps",
     "PlanStep",
     "build_implementation_agent",
     "estimate_confidence",
@@ -112,40 +112,6 @@ _GENERIC_PLAN: list[dict[str, str]] = [
     {"action": "analyze", "description": "Analyze the task"},
     {"action": "execute", "description": "Execute the operation"},
     {"action": "verify", "description": "Verify the result"}]
-
-
-@dataclass
-class FileChange:
-    """One file a run actually modified on disk.
-
-    Attributes:
-        action: Which mutating tool did it (write/edit/patch).
-        path: Workspace-relative path as the tool resolved it.
-    """
-
-    action: str
-    path: str
-
-
-@dataclass
-class ImplementationDeps:
-    """Dependencies injected into each implementation agent run.
-
-    Attributes:
-        workspace_root: Workspace directory file tools are bound to.
-        complexity: Task complexity level driving model selection.
-        task_type: Task type being executed (e.g. ``"edit_file"``).
-        changes: Every file this run actually wrote, appended by the
-            mutating tools. This is the ground truth for "did the work
-            happen" - the model's own summary is narration and may claim
-            success for a write that never occurred. Callers report from
-            here, never from the model's prose.
-    """
-
-    workspace_root: str = "."
-    complexity: str = "standard"
-    task_type: str = "generic"
-    changes: list[FileChange] = field(default_factory=list)
 
 
 class PlanStep(BaseModel):
@@ -224,7 +190,7 @@ def estimate_confidence(task_type: str, description: str) -> float:
 
 
 def _record_change(
-    ctx: RunContext[ImplementationDeps], action: str, target: Any, root: Any
+    ctx: RunContext[AgentDeps], action: str, target: Any, root: Any
 ) -> None:
     """Note that this run really wrote *target*, for honest reporting.
 
@@ -283,15 +249,15 @@ def build_implementation_agent(
     cfg: dict[str, Any] | None = None,
     instructions: str | None = None,
     read_only: bool = False,
-    plugin_tools: list[Tool[ImplementationDeps]] | None = None,
-) -> Agent[ImplementationDeps, str]:
+    plugin_tools: list[Tool[AgentDeps]] | None = None,
+) -> Agent[AgentDeps, str]:
     """Build the implementation Pydantic AI agent.
 
     Selects the model for the complexity level (unless an
     explicit *model_id* is given) and registers the execution
     planning tools. Construction performs no network or LLM
     calls; the model string resolves lazily at run time.
-    Harness callers pass :class:`ImplementationDeps` per run via
+    Harness callers pass :class:`AgentDeps` per run via
     ``agent.run(prompt, deps=...)``. The output retry budget is
     explicit (``OUTPUT_RETRIES``, 3) instead of the library
     default (1), so malformed tool calls get retried before
@@ -346,11 +312,11 @@ def build_implementation_agent(
     # The type parameters are repeated on the constructor: without them a
     # checker infers the deps slot as `object` and the annotation above is
     # reported as a mismatch.
-    agent: Agent[ImplementationDeps, str] = Agent[ImplementationDeps, str](
+    agent: Agent[AgentDeps, str] = Agent[AgentDeps, str](
         model,
         # Explicit name labels this agent's Logfire run span.
         name=IMPLEMENTATION_AGENT_NAME,
-        deps_type=ImplementationDeps,
+        deps_type=AgentDeps,
         # Cross-agent message sharing passes a prior run's messages into
         # this one; ReinjectSystemPrompt keeps this agent's own system
         # prompt at the head (otherwise a non-empty history suppresses
@@ -380,7 +346,7 @@ def build_implementation_agent(
 
     @agent.tool
     def build_execution_plan(
-        ctx: RunContext[ImplementationDeps], task_type: str
+        ctx: RunContext[AgentDeps], task_type: str
     ) -> str:
         """Build the step-by-step execution plan for a task type.
 
@@ -403,7 +369,7 @@ def build_implementation_agent(
 
     @agent.tool
     def required_tools(
-        ctx: RunContext[ImplementationDeps], task_type: str
+        ctx: RunContext[AgentDeps], task_type: str
     ) -> str:
         """List the tools a task type requires.
 
@@ -421,7 +387,7 @@ def build_implementation_agent(
 
     @agent.tool
     def task_confidence(
-        ctx: RunContext[ImplementationDeps], task_type: str, description: str
+        ctx: RunContext[AgentDeps], task_type: str, description: str
     ) -> str:
         """Score how confidently this agent handles a task.
 
@@ -439,7 +405,7 @@ def build_implementation_agent(
         return str(estimate_confidence(task_type, description))
 
     @agent.tool
-    def read_file(ctx: RunContext[ImplementationDeps], file_path: str) -> str:
+    def read_file(ctx: RunContext[AgentDeps], file_path: str) -> str:
         """Read a file from the workspace.
 
         Returns a helpful message instead of raising when the
@@ -477,7 +443,7 @@ def build_implementation_agent(
 
     @agent.tool
     def list_files(
-        ctx: RunContext[ImplementationDeps], file_path: str = "."
+        ctx: RunContext[AgentDeps], file_path: str = "."
     ) -> str:
         """List files and subdirectories in a workspace directory.
 
@@ -521,7 +487,7 @@ def build_implementation_agent(
 
     @agent.tool
     def bash(
-        ctx: RunContext[ImplementationDeps], command: str, timeout: int = 30
+        ctx: RunContext[AgentDeps], command: str, timeout: int = 30
     ) -> str:
         """Run a shell command in the workspace root.
 
@@ -574,7 +540,7 @@ def build_implementation_agent(
 
     @agent.tool
     def search_code(
-        ctx: RunContext[ImplementationDeps], pattern: str, directory: str = "."
+        ctx: RunContext[AgentDeps], pattern: str, directory: str = "."
     ) -> str:
         """Search file contents under a workspace directory.
 
@@ -657,7 +623,7 @@ def build_implementation_agent(
 
         @agent.tool
         def write_file(
-            ctx: RunContext[ImplementationDeps], file_path: str, content: str
+            ctx: RunContext[AgentDeps], file_path: str, content: str
         ) -> str:
             """Create or overwrite a file in the workspace.
 
@@ -676,7 +642,7 @@ def build_implementation_agent(
 
         @agent.tool
         def edit_file(
-            ctx: RunContext[ImplementationDeps], file_path: str, content: str
+            ctx: RunContext[AgentDeps], file_path: str, content: str
         ) -> str:
             """Replace the contents of an existing file in the workspace.
 
@@ -695,7 +661,7 @@ def build_implementation_agent(
 
         @agent.tool
         def patch_file(
-            ctx: RunContext[ImplementationDeps],
+            ctx: RunContext[AgentDeps],
             file_path: str,
             old_text: str,
             new_text: str,
@@ -764,7 +730,7 @@ def build_implementation_agent(
 # a different model whenever the config named an undeclared one, which
 # hid a typo instead of reporting it.
 try:
-    implementation_agent: Agent[ImplementationDeps, str] = (
+    implementation_agent: Agent[AgentDeps, str] = (
         build_implementation_agent()
     )
 except Exception as exc:

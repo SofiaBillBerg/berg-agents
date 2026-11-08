@@ -51,7 +51,7 @@ import logging
 import re
 from typing import Any
 
-from berg_agents.agents.implementation import ImplementationDeps
+from berg_agents.agents.deps import AgentDeps
 from berg_agents.core.interface import TaskComplexity
 
 logger = logging.getLogger(__name__)
@@ -132,7 +132,7 @@ def _inference_prompt(
 async def _await_inference(
     agent: Any,
     prompt: str,
-    deps: ImplementationDeps,
+    deps: AgentDeps,
     message_history: Any = None,
 ) -> Any:
     """Run one implementation-agent call under an explicit timeout.

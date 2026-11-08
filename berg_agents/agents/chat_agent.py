@@ -32,6 +32,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from berg_agents.agents.deps import AgentDeps
+
 logger = logging.getLogger(__name__)
 
 
@@ -294,6 +296,7 @@ def build_chat_agent(
     # accepts no such keyword.
     agent_kwargs: dict[str, Any] = {
         "model": model,
+        "deps_type": AgentDeps,
         "system_prompt": system_prompt,
         "tool_timeout": 30,
         # Two output retries so one malformed tool call gets a

@@ -688,7 +688,7 @@ def _make_implement_task(
         :return: Execution summary naming the files really changed.
         """
         from berg_agents.agents.implementation import (
-            ImplementationDeps,
+            AgentDeps,
             build_implementation_agent,
             summarize_changes,
         )
@@ -735,7 +735,7 @@ def _make_implement_task(
         agent = build_implementation_agent(
             plugin_tools=list(plan_tools.values())
         )
-        deps = ImplementationDeps(workspace_root=root_dir, task_type=task_type)
+        deps = AgentDeps(workspace_root=root_dir, task_type=task_type)
 
         # Live stream of the subagent's own run into the parent's journal,
         # so the web UI shows what the implementer is doing instead of a
