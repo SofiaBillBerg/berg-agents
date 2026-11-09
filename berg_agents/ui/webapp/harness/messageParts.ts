@@ -50,6 +50,9 @@ export interface MessageToolCall {
     /** Streamed work that ran INSIDE this call (a delegated subagent),
         rendered nested under its card rather than as loose siblings. */
     children?: MessageParts;
+    /** Set while the sub-agent delegated by this call is still running, so
+        its card can steer and stop the task. */
+    delegatedTask?: DelegatedTaskInCard;
 }
 
 /** The UI-facing shape of one transcript message. */
@@ -106,6 +109,18 @@ interface SubagentScan {
     claimed: Set<UIMessage["parts"][number]>;
     /** Parts a bracket delimited but no call claimed. */
     orphaned: UIMessage["parts"];
+    /** Bracketed task descriptors, by the parent call they belong to. */
+    tasks: Map<string, DelegatedTaskInCard>;
+}
+
+/** A delegated task, as its parent call's card needs it. */
+export interface DelegatedTaskInCard {
+    /** The task's id: the handle a steer or a stop acts on. */
+    taskId: string;
+    /** Which sub-agent is running it, for the control's label. */
+    agentName: string;
+    /** Whether the bracket is still open, so the task is still live. */
+    open: boolean;
 }
 
 /**
@@ -122,6 +137,9 @@ function scanSubagentBrackets(parts: UIMessage["parts"]): SubagentScan {
     const bracketed = new Map<string, UIMessage["parts"]>();
     const claimed = new Set<UIMessage["parts"][number]>();
     const orphaned: UIMessage["parts"] = [];
+    // Task descriptors keyed by parent call id, so the card can steer or
+    // stop the task whose work it is showing.
+    const tasks = new Map<string, DelegatedTaskInCard>();
     let openId: string | null = null;
 
     for (const part of parts) {
@@ -129,7 +147,32 @@ function scanSubagentBrackets(parts: UIMessage["parts"]): SubagentScan {
         const p = part as unknown as Record<string, unknown>;
         if (p.type === SUBAGENT_MARKER_TYPE) {
             const markerId = subagentMarkerCallId(p);
-            openId = isSubagentStart(p) && markerId ? markerId : null;
+            // The close bracket carries no task id (a settled task has
+            // none worth steering), so the extent is matched on the parent
+            // call both markers name - that is the bracket's own contract.
+            if (isSubagentStart(p)) {
+                openId = markerId;
+                if (openId) {
+                    const data = (p as {data?: Record<string, unknown>}).data ?? {};
+                    const taskId =
+                        typeof data.taskId === "string" ? data.taskId : "";
+                    if (taskId) {
+                        tasks.set(openId, {
+                            agentName:
+                                typeof data.agentName === "string" && data.agentName
+                                    ? data.agentName
+                                    : "the sub-agent",
+                            open: true,
+                            taskId});
+                    }
+                }
+            } else {
+                openId = null;
+                if (markerId && tasks.has(markerId)) {
+                    const settled = tasks.get(markerId)!;
+                    tasks.set(markerId, {...settled, open: false});
+                }
+            }
             continue;
         }
         if (openId === null) continue;
@@ -149,7 +192,7 @@ function scanSubagentBrackets(parts: UIMessage["parts"]): SubagentScan {
         );
         if (!hasCall) orphaned.push(...buffered);
     }
-    return {bracketed, claimed, orphaned};
+    return {bracketed, claimed, orphaned, tasks};
 }
 
 /**
@@ -228,7 +271,7 @@ export function readMessageParts(msg: UIMessage): MessageParts {
     // nothing renders twice. `orphaned` keeps what a bracket delimited but
     // no call claimed - a delegate whose card was replaced by a later dump
     // still shows its work, at the end of the turn rather than in place.
-    const {bracketed, claimed, orphaned} = scanSubagentBrackets(msg.parts);
+    const {bracketed, claimed, orphaned, tasks} = scanSubagentBrackets(msg.parts);
 
     for (const part of msg.parts) {
         if (typeof part !== "object" || part === null) continue;
@@ -304,9 +347,10 @@ export function readMessageParts(msg: UIMessage): MessageParts {
                     output = `${output.slice(0, MAX_TOOL_OUTPUT_CHARS)}\n… (output truncated)`;
                 }
             }
-            const nested = bracketed.get(
-                typeof p.toolCallId === "string" ? (p.toolCallId as string) : "",
-            );
+            const callId =
+                typeof p.toolCallId === "string" ? (p.toolCallId as string) : "";
+            const nested = bracketed.get(callId);
+            const delegated = tasks.get(callId);
             toolCalls.push({
                 tool: name,
                 input: input || undefined,
@@ -314,6 +358,9 @@ export function readMessageParts(msg: UIMessage): MessageParts {
                 state: typeof p.state === "string" ? (p.state as string) : undefined,
                 ...(nested && nested.length > 0
                     ? {children: readMessageParts({...msg, parts: nested} as UIMessage)}
+                    : {}),
+                ...(delegated && delegated.open
+                    ? {delegatedTask: delegated}
                     : {})});
 
             // A call still in flight or awaiting a decision: the card

@@ -39,6 +39,7 @@ import SteeringStrip from "./components/SteeringStrip.tsx";
 import ContextGauge from "./components/ContextGauge.tsx";
 import ApprovalItem from "./components/ApprovalItem";
 import QuestionItem from "./components/QuestionItem";
+import DelegationQuestionCard from "./components/DelegationQuestionCard";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
 import AgentPanel from "./components/AgentPanel.tsx";
@@ -133,6 +134,8 @@ function ChatContent() {
     questionBatch,
     respondToQuestion,
     declineAllQuestions,
+    delegationQuestions,
+    answerDelegation,
     failureNotice,
     dismissFailureNotice,
     retryLast,
@@ -142,7 +145,7 @@ function ChatContent() {
     openSession} = aiChat;
   // The backend's three catalogs (tools, agents, router stats) - one
   // reader each, in ./hooks/useBackendCatalog.
-  const {backendTools, agents, routerStats} = useBackendCatalog({
+  const { backendTools, agents, routerStats } = useBackendCatalog({
     apiBase: API_BASE});
 
   // Publish the active session to plugin surfaces (via window.BergRuntime).
@@ -158,16 +161,16 @@ function ChatContent() {
     ...backendTools.map((t) => ({
       name: `/${t.name}`,
       description: t.description})),
-    {name: "/help", description: "Show help info"},
-    {name: "/agents", description: "List available agents"},
-    {name: "/stats", description: "Show stats"},
-    {name: "/clear", description: "Clear chat history"},
-    {name: "/memory", description: "Show shared memory files"},
-    {name: "/skills", description: "List agent skills"},
-    {name: "/mcps", description: "Show MCP server status"},
-    {name: "/exit", description: "Exit chat"},
-    {name: "/read_file", description: "Read a file via the backend"},
-    {name: "/list_files", description: "List a directory via the backend"}];
+    { name: "/help", description: "Show help info" },
+    { name: "/agents", description: "List available agents" },
+    { name: "/stats", description: "Show stats" },
+    { name: "/clear", description: "Clear chat history" },
+    { name: "/memory", description: "Show shared memory files" },
+    { name: "/skills", description: "List agent skills" },
+    { name: "/mcps", description: "Show MCP server status" },
+    { name: "/exit", description: "Exit chat" },
+    { name: "/read_file", description: "Read a file via the backend" },
+    { name: "/list_files", description: "List a directory via the backend" }];
 
   // Total questions across the active question batch (one call can carry
   // several), for the question card's header copy.
@@ -223,7 +226,7 @@ function ChatContent() {
     activeSurface,
     pluginRefreshKey,
     pluginCount,
-    setPluginCount} = usePluginSurface({apiBase: API_BASE, messages});
+    setPluginCount} = usePluginSurface({ apiBase: API_BASE, messages });
 
   /** Scroll the transcript (the page itself never scrolls). */
   const scrollChatTo = (where: "top" | "bottom") => {
@@ -640,6 +643,21 @@ function ChatContent() {
             </Card.Content>
           </Card>
         )}
+
+        {/* A delegated sub-agent's question. Separate from the ask_user
+            card above and deliberately not inside it: that surface
+            answers a deferred call on the parent, which has paused; this
+            answers a question a CHILD asked while the parent is still
+            streaming. The cards sit inline in the transcript's flow
+            rather than in a chrome row, because the question belongs to
+            the work that is still on screen. */}
+        {delegationQuestions.map((question) => (
+          <DelegationQuestionCard
+            key={question.taskId}
+            question={question}
+            onAnswer={answerDelegation}
+          />
+        ))}
 
         {/* Orchestrator HITL gate surfaced in the UI (Phase 1 of
             unifying the two approval systems). When run_task returns

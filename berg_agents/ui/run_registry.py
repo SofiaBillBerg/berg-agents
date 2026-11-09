@@ -755,6 +755,119 @@ class LiveRun:
             append=self._append, note=self._append_text, sdk_version=SDK_VERSION
         )
 
+    # -- a delegated task's question -------------------------------------
+
+    @property
+    def delegation_owner(self) -> Any | None:
+        """The harness's delegation owner, while a run with one is live.
+
+        The owner is what a delegated task's question waits on, and what
+        the task-control tools act through. It lives only for the run's
+        duration, so a reader that arrives after the run has ended finds
+        ``None`` and is told the question is stale rather than answered
+        into nothing.
+
+        :return: The owner, or ``None`` when no run or no owner exists.
+        """
+        if self._done or self._delegation_owner is None:
+            return None
+        return self._delegation_owner
+
+    def answer_delegated_question(self, task_id: str, answer: str) -> bool:
+        """Answer the question a delegated task is waiting on.
+
+        The harness's own ``answer_task`` tool is the model-facing route
+        to the same operation, and it is the right one for a task the
+        chat model is driving. This is the *user-facing* route: the user
+        answers directly, without depending on the model choosing to
+        forward it. Both land on
+        ``DelegationTasks.answer`` - one operation, two doors, which is
+        why a question answered here is indistinguishable afterwards from
+        one the model answered.
+
+        :param task_id: The task whose child is waiting.
+        :param answer: The user's answer, verbatim.
+        :return: ``True`` when the task was waiting on a question and got
+            this answer; ``False`` when it was not waiting (already
+            answered, or the run ended underneath the card).
+        """
+        owner = self.delegation_owner
+        if owner is None:
+            return False
+        pending = owner.pending_question(task_id)
+        if pending is None:
+            return False
+        question_id = pending[0]
+        if not owner.answer(task_id, question_id=question_id, answer=answer):
+            return False
+        # Journal the exchange as plain text: it is what the run *did*
+        # rather than part of the child's stream, so it belongs above the
+        # surface where the card was - the same channel the relay uses for
+        # a pause or a stream that died.
+        self._append_text(f"✉️ You answered the task's question: {answer}")
+        return True
+
+    def message_delegated_task(self, task_id: str, message: str) -> bool:
+        """Steer a running delegated task with a message from the user.
+
+        The child's run is live in this process, so the message reaches it
+        directly rather than through the chat model - the same reason the
+        answer endpoint exists. It is read at the child's next model
+        request, which is the harness's own contract: a message cannot
+        interrupt a step already in flight.
+
+        :param task_id: The task to steer.
+        :param message: What to tell it.
+        :return: True when the task was running and took the message.
+        """
+        owner = self.delegation_owner
+        if owner is None:
+            return False
+        record = owner.records.get(task_id)
+        if record is None or record.status != "running":
+            # A finished task cannot be steered. The harness's own reply
+            # for this case is that a finished task is continued by
+            # delegating again with resume=task_id, which is the model's
+            # move to make, not the user's.
+            return False
+        if not owner.steer(task_id, message):
+            return False
+        self._append_text(f"💬 You steered the task: {message}")
+        return True
+
+    async def cancel_delegated_task(
+        self, task_id: str, *, force: bool = False
+    ) -> bool:
+        """Stop a running delegated task.
+
+        The graceful stop is the harness's ``request_stop``: the child
+        ends after its current step, so a write already in flight finishes
+        rather than being torn in half. ``force`` is the immediate
+        cancellation, which interrupts the step - the right choice for a
+        task that is plainly stuck, and the wrong one for anything midway
+        through a file it was writing.
+
+        :param task_id: The task to stop.
+        :param force: Interrupt the current step rather than waiting for
+            it to end.
+        :return: True when a task was running and the stop was requested
+            or applied.
+        """
+        owner = self.delegation_owner
+        if owner is None:
+            return False
+        record = owner.records.get(task_id)
+        if record is None or record.status != "running":
+            return False
+        if force:
+            # Async: it drains the child, and the caller is a request.
+            await owner.cancel(task_id)
+        else:
+            owner.request_stop(task_id)
+        label = "Stopped" if force else "Stopping"
+        self._append_text(f"⏹ You {label.lower()} the task.")
+        return True
+
     def _append_text(self, text: str) -> None:
         """Journal a plain assistant text chunk (the time-limit notice)."""
         from pydantic_ai.ui.vercel_ai.response_types import (

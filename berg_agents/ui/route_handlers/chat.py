@@ -1229,6 +1229,167 @@ def _track_context_usage(agent: Any, session_id: str | None) -> None:
         logger.warning(f"Context usage gauge unavailable: {exc}")
 
 
+async def _answer_delegated_question(request: Request) -> Response:
+    """Answer the question a delegated task is waiting on, or say why not.
+
+    A delegated task that calls ``ask_parent`` blocks and is backgrounded;
+    the harness's own ``answer_task`` tool is the model-facing route to
+    answering it. This is the user-facing one, so the answer does not
+    depend on the chat model choosing to forward it - the question is
+    already on the wire as a ``data-delegation-question`` chunk, and this
+    is what the card it renders calls.
+
+    It is a separate request rather than a deferred-resume on
+    ``/api/chat/stream`` on purpose: the parent run is still LIVE and
+    streaming while the task waits, so a resume body would be read as
+    steering instead. Stale is a 409, not a silent success: the run may
+    have ended between the card being drawn and the user answering, and
+    the client then expires the card.
+
+    :param request: FastAPI request; body is
+        ``{"task_id": str, "answer": str}`` and ``?session=`` names the
+        session.
+    :return: Success dict, or a JSON error response.
+    """
+    session_id = request.query_params.get("session")
+    run = (
+        request.app.state.run_registry.live_run(session_id)
+        if session_id
+        else None
+    )
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Body must be JSON: {task_id, answer}"},
+        )
+    task_id = str((body or {}).get("task_id", "") or "")
+    answer = str((body or {}).get("answer", "") or "")
+    if not task_id:
+        return JSONResponse(
+            status_code=400, content={"detail": "task_id is required"}
+        )
+    if run is None:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": "No live run is holding that question",
+                "stale": True},
+        )
+    if not run.answer_delegated_question(task_id, answer):
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": "That task is no longer waiting for an answer",
+                "stale": True},
+        )
+    # A Response on every branch, so the route needs no response_model and
+    # FastAPI never tries to build one from a union of a Response and a dict.
+    return JSONResponse(content={"answered": True, "taskId": task_id})
+
+
+async def _delegated_task_action(request: Request, action: str) -> Response:
+    """Steer or stop a delegated task, or say why not.
+
+    The shared body of the two delegated-task endpoints, because both do
+    the same three things: read the live run, find the task, act. They
+    differ only in the action, and a separate route each is what keeps
+    the two verbs honest on the wire.
+
+    Both act on the owner directly rather than through the chat model, for
+    the same reason the answer endpoint does: the parent run is live and
+    streaming while the task works, so anything routed through the model
+    would arrive a step late or not at all.
+
+    :param request: FastAPI request; body is ``{"task_id": str}`` plus
+        ``message`` for steering, and ``?session=`` names the session.
+    :param action: ``"message"`` or ``"cancel"``.
+    :return: Success or a JSON error response.
+    """
+    session_id = request.query_params.get("session")
+    run = (
+        request.app.state.run_registry.live_run(session_id)
+        if session_id
+        else None
+    )
+    try:
+        body = await request.json()
+    except Exception:
+        expected = "message" if action == "message" else "force"
+        return JSONResponse(
+            status_code=400,
+            content={"detail": f"Body must be JSON: {{task_id, {expected}}}"},
+        )
+    task_id = str((body or {}).get("task_id", "") or "")
+    if not task_id:
+        return JSONResponse(
+            status_code=400, content={"detail": "task_id is required"}
+        )
+    if run is None:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": "No live run holds that task", "stale": True},
+        )
+
+    if action == "message":
+        message = str((body or {}).get("message", "") or "")
+        if not message.strip():
+            return JSONResponse(
+                status_code=400, content={"detail": "message is required"}
+            )
+        if not run.message_delegated_task(task_id, message):
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "detail": "That task is not running, so it cannot be steered",
+                    "stale": True},
+            )
+        return JSONResponse(content={"steered": True, "taskId": task_id})
+
+    # A graceful stop lets the current step finish; force interrupts it.
+    # The force flag is opt-in so a mis-click does not tear a half-written
+    # file.
+    force = bool((body or {}).get("force", False))
+    if not await run.cancel_delegated_task(task_id, force=force):
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": "That task is not running, so there is nothing to stop",
+                "stale": True},
+        )
+    return JSONResponse(
+        content={"cancelled": True, "taskId": task_id, "force": force}
+    )
+
+
+def register_delegation_routes(router: APIRouter) -> None:
+    """Register the routes that act on a delegated task, not on the run.
+
+    A delegated task outlives the tool call that started it, so these
+    three verbs - answer its question, steer it, stop it - are separate
+    requests rather than part of a resume body. Each body lives in
+    :func:`_answer_delegated_question` or :func:`_delegated_task_action`,
+    so this is a routing table and nothing else.
+
+    :param router: Router to attach endpoints to.
+    """
+    @router.post("/api/chat/delegation-answer")
+    async def chat_delegation_answer(request: Request) -> Response:
+        """Answer a delegated task's question from the user's card."""
+        return await _answer_delegated_question(request)
+
+    @router.post("/api/chat/delegation-message")
+    async def chat_delegation_message(request: Request) -> Response:
+        """Steer a running delegated task with a message from the user."""
+        return await _delegated_task_action(request, "message")
+
+    @router.post("/api/chat/delegation-cancel")
+    async def chat_delegation_cancel(request: Request) -> Response:
+        """Stop a running delegated task (``force`` interrupts its step)."""
+        return await _delegated_task_action(request, "cancel")
+
+
 def register_chat_routes(
     router: APIRouter, *, harness: Harness, sessions: SessionManager
 ) -> None:
@@ -1238,6 +1399,10 @@ def register_chat_routes(
     :param harness: Shared harness (single instance per app).
     :param sessions: Session store (active provider/model + root dir).
     """
+    # The delegated-task routes are their own registration: they act on a
+    # task rather than on the run, and keeping them together is what keeps
+    # this function under the complexity ceiling.
+    register_delegation_routes(router)
 
     def _session_agent(
         request: Request,

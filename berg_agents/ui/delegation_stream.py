@@ -85,6 +85,12 @@ logger = logging.getLogger(__name__)
 #: names, which renders them inside that call's card.
 DELEGATION_CHUNK_TYPE = "data-subagent"
 
+#: The bracket's extra key. The client groups the streamed parts by
+#: ``parentToolCallId`` and ignores the rest, so this is additive: a task
+#: id the client does not yet read costs nothing, and it is the only
+#: handle a steer or a stop has on a live task.
+DELEGATION_TASK_ID_KEY = "taskId"
+
 #: Chunk type naming a delegated task's question. Phase 2c turns this
 #: into an answerable card; today it records that a task is waiting
 #: rather than letting the journal show a silent stall.
@@ -372,7 +378,15 @@ def build_delegation_event_stream(sdk_version: int = 6) -> Any:  # ruff: ignore[
                         if self._delegating_calls
                         else ""
                     ),
-                    "agentName": str(getattr(event, "agent_name", "") or "")},
+                    "agentName": str(getattr(event, "agent_name", "") or ""),
+                    # Present on the opening bracket, which is where the
+                    # task id first exists. Empty on the close, because a
+                    # settled task has no id worth steering any more.
+                    DELEGATION_TASK_ID_KEY: (
+                        str(getattr(event, "task_id", "") or "")
+                        if phase == "start"
+                        else ""
+                    )},
             )
 
         async def _handle_progress(self, event: Any) -> Any:

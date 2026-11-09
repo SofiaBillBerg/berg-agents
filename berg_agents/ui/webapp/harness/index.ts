@@ -49,6 +49,20 @@ export type {
 // HITL: the approval/question card vocabulary.
 export type {PendingApproval} from "./hitl";
 
+// A delegated sub-agent's question: read off the wire, answered in place.
+// Separate from the ask_user vocabulary above on purpose - that answers a
+// deferred call on the parent, this answers a question a child asked
+// while the parent is still streaming.
+export type {DelegationQuestion, LiveDelegatedTask} from "./delegationQuestions";
+export {
+    DELEGATION_MARKER_TYPE,
+    DELEGATION_QUESTION_TYPE,
+    answerDelegatedQuestion,
+    cancelDelegatedTask,
+    delegationQuestionsFrom,
+    liveDelegatedTasksFrom,
+    messageDelegatedTask} from "./delegationQuestions";
+
 // The failure dialog's notice, built by ./recovery.
 export type {FailureNotice} from "./recovery";
 

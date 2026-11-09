@@ -110,8 +110,34 @@ def build_delegation_capabilities(
     # for the inline run (decision-log, UsageLimits(request_limit=None)).
     # forward_usage stays True so the chat run's budget still bounds the
     # whole tree.
+    # The one rule a delegated implementer needs beyond the staged one:
+    # it may ASK. The library's `TaskLink` tells the child its delegating
+    # agent may steer it, and `SubAgents` tells the parent it can answer -
+    # but nothing tells the child that stopping to ask is a legitimate
+    # move. The default prompt actively works against it: the task IS the
+    # plan, and "do NOT re-plan" plus "execute the steps" reads as "never
+    # stop". Left unsaid, the model simply guesses - observed live: a child
+    # told to ask a question replied "Got it! I will ask the user which
+    # single file they want me to inspect" and then kept going, which is
+    # the failure this text has to prevent: stating an intention is not
+    # calling a tool.
+    delegation_instructions = (
+        "When a step needs a decision the task text does not answer - "
+        "which file, which of two plausible readings, whether to overwrite "
+        "something that exists - call ask_parent(question=...) and WAIT "
+        "for the answer. Do not guess and do not proceed on an "
+        "assumption.\n\n"
+        "Asking means calling the ask_parent TOOL. Writing the question "
+        "into your reply is not asking: your text goes back as your final "
+        "answer, the task ends, and nobody ever answers it. If you find "
+        "yourself typing a question mark at the user, stop and call "
+        "ask_parent instead.\n\n"
+        "Ask only when you cannot reasonably continue; a step the task "
+        "answers outright is yours to do."
+    )
     implementer = build_implementation_agent(
-        plugin_tools=list((plan_tools or {}).values())
+        plugin_tools=list((plan_tools or {}).values()),
+        extra_instructions=delegation_instructions,
     )
     return [
         SubAgents(

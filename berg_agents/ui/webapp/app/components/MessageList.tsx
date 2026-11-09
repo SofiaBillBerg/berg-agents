@@ -26,6 +26,7 @@ import {Surface} from "@heroui/react";
 
 import {MarkdownRenderer} from "./MarkdownRenderer.tsx";
 import {ToolCard} from "./ToolCard.tsx";
+import DelegationTaskControls from "./DelegationTaskControls.tsx";
 
 import {fetchPlugins} from "@/lib/backendCatalog";
 
@@ -151,6 +152,14 @@ function ToolCallGroup({
                                 call they ran under rather than beside it. */}
                             {call.children && (
                                 <SubagentWork parts={call.children}/>
+                            )}
+                            {/* Steering and stopping that task, while it
+                                is still running: the controls sit with the
+                                work they act on, not in the chrome. */}
+                            {call.delegatedTask && (
+                                <DelegationTaskControls
+                                    task={call.delegatedTask}
+                                />
                             )}
                         </div>
                     ))}

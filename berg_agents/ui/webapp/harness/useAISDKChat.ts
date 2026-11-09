@@ -54,6 +54,10 @@ import {
   pendingApprovalsFrom,
   questionBatchFrom} from "./hitl";
 import {
+  answerDelegatedQuestion,
+  delegationQuestionsFrom,
+  type DelegationQuestion} from "./delegationQuestions";
+import {
   storeSessionId} from "./sessionIdentity";
 
 import { API_BASE } from "@/envConfig";
@@ -107,6 +111,10 @@ export interface UseAISDKChatReturn {
      badge until the resume fires and the server overwrites their
      outputs with the rendered results). */
   questionBatch: PendingQuestion[];
+  /** A delegated sub-agent's question, waiting for the user. */
+  delegationQuestions: DelegationQuestion[];
+  /** Answer it. Resolves true when the task was still waiting. */
+  answerDelegation: (taskId: string, answer: string) => Promise<boolean>;
   /** Answer one ask_user_question call: its answers, or a decline. */
   respondToQuestion: (
     id: string,
@@ -307,6 +315,10 @@ export function useAISDKChat(): UseAISDKChatReturn {
   const pendingApprovals = pendingApprovalsFrom(uiMessages);
   const approvalBatch = approvalBatchFrom(uiMessages);
   const questionBatch = questionBatchFrom(uiMessages);
+  // A delegated sub-agent's question. Its own derivation, for the same
+  // reason ask_user's is: the part shape lives in one module and the
+  // responder is built next to the derivation that feeds it.
+  const delegationQuestions = delegationQuestionsFrom(uiMessages);
   const {
     respondToApproval,
     respondToAllApprovals,
@@ -318,6 +330,19 @@ export function useAISDKChat(): UseAISDKChatReturn {
     addToolApprovalResponse,
     addToolOutput,
     setMessages: setUIMessages});
+
+  // Answering a delegated task's question. Unlike the ask_user batch this
+  // writes no part: the task holds the waiting question, so the answer
+  // travels to the server and the task's own stream carries on. The
+  // session id is read at call time rather than closed over, so an answer
+  // sent after a session switch still names the run that asked.
+  const answerDelegation = useCallback(
+    async (taskId: string, answer: string) => {
+      if (!sessionId) return false;
+      return answerDelegatedQuestion(sessionId, taskId, answer);
+    },
+    [sessionId],
+  );
 
   // Convert AI SDK UIMessage[] to the simpler ChatMessage[] our UI expects.
   // One walk per message fills all three renderings (text, reasoning,
@@ -523,6 +548,8 @@ export function useAISDKChat(): UseAISDKChatReturn {
     questionBatch,
     respondToQuestion,
     declineAllQuestions,
+    delegationQuestions,
+    answerDelegation,
     failureNotice,
     dismissFailureNotice: () => setFailureNotice(null),
     retryLast,

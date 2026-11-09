@@ -248,6 +248,7 @@ def build_implementation_agent(
     model_id: str | None = None,
     cfg: dict[str, Any] | None = None,
     instructions: str | None = None,
+    extra_instructions: str | None = None,
     read_only: bool = False,
     plugin_tools: list[Tool[AgentDeps]] | None = None,
 ) -> Agent[AgentDeps, str]:
@@ -279,6 +280,14 @@ def build_implementation_agent(
             the implementer reads the same plan the planner wrote —
             it must be handed in rather than fetched here, so there
             is one place that decides a tool's binding.
+        extra_instructions: Appended to the instructions above instead
+            of replacing them, for the one thing a particular caller
+            needs to add. ``instructions`` still replaces outright,
+            because a caller that knows exactly what it wants should
+            not have to restate the defaults - but a caller that only
+            wants to *add* a rule (a delegated run, say, that may ask
+            the user a question) must not be forced to copy the whole
+            default prompt to say so.
 
     Returns:
         Configured Pydantic AI agent named ``"implementation"``.
@@ -340,14 +349,20 @@ def build_implementation_agent(
         # exhaustion when the model cannot serialize the schema.
         retries={"output": OUTPUT_RETRIES},
         instructions=(
-            instructions if instructions is not None else default_instructions
+            # explicit instructions replace; extra_instructions append,
+            # so a caller adding one rule does not copy the defaults.
+            instructions
+            if instructions is not None
+            else (
+                f"{default_instructions}\n\n{extra_instructions}"
+                if extra_instructions
+                else default_instructions
+            )
         ),
     )
 
     @agent.tool
-    def build_execution_plan(
-        ctx: RunContext[AgentDeps], task_type: str
-    ) -> str:
+    def build_execution_plan(ctx: RunContext[AgentDeps], task_type: str) -> str:
         """Build the step-by-step execution plan for a task type.
 
         Args:
@@ -368,9 +383,7 @@ def build_implementation_agent(
         return "\n".join(lines)
 
     @agent.tool
-    def required_tools(
-        ctx: RunContext[AgentDeps], task_type: str
-    ) -> str:
+    def required_tools(ctx: RunContext[AgentDeps], task_type: str) -> str:
         """List the tools a task type requires.
 
         Args:
@@ -442,9 +455,7 @@ def build_implementation_agent(
             return f"Could not read {file_path}: not a UTF-8 text file."
 
     @agent.tool
-    def list_files(
-        ctx: RunContext[AgentDeps], file_path: str = "."
-    ) -> str:
+    def list_files(ctx: RunContext[AgentDeps], file_path: str = ".") -> str:
         """List files and subdirectories in a workspace directory.
 
         Use this to explore the project layout before reading
@@ -730,9 +741,7 @@ def build_implementation_agent(
 # a different model whenever the config named an undeclared one, which
 # hid a typo instead of reporting it.
 try:
-    implementation_agent: Agent[AgentDeps, str] = (
-        build_implementation_agent()
-    )
+    implementation_agent: Agent[AgentDeps, str] = build_implementation_agent()
 except Exception as exc:
     logger.warning(
         "Implementation agent: configured model unusable (%s); "
