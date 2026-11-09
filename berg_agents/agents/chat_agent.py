@@ -37,6 +37,24 @@ from berg_agents.agents.deps import AgentDeps
 logger = logging.getLogger(__name__)
 
 
+def _delegation_gate_enabled() -> bool:
+    """Whether a delegated task asks the user before it starts.
+
+    Kill-switch for deployments where the user has already accepted
+    delegation and a card per task is noise: set
+    ``BERG_DELEGATION_GATE=off``. Absent or any other value means on,
+    because a delegated implementer's writes are ungated and "off" is the
+    setting that needs a reason.
+
+    :return: True when delegations pause for approval.
+    """
+    return os.getenv("BERG_DELEGATION_GATE", "").strip().lower() not in {
+        "off",
+        "0",
+        "false",
+        "no"}
+
+
 def _shell_allowed() -> bool:
     """Whether the ``bash`` tool may be offered to the model.
 
@@ -115,6 +133,7 @@ def build_chat_agent(
     from berg_agents.capabilities.context_capabilities import (
         build_context_capabilities,
     )
+    from berg_agents.capabilities.delegation_gate import DelegationApprovalGate
     from berg_agents.capabilities.mcp_toolsets import build_mcp_toolsets
     from berg_agents.capabilities.runaway_guard import RunawayGuard
     from berg_agents.capabilities.skills import load_skill_capabilities
@@ -415,6 +434,11 @@ def build_chat_agent(
     # implement_task is retired only once this path is verified live.
     agent_kwargs["capabilities"].extend(
         build_delegation_capabilities(plan_tools)
+    )
+    # A delegated implementer's writes are ungated, so the gate is on the
+    # delegation itself - the one the staged implement_task carried.
+    agent_kwargs["capabilities"].append(
+        DelegationApprovalGate(enabled=_delegation_gate_enabled())
     )
     # from_spec takes the spec first and merges the spec's own
     # capabilities with berg's list above; the model is always berg's

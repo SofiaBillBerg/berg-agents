@@ -94,7 +94,12 @@ def build_delegation_capabilities(
         unavailable (the staged delegates carry the turn alone).
     """
     try:
-        from berg_agents.agents.implementation import build_implementation_agent
+        from berg_agents.agents.implementation import (
+            _resolve_child_approvals,
+            _writes_gated,
+            build_implementation_agent,
+        )
+        from pydantic_ai.capabilities import HandleDeferredToolCalls
         from pydantic_ai.usage import UsageLimits
         from pydantic_ai_harness import SubAgent, SubAgents
         from pydantic_ai_harness.subagents import TaskControl
@@ -155,5 +160,17 @@ def build_delegation_capabilities(
                 )
             ],
             task_control=TaskControl(forward_events=True),
+            # The resolver for the implementer's gated writes. Registered
+            # here rather than on the implementer itself because a
+            # delegated child does not run with its agent's own capability
+            # list - shared_capabilities is the harness's documented way to
+            # give every delegated child one. Without it a gated write ends
+            # the child's run on DeferredToolRequests: a soft outcome
+            # nothing resumes, which is how this gap was first described.
+            shared_capabilities=[
+                HandleDeferredToolCalls(handler=_resolve_child_approvals)
+            ]
+            if _writes_gated()
+            else [],
         )
     ]

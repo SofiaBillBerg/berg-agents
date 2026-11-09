@@ -47,7 +47,6 @@ from pathlib import Path
 import re
 from typing import Any, override
 
-from pydantic_ai import RunContext
 from pydantic_ai.toolsets.wrapper import WrapperToolset
 
 logger = logging.getLogger(__name__)
@@ -79,11 +78,12 @@ Workspace tools (toolset `workspace`) - how to work the filesystem:
   dialog, so say what you are about to do before calling.
 - COMPLEX work (multistep plans, refactors, research) starts with
   plan_task, which writes the plan into this session's todo list (the
-  plan panel the user can see and edit). Then implement_task runs the
-  plan by its id. Each stage streams its own result — progress stays
-  visible.
+  plan panel the user can see and edit). Then delegate the plan: read
+  it back with list_subtasks, and pass its steps to the implementation
+  delegate with delegate_task. Its work streams inside its own card, so
+  progress stays visible.
 - The todo list IS the plan. If the user edits it, that edited version
-  is what implement_task executes — never re-plan over their changes.
+  is what you hand to the delegate — never re-plan over their changes.
   Use the todo tools to update it (add_subtask, complete_todo) instead
   of restating the plan in chat.
 - If a tool answers "not found" or "is a directory", follow the
@@ -97,10 +97,9 @@ class WorkspaceToolset(WrapperToolset[None]):
 
     Builds an inner :class:`FunctionToolset` from
     :func:`~berg_agents.agents.factory.create_tools` (the same specs
-    the harness loop and ``/api/tool/execute`` run) plus staged
-    ``plan_task`` / ``implement_task`` subagent delegates, then adds
-    identity, instructions, dynamic membership, and an audited call
-    path on top.
+    the harness loop and ``/api/tool/execute`` run) plus the staged
+    ``plan_task`` delegate, then adds identity, instructions, dynamic
+    membership, and an audited call path on top.
 
     :param root_dir: Workspace root all file tools are bound to.
     :param read_only: When True, only low-risk tools (list, read,
@@ -141,14 +140,6 @@ class WorkspaceToolset(WrapperToolset[None]):
         from berg_agents.agents.factory import create_tools
         from pydantic_ai.toolsets import FunctionToolset
 
-        # Relay for the subagent's streamed run, set by the web layer once
-        # the run exists (the run is created after the agent, so this cannot
-        # be a constructor argument). A holder dict rather than a plain
-        # attribute: the delegate reads it at call time, so it always sees
-        # the relay attached to the run that is currently streaming. No
-        # relay means "nothing is watching" - a CLI or harness caller
-        # simply gets no live stream.
-        self.progress_holder: dict[str, Any] = {"relay": None}
         inner: FunctionToolset[None] = FunctionToolset()
         # The planner subagent's read-only tool set: it may ground a plan
         # in the repo it plans for, but the plan itself is written by the
@@ -178,34 +169,19 @@ class WorkspaceToolset(WrapperToolset[None]):
         missing = _missing_plan_tools(plan_tools)
         if not read_only and not missing and plan_tools is not None:
             # Staged delegation over ONE plan store: plan_task writes the
-            # plan into the session's todo list, implement_task reads it
+            # plan into the session's todo list, and the delegate reads it
             # back by id. The user sees and edits that same list, so the
-            # three views never diverge.
+            # views never diverge.
             inner.add_function(
                 _make_plan_task(plan_tools, read_tools),
                 name="plan_task",
                 description=(
                     "Decompose a task into an ordered step plan and write "
                     "it to this session's todo list. Returns the plan's "
-                    "id, which implement_task consumes."
+                    "id, which the implementation delegate consumes."
                 ),
                 requires_approval=False,
                 timeout=240.0,
-            )
-            inner.add_function(
-                _make_implement_task(
-                    str(root_dir), plan_tools, self.progress_holder
-                ),
-                name="implement_task",
-                description=(
-                    "Execute a plan from this session's todo list, by id, "
-                    "via the implementation subagent (workspace-rooted "
-                    "file tools). Reads the list as the user left it."
-                ),
-                # No timeout: the subagent is a real run that keeps writing
-                # after the tool call returns, so a cap reported failure over
-                # live work. Stop is the way to end it.
-                requires_approval=True,
             )
         elif not read_only:
             # Say so rather than registering a planner that cannot store
@@ -303,92 +279,6 @@ async def _call_plan_tool(
     return result
 
 
-async def _resolve_todo_id(
-    plan_tools: dict[str, Any], todo_id: str
-) -> tuple[str | None, list[str]]:
-    """Resolve a possibly truncated todo id against the store.
-
-    Models re-type ids between stages and routinely drop edge
-    characters (observed: a 50-char slug ending in ``"alpha",`` was
-    sent twice without the trailing comma, and an exact-only lookup
-    misdiagnosed it as "no steps to execute"). Exact match wins;
-    failing that, a single unique prefix match is accepted in either
-    direction — the model usually *drops* characters (its id is then a
-    prefix of the stored one), but the stored id can also be the
-    prefix if it was truncated at creation. Anything ambiguous is left
-    unresolved with the full id list, so the caller can point the
-    model at the real id instead of guessing.
-
-    :param plan_tools: Session-bound tools keyed by name.
-    :param todo_id: The id as the model typed it.
-    :return: ``(resolved id or None, all stored todo ids)``.
-    """
-    available: list[str] = []
-    if "list_todo_items" not in plan_tools:
-        # Store without the structured listing (older plugin): exact
-        # match is all that can be checked.
-        return todo_id, available
-    try:
-        items = await _call_plan_tool(plan_tools, "list_todo_items")
-    except Exception as exc:
-        # A broken listing must not kill the exact-match path: fall
-        # back to treating the typed id as authoritative.
-        logger.warning("todo id resolution failed: %s", exc)
-        return todo_id, available
-    for item in items or []:
-        item_id = str(item.get("id") or "")
-        if item_id:
-            available.append(item_id)
-    if todo_id in available:
-        return todo_id, available
-    candidates = [
-        stored
-        for stored in available
-        if stored.startswith(todo_id) or todo_id.startswith(stored)
-    ]
-    if len(candidates) == 1:
-        logger.info(
-            "todo id %r resolved by unique prefix to %r", todo_id, candidates[0]
-        )
-        return candidates[0], available
-    return None, available
-
-
-def _plan_items_to_text(items: list[dict[str, Any]], title: str) -> str:
-    """Render stored plan items as the step list an implementer reads.
-
-    Completed steps stay in the list, marked done: the implementer needs
-    to know what is already finished, and dropping them would let it redo
-    work the user already checked off. Each line carries the step's store
-    index, which is what ``set_subtask_done`` takes - without it the
-    implementer could not check progress off even when told to.
-
-    :param items: Subtask dicts from the store, in order.
-    :param title: The plan's title, used as a heading.
-    :return: A Markdown step list; empty string when there are no items.
-    """
-    lines: list[str] = []
-    for position, item in enumerate(items):
-        text = str(item.get("text") or "").strip()
-        if not text:
-            continue
-        done = str(item.get("status") or "") == "done"
-        # Prefer the store's own index: it is the key set_subtask_done
-        # resolves, and a skipped blank subtask would shift a
-        # position-based number away from it.
-        index = item.get("index", position)
-        lines.append(f"[{index}] {'[done] ' if done else ''}{text}")
-    if not lines:
-        return ""
-    body = "\n".join(lines)
-    return (
-        f"Plan: {title}\n"
-        f"Todo id (use as todo_id): {title}\n\n{body}\n\n"
-        "Check each step off with set_subtask_done(todo_id, index) as you "
-        "finish it. Steps marked [done] are already finished — do not redo them."
-    )
-
-
 def _make_plan_task(plan_tools: dict[str, Any], read_tools: list[Any]) -> Any:
     """Build the ``plan_task`` delegate (the delegate writes the plan)."""
 
@@ -460,7 +350,8 @@ def _make_plan_task(plan_tools: dict[str, Any], read_tools: list[Any]) -> Any:
         return (
             f"Planned '{title}' as todo {todo_id} with "
             f"{len(steps)} steps. The user can edit this plan in the "
-            "todo panel; implement_task runs it as it stands.\n\n"
+            "todo panel; read it back with list_subtasks and hand it to "
+            "the implementation delegate with delegate_task.\n\n"
             + _excerpt(plan)
         )
 
@@ -650,165 +541,3 @@ def _is_commentary(step: str) -> bool:
     # "Step 6 has no review gate" - refers to another step by number and
     # therefore is about the plan, not an instruction of its own.
     return bool(re.search(r"\bstep[s]?\s+\d", lowered))
-
-
-def _make_implement_task(
-    root_dir: str,
-    plan_tools: dict[str, Any],
-    relay_holder: dict[str, Any] | None = None,
-) -> Any:
-    """Build the ``implement_task`` delegate (reads the stored plan).
-
-    :param root_dir: Workspace root the implementer's file tools are bound to.
-    :param plan_tools: Session-bound plan-store tools.
-    :param relay_holder: Mutable holder whose ``"relay"`` entry is read at
-        call time. The web layer sets it once the run exists (the run is
-        built after the agent), so a captured value would always be the
-        stale ``None``.
-    """
-
-    async def _implement_task(
-        ctx: RunContext[None], todo_id: str, task_type: str = "generic"
-    ) -> str:
-        """Execute a stored step plan via the implementation subagent.
-
-        Reads the plan from this session's todo list at call time, so a
-        plan the user edited is the plan that runs. Reports what was
-        actually written. Execution needs user approval first.
-
-        :param ctx: The run context; its ``tool_call_id`` names this
-            delegate's own call, which is what the subagent's streamed
-            parts are grouped under in the UI.
-        :param todo_id: Id of the todo whose subtasks form the plan.
-            Resolved exactly first, then by unique prefix, so a re-typed
-            id that lost edge punctuation still finds the plan; when
-            several or no todos match, the real ids are reported back
-            instead of a guess.
-        :param task_type: Task type label for model routing.
-        :return: Execution summary naming the files really changed.
-        """
-        from berg_agents.agents.implementation import (
-            AgentDeps,
-            build_implementation_agent,
-            summarize_changes,
-        )
-        from pydantic_ai.tools import DeferredToolRequests
-        from pydantic_ai.usage import UsageLimits
-
-        # prefix. The model re-types ids between stages and drops edge
-        # punctuation (one plan id lost its trailing comma twice in a
-        # single session); an exact-only lookup turned that into "no
-        # steps to execute" — the wrong diagnosis for a wrong id.
-        typed_id = todo_id.strip()
-        resolved, available = await _resolve_todo_id(plan_tools, typed_id)
-        if resolved is None:
-            listing = ", ".join(available) if available else "(no todos stored)"
-            return (
-                f"implement_task: no todo matches the id {typed_id!r}. "
-                f"Available todo ids: {listing}. Call again with one of them."
-            )
-        todo_id = resolved
-
-        # Read the plan from the store at call time: a subtask the user
-        # added, reworded, or checked off between planning and executing
-        # is part of the plan that runs.
-        steps = await _call_plan_tool(
-            plan_tools, "list_subtasks", todo_id=todo_id
-        )
-        if not steps:
-            return (
-                f"implement_task: todo {todo_id} has no steps to execute. "
-                "Plan first with plan_task, or add subtasks to the todo."
-            )
-        plan_text = _plan_items_to_text(steps, todo_id)
-        if not plan_text:
-            return (
-                f"implement_task: todo {todo_id} has no readable steps. "
-                "Add subtasks to the todo and try again."
-            )
-        completed = [i for i in steps if str(i.get("status")) == "done"]
-        if completed and len(completed) == len(steps):
-            return f"implement_task: every step of {todo_id} is already done."
-
-        # The implementation subagent executes the stored plan: the plan
-        # text is read from the store and handed to it as one run.
-        agent = build_implementation_agent(
-            plugin_tools=list(plan_tools.values())
-        )
-        deps = AgentDeps(workspace_root=root_dir, task_type=task_type)
-
-        # Live stream of the subagent's own run into the parent's journal,
-        # so the web UI shows what the implementer is doing instead of a
-        # silent wait. The relay is read from the holder at call time: it
-        # is attached by the web layer after this delegate is built.
-        relay = (relay_holder or {}).get("relay")
-        # This delegate's own call id: the subagent's streamed parts are
-        # grouped under it in the UI, so the brackets must name it.
-        parent_call_id = str(getattr(ctx, "tool_call_id", "") or "")
-
-        async def _on_event(_sub_ctx: Any, event_stream: Any) -> None:
-            """Stream the subagent's run to the parent run's journal.
-
-            pydantic-ai awaits this inline with each node of the
-            subagent's graph, so the relay sees every event in run order.
-            With no relay attached (CLI or harness callers) the events are
-            simply not observed - the run itself is unaffected.
-
-            :param _sub_ctx: The subagent's own run context (unused).
-            :param event_stream: The subagent's native event stream.
-            """
-            if relay is None:
-                return
-            # Bracket the stream: everything between these two markers is
-            # the subagent's work, and belongs to this tool call.
-            relay.start(parent_call_id)
-            try:
-                await relay.drive(_sub_ctx, event_stream)
-            finally:
-                relay.end(parent_call_id)
-
-        # No timeout: a cap on the delegate reported failure to the model
-        # while the subagent was still working. Ending the run is the
-        # explicit Stop.
-        result = await agent.run(
-            plan_text,
-            deps=deps,
-            event_stream_handler=_on_event,
-            usage_limits=UsageLimits(request_limit=None),
-        )
-
-        # A subagent whose own tool needs approval ends on deferred
-        # requests rather than a summary, and nothing in this delegate
-        # resumes it. Report that plainly: "no files were changed" reads
-        # as "nothing to do", which is the wrong diagnosis for a run that
-        # stopped waiting for a decision.
-        deferred = getattr(result, "output", None)
-        if isinstance(deferred, DeferredToolRequests):
-            waiting = ", ".join(
-                sorted({
-                    str(getattr(call, "tool_name", "") or "tool")
-                    for call in deferred.approvals
-                })
-            )
-            if relay is not None:
-                relay.note(
-                    f"⏸ The implementer paused waiting for approval: {waiting}"
-                )
-            return (
-                f"implement_task: the implementer paused waiting for approval "
-                f"for {waiting} and did not finish the plan. It wrote no "
-                "files yet. Tell the user the run needs its approval, and "
-                "do not report the plan as done."
-            )
-
-        # The model's own text is narration; report from the run's
-        # recorded writes so the caller sees what happened on disk.
-        summary = summarize_changes(deps.changes)
-        narration = str(result.output).strip()
-        if not deps.changes:
-            return (
-                f"{summary}\n\nThe implementation agent reported:\n{narration}"
-            )
-        return f"{summary}\n\nAgent report:\n{narration}"
-
-    return _implement_task

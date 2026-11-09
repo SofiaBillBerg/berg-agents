@@ -32,7 +32,9 @@ as a ``provider:model`` string via
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Literal
+import uuid
 
 from berg_agents.agents.deps import AgentDeps, FileChange
 from berg_agents.capabilities.registry import ToolCatalog
@@ -49,6 +51,102 @@ from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.capabilities import ReinjectSystemPrompt
 
 logger = logging.getLogger(__name__)
+
+
+def _writes_gated() -> bool:
+    """Whether the implementer's writes require the user's approval.
+
+    Kill-switch for callers that already gate at their own boundary:
+    set ``BERG_IMPLEMENTER_WRITES=off``. On by default, because a write
+    the user never approved is the "AI running loose" this exists to
+    prevent. The resolver that answers a gated write is registered by
+    the delegation (``agents/delegation.py``) through the harness's
+    ``shared_capabilities``, which reaches every delegated child - the
+    agent's own capability list does not survive that path.
+
+    :return: True when writes pause for approval.
+    """
+    return os.getenv("BERG_IMPLEMENTER_WRITES", "").strip().lower() not in {
+        "off",
+        "0",
+        "false",
+        "no"}
+
+
+async def _resolve_child_approvals(ctx: Any, requests: Any) -> Any:
+    """Ask the user about a gated write and answer it from their reply.
+
+    Without a resolver, a child whose write needs approval ends its run
+    on ``DeferredToolRequests`` - a soft outcome nobody can resume, which
+    is how this gap was first described. ``HandleDeferredToolCalls``
+    runs in the child's own process and resolves the batch *inline*, so
+    the child's run continues in a single call instead of dying.
+
+    The question travels the path the UI already answers: the task
+    owner's question, which lands as a ``TaskQuestionEvent`` and renders
+    as the delegation card. An empty or declined reply denies the write,
+    because a silent answer must never be read as consent.
+
+    :param ctx: The child agent's run context (unused - the owner is
+        bound by the delegation, not the deps).
+    :param requests: The pending approvals (and any external calls).
+    :return: Results approving the writes the user allowed.
+    """
+    from pydantic_ai_harness.subagents import DelegationTasks
+
+    _ = ctx
+    approvals = getattr(requests, "approvals", None) or []
+    if not approvals:
+        return requests.build_results()
+
+    owner = DelegationTasks.current()
+    task_id = DelegationTasks.child_id() or ""
+    described = ", ".join(
+        f"{getattr(call, 'tool_name', 'tool')}({_write_target(call)})"
+        for call in approvals
+    )
+
+    answer = ""
+    if owner is not None and task_id:
+        try:
+            answer = await owner.ask(
+                task_id,
+                question_id=uuid.uuid4().hex,
+                question=(
+                    f"The implementer wants to write {described}. "
+                    "Reply yes to allow, or anything else to stop it."
+                ),
+            )
+        except Exception as exc:  # an ownerless or stopped child gets no answer
+            logger.warning("child approval question failed: %s", exc)
+            answer = ""
+
+    # A cancelled or empty reply is a refusal. CANCELLED_ANSWER is what
+    # a stopped task receives, so it lands here rather than as consent.
+    granted = bool(answer.strip()) and answer.strip().lower() not in {
+        "no",
+        "stop",
+        "deny"}
+    logger.info(
+        "child approval for %d write(s): %s",
+        len(approvals),
+        "granted" if granted else "denied",
+    )
+    return requests.build_results(
+        approvals={call.tool_call_id: granted for call in approvals}
+    )
+
+
+def _write_target(call: Any) -> str:
+    """The path a write call names, for the question's wording.
+
+    :param call: A pending tool call.
+    :return: The ``file_path`` argument, or ``?`` when it is unreadable.
+    """
+    try:
+        return str(call.args_as_dict().get("file_path", "?"))
+    except Exception:
+        return "?"
 
 
 __all__ = [
@@ -630,9 +728,9 @@ def build_implementation_agent(
     # the model cannot change files without going through the
     # harness HITL gate - instructions alone never stop a
     # tool call, missing tools do.
-    if not read_only:
+    if not read_only and _writes_gated():
 
-        @agent.tool
+        @agent.tool(requires_approval=True)
         def write_file(
             ctx: RunContext[AgentDeps], file_path: str, content: str
         ) -> str:
@@ -651,7 +749,7 @@ def build_implementation_agent(
             _record_change(ctx, "write", target, root)
             return f"Wrote {target}"
 
-        @agent.tool
+        @agent.tool(requires_approval=True)
         def edit_file(
             ctx: RunContext[AgentDeps], file_path: str, content: str
         ) -> str:
@@ -670,7 +768,7 @@ def build_implementation_agent(
             _record_change(ctx, "edit", target, root)
             return f"Edited {target}"
 
-        @agent.tool
+        @agent.tool(requires_approval=True)
         def patch_file(
             ctx: RunContext[AgentDeps],
             file_path: str,
