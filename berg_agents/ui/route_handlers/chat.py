@@ -662,15 +662,6 @@ async def _start_run(
             max_duration=get_settings().run_max_duration_minutes * 60,
             on_finish=on_finish,
         )
-        # Attach the live run's subagent relay to the workspace toolset so
-        # the implement_task delegate can stream the subagent's own run -
-        # its text, reasoning and tool calls - into this journal. The relay
-        # is read at call time, so setting it here (before the graph task
-        # starts) is enough.
-        for ts in getattr(agent, "_user_toolsets", []):
-            if type(ts).__name__ == "WorkspaceToolset":
-                ts.progress_holder["relay"] = live.subagent_relay()
-                break
         if runtime is not None:
             runtime.run = live
         live.start()
@@ -1374,6 +1365,7 @@ def register_delegation_routes(router: APIRouter) -> None:
 
     :param router: Router to attach endpoints to.
     """
+
     @router.post("/api/chat/delegation-answer")
     async def chat_delegation_answer(request: Request) -> Response:
         """Answer a delegated task's question from the user's card."""
@@ -1489,9 +1481,9 @@ def register_chat_routes(
           next request, never an interruption.
 
         Multi-step requests stay visible: the model plans first
-        (``plan_task``), then implements (``implement_task``), so progress,
-        steering points and approvals are streamed rather than hidden inside
-        one opaque call.
+        (``plan_task``), then delegates the plan (``delegate_task``), so
+        progress, steering points and approvals are streamed rather than
+        hidden inside one opaque call.
 
         The agent, model, and system prompt all come from configuration
         (``.berg-agents/bergagents.jsonc`` and ``.berg-agents/profiles.yaml``) - never
@@ -1570,10 +1562,6 @@ def register_chat_routes(
             :param run: The finished ``LiveRun``.
             :param outcome: How it ended.
             """
-            for ts in getattr(agent, "_user_toolsets", []):
-                if type(ts).__name__ == "WorkspaceToolset":
-                    ts.progress_holder["relay"] = None
-                    break
             logger.info(
                 "chat run finished: %s (%s)", outcome.kind, outcome.detail
             )

@@ -34,9 +34,11 @@ not raise, it simply emits nothing, and a delegated run shows an empty
 proved nothing - accepting and emitting are different things. This module
 is the missing arm of that match.
 
-Two protocol rules from :mod:`berg_agents.ui.subagent_relay` still hold,
-because these frames land inside the stream the parent's encoder is still
-writing:
+Two protocol rules shape what may pass through, because these frames land
+inside the stream the parent's encoder is still writing. They were earned
+by the relay that carried a sub-agent's stream before this module existed
+(``berg_agents.ui.subagent_relay``, retired with the staged delegate it
+served), and they are the relay's one surviving contribution:
 
 * Turn boundaries belong to the parent. A second ``start``, ``finish``
   or ``done`` mid-stream would make the client open a second message or
@@ -76,6 +78,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -369,7 +372,15 @@ def build_delegation_event_stream(sdk_version: int = 6) -> Any:  # ruff: ignore[
                     return None
                 self._bracket_open = False
 
+            # A unique id per bracket. Without one the client's data-part
+            # matching compares `id === id` with both undefined and the
+            # SECOND bracket UPDATES the first instead of appending - the
+            # open and close markers collapse into one, no bracket remains
+            # open, and the child's parts stop being grouped under the call.
+            # Verified from the client side: a message that held both
+            # brackets while streaming lost the second on rebuild.
             return DataChunk(
+                id=uuid.uuid4().hex,
                 type=DELEGATION_CHUNK_TYPE,
                 data={
                     "phase": phase,
