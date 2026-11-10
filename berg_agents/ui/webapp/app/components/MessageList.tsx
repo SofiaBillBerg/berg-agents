@@ -21,7 +21,7 @@
 
 import type {ChatMessage, MessageToolCall} from "@/harness";
 
-import {useEffect, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {Button, Surface} from "@heroui/react";
 
 import {MarkdownRenderer} from "./MarkdownRenderer.tsx";
@@ -289,45 +289,86 @@ export function MessageList({
                                   isAnimating,
                                   onResolveDelegatedApproval}: MessageListProps) {
     usePluginSurfaceTools();
+
+    /**
+     * Merge consecutive assistant messages into one display group so that
+     * tool calls the backend split across several protocol messages render
+     * under a single header instead of one block per call. The merge is
+     * display-only: message ids, tool-call ids and approval state are kept
+     * per-call so HITL / delegation handling is untouched.
+     */
+    const groups = useMemo(() => {
+        const out: Array<{kind: "single" | "group"; messages: ChatMessage[]}> = [];
+        let cur: ChatMessage[] | null = null;
+        const push = (buf: ChatMessage[]) => {
+            if (buf.length === 0) return;
+            if (buf.length === 1) out.push({kind: "single", messages: buf});
+            else out.push({kind: "group", messages: buf});
+        };
+        for (const msg of history) {
+            if (msg.role === "assistant") {
+                if (cur === null) cur = [msg];
+                else cur.push(msg);
+            } else {
+                push(cur ?? []);
+                cur = null;
+                out.push({kind: "single", messages: [msg]});
+            }
+        }
+        push(cur ?? []);
+        return out;
+    }, [history]);
+
     return (
         <div
             aria-label="Conversation transcript"
             className="message-list flex flex-col gap-2"
             role="log"
         >
-            {history.map((msg, idx) => {
+            {groups.map((g, gi) => {
+                const assistant = g.kind === "group"
+                    ? g.messages
+                    : g.messages[0].role === "assistant"
+                        ? g.messages
+                        : null;
+                const isGroup = g.kind === "group" && !!assistant;
+                const role = isGroup ? "assistant" : g.messages[0].role;
                 const roleClass =
-                    msg.role === "user"
+                    role === "user"
                         ? "message-role-user"
-                        : msg.role === "system"
+                        : role === "system"
                             ? "message-role-system"
                             : "message-role-agent";
                 const roleLabel =
-                    msg.role === "user"
+                    role === "user"
                         ? "User"
-                        : msg.role === "system"
+                        : role === "system"
                             ? "System"
                             : "Agent";
-                const text = msg.content;
+                const text = assistant ? assistant.map((m) => m.content).filter(Boolean).join("\n") : g.messages[0].content;
+                const reasoning = assistant ? assistant.map((m) => m.reasoning).filter(Boolean).join("\n") : g.messages[0].reasoning;
+                const toolCalls = isGroup
+                    ? ([] as ChatMessage["toolCalls"]).concat(...g.messages.map((m) => m.toolCalls ?? []))
+                    : g.messages[0].toolCalls;
                 return (
                     <Surface
-                        key={msg.id || `msg-${idx}`}
+                        key={`msg-${gi}-${isGroup ? "group" : g.messages[0].id ?? gi}`}
                         className={`message-list-item px-2.5 py-2 ${roleClass}`}
                         variant="secondary"
                     >
                         <div className="text-xs font-semibold tracking-wide uppercase text-muted mb-1">
                             {roleLabel}
                         </div>
-                        {msg.reasoning && <ReasoningBlock isAnimating={isAnimating} text={msg.reasoning}/>}
+                        {reasoning && <ReasoningBlock isAnimating={isAnimating} text={reasoning}/>}
                         <div className="message-list-content text-sm">
                             <MarkdownRenderer
                                 content={text}
-                                isAnimating={msg.role === "assistant" && isAnimating}
+                                isAnimating={role === "assistant" && isAnimating}
                             />
                         </div>
-                        {msg.toolCalls && msg.toolCalls.length > 0 && (
+                        {toolCalls && toolCalls.length > 0 && (
                             <ToolCallGroup
-                                    calls={msg.toolCalls}
+                                    calls={toolCalls}
                                     isAnimating={isAnimating}
                                     onResolveDelegatedApproval={
                                         onResolveDelegatedApproval
