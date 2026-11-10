@@ -59,6 +59,8 @@ import { useSlashCommands } from "./hooks/useSlashCommands";
 import { buildExportMarkdown } from "@/utils/utils";
 import { API_BASE } from "@/envConfig";
 import { useAISDKChat } from "@/harness";
+// Import KaTeX styles for math rendering
+import "katex/dist/katex.min.css";
 
 /*
  * Error boundary for lazy-loaded components.
@@ -709,6 +711,7 @@ function ChatContent() {
             <div className="flex min-w-0 flex-1 flex-col">
               <ChatTranscript
                 hitlRequest={undefined}
+                isAnimating={isStreaming}
                 isExecuting={isStreaming}
                 toolResults={toolResults}
                 transcript={messages}

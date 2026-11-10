@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,23 +19,30 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
+import type { ComponentPropsWithoutRef } from "react";
+
+import { Streamdown } from "streamdown";
+import { code } from "@streamdown/code";
+import { mermaid } from "@streamdown/mermaid";
 
 export interface MarkdownRendererProps {
     content?: string;
+    /** Animate code blocks while this message is still being streamed. */
+    isAnimating?: boolean;
 }
 
 /**
  * MarkdownRenderer component.
- * Wraps react-markdown with remark-gfm and rehype-highlight syntax highlighting.
- * Catches rendering exceptions gracefully and displays plain text if markdown parsing fails.
+ * Wraps Streamdown (a drop-in react-markdown replacement built for AI
+ * streaming) with GFM, syntax-highlighted code blocks (via @streamdown/code),
+ * mermaid diagrams (via @streamdown/mermaid), and math all built in.
+ * Catches rendering exceptions gracefully and displays plain text if
+ * markdown parsing fails.
  *
  * @param props - Component properties
  * @returns JSX element rendering the formatted markdown
  */
-export function MarkdownRenderer({content}: MarkdownRendererProps) {
+export function MarkdownRenderer({content, isAnimating}: MarkdownRendererProps) {
     // Guard empty content - render nothing
     if (!content || content.trim() === "") {
         return null;
@@ -43,39 +50,19 @@ export function MarkdownRenderer({content}: MarkdownRendererProps) {
 
     return (
         <div className="markdown-content text-sm leading-relaxed">
-            <ReactMarkdown
-                components={{
-                    code({className, children, ...props}: any) {
-                        const isInline =
-                            !className &&
-                            typeof children === "string" &&
-                            !children.includes("\n");
-                        if (isInline) {
-                            return (
-                                <code
-                                    className="font-mono bg-surface-soft px-1.5 py-0.5 rounded text-xs text-muted"
-                                    {...props}
-                                >
-                                    {children}
-                                </code>
-                            );
-                        }
-                        return (
-                            <pre
-                                className="font-mono bg-surface-soft p-3 rounded-lg overflow-x-auto text-xs my-2 border border-border">
-                <code className={className} {...props}>
-                  {children}
-                </code>
-              </pre>
-                        );
-                    }}}
-                rehypePlugins={[rehypeHighlight]}
-                remarkPlugins={[remarkGfm]}
+            <Streamdown
+                parseIncompleteMarkdown
+                isAnimating={isAnimating}
+                mode="streaming"
+                plugins={{ code, mermaid }}
             >
                 {content}
-            </ReactMarkdown>
+            </Streamdown>
         </div>
     );
 }
 
 export default MarkdownRenderer;
+
+export type Options = ComponentPropsWithoutRef<typeof Streamdown>;
+export type Components = Options["components"];

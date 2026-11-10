@@ -32,6 +32,7 @@ import { useCallback, useEffect, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { Button, Card, Chip } from "@heroui/react";
+import { Streamdown } from "streamdown";
 
 import { API_BASE } from "@/envConfig";
 
@@ -214,19 +215,38 @@ export function SharedContextEditor() {
 
         {status && <p className="text-xs text-muted-foreground">{status}</p>}
 
-        {/* The editor itself. */}
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : (
-          <CodeMirror
-            basicSetup={{ lineNumbers: false }}
-            extensions={[markdown()]}
-            height="320px"
-            theme={theme}
-            value={content}
-            onChange={(value) => setContent(value)}
-          />
-        )}
+        {/* The editor (left) and a live Streamdown preview (right) so the
+            user sees rendered markdown as they type — no new route, just
+            a nicer editor on the shared-context page. */}
+        <div className="flex flex-col lg:flex-row gap-3 min-h-0">
+          <div className="min-w-0 flex-1 flex flex-col border border-border rounded-lg">
+            <div className="px-2 py-1 text-[11px] text-muted-foreground border-b border-border">
+              Edit
+            </div>
+            <div className="min-h-0 flex-1">
+              {loading ? (
+                <p className="text-sm text-muted-foreground p-3">Loading…</p>
+              ) : (
+                <CodeMirror
+                  basicSetup={{ lineNumbers: false }}
+                  extensions={[markdown()]}
+                  height="320px"
+                  theme={theme}
+                  value={content}
+                  onChange={(value) => setContent(value)}
+                />
+              )}
+            </div>
+          </div>
+          <div className="min-w-0 flex-1 flex flex-col border border-border rounded-lg bg-surface-soft/30">
+            <div className="px-2 py-1 text-[11px] text-muted-foreground border-b border-border">
+              Preview
+            </div>
+            <div className="min-h-[320px] flex-1 overflow-y-auto p-3 text-sm leading-relaxed">
+              <Streamdown>{content}</Streamdown>
+            </div>
+          </div>
+        </div>
 
         {/* The section's what/why history, newest first. */}
         {history.length > 0 && (

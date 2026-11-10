@@ -72,6 +72,8 @@ export function usePluginSurfaceTools(): void {
  */
 export interface MessageListProps {
     history?: ChatMessage[];
+    /** Whether the assistant turn is currently streaming (animates code blocks). */
+    isAnimating?: boolean;
     /** Answer a delegated task's gated write. Absent means the caller has
         no such surface (export, tests), and the buttons are not drawn. */
     onResolveDelegatedApproval?: (callId: string, approved: boolean) => void;
@@ -264,6 +266,7 @@ function SubagentWork({
  */
 export function MessageList({
                                   history = [],
+                                  isAnimating,
                                   onResolveDelegatedApproval}: MessageListProps) {
     usePluginSurfaceTools();
     return (
@@ -297,7 +300,10 @@ export function MessageList({
                         </div>
                         {msg.reasoning && <ReasoningBlock text={msg.reasoning}/>}
                         <div className="message-list-content text-sm">
-                            <MarkdownRenderer content={text}/>
+                            <MarkdownRenderer
+                                content={text}
+                                isAnimating={msg.role === "assistant" && isAnimating}
+                            />
                         </div>
                         {msg.toolCalls && msg.toolCalls.length > 0 && (
                             <ToolCallGroup

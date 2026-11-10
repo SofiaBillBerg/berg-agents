@@ -8,6 +8,7 @@ import {
   Chip,
   Fieldset,
   FieldsetLegend} from "@heroui/react";
+import { Streamdown } from "streamdown";
 import { apiFetch, sessionId } from "./runtime";
 
 /**
@@ -444,7 +445,7 @@ export function TodoSurface({
                   <p
                     className={`text-xs text-muted-foreground whitespace-pre-wrap ${view === "panel" ? "line-clamp-2" : ""}`}
                   >
-                    {todo.description}
+                    <Streamdown>{todo.description}</Streamdown>
                   </p>
                 )
               )}
@@ -494,7 +495,7 @@ export function TodoSurface({
                           <span
                             className={`flex-1 text-xs whitespace-pre-wrap ${sub.done ? "line-through text-muted-foreground" : ""}`}
                           >
-                            {sub.text}
+                            <Streamdown>{sub.text}</Streamdown>
                           </span>
                         </button>
                         <Button

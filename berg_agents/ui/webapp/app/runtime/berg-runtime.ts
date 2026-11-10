@@ -39,6 +39,7 @@ import * as ReactJSXRuntime from "react/jsx-runtime";
 import * as ReactDOM from "react-dom";
 import * as ReactDOMClient from "react-dom/client";
 import * as HeroUI from "@heroui/react";
+import * as Streamdown from "streamdown";
 
 import {API_BASE} from "@/envConfig";
 
@@ -49,7 +50,8 @@ const RUNTIME_MODULES: Record<string, unknown> = {
     "react/jsx-dev-runtime": ReactJSXRuntime,
     "react-dom": ReactDOM,
     "react-dom/client": ReactDOMClient,
-    "@heroui/react": HeroUI};
+    "@heroui/react": HeroUI,
+    streamdown: Streamdown};
 
 interface BergRuntimeGlobal {
     React: typeof React;

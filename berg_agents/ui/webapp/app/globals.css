@@ -34,11 +34,11 @@
  * Order matters: tailwindcss, then @heroui/styles, then local theme.
  * https://heroui.com/en/themes?chroma=0.13&hue=336.3409276429381&lightness=0.77&formRadius=small&fontFamily=public-sans&base=0.0154 
  */
-@import "tailwindcss";
-@import "@heroui/styles";
-@import "./styles.css";
-@import "./theme.css";
-
+@import url("tailwindcss");
+@import url("@heroui/styles");
+@import url("./styles.css");
+@import url("./theme.css");
+@import url("streamdown");
 
 :root,
 .light,

@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,7 +19,6 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-
 /**
  * Main landing page for the Berg Agents web application.
  * Imports theme assets and renders the interactive client application.
@@ -32,9 +31,11 @@
  * deterministic "Loading chat..." fallback.
  */
 
-import {Suspense} from "react";
+import { Suspense } from "react";
+// Import KaTeX styles for math rendering
+import "katex/dist/katex.min.css";
 
-import {ClientOnly} from "./client.tsx";
+import { ClientOnly } from "./client.tsx";
 
 /**
  * Root Page component for Next.js App Router.
@@ -42,9 +43,9 @@ import {ClientOnly} from "./client.tsx";
  * @returns JSX element rendering the client-only application.
  */
 export default function Page() {
-    return (
-        <Suspense fallback={<div className="p-8 text-sm">Loading chat...</div>}>
-            <ClientOnly/>
-        </Suspense>
-    );
+  return (
+    <Suspense fallback={<div className="p-8 text-sm">Loading chat...</div>}>
+      <ClientOnly />
+    </Suspense>
+  );
 }
