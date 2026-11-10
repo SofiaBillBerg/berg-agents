@@ -47,7 +47,9 @@ import {
     ASK_USER_TOOL_NAME,
     isQuestionAnswerPayload,
     parseQuestionCall} from "./askUser";
-import {partToolName} from "./messageParts";
+import {partToolName, delegatedApprovalIds} from "./messageParts";
+
+import {apiFetch} from "@/envConfig";
 
 /** One approval card: a tool call the user decides on. */
 export interface PendingApproval {
@@ -62,19 +64,12 @@ export interface PendingApproval {
     decided?: boolean;
     /** User's denial reason, when rejected with one. */
     reason?: string;
+    /** True when the call belongs to a delegated task rather than to this
+        run, so it is answered through the delegation endpoint instead of
+        the resume batch. */
+    delegated?: boolean;
 }
 
-/**
- * Tool calls paused for human approval, across the whole conversation.
- *
- * Any tool part in state "approval-requested" with a readable approval
- * id is pending. Questions have their own card and are answered by tool
- * call id, not approval id; a reloaded run renders them as
- * approval-requested, so they must not leak into this batch.
- *
- * @param messages - The raw UI messages.
- * @returns Pending approvals, de-duplicated by id.
- */
 export function pendingApprovalsFrom(
     messages: readonly UIMessage[],
 ): PendingApproval[] {
@@ -106,7 +101,14 @@ export function pendingApprovalsFrom(
                 }
             }
             if (!pendingApprovals.some((a) => a?.id === approvalId)) {
-                pendingApprovals.push({id: approvalId, toolName, args});
+                pendingApprovals.push({
+                    id: approvalId,
+                    toolName,
+                    args,
+                    // A delegated task's approvals cannot be answered
+                    // through the run's resume batch, so they are told
+                    // apart here from the bracket the relay already scans.
+                    delegated: delegatedApprovalIds(msg).has(approvalId)});
             }
         }
     }
@@ -166,6 +168,13 @@ export function approvalBatchFrom(
             const decided = p.state === "approval-responded";
             const reason =
                 typeof approval?.reason === "string" ? approval.reason : undefined;
+            if (delegatedApprovalIds(msg).has(approvalId)) {
+                // A delegated task's write is answered inside its own card,
+                // not in this top-level batch: the run cannot resolve it,
+                // so showing it here would offer a click that does
+                // nothing.
+                continue;
+            }
             if (!approvalBatch.some((a) => a?.id === approvalId)) {
                 approvalBatch.push({id: approvalId, toolName, args, decided, reason});
             }
@@ -318,6 +327,9 @@ export interface HitlResponders {
         approved: boolean,
         reason?: string,
     ) => Promise<void>;
+    /** Answer a delegated task's gated write. The run's batch cannot, so
+        this is a separate route to the child. */
+    resolveDelegatedApproval: (id: string, approved: boolean) => Promise<void>;
     editApprovalArgs: (id: string, args: unknown) => void;
     revertApproval: (id: string) => void;
     respondToQuestion: (
@@ -360,7 +372,31 @@ export function createHitlResponders(
             );
             return;
         }
+        // A delegated task's write is not the run's to answer: the SDK
+        // would throw on an id it does not hold, so it goes to the
+        // endpoint that reaches the child instead. Same decision, one
+        // more door - which is why the two paths sit together here.
+        const delegated = pendingApprovalsFrom(messages).find(
+            (a) => a?.id === id,
+        );
+        if (delegated?.delegated) {
+            void resolveDelegatedApproval(id, approved);
+            return;
+        }
         void addToolApprovalResponse({id, approved, reason});
+    };
+
+    // Answer a delegated task's gated write. Lives in the hook so the
+    // decision travels the one path the run cannot.
+    const resolveDelegatedApproval = async (id: string, approved: boolean) => {
+        try {
+            await apiFetch("/api/chat/delegation-approval", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({call_id: id, approved})});
+        } catch (error) {
+            console.warn("[useAISDKChat] delegated approval failed:", error);
+        }
     };
 
     // Answer EVERY pending approval at once (batch convenience).
@@ -493,6 +529,7 @@ export function createHitlResponders(
     return {
         respondToApproval,
         respondToAllApprovals,
+        resolveDelegatedApproval,
         editApprovalArgs,
         revertApproval,
         respondToQuestion,

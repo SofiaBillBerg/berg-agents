@@ -22,7 +22,7 @@
 import type {ChatMessage, MessageToolCall} from "@/harness";
 
 import {useEffect, useState} from "react";
-import {Surface} from "@heroui/react";
+import {Button, Surface} from "@heroui/react";
 
 import {MarkdownRenderer} from "./MarkdownRenderer.tsx";
 import {ToolCard} from "./ToolCard.tsx";
@@ -72,6 +72,9 @@ export function usePluginSurfaceTools(): void {
  */
 export interface MessageListProps {
     history?: ChatMessage[];
+    /** Answer a delegated task's gated write. Absent means the caller has
+        no such surface (export, tests), and the buttons are not drawn. */
+    onResolveDelegatedApproval?: (callId: string, approved: boolean) => void;
 }
 
 /**
@@ -106,8 +109,10 @@ function ReasoningBlock({text}: { text: string }) {
  * Each call keeps its own Show/Hide + Copy inside.
  */
 function ToolCallGroup({
-                           calls}: {
+                           calls,
+                           onResolveDelegatedApproval}: {
     calls: NonNullable<ChatMessage["toolCalls"]>;
+    onResolveDelegatedApproval?: (callId: string, approved: boolean) => void;
 }) {
     const [open, setOpen] = useState(calls.length <= 3);
     // NOTE: Plugin tool calls render under their own marker so todo
@@ -151,7 +156,12 @@ function ToolCallGroup({
                                 its text and tool calls, nested inside the
                                 call they ran under rather than beside it. */}
                             {call.children && (
-                                <SubagentWork parts={call.children}/>
+                                <SubagentWork
+                                    parts={call.children}
+                                    onResolveDelegatedApproval={
+                                        onResolveDelegatedApproval
+                                    }
+                                />
                             )}
                             {/* Steering and stopping that task, while it
                                 is still running: the controls sit with the
@@ -176,7 +186,12 @@ function ToolCallGroup({
  * that call; this is what makes a delegate inspectable - the implementer's
  * own file reads, writes and text, inside the `implement_task` card.
  */
-function SubagentWork({parts}: {parts: NonNullable<MessageToolCall["children"]>}) {
+function SubagentWork({
+    parts,
+    onResolveDelegatedApproval}: {
+    parts: NonNullable<MessageToolCall["children"]>;
+    onResolveDelegatedApproval?: (callId: string, approved: boolean) => void;
+}) {
     return (
         <div
             aria-label="Work done inside this tool call"
@@ -192,6 +207,50 @@ function SubagentWork({parts}: {parts: NonNullable<MessageToolCall["children"]>}
             {parts.toolCalls && parts.toolCalls.length > 0 && (
                 <ToolCallGroup calls={parts.toolCalls}/>
             )}
+            {/* A delegated task's gated write, decided in place. It sits
+                with the work it belongs to rather than in the run's
+                approval batch, which cannot answer it. */}
+            {onResolveDelegatedApproval &&
+                (parts.toolCalls ?? [])
+                    .filter((c) => c.state === "approval-requested")
+                    .filter((c) => Boolean(c.toolCallId))
+                    .map((call) => (
+                        <div
+                            key={`delegated-approval-${call.toolCallId}`}
+                            className="flex flex-wrap items-center gap-2 rounded-md border border-warning p-1.5"
+                        >
+                            <span className="text-xs">
+                                ⏳ {call.tool} needs your approval
+                                {call.input ? ` (${call.input})` : ""}
+                            </span>
+                            <Button
+                                isDisabled={false}
+                                size="sm"
+                                variant="primary"
+                                onPress={() =>
+                                    onResolveDelegatedApproval(
+                                        call.toolCallId as string,
+                                        true,
+                                    )
+                                }
+                            >
+                                ✅ Approve
+                            </Button>
+                            <Button
+                                isDisabled={false}
+                                size="sm"
+                                variant="secondary"
+                                onPress={() =>
+                                    onResolveDelegatedApproval(
+                                        call.toolCallId as string,
+                                        false,
+                                    )
+                                }
+                            >
+                                ❌ Reject
+                            </Button>
+                        </div>
+                    ))}
         </div>
     );
 }
@@ -203,7 +262,9 @@ function SubagentWork({parts}: {parts: NonNullable<MessageToolCall["children"]>}
  * @param props - Component properties
  * @returns JSX element rendering the messages list
  */
-export function MessageList({history = []}: MessageListProps) {
+export function MessageList({
+                                  history = [],
+                                  onResolveDelegatedApproval}: MessageListProps) {
     usePluginSurfaceTools();
     return (
         <div
@@ -239,7 +300,12 @@ export function MessageList({history = []}: MessageListProps) {
                             <MarkdownRenderer content={text}/>
                         </div>
                         {msg.toolCalls && msg.toolCalls.length > 0 && (
-                            <ToolCallGroup calls={msg.toolCalls}/>
+                            <ToolCallGroup
+                                    calls={msg.toolCalls}
+                                    onResolveDelegatedApproval={
+                                        onResolveDelegatedApproval
+                                    }
+                                />
                         )}
                     </Surface>
                 );

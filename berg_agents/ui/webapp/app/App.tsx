@@ -129,6 +129,7 @@ function ChatContent() {
     approvalBatch,
     respondToApproval,
     respondToAllApprovals,
+    resolveDelegatedApproval,
     editApprovalArgs,
     revertApproval,
     questionBatch,
@@ -711,6 +712,7 @@ function ChatContent() {
                 isExecuting={isStreaming}
                 toolResults={toolResults}
                 transcript={messages}
+                onResolveDelegatedApproval={resolveDelegatedApproval}
               />
             </div>
             {/*
@@ -768,6 +770,7 @@ function ChatContent() {
             isExecuting={isStreaming}
             toolResults={toolResults}
             transcript={messages}
+            onResolveDelegatedApproval={resolveDelegatedApproval}
           />
         )}
 

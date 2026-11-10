@@ -100,6 +100,8 @@ export interface UseAISDKChatReturn {
   approvalBatch: PendingApproval[];
   /** Answer one approval (per-item stepwise decisions). */
   respondToApproval: (id: string, approved: boolean, reason?: string) => void;
+  /** Answer a delegated task's gated write from its own card. */
+  resolveDelegatedApproval: (id: string, approved: boolean) => Promise<void>;
   /** Answer every pending approval at once (batch convenience). */
   respondToAllApprovals: (approved: boolean, reason?: string) => Promise<void>;
   /** Replace a paused call's args (edit before approving). */
@@ -322,6 +324,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
   const {
     respondToApproval,
     respondToAllApprovals,
+    resolveDelegatedApproval,
     editApprovalArgs,
     revertApproval,
     respondToQuestion,
@@ -543,6 +546,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     approvalBatch,
     respondToApproval,
     respondToAllApprovals,
+    resolveDelegatedApproval,
     editApprovalArgs,
     revertApproval,
     questionBatch,

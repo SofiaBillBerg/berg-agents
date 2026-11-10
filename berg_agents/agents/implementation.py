@@ -31,10 +31,11 @@ as a ``provider:model`` string via
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import threading
 from typing import Any, Literal
-import uuid
 
 from berg_agents.agents.deps import AgentDeps, FileChange
 from berg_agents.capabilities.registry import ToolCatalog
@@ -50,123 +51,10 @@ from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.capabilities import ReinjectSystemPrompt
 
-logger = logging.getLogger(__name__)
-
-
-def _writes_gated() -> bool:
-    """Whether the implementer's writes require the user's approval.
-
-    Kill-switch for callers that already gate at their own boundary:
-    set ``BERG_IMPLEMENTER_WRITES=off``. On by default, because a write
-    the user never approved is the "AI running loose" this exists to
-    prevent. The resolver that answers a gated write is registered by
-    the delegation (``agents/delegation.py``) through the harness's
-    ``shared_capabilities``, which reaches every delegated child - the
-    agent's own capability list does not survive that path.
-
-    :return: True when writes pause for approval.
-    """
-    return os.getenv("BERG_IMPLEMENTER_WRITES", "").strip().lower() not in {
-        "off",
-        "0",
-        "false",
-        "no"}
-
-
-async def _resolve_child_approvals(ctx: Any, requests: Any) -> Any:
-    """Ask the user about a gated write and answer it from their reply.
-
-    Without a resolver, a child whose write needs approval ends its run
-    on ``DeferredToolRequests`` - a soft outcome nobody can resume, which
-    is how this gap was first described. ``HandleDeferredToolCalls``
-    runs in the child's own process and resolves the batch *inline*, so
-    the child's run continues in a single call instead of dying.
-
-    The question travels the path the UI already answers: the task
-    owner's question, which lands as a ``TaskQuestionEvent`` and renders
-    as the delegation card. An empty or declined reply denies the write,
-    because a silent answer must never be read as consent.
-
-    :param ctx: The child agent's run context (unused - the owner is
-        bound by the delegation, not the deps).
-    :param requests: The pending approvals (and any external calls).
-    :return: Results approving the writes the user allowed.
-    """
-    from pydantic_ai_harness.subagents import DelegationTasks
-
-    _ = ctx
-    approvals = getattr(requests, "approvals", None) or []
-    if not approvals:
-        return requests.build_results()
-
-    owner = DelegationTasks.current()
-    task_id = DelegationTasks.child_id() or ""
-    described = ", ".join(
-        f"{getattr(call, 'tool_name', 'tool')}({_write_target(call)})"
-        for call in approvals
-    )
-
-    answer = ""
-    if owner is not None and task_id:
-        try:
-            answer = await owner.ask(
-                task_id,
-                question_id=uuid.uuid4().hex,
-                question=(
-                    f"The implementer wants to write {described}. "
-                    "Reply yes to allow, or anything else to stop it."
-                ),
-            )
-        except Exception as exc:  # an ownerless or stopped child gets no answer
-            logger.warning("child approval question failed: %s", exc)
-            answer = ""
-
-    # A cancelled or empty reply is a refusal. CANCELLED_ANSWER is what
-    # a stopped task receives, so it lands here rather than as consent.
-    granted = bool(answer.strip()) and answer.strip().lower() not in {
-        "no",
-        "stop",
-        "deny"}
-    logger.info(
-        "child approval for %d write(s): %s",
-        len(approvals),
-        "granted" if granted else "denied",
-    )
-    return requests.build_results(
-        approvals={call.tool_call_id: granted for call in approvals}
-    )
-
-
-def _write_target(call: Any) -> str:
-    """The path a write call names, for the question's wording.
-
-    :param call: A pending tool call.
-    :return: The ``file_path`` argument, or ``?`` when it is unreadable.
-    """
-    try:
-        return str(call.args_as_dict().get("file_path", "?"))
-    except Exception:
-        return "?"
-
-
-__all__ = [
-    "EXECUTABLE_TASK_TYPES",
-    "IMPLEMENTATION_AGENT_NAME",
-    "OUTPUT_RETRIES",
-    "AgentDeps",
-    "ComplexityLevel",
-    "PlanStep",
-    "build_implementation_agent",
-    "estimate_confidence",
-    "implementation_agent",
-    "plan_steps_for",
-    "resolve_implementation_model"]
-
-# Explicit output retry budget for the implementation agent.
-# Spec name: ``output_retries (3)``. Pydantic AI v2 exposes it
-# as the ``output`` entry of ``Agent(retries=...)`` (library
-# default 1 for both budgets); the dict form below sets only
-# the output budget and leaves the tool budget at its default.
+# Restored module constants (see the comment above each): the
+# implementer's step templates, its run-span name, and its explicit
+# output-retry budget. They live here so one definition serves both
+# the standalone agent and the delegated one.
 OUTPUT_RETRIES = 3
 
 # Explicit agent name: labels this agent's run span in Logfire so
@@ -222,6 +110,138 @@ class PlanStep(BaseModel):
 
     action: str
     description: str
+
+
+#: Futures a delegated child is waiting on, keyed by tool call id, so the
+#: answer endpoint can resolve one from outside the child's run. Process
+#: level for the same reason the delegation gate's pending list is: the
+#: capability object that waits is not the object the request comes back
+#: to. An id leaves the dict the moment its write is decided.
+_PENDING_WRITE_APPROVALS: dict[str, Any] = {}
+
+#: Set while a Stop is being carried out, so a pending write decided
+#: during one is refused rather than granted.
+_STOP_REQUESTED = threading.Event()
+
+
+def resolve_write_approval(call_id: str, *, approved: bool) -> bool:
+    """Answer a delegated child's gated write from the user's decision.
+
+    Called by the endpoint the approval card submits to, which is what
+    makes the decision reach a run it did not start.
+
+    :param call_id: The pending tool call's id.
+    :param approved: Whether the user allowed it.
+    :return: True when a child was waiting on that call.
+    """
+    future = _PENDING_WRITE_APPROVALS.get(call_id)
+    if future is None or future.done():
+        return False
+    future.set_result(approved)
+    return True
+
+
+def pending_write_approvals() -> list[str]:
+    """Call ids a delegated child is currently waiting on.
+
+    :return: The pending ids, for diagnostics and for the status surface.
+    """
+    return list(_PENDING_WRITE_APPROVALS)
+
+
+logger = logging.getLogger(__name__)
+
+
+def _writes_gated() -> bool:
+    """Whether the implementer's writes require the user's approval.
+
+    Kill-switch for callers that already gate at their own boundary:
+    set ``BERG_IMPLEMENTER_WRITES=off``. On by default, because a write
+    the user never approved is the "AI running loose" this exists to
+    prevent. The resolver that answers a gated write is registered by
+    the delegation (``agents/delegation.py``) through the harness's
+    ``shared_capabilities``, which reaches every delegated child - the
+    agent's own capability list does not survive that path.
+
+    :return: True when writes pause for approval.
+    """
+    return os.getenv("BERG_IMPLEMENTER_WRITES", "").strip().lower() not in {
+        "off",
+        "0",
+        "false",
+        "no"}
+
+
+async def _resolve_child_approvals(ctx: Any, requests: Any) -> Any:
+    """Wait for the user's decision on a gated write, then apply it.
+
+    Without a resolver, a child whose write needs approval ends its run
+    on ``DeferredToolRequests`` - a soft outcome nobody can resume, which
+    is how this gap was first described. ``HandleDeferredToolCalls``
+    resolves the batch *inline*, so the child's run continues in a single
+    call and keeps everything it had reasoned so far.
+
+    This function does not ask. pydantic-ai emits the pending approvals
+    as ``DeferredToolRequestsEvent`` before this handler runs, which
+    ``delegation_stream`` turns into berg's ordinary approval card, so the
+    card and this wait are two halves of one answer. The wait itself is a
+    future the answer endpoint resolves, keyed by tool call id.
+
+    A cancelled or expired wait denies: a silent answer must never read
+    as consent, and an approval nobody answered is not an approval.
+
+    :param ctx: The child agent's run context (unused - the owner is
+        bound by the delegation, not the deps).
+    :param requests: The pending approvals (and any external calls).
+    :return: Results applying the decision to every pending call.
+    """
+    _ = ctx
+    approvals = getattr(requests, "approvals", None) or []
+    if not approvals:
+        return requests.build_results()
+
+    loop = asyncio.get_running_loop()
+    waits: list[tuple[str, Any]] = []
+    for call in approvals:
+        call_id = str(getattr(call, "tool_call_id", "") or "")
+        if not call_id:
+            continue
+        future: Any = loop.create_future()
+        _PENDING_WRITE_APPROVALS[call_id] = future
+        waits.append((call_id, future))
+
+    if not waits:
+        return requests.build_results()
+
+    logger.info("child waiting on %d gated write(s)", len(waits))
+    granted: dict[str, bool] = {}
+    try:
+        for call_id, future in waits:
+            try:
+                granted[call_id] = bool(await future)
+            except asyncio.CancelledError:
+                # The run was stopped: deny this write, and let the
+                # cancellation be re-raised once the batch is answered.
+                granted[call_id] = False
+                raise
+            except Exception as exc:  # a lost answer denies, never grants
+                logger.warning("write approval for %s failed: %s", call_id, exc)
+                granted[call_id] = False
+    finally:
+        for call_id, _future in waits:
+            _PENDING_WRITE_APPROVALS.pop(call_id, None)
+
+    if _STOP_REQUESTED.is_set():
+        # A Stop landed while the answers were being decided: a write the
+        # user approved before it must not execute after it.
+        granted = dict.fromkeys(granted, False)
+
+    logger.info(
+        "child approval for %d write(s): %s",
+        len(granted),
+        "granted" if granted and all(granted.values()) else "denied (in part)",
+    )
+    return requests.build_results(approvals=granted)
 
 
 def resolve_implementation_model(

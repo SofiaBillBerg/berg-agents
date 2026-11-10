@@ -119,8 +119,7 @@ def _content_chunk_types() -> tuple[type, ...]:
 
     Everything else a child encoder produces describes the parent's turn
     (``start``, ``start-step``, ``finish-step``, ``finish``,
-    ``message-metadata``) or an approval the run registry cannot resolve
-    (``tool-approval-request``).
+    ``message-metadata``).
 
     :return: Tuple of chunk classes allowed to reach the client.
     """
@@ -134,6 +133,7 @@ def _content_chunk_types() -> tuple[type, ...]:
         TextDeltaChunk,
         TextEndChunk,
         TextStartChunk,
+        ToolApprovalRequestChunk,
         ToolInputAvailableChunk,
         ToolInputDeltaChunk,
         ToolInputErrorChunk,
@@ -160,6 +160,10 @@ def _content_chunk_types() -> tuple[type, ...]:
         FileChunk,
         SourceUrlChunk,
         DataChunk,
+        # A delegated task's pending approval. It belongs to the parent's
+        # turn (the child cannot own an approval the run registry has no
+        # record of), and it is the chunk berg's approval card renders.
+        ToolApprovalRequestChunk,
     )
 
 
@@ -229,8 +233,11 @@ def build_delegation_event_stream(sdk_version: int = 6) -> Any:  # ruff: ignore[
         put them.
         """
 
-        def __init__(self) -> None:
-            """Start with an empty delegation stack and no child encoders."""
+        def __init__(self, sdk_version: int = 6) -> None:
+            """Start with an empty delegation stack and no child encoders.
+
+            :param sdk_version: Protocol version this encoder writes.
+            """
             super().__init__(sdk_version=sdk_version)
             # Call ids of the delegate_task calls currently streaming,
             # innermost last. Pushed when the model emits the call and
@@ -417,11 +424,57 @@ def build_delegation_event_stream(sdk_version: int = 6) -> Any:  # ruff: ignore[
             task_id = str(getattr(event, "task_id", "") or "")
             encoder = self._child_encoders.get(task_id)
             if encoder is None:
-                encoder = VercelAIEventStream(sdk_version=sdk_version)
+                encoder = DelegationEventStream(sdk_version)
                 self._child_encoders[task_id] = encoder
             allowed = _content_chunk_types()
             async for chunk in encoder.handle_event(inner):
                 if isinstance(chunk, allowed):
                     yield chunk
 
-    return DelegationEventStream()
+        @staticmethod
+        async def handle_deferred_tool_requests(event: Any) -> Any:
+            """Announce the delegated task's pending approvals as cards.
+
+            pydantic-ai emits ``DeferredToolRequestsEvent`` *before* any
+            ``HandleDeferredToolCalls`` handler runs, precisely so a stream
+            consumer can tell the frontend while the handler waits. The
+            base encoder emits nothing for it, so without this override a
+            child's gated write is invisible: the run is held open with
+            nothing on screen to answer, which is the dead end this
+            replaces.
+
+            The chunk is berg's ordinary approval chunk — no new shape, so
+            the existing card renders it — and a delegated one is told
+            apart by a field already on it: the SDK only ever puts a call
+            in `approval-requested` for a tool the *run itself* deferred,
+            so a delegated approval arrives as a tool call first (nested
+            under the delegation bracket) and its approval second. The
+            relay's bracket is what marks it, and the walker already
+            records which call a bracket belongs to, so the pending
+            approval's parent is derivable where the part is read.
+
+            :param event: The child's ``DeferredToolRequestsEvent``,
+                wrapped by the harness, so it carries the task id and the
+                agent name alongside the requests.
+            :return: Async iterator yielding one chunk per pending call.
+            """
+            from pydantic_ai.ui.vercel_ai.response_types import (
+                ToolApprovalRequestChunk,
+            )
+
+            requests = getattr(event, "requests", None)
+            if requests is None:
+                return
+            for call in getattr(requests, "approvals", None) or []:
+                call_id = str(getattr(call, "tool_call_id", "") or "")
+                if not call_id:
+                    continue
+                logger.info(
+                    "delegation asking for approval of %s",
+                    getattr(call, "tool_name", "?"),
+                )
+                yield ToolApprovalRequestChunk(
+                    approval_id=call_id, tool_call_id=call_id
+                )
+
+    return DelegationEventStream(sdk_version)

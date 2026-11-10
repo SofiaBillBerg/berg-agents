@@ -44,6 +44,9 @@ const MAX_TOOL_OUTPUT_CHARS = 4000;
 /** One tool call as the UI renders it. */
 export interface MessageToolCall {
     tool: string;
+    /** The tool call's id. A pending approval is answered by this id - the
+        tool name alone matches no resolver. */
+    toolCallId?: string;
     input?: string;
     output?: string;
     state?: string;
@@ -353,6 +356,7 @@ export function readMessageParts(msg: UIMessage): MessageParts {
             const delegated = tasks.get(callId);
             toolCalls.push({
                 tool: name,
+                toolCallId: callId || undefined,
                 input: input || undefined,
                 output,
                 state: typeof p.state === "string" ? (p.state as string) : undefined,
@@ -403,6 +407,33 @@ export function readMessageParts(msg: UIMessage): MessageParts {
             .join("\n\n"),
         reasoning: reasoningBits.length > 0 ? reasoningBits.join("\n") : undefined,
         toolCalls: orphanedCalls.length > 0 ? orphanedCalls : undefined};
+}
+
+/**
+ * Approval call ids that belong to a delegated task, from one message.
+ *
+ * A delegated run's own tool calls - and their pending approvals - are
+ * the parts inside a bracket, which the scan already identifies. That is
+ * the only reliable discriminator: the same part is also on the message
+ * at top level, and `ToolApprovalRequestChunk` carries nothing that says
+ * where it came from. A delegated approval cannot be answered by the
+ * run's resume batch, so the client needs this set to route it instead.
+ *
+ * @param msg - The AI SDK message to read.
+ * @returns The delegated approval call ids, de-duplicated.
+ */
+export function delegatedApprovalIds(msg: UIMessage): Set<string> {
+    const ids = new Set<string>();
+    if (!Array.isArray(msg.parts)) return ids;
+    const {claimed} = scanSubagentBrackets(msg.parts);
+    for (const part of msg.parts) {
+        if (!claimed.has(part)) continue;
+        const p = part as unknown as Record<string, unknown>;
+        if (p.state !== "approval-requested") continue;
+        const id = typeof p.toolCallId === "string" ? p.toolCallId : "";
+        if (id) ids.add(id);
+    }
+    return ids;
 }
 
 /**

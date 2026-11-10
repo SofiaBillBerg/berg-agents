@@ -32,6 +32,8 @@ export interface ChatTranscriptProps {
     isExecuting: boolean;
     hitlRequest: unknown;
     onExport?: () => void;
+    /** Answer a delegated task's gated write from its own card. */
+    onResolveDelegatedApproval?: (callId: string, approved: boolean) => void;
     /** Optional tool results to display as collapsible cards */
     toolResults?: ToolResult[];
 }
@@ -58,7 +60,8 @@ export function ChatTranscript({
                                    isExecuting,
                                    hitlRequest,
                                    onExport,
-                                   toolResults}: ChatTranscriptProps) {
+                                   toolResults,
+                                   onResolveDelegatedApproval}: ChatTranscriptProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Stick-to-bottom while new content streams in — but only when the
@@ -86,7 +89,12 @@ export function ChatTranscript({
                         className="conversation-container"
                         id={CHAT_SCROLL_ID}
                     >
-                        <MessageList history={transcript}/>
+                        <MessageList
+                                       history={transcript}
+                                       onResolveDelegatedApproval={
+                                           onResolveDelegatedApproval
+                                       }
+                                   />
 
                         {/* HITL Pending Notice - HeroUI Alert with compound components */}
                         {hitlRequest != null && (

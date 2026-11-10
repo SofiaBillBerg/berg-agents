@@ -33,6 +33,7 @@ from typing import Any
 
 from berg_agents.agents.chat_agent import build_chat_agent
 from berg_agents.agents.deps import AgentDeps
+from berg_agents.agents.implementation import resolve_write_approval
 from berg_agents.config.settings import get_settings
 from berg_agents.core.harness import Harness
 from berg_agents.core.turn import record_turn_outcome
@@ -1220,6 +1221,49 @@ def _track_context_usage(agent: Any, session_id: str | None) -> None:
         logger.warning(f"Context usage gauge unavailable: {exc}")
 
 
+async def _answer_delegated_approval(request: Request) -> Response:
+    """Answer a delegated child's gated write from the user's decision.
+
+    The approval card renders through berg's ordinary approval surface,
+    but it is answered here rather than in the deferred batch: the
+    pending call belongs to a *child* run the parent's batch cannot
+    reach, which is why the click previously left the write pending
+    forever. The decision travels to the resolver awaiting it inside
+    the child's run, and the write then executes normally.
+
+    :param request: FastAPI request; body is
+        ``{"call_id": str, "approved": bool}``. No ``?session=``: the
+        pending write is keyed on the call id, which is unique across
+        the process.
+    :return: Success dict, or a JSON error response.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Body must be JSON: {call_id, approved}"},
+        )
+    call_id = str((body or {}).get("call_id", "") or "")
+    approved = bool((body or {}).get("approved", False))
+    if not call_id:
+        return JSONResponse(
+            status_code=400, content={"detail": "call_id is required"}
+        )
+    if resolve_write_approval(call_id, approved=approved):
+        return JSONResponse(content={"resolved": True, "callId": call_id})
+    # Nothing waiting means the decision is spent: the run ended, the
+    # call was answered already, or the task was stopped underneath
+    # the card. Say so rather than reporting a success that changes
+    # nothing.
+    return JSONResponse(
+        status_code=409,
+        content={
+            "detail": "No delegated task is waiting on that call",
+            "stale": True},
+    )
+
+
 async def _answer_delegated_question(request: Request) -> Response:
     """Answer the question a delegated task is waiting on, or say why not.
 
@@ -1657,6 +1701,11 @@ def register_chat_routes(
             return {"stopped": False}
         await run.cancel("stopped by user")
         return {"stopped": True}
+
+    @router.post("/api/chat/delegation-approval")
+    async def chat_delegation_approval(request: Request) -> Response:
+        """Answer a delegated child's gated write from the user's card."""
+        return await _answer_delegated_approval(request)
 
     @router.get("/api/chat/status")
     async def chat_status(request: Request) -> dict[str, Any]:
