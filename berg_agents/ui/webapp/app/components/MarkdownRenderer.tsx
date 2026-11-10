@@ -52,6 +52,9 @@ export function MarkdownRenderer({content, isAnimating}: MarkdownRendererProps) 
         <div className="markdown-content text-sm leading-relaxed">
             <Streamdown
                 parseIncompleteMarkdown
+                controls={{
+                    code: { copy: true, download: true },
+                    mermaid: { copy: true, download: true }}}
                 isAnimating={isAnimating}
                 mode="streaming"
                 plugins={{ code, mermaid }}

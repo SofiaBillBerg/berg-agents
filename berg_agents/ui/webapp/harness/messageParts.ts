@@ -399,9 +399,9 @@ export function readMessageParts(msg: UIMessage): MessageParts {
     }
 
     return {
-        // Double newline: react-markdown renders a single \n as a space,
-        // so separate text parts (e.g. the implementer's progress lines)
-        // would otherwise collapse onto one line.
+        // Streamdown renders a single \n as a space, so separate text parts
+        // (e.g. the implementer's progress lines) would otherwise collapse
+        // onto one line.
         text: [textChunks.filter(Boolean).join("\n\n"), orphanedText]
             .filter((s) => s.length > 0)
             .join("\n\n"),
