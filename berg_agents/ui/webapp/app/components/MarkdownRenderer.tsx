@@ -24,6 +24,7 @@ import type { ComponentPropsWithoutRef } from "react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
 import { mermaid } from "@streamdown/mermaid";
+import { math } from "@streamdown/math";
 
 export interface MarkdownRendererProps {
     content?: string;
@@ -57,7 +58,7 @@ export function MarkdownRenderer({content, isAnimating}: MarkdownRendererProps) 
                     mermaid: { copy: true, download: true }}}
                 isAnimating={isAnimating}
                 mode="streaming"
-                plugins={{ code, mermaid }}
+                plugins={{ code, mermaid, math }}
             >
                 {content}
             </Streamdown>

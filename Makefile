@@ -69,9 +69,28 @@ make-install-and-run: ## Run bash script install_and_run.sh to build and start B
 
 run-berg-agents-web: ## Quickstart berg-agents webui on port 8001
 	@echo "Running the Berg-Agents web-ui on port 8001"
-	@.venv/bin/uv run berg_agents --web --hot-reload --port 8001
+	@.venv/bin/uv run berg_agents --web --hot-reload  --debug --log-level=info --port 8001
 
+make-social-cheatsheet-app-dev: ## Add social-cheatsheet-app as root-dir to run berg-agents in that project
+	@BERG_AGENT_ROOT_DIR=/home/sofiabillberg/code-projects/social-cheatsheet-app/
+	@.venv/bin/uv run berg_agents --web --hot-reload  --debug --log-level=info --port 8007
 
+run-social-cheatsheet-app-dev: ## Start dev environment with custom backend target
+	@echo "Starting Berg Agents Development Environment, open http://localhost:3000 in your browser to access the dev web-ui"
+	@BERG_AGENT_ROOT_DIR=/home/sofiabillberg/code-projects/social-cheatsheet-app/
+	$(MAKE) -j 2 run-frontend-dev make-social-cheatsheet-app-dev
+
+run-backend-dev: ## Quickstart berg-agents webui on port 8007
+	@echo "Running the Berg-Agents web-ui on port 8007"
+	@.venv/bin/uv run berg_agents --web --hot-reload  --debug --log-level=info --port 8007
+
+run-frontend-dev: ## Quickstart berg-agents webui frontend dev server on port 3000
+	@echo "Running the Berg-Agents web-ui frontend dev server on port 3000"
+	@NEXT_PUBLIC_API_BASE_URL=http://localhost:8007 bun --cwd berg_agents/ui/webapp next dev
+
+run-berg-agents-dev: ## Start dev environment with custom backend target
+	@echo "Starting Berg Agents Development Environment, open http://localhost:3000 in your browser to access the dev web-ui"
+	$(MAKE) -j 2 run-frontend-dev run-backend-dev
 stop-berg-agents: ## Find process that might be related to the Berg-Agents web-ui, list then and let the user chose
 					# which ones to stop, if any
 	# Search for any ports that the Berg-Agents web-ui might be running on

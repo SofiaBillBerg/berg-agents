@@ -129,3 +129,4 @@ entities.json
 /**/*.lock
 /feat_dev
 /examples
+/wgate-test.txt
