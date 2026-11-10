@@ -75,7 +75,8 @@ agent-deps = [
     "rich>=13.5.2",
     "typer>=0.28.0",
     "typesafe-sdk>=0.7.4",
-    "uvicorn>=0.52.1"]
+    "uvicorn>=0.52.1",
+    "vercel-workflow>=0.12.1 ; platform_python_implementation == 'CPython'"]
 docs = ["pydoctor>=25.10.1", "quarto>=0.1.0"]
 dev = [
     "black>=24.3.0",

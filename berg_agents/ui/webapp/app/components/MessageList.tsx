@@ -82,10 +82,18 @@ export interface MessageListProps {
 /**
  * Collapsible reasoning trace for one assistant message.
  * The model's chain-of-thought streams in as `reasoning` parts;
- * shown collapsed by default so long traces don't flood the chat.
+ * shown open by default so the reasoning stays visible (cumulative) as it
+ * lands and after the turn completes. Collapse it with the button to read
+ * back through history.
  */
-function ReasoningBlock({text}: { text: string }) {
-    const [open, setOpen] = useState(false);
+function ReasoningBlock({
+    text,
+    isAnimating}: {
+    text: string;
+    /** Whether the turn is still streaming (keeps thinking open). */
+    isAnimating?: boolean;
+}) {
+    const [open, setOpen] = useState(true);
     return (
         <div className="reasoning-block mt-1">
             <button
@@ -97,7 +105,7 @@ function ReasoningBlock({text}: { text: string }) {
             </button>
             {open && (
                 <div className="mt-1 border-l-2 border-accent/40 pl-2 text-xs text-muted-foreground">
-                    <MarkdownRenderer content={text}/>
+                    <MarkdownRenderer content={text} isAnimating={isAnimating}/>
                 </div>
             )}
         </div>
@@ -111,12 +119,15 @@ function ReasoningBlock({text}: { text: string }) {
  * Each call keeps its own Show/Hide + Copy inside.
  */
 function ToolCallGroup({
-                           calls,
-                           onResolveDelegatedApproval}: {
+                            calls,
+                            isAnimating,
+                            onResolveDelegatedApproval}: {
     calls: NonNullable<ChatMessage["toolCalls"]>;
+    /** Keep the group open while the turn is still streaming. */
+    isAnimating?: boolean;
     onResolveDelegatedApproval?: (callId: string, approved: boolean) => void;
 }) {
-    const [open, setOpen] = useState(calls.length <= 3);
+    const [open, setOpen] = useState(true);
     // NOTE: Plugin tool calls render under their own marker so todo
     // activity reads as plugin work, not generic tool output. The full
     // interactive surface lives in the side-panel/canvas (TodoPanel).
@@ -142,6 +153,11 @@ function ToolCallGroup({
                 <span className="truncate text-[11px]">
           {calls.map((c) => c.tool).join(", ")}
         </span>
+                {isAnimating && (
+                    <span className="ml-1 text-[10px] text-muted-foreground animate-pulse">
+                        streaming
+                    </span>
+                )}
             </button>
             {open && (
                 <div className="flex flex-col gap-1">
@@ -159,6 +175,7 @@ function ToolCallGroup({
                                 call they ran under rather than beside it. */}
                             {call.children && (
                                 <SubagentWork
+                                    isAnimating={isAnimating}
                                     parts={call.children}
                                     onResolveDelegatedApproval={
                                         onResolveDelegatedApproval
@@ -190,8 +207,11 @@ function ToolCallGroup({
  */
 function SubagentWork({
     parts,
+    isAnimating,
     onResolveDelegatedApproval}: {
     parts: NonNullable<MessageToolCall["children"]>;
+    /** Whether the turn is still streaming (thinking shown open by default). */
+    isAnimating?: boolean;
     onResolveDelegatedApproval?: (callId: string, approved: boolean) => void;
 }) {
     return (
@@ -200,14 +220,14 @@ function SubagentWork({
             className="ml-2 flex flex-col gap-1 border-l-2 border-accent/40 pl-2"
             role="group"
         >
-            {parts.reasoning && <ReasoningBlock text={parts.reasoning}/>}
+            {parts.reasoning && <ReasoningBlock isAnimating={isAnimating} text={parts.reasoning}/>}
             {parts.text && (
                 <div className="text-xs text-muted-foreground">
-                    <MarkdownRenderer content={parts.text}/>
+                    <MarkdownRenderer content={parts.text} isAnimating={isAnimating}/>
                 </div>
             )}
             {parts.toolCalls && parts.toolCalls.length > 0 && (
-                <ToolCallGroup calls={parts.toolCalls}/>
+                <ToolCallGroup calls={parts.toolCalls} isAnimating={isAnimating}/>
             )}
             {/* A delegated task's gated write, decided in place. It sits
                 with the work it belongs to rather than in the run's
@@ -298,7 +318,7 @@ export function MessageList({
                         <div className="text-xs font-semibold tracking-wide uppercase text-muted mb-1">
                             {roleLabel}
                         </div>
-                        {msg.reasoning && <ReasoningBlock text={msg.reasoning}/>}
+                        {msg.reasoning && <ReasoningBlock isAnimating={isAnimating} text={msg.reasoning}/>}
                         <div className="message-list-content text-sm">
                             <MarkdownRenderer
                                 content={text}
@@ -308,6 +328,7 @@ export function MessageList({
                         {msg.toolCalls && msg.toolCalls.length > 0 && (
                             <ToolCallGroup
                                     calls={msg.toolCalls}
+                                    isAnimating={isAnimating}
                                     onResolveDelegatedApproval={
                                         onResolveDelegatedApproval
                                     }
