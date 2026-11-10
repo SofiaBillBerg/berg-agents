@@ -34,14 +34,14 @@ be re-checked whenever the SDK's version moves.
 
 from __future__ import annotations
 
-import json
-import os
-import sqlite3
-import uuid
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
+import json
+import os
 from pathlib import Path
+import sqlite3
+import uuid
 
 from berg_agents.config.paths import resolve_config_dir
 
@@ -66,7 +66,7 @@ def _queue_database() -> Path:
 
 
 @contextmanager
-def _connection() -> Iterator[sqlite3.Connection]:
+def _connection() -> Generator[sqlite3.Connection, None, None]:
     """Open the broker's database, creating its schema on first use.
 
     Berg's own convention (``ui/session_store.py``): WAL, an explicit schema,

@@ -117,12 +117,28 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     registry = app.state.run_registry
     sweeper = asyncio.create_task(registry.sweep(SWEEP_INTERVAL_SECONDS))
+    # The workflow queue's worker. Failure-isolated by design: if the SDK or
+    # berg's broker cannot start, chat keeps working and the error is only
+    # logged, exactly like the plugin warmup above.
+    worker = None
+    try:
+        from berg_agents.workflow.registry import start_worker
+
+        worker = start_worker()
+        logger.info("Workflow queue worker started")
+    except Exception as exc:
+        logger.warning("Workflow queue worker not started: %s", exc)
     try:
         yield
     finally:
         sweeper.cancel()
+        if worker is not None:
+            worker.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await sweeper
+        if worker is not None:
+            with contextlib.suppress(asyncio.CancelledError):
+                await worker
 
 
 def create_app(

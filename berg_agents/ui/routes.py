@@ -42,6 +42,7 @@ from berg_agents.ui.route_handlers.router_stats import (
 from berg_agents.ui.route_handlers.sessions import register_session_routes
 from berg_agents.ui.route_handlers.tools import register_tool_routes
 from berg_agents.ui.sessions import SessionManager
+from berg_agents.workflow.routes import register_workflow_routes
 from fastapi import APIRouter
 
 logger = logging.getLogger(__name__)
@@ -73,4 +74,8 @@ def create_router(
     register_tool_routes(router, harness=harness, sessions=sessions)
 
     register_provider_routes(router, sessions, providers)
+    # Mounted last and next to nothing: the workflow host's two surfaces
+    # (the queue intake and the SDK's consumer) are read by the runtime,
+    # not by the chat UI.
+    register_workflow_routes(router)
     return router
