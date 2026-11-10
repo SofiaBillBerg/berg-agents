@@ -21,7 +21,7 @@
 
 import type { ChatMessage } from "@/harness";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Alert, Card, Spinner, Surface } from "@heroui/react";
 
 import { ToolCard } from "./ToolCard";
@@ -49,7 +49,7 @@ export interface ToolResult {
   /** Raw input arguments (JSON-serialized string) - optional */
   input?: string;
   /** Output from the tool - must be JSON-serializable */
-  output?: any;
+  output?: unknown;
   /** Whether the card is currently expanded */
   expanded?: boolean;
   /** Callback to toggle expansion */
@@ -69,26 +69,40 @@ export function ChatTranscript({
   onResolveDelegatedApproval}: ChatTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Stick-to-bottom while new content streams in — but only when the
-  // user is already near the bottom, so reading back through history
-  // is never yanked away.
+  // Follow the bottom while new content streams in. When auto-scroll is on the
+  // transcript always sticks to the latest message so the user can read the
+  // agent's reasoning and output as it lands without scrolling manually. When
+  // off the viewport stays where the user left it.
+  const [autoScroll, setAutoScroll] = useState(true);
   const lastCount = useRef(transcript.length);
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || !autoScroll) return;
     if (transcript.length !== lastCount.current) {
       lastCount.current = transcript.length;
-      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-      if (nearBottom) {
-        el.scrollTop = el.scrollHeight;
-      }
+      el.scrollTop = el.scrollHeight;
     }
-  }, [transcript]);
+  }, [transcript, autoScroll]);
 
   return (
     <>
       <Card className="mb-2 min-h-0 flex-1 flex flex-col" variant="default">
         <Card.Content className="p-1.5 min-h-0 flex-1 flex flex-col">
+          {/* Auto-scroll toggle - stays with the transcript so the user can
+              follow streaming output or pin the viewport to read back. */}
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <button
+              aria-label={autoScroll ? "Disable auto-scroll" : "Enable auto-scroll"}
+              className="rounded-md border border-border bg-background px-2 py-0.5 text-xs"
+              type="button"
+              onClick={() => setAutoScroll((prev) => !prev)}
+            >
+              {autoScroll ? "⏬ Autoscroll ON" : "⏸ Autoscroll OFF"}
+            </button>
+            <span className="text-[10px] text-muted-foreground">
+              {autoScroll ? "following new messages" : "viewport pinned"}
+            </span>
+          </div>
           <div
             ref={scrollRef}
             className="conversation-container"

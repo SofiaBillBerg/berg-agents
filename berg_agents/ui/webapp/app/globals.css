@@ -17,9 +17,7 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
- */
-
-/*
+ *
  * Tailwind v4 (CSS-first) must be imported as a bare module specifier,
  * NOT `@import url("tailwindcss")`. The url() form is treated as an
  * external CSS import that PostCSS/Next cannot resolve to the bundle,
@@ -96,8 +94,7 @@
     /* Font Family */
 
     /* Make sure to load Public Sans font in your app */
-    --font-sans: var(--font-public-sans);
-}
+    --font-sans: var(--font-public-sans, 'Public Sans', sans-serif);}
 
 .dark,
 [data-theme="dark"] {

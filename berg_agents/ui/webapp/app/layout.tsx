@@ -31,12 +31,11 @@ import { Public_Sans, Nunito_Sans } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
-const nunitoSans = Nunito_Sans({subsets:['latin'],variable:'--font-sans'});
+const nunitoSans = Nunito_Sans({ subsets: ["latin"], variable: "--font-sans" });
 
 /**
  * Public Sans, self-hosted via next/font. The `variable` option exposes
- * `--font-public-sans`, which is exactly what the HeroUI `--font-sans`
- * token in globals.css (Sofia's builder theme) points at.
+ * `--font-public-sans`
  */
 const publicSans = Public_Sans({
   subsets: ["latin"],
@@ -67,7 +66,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html suppressHydrationWarning className={cn("font-sans", nunitoSans.variable)} lang="en">
+    <html
+      suppressHydrationWarning
+      className={cn("font-sans", nunitoSans.variable)}
+      lang="en"
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
