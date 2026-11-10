@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -21,5 +21,6 @@
 
 /** @type {import("stylelint").Config} */
 export default {
-    extends: ["stylelint-config-standard"]
-};
+  extends: ["stylelint-config-standard", "@cedric-ruiu/stylelint-config"],
+  rules: {
+    "import-notation": "string"}};

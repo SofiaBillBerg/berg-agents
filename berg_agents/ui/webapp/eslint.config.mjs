@@ -76,6 +76,7 @@ export default tseslint.config(
     rules: {
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs["core-web-vitals"].rules,
+
       "no-console": "warn",
       "react/prop-types": "off",
       "react/jsx-uses-react": "off",

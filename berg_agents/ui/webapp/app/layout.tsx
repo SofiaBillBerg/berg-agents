@@ -26,9 +26,12 @@ import "katex/dist/katex.min.css";
 
 import "streamdown/styles.css";
 import React from "react";
-import { Public_Sans } from "next/font/google";
+import { Public_Sans, Nunito_Sans } from "next/font/google";
 
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const nunitoSans = Nunito_Sans({subsets:['latin'],variable:'--font-sans'});
 
 /**
  * Public Sans, self-hosted via next/font. The `variable` option exposes
@@ -64,7 +67,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html suppressHydrationWarning className={publicSans.variable} lang="en">
+    <html suppressHydrationWarning className={cn("font-sans", nunitoSans.variable)} lang="en">
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
