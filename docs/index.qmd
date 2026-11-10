@@ -27,7 +27,7 @@ FastAPI web UI that share the same commands and task lifecycle.
 
 <!-- badges: end -->
 
-![Berg-Agents Overview](../docs/visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
+![Berg-Agents Overview](docs/visualizations/svg/packages_berg_agents.svg "Berg Agents overview")
 
 ## Quick Start
 
@@ -94,7 +94,7 @@ The config directory resolves via `BERG_AGENTS_CONFIG_DIR` â†’ `.berg-config` â†
 
 See [CONFIGURATION](../docs/CONFIGURATION.qmd) for the full reference.
 
-![Berg-Agents Config](../docs/visualizations/svg/packages_berg_agents.svg "Berg Agents Config Modules")
+![Berg-Agents Config](docs/visualizations/svg/packages_berg_agents.svg "Berg Agents Config Modules")
 
 ## Documentation
 
