@@ -1,22 +1,3 @@
-# Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-# The system follows a harness-based execution model with multiple specialized agents working together.
-#
-# Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
-#
-# This program is free software: you can redistribute it and/or modify
-#
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
-
 """Berg Agents - framework-agnostic multi-agent system.
 
 The main entry point is BergAgentsApp:
@@ -28,32 +9,66 @@ The main entry point is BergAgentsApp:
 Or via CLI:
     python -m berg_agents --web
     python -m berg_agents --tui
+
+**Importing a submodule must not import the application.** This package root is
+deliberately lazy: importing ``berg_agents.<anything>`` used to run this file,
+which imported ``berg_agents.app`` and the whole harness on the way. That is fine
+for a user of the package and wrong for two consumers that import *inside* it:
+
+* the durable workflow runtime re-imports a workflow's module on every replay
+  inside a sandbox that forbids nondeterminism — and ``berg_agents.app`` pulls in
+  the harness, which calls ``uuid.uuid4()`` (``os.urandom()`` underneath) at
+  import time. The runtime refused the run with
+  ``SandboxRestrictionError: Cannot call os.urandom() inside a workflow``.
+* anything measuring or tracing import cost paid for the app before it asked.
+
+So the public names stay exactly as they were, but resolve on first use through
+PEP 562 (``__getattr__``), and importing a submodule runs only this docstring.
+``import berg_agents; berg_agents.BergAgentsApp`` behaves as before;
+``from berg_agents.workflow.turn import turn`` no longer drags the app in.
 """
 
-from berg_agents.app import BergAgentsApp, get_app
-from berg_agents.config.settings import ensure_env_loaded
-from berg_agents.core import (
-    AbstractAgent,
-    AgentResult,
-    Harness,
-    RiskLevel,
-    RouterStats,
-    TaskComplexity,
-    TaskContext,
-)
+from __future__ import annotations
 
-# Load .berg-agents/.env into the process environment first: agent modules
-# below construct their Pydantic AI models at import time, and the
-# provider SDKs read endpoint configuration from the environment.
-ensure_env_loaded()
+from typing import Any
 
-__all__ = [
-    "AbstractAgent",
-    "AgentResult",
-    "BergAgentsApp",
-    "Harness",
-    "RiskLevel",
-    "RouterStats",
-    "TaskComplexity",
-    "TaskContext",
-    "get_app"]
+# Deliberately not a bare re-export list: the exports must resolve on first use
+# (see the docstring), which PEP 562 puts in this file rather than in a helper
+# module. The rule is waived with the reason kept beside it.
+# ruff: ignore[non-empty-init-module]
+
+#: The names this package exports, and the module each lives in. Kept as data
+#: so the lazy ``__getattr__`` below stays a lookup rather than a hardcoded
+#: ladder, and so a new export is one line here.
+_EXPORTS = {
+    "AbstractAgent": "berg_agents.core",
+    "AgentResult": "berg_agents.core",
+    "BergAgentsApp": "berg_agents.app",
+    "Harness": "berg_agents.core",
+    "RiskLevel": "berg_agents.core",
+    "RouterStats": "berg_agents.core",
+    "TaskComplexity": "berg_agents.core",
+    "TaskContext": "berg_agents.core",
+    "get_app": "berg_agents.app"}
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve an export on first use, importing only its own module.
+
+    :param name: The requested public name.
+    :return: The attribute from its defining module.
+    :raises AttributeError: For a name this package does not export.
+    """
+    module_path = _EXPORTS.get(name)
+    if module_path is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from importlib import import_module
+
+    value = getattr(import_module(module_path), name)
+    globals()[name] = value  # cache: the second lookup skips this function
+    return value
+
+
+def __dir__() -> list[str]:
+    """The package's public names, for ``dir()`` and tab completion."""
+    return sorted(set(globals()) | set(_EXPORTS))

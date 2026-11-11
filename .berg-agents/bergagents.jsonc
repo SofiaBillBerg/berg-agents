@@ -180,7 +180,7 @@
   "defaultModel": "bonsai-2:9b",
   //# Context window used when the model's real window cannot be resolved
   //# (a local endpoint the pricing registry does not know). Drives the
-  //# chat header gauge and the compaction trigger. Your ollama is
+  //# chat header gauge and the compaction trigger.  Ollama is
   //# configured for 100 000, and unsloth's models are configured inside
   //# unsloth, so the fallback only covers what resolution misses.
   "context_window": {
@@ -213,7 +213,7 @@
         "models": [
           "bonsai-2:9b",
           "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
-
+          "sofia/free-routing",
           "auto/best-free",
           "unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF:UD-IQ3_XXS",
           "mradermacher/Muse-Glimmer-30B-Hermes-Agentic-i1-GGUF:IQ3_M",

@@ -13,14 +13,17 @@ configuration declares.
 
 from __future__ import annotations
 
-from typing import Any
-
 from berg_agents.workflow.registry import Chunk, wf
 from vercel import workflow
 
 
 @wf.step
-async def emit(*, writable: Any, kind: str, text: str) -> None:
+async def emit(
+    *,
+    writable: workflow.WorkflowWritable[Chunk],
+    kind: str,
+    text: str,
+) -> None:
     """Publish one transcript chunk. Only a step may touch a stream."""
     await writable.write(Chunk(kind=kind, text=text))
 
@@ -64,6 +67,6 @@ async def turn(*, token: str, prompt: str) -> dict:
 
 
 @wf.step
-async def _close(*, writable: Any) -> None:
+async def _close(*, writable: workflow.WorkflowWritable[Chunk]) -> None:
     """Close the stream so readers know the turn is over."""
     await writable.close()
