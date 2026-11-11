@@ -29,9 +29,29 @@ world unless ``VERCEL_DEPLOYMENT_ID`` is set, and nothing here needs Vercel.
 from __future__ import annotations
 
 import asyncio
+import os
 
 import pydantic
 from vercel import workflow
+
+
+def _workflow_data_dir() -> os.PathLike[str]:
+    """Berg's own home for the runtime's event log, steps, hooks and streams."""
+    from berg_agents.config.paths import resolve_config_dir
+
+    path = resolve_config_dir(None) / "workflow-data"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# berg keeps its own stores under its config dir (``sessions.db``,
+# ``runs.db`` and now this). The workflow runtime's local world otherwise
+# defaults to ``.workflow-data`` in the process's cwd, which for berg would be
+# wherever the server happened to be started from. Set before the world is
+# first constructed — the runtime builds it lazily, and berg's consumer route
+# is what first asks for it.
+os.environ.setdefault("WORKFLOW_LOCAL_DATA_DIR", str(_workflow_data_dir()))
+
 
 #: How long the worker sleeps when the queue is empty. berg's broker is polled
 #: rather than pushed, so this is the trade between latency and an idle core.

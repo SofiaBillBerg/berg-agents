@@ -127,6 +127,17 @@ async def deliver(message: dict, consumer: Any) -> bool:
     return ok
 
 
+def _new_token() -> str:
+    """A fresh hook/stream token for a run.
+
+    The workflow body runs deterministically, so the token is minted here in the
+    request path rather than inside the workflow.
+    """
+    import secrets
+
+    return secrets.token_hex(6)
+
+
 def register_workflow_routes(router: APIRouter) -> None:
     """Mount the queue intake and the consumer on berg's router.
 
@@ -170,6 +181,31 @@ def register_workflow_routes(router: APIRouter) -> None:
             str(request.url), dict(request.headers), await request.body()
         )
         return JSONResponse(_as_json(await consumer(delivery)))
+
+    @router.post("/api/workflow/turn")
+    async def workflow_turn(request: Request) -> JSONResponse:
+        """Start a durable turn in berg's own server, through berg's queue.
+
+        This is step 2 of phase 1b: berg starting its own runs rather than an
+        external queue client. The run goes onto berg's broker exactly as an
+        SDK client's send would, so the durable properties already proven
+        (resumption after a crash, a gated write, a mid-run steer) hold for
+        runs berg starts itself.
+
+        :param request: JSON body with ``prompt`` and optional ``token``.
+        :return: The run id, for reading its stream and outcome back.
+        """
+        body = await request.json()
+        from berg_agents.workflow.turn import turn
+        from vercel import workflow
+
+        token = str(body.get("token") or "").strip() or None
+        run = await workflow.start(
+            turn,
+            token=token or _new_token(),
+            prompt=str(body.get("prompt", "")),
+        )
+        return JSONResponse({"run_id": run.run_id})
 
     @router.get("/api/workflow/pending")
     async def workflow_pending() -> JSONResponse:

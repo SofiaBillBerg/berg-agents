@@ -12,10 +12,9 @@ on it.
 
 from __future__ import annotations
 
-from berg_agents.workflow.registry import Chunk, start_worker, wf
-
 # Registers berg's workflows and steps on `wf`. Imported for the side effect,
 # so the linter is told why the name is unused.
-from berg_agents.workflow import turn as _turn  # noqa: F401
+from berg_agents.workflow import turn as _turn  # ruff: ignore[unused-import]
+from berg_agents.workflow.registry import Chunk, start_worker, wf
 
 __all__ = ["Chunk", "start_worker", "wf"]
