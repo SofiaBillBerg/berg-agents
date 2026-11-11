@@ -131,3 +131,5 @@ entities.json
 /examples
 /wgate-test.txt
 /.wf*
+/.berg-agents/workflow*
+w*.txt

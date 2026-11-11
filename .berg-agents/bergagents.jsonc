@@ -116,14 +116,11 @@
         "hf.co/JackAgentLead/Jack-3.8-27B-Coder-16GB-VRAM:latest": {
           "name": "Jack-3.8-27B-Coder"
         },
-        "gemma3:12b": {
-          "name": "gemma3:12b"
+        "ssfdre38/gemma4-turbo:12b": {
+          "name": "ssfdre38/gemma4-turbo:12b"
         },
-        "gemma4:cloud": {
-          "name": "gemma4:cloud"
-        },
-        "nemotron-3-nano:30b-cloud": {
-          "name": "nemotron-3-nano:30b-cloud"
+        "gemma4:12b": {
+          "name": "gemma4:12b"
         }
       }
     },
@@ -204,6 +201,8 @@
       "trivial": {
         "models": [
           "bonsai-2:9b",
+          "ssfdre38/gemma4-turbo:12b",
+          "gemma4:12b",
           "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
           "ornith:9b-q4_K_M"
         ],
@@ -212,6 +211,8 @@
       "standard": {
         "models": [
           "bonsai-2:9b",
+          "ssfdre38/gemma4-turbo:12b",
+          "gemma4:12b",
           "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
           "sofia/free-routing",
           "auto/best-free",
@@ -223,7 +224,9 @@
       },
       "complex": {
         "models": [
+          "gemma4:12b",
           "bonsai-2:9b",
+          "ssfdre38/gemma4-turbo:12b",
           "logfare/logfare/auto",
           "auto/free-combo",
           "base-free-stack",
@@ -233,7 +236,9 @@
       },
       "critical": {
         "models": [
+          "gemma4:12b",
           "bonsai-2:9b",
+          "ssfdre38/gemma4-turbo:12b",
           "auto/free-combo",
           "logfare/logfare/auto",
           "base-free-stack",

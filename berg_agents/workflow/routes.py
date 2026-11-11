@@ -139,6 +139,117 @@ def _new_token() -> str:
     return secrets.token_hex(6)
 
 
+#: The devalue envelope's width for its little-endian payload length.
+_LENGTH_BYTES = 4
+
+
+#: The devalue envelope's width for its little-endian payload length.
+_LENGTH_BYTES = 4
+
+
+def _decode_payload(raw: Any) -> Any:
+    """Decode a stored payload with the runtime's own decoder.
+
+    The runtime stores inputs, outputs and step results as format-prefixed,
+    **compressed** payloads, and ``serialization.hydrate`` is its own decoder
+    for them — so berg reads through it rather than parsing bytes by hand.
+    The value also arrives JSON-wrapped as ``{"__type": "Uint8Array",
+    "data": ...}`` when it comes from the event log, which is unwrapped first.
+
+    :param raw: The stored value, in either shape.
+    :return: The decoded value, or ``None`` when it cannot be read.
+    """
+    import base64
+
+    if isinstance(raw, dict) and raw.get("__type") == "Uint8Array":
+        try:
+            raw = base64.urlsafe_b64decode(str(raw.get("data", "")) + "===")
+        except Exception:  # ruff: ignore[blind-except] - unreadable stays None
+            return None
+    if not isinstance(raw, (bytes, bytearray)) or not raw:
+        return None
+    try:
+        # The runtime owns this format; berg decodes through it rather than
+        # re-implementing its compression and framing.
+        from vercel.workflow._internal import serialization  # ruff: ignore[import-private-name]
+
+        return serialization.hydrate(bytes(raw), what="a stored run payload")
+    except Exception:  # ruff: ignore[blind-except] - an unreadable payload is not parked
+        return None
+
+
+def _parked_pass(run_id: str) -> dict[str, Any] | None:
+    """What the run parked on, and the context to resume it with.
+
+    The durable record holds all of it: the step's own outcome (which carries
+    the pending calls) sits in the run's event log, and the run's inputs sit
+    on the run itself. Reading both through the runtime's own files is what
+    makes the answer key durable — the run id resolves it, wherever the
+    process is.
+
+    :param run_id: The run that parked on the gate.
+    :return: The pending calls plus the context to resume with, or ``None``
+        when that run holds no parked gate.
+    """
+    from berg_agents.workflow.registry import _workflow_data_dir
+
+    events_dir = _workflow_data_dir() / "events" / run_id
+    if not events_dir.is_dir():
+        return None
+
+    # Every completed step is scanned, and the FIRST one that reported a gate is
+    # kept: later steps (closing the stream, for one) carry no ``pending`` and
+    # would overwrite it with an empty list, which is exactly the false
+    # negative this had.
+    pending: list[dict[str, Any]] = []
+    history: list[Any] = []
+    for path in sorted(events_dir.glob("*.json")):
+        try:
+            event = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if event.get("eventType") != "step_completed":
+            continue
+        outcome = _decode_payload((event.get("eventData") or {}).get("result"))
+        if not isinstance(outcome, dict):
+            continue
+        calls = outcome.get("pending")
+        if isinstance(calls, list) and calls:
+            pending = [c for c in calls if isinstance(c, dict)]
+            # The pass's own history rides with the gate: the resumed run
+            # continues this turn, so it must carry what the first pass saw.
+            history = outcome.get("history")
+            history = history if isinstance(history, list) else []
+            break
+    if not pending:
+        return None
+
+    run_record = _run_record(run_id)
+    started = _decode_payload((run_record or {}).get("input"))
+    # The stored input is the workflow's own keyword arguments, as a mapping —
+    # the runtime encodes them by name, not by position.
+    if isinstance(started, list) and started and isinstance(started[0], dict):
+        started = started[0]
+    if not isinstance(started, dict):
+        return None
+    return {"pending": pending, "history": history, **started}
+
+
+def _run_record(run_id: str) -> dict[str, Any] | None:
+    """One run's stored record, read straight from its own file."""
+    from berg_agents.workflow.registry import _workflow_data_dir
+
+    path = _workflow_data_dir() / "runs" / f"{run_id}.json"
+    if not path.is_file():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+
 def register_workflow_routes(router: APIRouter, *, port: int) -> None:
     """Mount the queue intake and the consumer on berg's router.
 
@@ -295,36 +406,90 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
 
         return StreamingResponse(_frames(), media_type="text/event-stream")
 
-    @router.post("/api/workflow/chat/{token}/approval")
-    async def workflow_chat_approval(token: str, request: Request) -> JSONResponse:
-        """Answer a gated write on the durable host — slice b.
+    @router.post("/api/workflow/chat/{run_id}/approval")
+    async def workflow_chat_approval(run_id: str, request: Request) -> JSONResponse:
+        """Answer a gated write by re-driving the run that parked on it.
 
-        The waiting half is a hook in the turn's workflow body, so the decision
-        reaches it wherever the process is. This is the durable host's
-        counterpart to ``POST /api/chat/delegation-approval``, and it is a
-        separate route for the same structural reason that one is: the turn is
-        still LIVE while the user decides.
+        The shape is the SDK's, not mine: a deferred write means the run ENDED,
+        and the decision arrives as a new run carrying history plus the answers
+        (``_adapter.py:314``). On the durable host that is *better* than a hook —
+        each pass is a durable run, so the decision survives because the run
+        record does, and there is no process-local future to lose.
 
-        :param token: The turn's token, as the start route returned it.
+        This route answers by key: the run id, which is durable, not the token
+        (the reservoir is the run id, and it is what the start route returned).
+
+        :param run_id: The run that parked on the gate, as the start route
+            returned it.
         :param request: JSON body with ``decision`` ("approved" | "rejected").
-        :return: The resumed run, or 409 when nothing is waiting on that token.
+        :return: The new run's id, or 409 when that run has nothing pending.
         """
-        from berg_agents.workflow.gated_turn import WriteGate
+        from berg_agents.workflow.gated_turn import gated_turn
+        from vercel import workflow
+
 
         body = await request.json()
         decision = str(body.get("decision", "rejected"))
-        try:
-            hook = await WriteGate(
-                decision=decision, reason=body.get("reason")
-            ).resume(f"{token}-write")
-        except Exception as exc:  # ruff: ignore[blind-except] - a spent decision must be a 409
-            if "HookNotFound" in type(exc).__name__:
-                return JSONResponse(
-                    status_code=409,
-                    content={"detail": "No durable turn is waiting on that token"},
-                )
-            raise
-        return JSONResponse({"resumed_run": hook.run_id, "decision": decision})
+        reason = body.get("reason")
+
+        parked = _parked_pass(run_id)
+        if parked is None:
+            # Nothing parked means the decision is spent: the run finished, was
+            # answered already, or was stopped underneath the card. Say so
+            # rather than reporting a success that changes nothing.
+            return JSONResponse(
+                status_code=409,
+                content={"detail": "That run has no write waiting for a decision"},
+            )
+
+        # The decision crosses the boundary as plain data: a pydantic object
+        # cannot be serialised into a step's arguments, and the run decodes it
+        # back into DeferredToolResults where it is used.
+        approvals = {
+            call["tool_call_id"]: {
+                "approved": decision == "approved",
+                "reason": reason}
+            for call in parked["pending"]
+        }
+        run = await workflow.start(
+            gated_turn,
+            token=parked["token"],
+            prompt=parked["prompt"],
+            model_id=parked["model_id"],
+            root_dir=parked["root_dir"],
+            active_agent=parked["active_agent"],
+            active_agent_description=parked["active_agent_description"],
+            _decisions=approvals,
+            _history=parked["history"],
+        )
+        return JSONResponse({"run_id": run.run_id, "decision": decision})
+
+    @router.post("/api/workflow/chat/{run_id}/steer")
+    async def workflow_chat_steer(run_id: str, request: Request) -> JSONResponse:
+        """Send a message into a durable turn — slice c.
+
+        A steer is stored against the run id, not held in a process, because
+        ``AgentRun.enqueue`` only exists while a run is live and cannot outlive
+        it. The store is what makes the text survive until the run next reads it:
+        a parked run picks it up when it is resumed, and a live one picks it up
+        on its next pass. Either way the text becomes a user turn in the run's
+        history, which is the SDK's own rule for content arriving at a
+        deferred-tool pause.
+
+        :param run_id: The run the text is addressed to.
+        :param request: JSON body with ``text``.
+        :return: Confirmation, and whether anything will read it.
+        """
+        from berg_agents.workflow.steering import append_steer
+
+        body = await request.json()
+        text = str(body.get("text") or "")
+        if not text.strip():
+            return JSONResponse(
+                status_code=400, content={"detail": "text is required"}
+            )
+        append_steer(run_id, text)
+        return JSONResponse({"run_id": run_id, "queued": True})
 
     @router.get("/api/workflow/pending")
     async def workflow_pending() -> JSONResponse:
