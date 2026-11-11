@@ -147,6 +147,66 @@ _LENGTH_BYTES = 4
 _LENGTH_BYTES = 4
 
 
+async def _resume_parked(
+    run_id: str,
+    parked: dict[str, Any],
+    *,
+    approved: bool,
+    reason: str | None,
+    steer: str | None = None,
+) -> str:
+    """Resume a parked run with its decision, and return the new run's id.
+
+    One path, used by the approval route and by the orchestrator's
+    ``approve_specialist``: a gate is answered by resuming (the parked pass has
+    ended), so every caller has to do the same four things — collect any steer,
+    turn the decision into plain data, start the next run, and hand its id back.
+
+    :param run_id: The parked run being answered.
+    :param parked: Its parked record, from ``_parked_pass``.
+    :param approved: Whether the user allowed the calls.
+    :param reason: Why not, when rejected.
+    :param steer: A new instruction that supersedes the pending ones; when
+        absent, the turn's stored steers are used.
+    :return: The resumed run's id.
+    """
+    from berg_agents.workflow.gated_turn import gated_turn
+    from vercel import workflow
+
+    steer_text = (steer or "").strip()
+    if not steer_text:
+        # Read WITHOUT clearing: the resumed pass owns the store (``take_steers``
+        # clears on read), and clearing here too would make delivery depend on
+        # which of the two happened to run first.
+        from berg_agents.workflow.steering import read_steers
+
+        turn = _turn_token(run_id) or parked.get("token") or ""
+        steers = read_steers(turn) if turn else []
+        steer_text = " ".join(s for s in steers if s.strip()).strip()
+
+    # Plain data across the boundary: a pydantic object cannot be serialised
+    # into a step's arguments, so the run rebuilds DeferredToolResults itself.
+    approvals = {
+        call["tool_call_id"]: {
+            "approved": approved,
+            "reason": reason,
+            "steer": steer_text or None}
+        for call in parked["pending"]
+    }
+    run = await workflow.start(
+        gated_turn,
+        token=parked["token"],
+        prompt=parked["prompt"],
+        model_id=parked["model_id"],
+        root_dir=parked["root_dir"],
+        active_agent=parked["active_agent"],
+        active_agent_description=parked["active_agent_description"],
+        _decisions=approvals,
+        _history=parked["history"],
+    )
+    return str(run.run_id)
+
+
 def _turn_token(run_id: str) -> str | None:
     """The turn's token for a run, from the run's own stored input.
 
@@ -269,7 +329,6 @@ def _run_record(run_id: str) -> dict[str, Any] | None:
     return record if isinstance(record, dict) else None
 
 
-
 def register_workflow_routes(router: APIRouter, *, port: int) -> None:
     """Mount the queue intake and the consumer on berg's router.
 
@@ -381,9 +440,29 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         )
         # The session's own root dir, exactly as the chat path reads it.
         root_dir = str(sessions._harness_root_dir())
-        active_agent, active_agent_description = _resolve_active_agent(
-            request.app.state.harness, sessions
-        )
+        # An explicit ``agent`` names the specialist this run is for; without
+        # one the session's active agent is used, exactly as the chat path does.
+        # A specialist run is otherwise identical — same host, same wire, same
+        # record — which is what makes "a specialist is a run" literal.
+        requested_agent = str(body.get("agent") or "").strip()
+        if requested_agent:
+            active_agent = requested_agent
+            try:
+                active_agent_description = (
+                    request.app.state.harness
+                    .get_agent(requested_agent)
+                    .get_info()
+                    .get("description")
+                )
+            except KeyError:
+                return JSONResponse(
+                    status_code=404,
+                    content={"detail": f"Unknown agent {requested_agent!r}"},
+                )
+        else:
+            active_agent, active_agent_description = _resolve_active_agent(
+                request.app.state.harness, sessions
+            )
         token = str(body.get("token") or "").strip() or _new_token()
         point_queue_at_berg(port)
         run = await workflow.start(
@@ -424,7 +503,9 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         return StreamingResponse(_frames(), media_type="text/event-stream")
 
     @router.post("/api/workflow/chat/{run_id}/approval")
-    async def workflow_chat_approval(run_id: str, request: Request) -> JSONResponse:
+    async def workflow_chat_approval(
+        run_id: str, request: Request
+    ) -> JSONResponse:
         """Answer a gated write by re-driving the run that parked on it.
 
         The shape is the SDK's, not mine: a deferred write means the run ENDED,
@@ -441,13 +522,12 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         :param request: JSON body with ``decision`` ("approved" | "rejected").
         :return: The new run's id, or 409 when that run has nothing pending.
         """
-        from berg_agents.workflow.gated_turn import gated_turn
-        from vercel import workflow
-
-
         body = await request.json()
         decision = str(body.get("decision", "rejected"))
         reason = body.get("reason")
+        # An orchestrator may submit the new instruction with the decision, so it
+        # does not have to write the steer store and race the turn's own read.
+        steer = str(body.get("steer") or "").strip() or None
 
         parked = _parked_pass(run_id)
         if parked is None:
@@ -456,47 +536,29 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
             # rather than reporting a success that changes nothing.
             return JSONResponse(
                 status_code=409,
-                content={"detail": "That run has no write waiting for a decision"},
+                content={
+                    "detail": "That run has no write waiting for a decision"
+                },
             )
-
-        # Steers that arrived while the run was parked are delivered WITH the
-        # decision, as the denial's message — an approval alone would let the
-        # model keep the arguments it already committed, which a local model
-        # does (observed twice). The token is the turn's identity across runs.
-        # Read WITHOUT clearing: the resumed pass owns the store
-        # (``take_steers`` clears on read), and clearing here as well would make
-        # delivery depend on which of the two happened to run first.
-        from berg_agents.workflow.steering import read_steers
-
-        turn = _turn_token(run_id) or parked.get("token") or ""
-        steers = read_steers(turn) if turn else []
-        steer_text = " ".join(s for s in steers if s.strip()).strip()
-
-        # The decision crosses the boundary as plain data: a pydantic object
-        # cannot be serialised into a step's arguments, and the run decodes it
-        # back into DeferredToolResults where it is used.
-        approvals = {
-            call["tool_call_id"]: {
-                "approved": decision == "approved",
-                "reason": reason,
-                "steer": steer_text or None}
-            for call in parked["pending"]
-        }
-        run = await workflow.start(
-            gated_turn,
-            token=parked["token"],
-            prompt=parked["prompt"],
-            model_id=parked["model_id"],
-            root_dir=parked["root_dir"],
-            active_agent=parked["active_agent"],
-            active_agent_description=parked["active_agent_description"],
-            _decisions=approvals,
-            _history=parked["history"],
+        resumed = await _resume_parked(
+            run_id,
+            parked,
+            approved=decision == "approved",
+            reason=reason,
+            steer=steer,
         )
-        return JSONResponse({"run_id": run.run_id, "decision": decision})
+        return JSONResponse(
+            {
+                "run_id": resumed,
+                "decision": decision,
+                "token": parked.get("token", ""),
+                "agent_name": parked.get("active_agent") or ""}
+        )
 
     @router.post("/api/workflow/chat/{run_id}/steer")
-    async def workflow_chat_steer(run_id: str, request: Request) -> JSONResponse:
+    async def workflow_chat_steer(
+        run_id: str, request: Request
+    ) -> JSONResponse:
         """Send a message into a durable turn — slice c.
 
         A steer is stored against the run id, not held in a process, because
