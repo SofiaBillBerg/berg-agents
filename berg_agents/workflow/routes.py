@@ -368,15 +368,12 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         from vercel import workflow
 
         body = await request.json()
-        gated = bool(body.get("gate", False))
-        if gated:
-            from berg_agents.workflow.gated_turn import (
-                gated_turn as turn_workflow,
-            )
-        else:
-            from berg_agents.workflow.chat_turn import (
-                chat_turn as turn_workflow,
-            )
+        # ONE host. The plain ``chat_turn`` this used to select could not park a
+        # gated tool: without ``DeferredToolRequests`` in its output types a
+        # gated call — ``delegate_task`` included — dies instead of asking, which
+        # is how this was found. The gated host parks correctly and a turn with
+        # no gated call is identical under it, so there is no second path.
+        from berg_agents.workflow.gated_turn import gated_turn as turn_workflow
 
         sessions = request.app.state.sessions
         model_id = (
@@ -411,7 +408,7 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         :param run_id: The turn's run id.
         :return: A streaming SSE response of ``data: {...}`` frames.
         """
-        from berg_agents.workflow.chat_turn import Frame
+        from berg_agents.workflow.registry import Frame
         from fastapi.responses import StreamingResponse
 
         async def _frames() -> Any:

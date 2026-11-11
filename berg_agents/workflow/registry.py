@@ -105,6 +105,17 @@ _IDLE_POLL_SECONDS = 0.5
 wf = workflow.Workflows(as_vercel_job=False)
 
 
+class Frame(pydantic.BaseModel):
+    """One SSE frame, byte-for-byte as berg's encoder produced it.
+
+    Stored on a run's durable stream, so a reader that joins late — or a server
+    that restarted mid-turn — replays exactly the frames the turn produced rather
+    than a rebuilt approximation.
+    """
+
+    data: str
+
+
 class Chunk(pydantic.BaseModel):
     """One transcript chunk on a run's namespaced durable stream.
 
@@ -145,4 +156,4 @@ def start_worker() -> asyncio.Task:
     return asyncio.create_task(_dispatch_loop(), name="workflow.queue-worker")
 
 
-__all__ = ["Chunk", "start_worker", "wf"]
+__all__ = ["Chunk", "Frame", "start_worker", "wf"]

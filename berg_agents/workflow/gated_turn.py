@@ -30,8 +30,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from berg_agents.workflow.chat_turn import Frame
-from berg_agents.workflow.registry import wf
+from berg_agents.workflow.registry import Frame, wf
 from vercel import workflow
 
 
