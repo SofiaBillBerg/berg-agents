@@ -36,12 +36,18 @@ from vercel import workflow
 
 
 def _workflow_data_dir() -> os.PathLike[str]:
-    """Berg's own home for the runtime's event log, steps, hooks and streams."""
+    """Berg's own home for the runtime's event log, steps, hooks and streams.
+
+    The directory is NOT created here. A workflow's module is re-imported inside
+    the runtime's deterministic sandbox on every replay, and ``os.mkdir`` is one
+    of the calls it forbids — so a directory created at import time is a
+    ``SandboxRestrictionError`` waiting to happen. The runtime creates its own
+    data dir when it writes, and berg creates it at startup if it wants it to
+    exist first.
+    """
     from berg_agents.config.paths import resolve_config_dir
 
-    path = resolve_config_dir(None) / "workflow-data"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return resolve_config_dir(None) / "workflow-data"
 
 
 # berg keeps its own stores under its config dir (``sessions.db``,
@@ -51,6 +57,42 @@ def _workflow_data_dir() -> os.PathLike[str]:
 # first constructed — the runtime builds it lazily, and berg's consumer route
 # is what first asks for it.
 os.environ.setdefault("WORKFLOW_LOCAL_DATA_DIR", str(_workflow_data_dir()))
+
+
+def _own_queue_url(port: int) -> str:
+    """Berg's own queue intake, so the runtime's sends come back to berg.
+
+    ONE path, deliberately. ``workflow.start()`` would otherwise hand the
+    message to the SDK's in-process embedded queue, and berg's worker reads the
+    SQLite broker — two dispatchers, and a run started by berg reaches neither
+    (observed 2026-11-11: ``status: pending``, one event, zero steps). Pointing
+    the runtime at berg's own intake is the arrangement already proven end to
+    end by an external client in step 1, so berg's own starts take it too.
+
+    The port is the one berg is actually serving on, threaded from ``--port``
+    through ``create_app``, because berg's port is a launch argument rather than
+    a setting. Anything already set in the environment wins, so a deployment
+    that fronts berg elsewhere needs no code change.
+    """
+    existing = os.environ.get("VERCEL_QUEUE_BASE_URL")
+    if existing:
+        return existing
+    return f"http://127.0.0.1:{port}"
+
+
+def point_queue_at_berg(port: int) -> None:
+    """Point the runtime's queue client at berg's own intake, once it is known.
+
+    Called from ``register_workflow_routes`` — the first moment the port berg
+    will actually serve on is known, since it arrives as a launch argument
+    rather than living in settings.
+
+    :param port: The port berg's server binds.
+    """
+    os.environ.setdefault("VERCEL_QUEUE_BASE_URL", _own_queue_url(port))
+    # The client requires a bearer token; berg's intake does not authenticate,
+    # so a constant local value says exactly that.
+    os.environ.setdefault("VERCEL_QUEUE_TOKEN", "berg-local")
 
 
 #: How long the worker sleeps when the queue is empty. berg's broker is polled

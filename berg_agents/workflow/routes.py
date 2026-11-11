@@ -31,6 +31,7 @@ import json
 from typing import Any
 
 from berg_agents.workflow import queue as broker
+from berg_agents.workflow.registry import point_queue_at_berg
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
@@ -138,11 +139,17 @@ def _new_token() -> str:
     return secrets.token_hex(6)
 
 
-def register_workflow_routes(router: APIRouter) -> None:
+def register_workflow_routes(router: APIRouter, *, port: int) -> None:
     """Mount the queue intake and the consumer on berg's router.
 
     :param router: Router to attach endpoints to.
+    :param port: The port berg serves on, so the runtime's queue client can be
+        pointed back at berg's own intake. Threaded from ``--port`` because
+        berg's port is a launch argument rather than a setting.
     """
+    # Set before the consumer is built: the SDK constructs its queue client
+    # lazily, and the first thing to ask for it is what happens here.
+    point_queue_at_berg(port)
     consumer = build_consumer()
     # Held where the dispatcher can reach it without importing routes.
     from berg_agents.workflow import registry
@@ -206,6 +213,118 @@ def register_workflow_routes(router: APIRouter) -> None:
             prompt=str(body.get("prompt", "")),
         )
         return JSONResponse({"run_id": run.run_id})
+
+    @router.post("/api/workflow/chat")
+    async def workflow_chat(request: Request) -> JSONResponse:
+        """Start a durable chat turn on berg's real chat agent.
+
+        ``/api/chat/stream`` keeps its current host; this is the second,
+        temporary one (``chat_turn._TEMPORARY_HOST``), and it exists so the
+        durable host can be verified against the real agent and the real wire
+        before anything moves.
+
+        ``gate: true`` selects the gated host, where a write waits for the user
+        rather than executing — the host this port exists for. The flag exists
+        so the plain turn can still be reproduced, and it goes away when LiveRun
+        retires and only one host is left.
+
+        :param request: JSON body with ``prompt``, optional ``token``, the
+            selections the chat path resolves, and optional ``gate``.
+        :return: The run id and the token its approval route is keyed on.
+        """
+        from berg_agents.ui.route_handlers.chat import _resolve_active_agent
+        from berg_agents.workflow.registry import point_queue_at_berg
+        from vercel import workflow
+
+        body = await request.json()
+        gated = bool(body.get("gate", False))
+        if gated:
+            from berg_agents.workflow.gated_turn import (
+                gated_turn as turn_workflow,
+            )
+        else:
+            from berg_agents.workflow.chat_turn import (
+                chat_turn as turn_workflow,
+            )
+
+        sessions = request.app.state.sessions
+        model_id = (
+            request.query_params.get("model") or sessions.active_model or ""
+        )
+        # The session's own root dir, exactly as the chat path reads it.
+        root_dir = str(sessions._harness_root_dir())
+        active_agent, active_agent_description = _resolve_active_agent(
+            request.app.state.harness, sessions
+        )
+        token = str(body.get("token") or "").strip() or _new_token()
+        point_queue_at_berg(port)
+        run = await workflow.start(
+            turn_workflow,
+            token=token,
+            prompt=str(body.get("prompt", "")),
+            model_id=model_id,
+            root_dir=root_dir,
+            active_agent=active_agent,
+            active_agent_description=active_agent_description,
+        )
+        return JSONResponse({"run_id": run.run_id, "token": token})
+
+    @router.get("/api/workflow/chat/{run_id}/stream")
+    async def workflow_chat_stream(run_id: str) -> Any:
+        """Serve a durable turn's frames in the SSE protocol the UI renders.
+
+        Same frames berg's own encoder produced, read from the durable stream —
+        so a reader that joins late, or a server that restarted mid-turn, gets
+        exactly the bytes the turn emitted rather than a rebuilt approximation.
+
+        :param run_id: The turn's run id.
+        :return: A streaming SSE response of ``data: {...}`` frames.
+        """
+        from berg_agents.workflow.chat_turn import Frame
+        from fastapi.responses import StreamingResponse
+
+        async def _frames() -> Any:
+            from vercel import workflow
+
+            run = workflow.Run(run_id)
+            async for frame in run.readable(type=Frame):
+                yield frame.data
+            # The protocol closes a turn with a finish frame; the turn's own
+            # encoder already emitted it, so the reader only needs to stop.
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(_frames(), media_type="text/event-stream")
+
+    @router.post("/api/workflow/chat/{token}/approval")
+    async def workflow_chat_approval(token: str, request: Request) -> JSONResponse:
+        """Answer a gated write on the durable host — slice b.
+
+        The waiting half is a hook in the turn's workflow body, so the decision
+        reaches it wherever the process is. This is the durable host's
+        counterpart to ``POST /api/chat/delegation-approval``, and it is a
+        separate route for the same structural reason that one is: the turn is
+        still LIVE while the user decides.
+
+        :param token: The turn's token, as the start route returned it.
+        :param request: JSON body with ``decision`` ("approved" | "rejected").
+        :return: The resumed run, or 409 when nothing is waiting on that token.
+        """
+        from berg_agents.workflow.gated_turn import WriteGate
+
+        body = await request.json()
+        decision = str(body.get("decision", "rejected"))
+        try:
+            hook = await WriteGate(
+                decision=decision, reason=body.get("reason")
+            ).resume(f"{token}-write")
+        except Exception as exc:  # ruff: ignore[blind-except] - a spent decision must be a 409
+            if "HookNotFound" in type(exc).__name__:
+                return JSONResponse(
+                    status_code=409,
+                    content={"detail": "No durable turn is waiting on that token"},
+                )
+            raise
+        return JSONResponse({"resumed_run": hook.run_id, "decision": decision})
 
     @router.get("/api/workflow/pending")
     async def workflow_pending() -> JSONResponse:

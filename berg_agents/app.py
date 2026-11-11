@@ -240,7 +240,9 @@ class BergAgentsApp:
         import uvicorn
 
         logger.info("Starting BergAgents server on %s:%d", host, port)
-        uvicorn.run(create_app(self.harness), host=host, port=port)
+        uvicorn.run(
+            create_app(self.harness, web_port=port), host=host, port=port
+        )
 
     def execute(
         self, description: str, task_type: str = "generic"

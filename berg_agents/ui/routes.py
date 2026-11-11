@@ -54,12 +54,16 @@ def create_router(
     sessions: SessionManager,
     *,
     providers: list[dict[str, Any]],
+    web_port: int = 8001,
 ) -> APIRouter:
     """Build the API router with injected dependencies.
 
     :param harness: Shared harness (single instance per app).
     :param sessions: Session store (needed for model override in chat).
     :param providers: Configured provider/model pairs.
+    :param web_port: The port the app will serve on, threaded from ``--port``.
+        Only the workflow queue needs it, so berg's port stays a launch
+        argument and never becomes a second source of truth.
     :return: Configured APIRouter.
     """
     router = APIRouter()
@@ -77,5 +81,5 @@ def create_router(
     # Mounted last and next to nothing: the workflow host's two surfaces
     # (the queue intake and the SDK's consumer) are read by the runtime,
     # not by the chat UI.
-    register_workflow_routes(router)
+    register_workflow_routes(router, port=web_port)
     return router

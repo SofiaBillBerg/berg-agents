@@ -147,6 +147,7 @@ def create_app(
     providers: list[dict[str, Any]] | None = None,
     active_provider: str | None = None,
     active_model: str | None = None,
+    web_port: int = 8001,
 ) -> FastAPI:
     """Create the BergAgents FastAPI application.
 
@@ -155,6 +156,9 @@ def create_app(
     :param providers: Provider/model pairs; resolved from settings when None.
     :param active_provider: Active provider override.
     :param active_model: Active model override.
+    :param web_port: The port this app will serve on, from ``--port``. Forwarded
+        to the workflow routes so the runtime's queue client points back at the
+        port berg is actually on.
     :return: Configured FastAPI application.
     """
     settings = get_settings()
@@ -258,7 +262,7 @@ def create_app(
 
     app.state.run_registry = RunRegistry()
     router = create_router(
-        resolved_harness, sessions, providers=resolved_providers
+        resolved_harness, sessions, providers=resolved_providers, web_port=web_port
     )
     print(
         "DEBUG create_router routes:",

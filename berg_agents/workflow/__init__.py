@@ -14,6 +14,8 @@ from __future__ import annotations
 
 # Registers berg's workflows and steps on `wf`. Imported for the side effect,
 # so the linter is told why the name is unused.
+from berg_agents.workflow import chat_turn as _chat_turn  # ruff: ignore[unused-import]
+from berg_agents.workflow import gated_turn as _gated_turn  # ruff: ignore[unused-import]
 from berg_agents.workflow import turn as _turn  # ruff: ignore[unused-import]
 from berg_agents.workflow.registry import Chunk, start_worker, wf
 
