@@ -35,6 +35,59 @@ from berg_agents.workflow.registry import wf
 from vercel import workflow
 
 
+# A step must be declared async even when its body has nothing to await:
+# the runtime resolves it by signature, not by whether it yields.
+def _decision_for(answer: dict[str, Any]) -> Any:
+    """One approval decision, in the shape the run expects.
+
+    An approval that carries a **steer instruction** is delivered as a denial
+    *with that instruction as its message*, not as a silent approval. The
+    difference matters: approving leaves the call to execute with the arguments
+    the model already committed, and a local model will keep them — observed
+    twice. A denial hands the model a message and makes it re-plan, so the
+    steer actually changes what happens rather than merely being visible.
+
+    :param answer: ``{"approved": bool, "reason": str | None, "steer": str |
+        None}``, as the approval endpoint stored it.
+    :return: ``ToolApproved`` or ``ToolDenied``.
+    """
+    from pydantic_ai.tools import ToolApproved, ToolDenied
+
+    steer = str(answer.get("steer") or "").strip()
+    if steer:
+        return ToolDenied(
+            message=(
+                "The user changed the plan before this call ran. "
+                f"{steer} Re-plan and call the tools again, using the new "
+                "instruction instead of the arguments you had chosen."
+            )
+        )
+    if answer.get("approved"):
+        return ToolApproved()
+    return ToolDenied(message=answer.get("reason") or "The user rejected this call.")
+
+
+@wf.step
+async def take_steers(*, key: str) -> list[str]:  # ruff: ignore[unused-async]
+    """Read and clear the steers waiting for this turn.
+
+    A step, because a workflow body may not touch the filesystem — the runtime
+    refuses ``io.open`` there, and a steer store is a file. Clearing on read is
+    deliberate: the text is carried into this pass, and a later pass must not
+    see it twice.
+
+    :param key: The turn's token, which is what identifies the conversation a
+        steer is addressed to across the runs that make up one turn.
+    :return: The steer texts, oldest first.
+    """
+    from berg_agents.workflow.steering import clear_steers, read_steers
+
+    texts = read_steers(key)
+    if texts:
+        clear_steers(key)
+    return texts
+
+
 @wf.step(cancellable=True)
 async def run_pass(
     *,
@@ -105,19 +158,11 @@ async def run_pass(
     if decisions:
         # Rebuilt here, inside the step: a DeferredToolResults cannot be
         # serialised across the boundary, so only plain decisions travel.
-        from pydantic_ai.tools import (
-            DeferredToolResults,
-            ToolApproved,
-            ToolDenied,
-        )
+        from pydantic_ai.tools import DeferredToolResults
 
         kwargs["deferred_tool_results"] = DeferredToolResults(
             approvals={
-                call_id: (
-                    ToolDenied(message=answer.get("reason"))
-                    if not answer.get("approved")
-                    else ToolApproved()
-                )
+                call_id: _decision_for(answer)
                 for call_id, answer in decisions.items()
             }
         )
@@ -229,12 +274,13 @@ async def gated_turn(
     :return: The turn's outcome, readable from a fresh ``Run`` handle.
     """
     stream = workflow.get_writable(type=Frame)
-    # Steers addressed to this run are read here, in the body, so a pass always
-    # sees the ones that arrived before it started; the endpoint stores them
-    # because a steer must outlive the process that received it.
-    from berg_agents.workflow.steering import read_steers
-
-    pending_steers = read_steers(_steer_key or token)
+    # Steers are read in a STEP, never in the body: a workflow body re-runs on
+    # every replay and the runtime refuses file access there (`io.open`), so
+    # the read has to be a step's work like every other side effect.
+    # Taken here so a steer is delivered exactly once, by whichever pass
+    # reaches it first — the approval endpoint reads the same store when it
+    # resumes a parked run, so this pass sees only what arrived afterwards.
+    pending_steers = await take_steers(key=_steer_key or token)
     outcome = await run_pass(
         writable=stream,
         prompt=prompt,
@@ -250,10 +296,6 @@ async def gated_turn(
         active_agent_description=active_agent_description,
     )
     await close_frames(writable=stream)
-    if pending_steers:
-        from berg_agents.workflow.steering import clear_steers
-
-        clear_steers(_steer_key or token)
     return outcome
 
 

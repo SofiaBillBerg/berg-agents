@@ -147,6 +147,26 @@ _LENGTH_BYTES = 4
 _LENGTH_BYTES = 4
 
 
+def _turn_token(run_id: str) -> str | None:
+    """The turn's token for a run, from the run's own stored input.
+
+    A turn spans several runs (the parked one and each resumed one), and the
+    token is the part that stays the same, so it is what a steer is filed
+    under.
+
+    :param run_id: Any run belonging to the turn.
+    :return: The token, or ``None`` when the record cannot be read.
+    """
+    started = _decode_payload((_run_record(run_id) or {}).get("input"))
+    if isinstance(started, list) and started and isinstance(started[0], dict):
+        started = started[0]
+    if isinstance(started, dict):
+        token = started.get("token")
+        if isinstance(token, str) and token:
+            return token
+    return None
+
+
 def _decode_payload(raw: Any) -> Any:
     """Decode a stored payload with the runtime's own decoder.
 
@@ -442,13 +462,27 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
                 content={"detail": "That run has no write waiting for a decision"},
             )
 
+        # Steers that arrived while the run was parked are delivered WITH the
+        # decision, as the denial's message — an approval alone would let the
+        # model keep the arguments it already committed, which a local model
+        # does (observed twice). The token is the turn's identity across runs.
+        # Read WITHOUT clearing: the resumed pass owns the store
+        # (``take_steers`` clears on read), and clearing here as well would make
+        # delivery depend on which of the two happened to run first.
+        from berg_agents.workflow.steering import read_steers
+
+        turn = _turn_token(run_id) or parked.get("token") or ""
+        steers = read_steers(turn) if turn else []
+        steer_text = " ".join(s for s in steers if s.strip()).strip()
+
         # The decision crosses the boundary as plain data: a pydantic object
         # cannot be serialised into a step's arguments, and the run decodes it
         # back into DeferredToolResults where it is used.
         approvals = {
             call["tool_call_id"]: {
                 "approved": decision == "approved",
-                "reason": reason}
+                "reason": reason,
+                "steer": steer_text or None}
             for call in parked["pending"]
         }
         run = await workflow.start(
@@ -488,7 +522,12 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
             return JSONResponse(
                 status_code=400, content={"detail": "text is required"}
             )
-        append_steer(run_id, text)
+        # Filed under the TURN's token, not the run id: a resumed turn is a new
+        # run, so a steer keyed on the run id would be stranded the moment the
+        # user's next decision starts the resumed pass. The token is what
+        # identifies the conversation the user is speaking to.
+        turn = _turn_token(run_id)
+        append_steer(turn or run_id, text)
         return JSONResponse({"run_id": run_id, "queued": True})
 
     @router.get("/api/workflow/pending")
