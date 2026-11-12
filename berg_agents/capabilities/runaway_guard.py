@@ -48,8 +48,8 @@ from typing import TYPE_CHECKING, Any
 from pydantic_ai.capabilities import AbstractCapability
 
 if TYPE_CHECKING:
-    from pydantic_ai import RunContext
-    from pydantic_ai.messages import ModelRequestContext
+    from pydantic_ai import RunContext, ModelRequestContext
+    from pydantic_ai.models import ModelRequestContext
     from pydantic_ai.tools import ToolDefinition
 
 logger = logging.getLogger(__name__)
