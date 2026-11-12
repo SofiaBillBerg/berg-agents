@@ -20,8 +20,9 @@
 """Plugin lifecycle management hooks."""
 
 import asyncio
-from datetime import datetime
 import logging
+
+from datetime import datetime
 from typing import Any
 
 from plugin_system.discovery.plugin_entry import PluginEntry
@@ -36,6 +37,7 @@ from plugin_system.exceptions import (
 from plugin_system.lifecycle.lifecycle_states import PluginState
 from plugin_system.plugin_context import PluginContext
 from plugin_system.plugin_contract import PluginCapability
+
 
 logger = logging.getLogger(__name__)
 

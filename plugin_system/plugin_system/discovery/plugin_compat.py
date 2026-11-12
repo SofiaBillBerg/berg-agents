@@ -32,6 +32,7 @@ from plugin_system.plugin_contract import (  # PluginContext,
     ToolCapability,
 )
 
+
 # Skill Adapter
 
 # Wrap existing skills as plugins:

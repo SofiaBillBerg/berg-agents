@@ -17,9 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
+import logging
+
 from collections import defaultdict
 from dataclasses import dataclass, field
-import logging
 
 from plugin_system.dependency.dependency_management import (
     DependencyGraph,
@@ -36,6 +37,7 @@ from plugin_system.exceptions import (
     VersionConflictError,
 )
 from plugin_system.lifecycle.lifecycle_states import PluginState
+
 
 logger = logging.getLogger(__name__)
 

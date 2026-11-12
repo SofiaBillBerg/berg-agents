@@ -30,11 +30,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+
 from pathlib import Path
 from typing import TYPE_CHECKING as __TYPE_CHECKING
 from typing import Any
 
 from plugin_system.lifecycle.lifecycle_states import PluginState
+
 
 logger = logging.getLogger(__name__)
 
@@ -114,11 +116,10 @@ async def ensure_plugin_system_ready() -> None:
             # NOTE: Migration-guide Phase 1 — repo skills join the
             # registry as adapter plugins (same lifecycle, no rewrites).
             try:
+                from berg_agents.config.settings import get_settings
                 from plugin_system.adapters.skill_adapter import (
                     register_skill_plugins,
                 )
-
-                from berg_agents.config.settings import get_settings
 
                 skill_settings = get_settings()
                 await register_skill_plugins(manager, skill_settings.skills)
@@ -201,9 +202,8 @@ async def get_plugin_tools_for(
         # tools stay usable with their own defaults.
         return tools
 
-    from plugin_system.session_scope import bind_session_scope, session_dir_for
-
     from berg_agents.ui.projects import project_dir, resolve_project
+    from plugin_system.session_scope import bind_session_scope, session_dir_for
 
     project = resolve_project(root_dir)
     out: list[Any] = []

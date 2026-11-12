@@ -21,13 +21,15 @@
 
 # Plugin Entry
 
+import logging
+
 from dataclasses import dataclass
 from datetime import datetime
-import logging
 
 from plugin_system.discovery.plugin_metadata import PluginMetadata
 from plugin_system.lifecycle.bergplugin import BergPlugin
 from plugin_system.lifecycle.lifecycle_states import PluginState
+
 
 logger = logging.getLogger(__name__)
 

@@ -21,4 +21,5 @@
 
 from plugin_system.permissions.hitl import HITLManager, HITLRequest, HITLStatus
 
+
 __all__ = ["HITLManager", "HITLRequest", "HITLStatus"]

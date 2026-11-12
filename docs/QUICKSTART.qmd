@@ -171,7 +171,7 @@ the created app for background use.
   low/high-risk tools as registered.
 - `GET http://localhost:8001/api/plugins` (in UI or curl) lists
   `berg-plugin-shared-todo`, 10 tools, and `ui.entry_built: true`.
-- The `📋 Todos` button appears in the tool bar; clicking toggles both
+- The `📋 Todos` button appears in the toolbar; clicking toggles both
   directions.
 - `GET http://localhost:8001/_next/...` 404s only mean the production
   UI was never built; run `npm run build` again.

@@ -34,8 +34,9 @@ This class manages the complete plugin lifecycle:
 import asyncio
 import importlib
 import logging
-from pathlib import Path
 import sys
+
+from pathlib import Path
 from typing import Any
 
 # NOTE: app/harness are typed as Any to avoid a circular import
@@ -56,6 +57,7 @@ from plugin_system.exceptions import (
 from plugin_system.lifecycle.bergplugin import BergPlugin
 from plugin_system.lifecycle.lifecycle_states import PluginState
 from plugin_system.plugin_context import PluginContext
+
 
 logger = logging.getLogger(__name__)
 

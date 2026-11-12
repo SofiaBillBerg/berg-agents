@@ -73,6 +73,9 @@ export function PluginCatalog({
   const [toggling, setToggling] = useState<string | null>(null);
 
   const reloadPlugins = useCallback(async () => {
+    // One spinner rule for both entry points (mount and ↻), so a refresh shows
+    // the same state a mount does.
+    setLoading(true);
     try {
       invalidateCatalog();
       setPlugins(await fetchPlugins());
@@ -84,9 +87,14 @@ export function PluginCatalog({
     }
   }, []);
 
+  // Both the mount and the ↻ button go through `reloadPlugins`, which is what
+  // actually applies the result and clears `loading`. They used to call
+  // `fetchPlugins()` directly and discard the promise, so `loading` never
+  // became false and the panel sat on "Loading…" forever — a bug that looked
+  // like a broken backend because the request itself succeeded (2026-11-12).
   useEffect(() => {
-    void fetchPlugins();
-  }, [fetchPlugins]);
+    void reloadPlugins();
+  }, [reloadPlugins]);
 
   // Enable/disable one plugin: the next chat turn picks up the change
   // (tools withheld, MCP toolsets and skills excluded server-side).
@@ -130,8 +138,9 @@ export function PluginCatalog({
           size="sm"
           variant="secondary"
           onPress={() => {
-            setLoading(true);
-            void fetchPlugins();
+            // `reloadPlugins` invalidates the catalog cache, so this is a real
+            // refresh rather than a re-read of the cached list.
+            void reloadPlugins();
           }}
         >
           ↻

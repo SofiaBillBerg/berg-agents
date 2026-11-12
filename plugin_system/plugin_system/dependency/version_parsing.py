@@ -23,9 +23,10 @@
 
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass
 from functools import total_ordering
-import re
 
 
 @total_ordering

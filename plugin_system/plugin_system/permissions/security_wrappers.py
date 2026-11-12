@@ -21,14 +21,18 @@
 
 # Security Wrappers
 import asyncio
+import json
+import logging
+
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import StrEnum
-import json
-import logging
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
+
+from berg_agents.capabilities.base import RISK_HIGH, RiskClass
 from plugin_system.exceptions import PermissionDeniedError
 from plugin_system.permissions import HITLManager, HITLRequest
 from plugin_system.permissions.permissions import (
@@ -37,8 +41,6 @@ from plugin_system.permissions.permissions import (
 )
 from plugin_system.permissions.sandbox import SandboxLevel
 
-from berg_agents.capabilities.base import RISK_HIGH, RiskClass
-import httpx
 
 logger = logging.getLogger(__name__)
 

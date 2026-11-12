@@ -35,11 +35,13 @@ plugin system and berg_agents, never the reverse.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
 import inspect
 import logging
+
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
+
 
 logger = logging.getLogger(__name__)
 

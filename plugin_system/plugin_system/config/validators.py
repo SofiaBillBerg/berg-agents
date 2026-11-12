@@ -19,11 +19,13 @@
 
 """Configuration validators for the plugin system."""
 
+import re
+
 # Configuration Validation
 from collections.abc import Callable
 from pathlib import Path
-import re
 from typing import Any
+
 
 # Custom Validators
 

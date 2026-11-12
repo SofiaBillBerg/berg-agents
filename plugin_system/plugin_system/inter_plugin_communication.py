@@ -20,9 +20,11 @@
 """Inter-plugin communication mechanisms."""
 
 import asyncio
+
 from typing import Any
 
 from plugin_system.events.event_bus import Event, EventBus, EventHandler
+
 
 # [Request-Response Pattern](../08-plugin-event-system#Request-Response Pattern)
 

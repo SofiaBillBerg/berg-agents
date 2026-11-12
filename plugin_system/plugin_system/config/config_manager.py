@@ -22,16 +22,19 @@
 # Configuration Manager
 import logging
 import os
-from pathlib import Path
 import re
+
+from pathlib import Path
 from typing import Any
+
+import yaml
+
+from jsonschema import ValidationError, validate
 
 from plugin_system.config.file_watcher import FileWatcher
 from plugin_system.exceptions import ConfigValidationError
 from plugin_system.lifecycle.lifecycle_hooks import PluginLifecycle
 
-from jsonschema import ValidationError, validate
-import yaml
 
 logger = logging.getLogger(__name__)
 

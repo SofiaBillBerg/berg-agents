@@ -33,7 +33,7 @@ SVG_DIR="$RAW_VISUALIZATION_DIR/svg"
 mkdir -p "$SVG_DIR"
 mkdir -p "$PNG_DIR"
 echo "▶ Running custom Python diagram extractor..."
-python project_utils/generate_diagrams.py
+python project_utils/generate_diagrams.py || { echo "❌ Python diagram extractor failed!"; exit 1; }
 for mermaid_file in "$RAW_VISUALIZATION_DIR"/*.mmd; do
   if [ -f "$mermaid_file" ]; then
     bunx mermaidfmt -w "$mermaid_file" 2>/dev/null || true

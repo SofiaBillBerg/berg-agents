@@ -36,6 +36,7 @@ from plugin_system.adapters.skill_adapter import (
     register_skill_plugins,
 )
 
+
 __all__ = [
     "MCPPluginAdapter",
     "SkillPluginAdapter",

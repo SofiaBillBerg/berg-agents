@@ -21,14 +21,16 @@
 # Discovery Algorithm
 
 import asyncio
-from importlib.metadata import entry_points
 import logging
+
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from plugin_system.discovery.plugin_metadata import PluginMetadata
 
-import yaml
 
 logger = logging.getLogger(__name__)
 

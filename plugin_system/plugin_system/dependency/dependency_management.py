@@ -19,8 +19,9 @@
 
 """Dependency management for the plugin system."""
 
-from collections import defaultdict
 import logging
+
+from collections import defaultdict
 
 from plugin_system.dependency.version_parsing import Version, VersionConstraint
 from plugin_system.discovery.plugin_metadata import PluginMetadata
@@ -32,6 +33,7 @@ from plugin_system.exceptions import (
     DependencyVersionError,
     VersionConflictError,
 )
+
 
 logger = logging.getLogger(__name__)
 

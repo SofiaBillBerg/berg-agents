@@ -21,15 +21,17 @@
 
 # Sandboxing
 import asyncio
-from enum import StrEnum
 import json
 import logging
 import os
 import sys
+
+from enum import StrEnum
 from typing import Any
 
 from plugin_system.discovery.plugin_registry import PluginError
 from plugin_system.permissions.permissions import Permission, PermissionCategory
+
 
 logger = logging.getLogger(__name__)
 

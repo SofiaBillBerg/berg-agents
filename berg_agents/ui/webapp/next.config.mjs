@@ -62,7 +62,19 @@ const nextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: `${backend}/api/:path*`}];
+        destination: `${backend}/api/:path*`},
+      {
+        // Plugin UI bundles are served BY PYTHON, not by this app. Each
+        // plugin's manifest gives an `entry_url` such as
+        // `/berg-plugins/shared-todo/ui/dist/todo-surface.js`, and the browser
+        // loads it directly — so without this rewrite the Plugins page renders
+        // its chrome but the bundle 404s and the panel is empty (found
+        // 2026-11-12 from a screenshot: 404 here, 200 on the backend).
+        //
+        // Not under /api/*, so it needs its own rule; and not a Next route, so
+        // there is no precedence concern as there is with /api/orchestrator.
+        source: "/berg-plugins/:path*",
+        destination: `${backend}/berg-plugins/:path*`}];
   },
 
   distDir: "./dist",

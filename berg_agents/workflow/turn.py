@@ -19,10 +19,7 @@ from vercel import workflow
 
 @wf.step
 async def emit(
-    *,
-    writable: workflow.WorkflowWritable[Chunk],
-    kind: str,
-    text: str,
+    *, writable: workflow.WorkflowWritable[Chunk], kind: str, text: str
 ) -> None:
     """Publish one transcript chunk. Only a step may touch a stream."""
     await writable.write(Chunk(kind=kind, text=text))

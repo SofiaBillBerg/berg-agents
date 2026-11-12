@@ -55,7 +55,7 @@ Guardian (risk gate), Planner (breakdown), Implementation (edits), Curator (revi
 
 ![Berg-Agents Core](visualizations/svg/packages_berg_agents.core.svg)
 
-![Berg-Agents Plugin System](visualizations/svg/packages_berg_agents.plugin_system.svg)
+![Berg-Agents Plugin System](visualizations/svg/packages_plugin_system.svg)
 
 ![Berg-Agents Profiles](visualizations/svg/packages_berg_agents.profiles.svg)
 

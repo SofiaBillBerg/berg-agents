@@ -18,15 +18,17 @@
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
 import importlib
+
 from pathlib import Path
 
-from plugin_system.exceptions import ManifestError
-from plugin_system.plugin_schema import PluginManifest
+import yaml
 
 from jsonschema import ValidationError as JsonValidationError
 from jsonschema import validate
 from pydantic import ValidationError as PydanticValidationError
-import yaml
+
+from plugin_system.exceptions import ManifestError
+from plugin_system.plugin_schema import PluginManifest
 
 
 class ManifestValidator:

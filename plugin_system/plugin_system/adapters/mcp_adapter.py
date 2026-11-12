@@ -30,6 +30,7 @@ chat agent keeps attaching their toolsets through the existing
 from __future__ import annotations
 
 import logging
+
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,7 @@ from plugin_system.discovery.plugin_metadata import PluginMetadata
 from plugin_system.lifecycle.bergplugin import BergPlugin
 from plugin_system.plugin_context import PluginContext
 from plugin_system.plugin_contract import MCPCapability
+
 
 logger = logging.getLogger(__name__)
 
@@ -198,9 +200,8 @@ async def register_mcp_plugins(manager: Any) -> list[str]:
     """
     # NOTE: Same config reader as the chat toolsets — adapter and chat
     # can never disagree about which servers exist.
-    from plugin_system.exceptions import PluginError
-
     from berg_agents.capabilities.mcp_toolsets import _load_config
+    from plugin_system.exceptions import PluginError
 
     registered: list[str] = []
     for server_name, entry in _load_config().items():

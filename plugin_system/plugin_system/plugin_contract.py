@@ -19,14 +19,17 @@
 
 """Plugin contract for the plugin system."""
 
-from dataclasses import dataclass
 import logging
+
+from dataclasses import dataclass
 from typing import Any
+
+from pydantic_ai.agent.abstract import AbstractAgent
+from pydantic_ai.tools import Tool
 
 from berg_agents.capabilities.base import RiskClass
 from berg_agents.core.interface import TaskComplexity
-from pydantic_ai.agent.abstract import AbstractAgent
-from pydantic_ai.tools import Tool
+
 
 logger = logging.getLogger(__name__)
 

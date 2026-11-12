@@ -130,10 +130,7 @@ def _inference_prompt(
 
 
 async def _await_inference(
-    agent: Any,
-    prompt: str,
-    deps: AgentDeps,
-    message_history: Any = None,
+    agent: Any, prompt: str, deps: AgentDeps, message_history: Any = None
 ) -> Any:
     """Run one implementation-agent call under an explicit timeout.
 

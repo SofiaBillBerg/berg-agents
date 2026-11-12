@@ -209,7 +209,8 @@ async def approve_specialist_async(
     :raises RuntimeError: When berg's server cannot be reached.
     """
     payload: dict[str, Any] = {
-        "decision": "approved" if approved else "rejected"}
+        "decision": "approved" if approved else "rejected"
+    }
     if reason:
         payload["reason"] = reason
     if steer:
@@ -218,9 +219,7 @@ async def approve_specialist_async(
         _post_json, f"/api/workflow/chat/{run_id}/approval", payload
     )
     if not served.get("run_id"):
-        raise RuntimeError(
-            f"berg's server did not resume {run_id!r}: {served}"
-        )
+        raise RuntimeError(f"berg's server did not resume {run_id!r}: {served}")
     return {
         "run_id": str(served["run_id"]),
         "token": str(served.get("token") or ""),
@@ -256,7 +255,9 @@ async def steer_specialist_async(run_id: str, text: str) -> dict[str, Any]:
         # decision as the denial's message, which is what makes the model
         # re-plan. Steering it into the store would only be read by a pass that
         # has not started.
-        resumed = await approve_specialist_async(run_id, approved=True, steer=text)
+        resumed = await approve_specialist_async(
+            run_id, approved=True, steer=text
+        )
         return {"run_id": resumed["run_id"], "queued": True, "state": "waiting"}
 
     # A WORKING specialist has already read its steer store for the pass it is
@@ -292,7 +293,9 @@ def steer_specialist(run_id: str, text: str) -> dict[str, Any]:
     return asyncio.run(steer_specialist_async(run_id, text))
 
 
-async def stop_specialist_async(run_id: str, *, reason: str = "stopped by the user") -> dict[str, Any]:
+async def stop_specialist_async(
+    run_id: str, *, reason: str = "stopped by the user"
+) -> dict[str, Any]:
     """Stop a specialist, by whichever mechanism its state calls for.
 
     There are **two** states and they need **two** mechanisms, which is why this
@@ -318,10 +321,18 @@ async def stop_specialist_async(run_id: str, *, reason: str = "stopped by the us
             approved=False,
             reason=f"The user stopped this task. {reason}",
         )
-        return {"run_id": run_id, "stopped": True, "how": "gate-denied", "state": "waiting"}
+        return {
+            "run_id": run_id,
+            "stopped": True,
+            "how": "gate-denied",
+            "state": "waiting"}
 
     if state["state"] == "done":
-        return {"run_id": run_id, "stopped": False, "how": "already-finished", "state": state["state"]}
+        return {
+            "run_id": run_id,
+            "stopped": False,
+            "how": "already-finished",
+            "state": state["state"]}
 
     try:
         await workflow.Run(run_id).terminate(reason=reason)
@@ -331,10 +342,16 @@ async def stop_specialist_async(run_id: str, *, reason: str = "stopped by the us
             "stopped": False,
             "how": f"terminate-refused: {type(exc).__name__}",
             "state": state["state"]}
-    return {"run_id": run_id, "stopped": True, "how": "terminated", "state": state["state"]}
+    return {
+        "run_id": run_id,
+        "stopped": True,
+        "how": "terminated",
+        "state": state["state"]}
 
 
-def stop_specialist(run_id: str, *, reason: str = "stopped by the user") -> dict[str, Any]:
+def stop_specialist(
+    run_id: str, *, reason: str = "stopped by the user"
+) -> dict[str, Any]:
     """Synchronous door to :func:`stop_specialist_async`.
 
     :param run_id: The specialist's run.
@@ -437,12 +454,10 @@ def _did(record: Any) -> list[dict[str, Any]]:
             if part.get("part_kind") != "tool-call":
                 continue
             call_id = str(part.get("tool_call_id") or "")
-            did.append(
-                {
-                    "tool": str(part.get("tool_name") or ""),
-                    "args": part.get("args"),
-                    "result": results.get(call_id, "")}
-            )
+            did.append({
+                "tool": str(part.get("tool_name") or ""),
+                "args": part.get("args"),
+                "result": results.get(call_id, "")})
     return did
 
 

@@ -678,9 +678,7 @@ class Harness:
                 f"Task: {description}\n\nDeclare the exact mutating "
                 "tool actions for this task. JSON array only."
             )
-            deps = AgentDeps(
-                task_type=task_type, complexity=complexity.value
-            )
+            deps = AgentDeps(task_type=task_type, complexity=complexity.value)
             run_result = asyncio.run(
                 _await_inference(
                     agent, prompt, deps, message_history=message_history
@@ -786,9 +784,7 @@ class Harness:
             plan=plan,
             steps=steps,
         )
-        deps = AgentDeps(
-            task_type=task_type, complexity=complexity.value
-        )
+        deps = AgentDeps(task_type=task_type, complexity=complexity.value)
         start = time.perf_counter()
         # Harness-level output retries mirror the agent budget
         # (OUTPUT_RETRIES): fakes in tests raise UMB directly

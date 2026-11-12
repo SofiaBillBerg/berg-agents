@@ -66,11 +66,10 @@ def build_consumer() -> Any:
     :return: The callable ``workflow_entrypoint`` returns. Imported lazily so a
         failed SDK import cannot break importing berg's routes.
     """
-    from berg_agents.workflow.registry import wf
-
     # The only place these primitives exist, and not a published surface. The
     # coupling is recorded in decisions/decisions-log.md so a version bump is
     # re-checked rather than discovered in production.
+    from berg_agents.workflow.registry import wf
     from vercel.workflow._internal.runtime import workflow_entrypoint  # ruff: ignore[import-private-name]
 
     return workflow_entrypoint(wf)
@@ -547,13 +546,11 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
             reason=reason,
             steer=steer,
         )
-        return JSONResponse(
-            {
-                "run_id": resumed,
-                "decision": decision,
-                "token": parked.get("token", ""),
-                "agent_name": parked.get("active_agent") or ""}
-        )
+        return JSONResponse({
+            "run_id": resumed,
+            "decision": decision,
+            "token": parked.get("token", ""),
+            "agent_name": parked.get("active_agent") or ""})
 
     @router.post("/api/workflow/chat/{run_id}/steer")
     async def workflow_chat_steer(
@@ -607,6 +604,7 @@ def register_specialist_routes(router: APIRouter) -> None:
 
     :param router: Router to attach endpoints to.
     """
+
     @router.get("/api/workflow/chat/{run_id}/state")
     async def workflow_chat_state(run_id: str) -> JSONResponse:
         """What a specialist run is doing, in the terms a caller acts on.
@@ -659,7 +657,6 @@ def register_specialist_routes(router: APIRouter) -> None:
             body = {}
         reason = str((body or {}).get("reason") or "stopped by the user")
         return JSONResponse(await stop_specialist_async(run_id, reason=reason))
-
 
 
 def _as_json(result: Any) -> Any:

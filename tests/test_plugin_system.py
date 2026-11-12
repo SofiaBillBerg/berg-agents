@@ -20,14 +20,16 @@ Tests:
 """
 
 import asyncio
-from dataclasses import dataclass
 import logging
-from pathlib import Path
 import sys
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import pytest
 
 from plugin_system import PluginManager
 
-import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))

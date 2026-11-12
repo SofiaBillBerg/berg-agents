@@ -63,7 +63,9 @@ def _decision_for(answer: dict[str, Any]) -> Any:
         )
     if answer.get("approved"):
         return ToolApproved()
-    return ToolDenied(message=answer.get("reason") or "The user rejected this call.")
+    return ToolDenied(
+        message=answer.get("reason") or "The user rejected this call."
+    )
 
 
 @wf.step

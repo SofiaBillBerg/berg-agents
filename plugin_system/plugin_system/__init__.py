@@ -50,6 +50,7 @@ from plugin_system.plugin_contract import (
 )
 from plugin_system.plugin_manager import PluginManager
 
+
 __all__ = [
     "AgentCapability",
     "BackendCapability",

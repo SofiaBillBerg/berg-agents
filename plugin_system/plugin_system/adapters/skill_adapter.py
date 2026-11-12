@@ -32,14 +32,16 @@ adapter and the chat agent can never disagree about which skills exist.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 import re
+
+from pathlib import Path
 from typing import Any
 
 from plugin_system.discovery.plugin_metadata import PluginMetadata
 from plugin_system.lifecycle.bergplugin import BergPlugin
 from plugin_system.plugin_context import PluginContext
 from plugin_system.plugin_contract import SkillCapability
+
 
 logger = logging.getLogger(__name__)
 
@@ -169,9 +171,8 @@ async def register_skill_plugins(
     :param root_dir: Workspace root for relative path resolution.
     :return: Registered plugin ids.
     """
-    from plugin_system.exceptions import PluginError
-
     from berg_agents.capabilities.skills import list_skills
+    from plugin_system.exceptions import PluginError
 
     if not skill_paths:
         return []

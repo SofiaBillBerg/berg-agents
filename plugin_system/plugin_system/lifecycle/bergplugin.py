@@ -21,12 +21,14 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 import logging
+
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 from plugin_system.plugin_context import PluginContext
 from plugin_system.plugin_contract import PluginCapability
+
 
 if TYPE_CHECKING:
     from plugin_system.events.event_bus import EventBus

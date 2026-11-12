@@ -26,6 +26,7 @@ import logging
 from plugin_system.lifecycle.lifecycle_hooks import PluginLifecycle
 from plugin_system.lifecycle.lifecycle_states import PluginState
 
+
 logger = logging.getLogger(__name__)
 
 

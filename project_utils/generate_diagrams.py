@@ -17,17 +17,22 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
-"""This script generates Mermaid diagrams for the berg_agents package, providing a visual representation of its structure and relationships.
 
-It parses Python files to extract classes, functions, and their calls, then creates flowcharts that illustrate the internal and external dependencies of each submodule, as well as a high-level overview of the entire package. The diagrams are saved in the docs/visualizations directory for easy access and review.
+"""This script generates Mermaid diagrams for berg_agents and its plugin packages.
+
+It parses Python files to extract classes, functions, and their calls, then creates
+flowcharts that illustrate internal and external dependencies of each submodule,
+as well as a high-level overview of each package.
 """
 
 import ast
+import os
+
 from ast import AST
 from collections import defaultdict
-import os
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
+
 
 MERMAID_THEME_FLOWCHART = """
     %% Plasma Pastel Theme Configuration %%
@@ -38,17 +43,41 @@ MERMAID_THEME_FLOWCHART = """
     linkStyle default stroke:#936cd4,stroke-width:2px;
 """
 
+IGNORED_DIRS = {
+    "node_modules",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".git",
+    ".next",
+    "dist",
+    "build",
+    ".pytest_cache",
+    ".ruff_cache",
+    "tests",
+    "docs"}
+
+
+class PackageConfig(TypedDict):
+    name: str
+    path: Path
+
+
+PACKAGES: list[PackageConfig] = [
+    {"name": "berg_agents", "path": Path("./berg_agents")},
+    {"name": "plugin_system", "path": Path("./plugin_system")},
+    {"name": "shared_todo", "path": Path("./berg_plugins/shared-todo")}]
+
+
+def sanitize_id(name: str) -> str:
+    """Ersätt bindestreck och punkter med understreck för giltiga Mermaid-ID:n."""
+    return name.replace("-", "_").replace(".", "_")
+
 
 def parse_python_components(
-    file_path: Path, source_dir: Path
+    file_path: Path, source_dir: Path, pkg_name: str
 ) -> list[dict[str, Any]]:  # ruff: ignore[complex-structure]
-    """Parse a Python file and extract classes, functions, and their relationships.
-
-    :param file_path: Path to the Python file to parse.
-    :param source_dir: Directory containing the Python files.
-    :return: List of parsed components.
-    :rtype: list[dict[str, Any]]
-    """
+    """Parse a Python file and extract classes, functions, and their relationships."""
     with Path(file_path).open(encoding="utf-8") as f:
         try:
             node = ast.parse(f.read(), filename=file_path)
@@ -56,17 +85,25 @@ def parse_python_components(
             return []
 
     rel_path = file_path.relative_to(source_dir)
-    submodule = rel_path.parts[0] if len(rel_path.parts) > 1 else "core"
+    parts = list(rel_path.parts)
 
+    # If the file is in a subdirectory with the same name as the package (t.ex. plugin_system/plugin_system/fil.py), remove the first part
+    if len(parts) > 1 and sanitize_id(parts[0]) == pkg_name:
+        parts = parts[1:]
+
+    # Determine the submodule name based on the file's relative path
+    if len(parts) > 1:
+        raw_submodule = parts[0]
+    else:
+        raw_submodule = (
+            file_path.stem if file_path.stem != "__init__" else "core"
+        )
+
+    submodule = sanitize_id(raw_submodule)
     components = []
 
     def find_calls(code_node: ast.AST) -> list[str]:
-        """A helper function to find all function calls within a given AST node.
-
-        :param code_node: The AST node to analyze for function calls.
-        :return: A list of function names called within the node.
-        :rtype: list[str]
-        """
+        """Find all function calls within a given AST node."""
         calls = []
         child: AST
         for child in ast.walk(code_node):
@@ -122,25 +159,27 @@ def parse_python_components(
     return components
 
 
-def generate_mermaid() -> None:  # ruff: ignore[complex-structure]
-    """Generate Mermaid diagrams for the berg_agents package, including detailed submodule maps and a high-level architectural overview.
-
-    The diagrams are saved in the docs/visualizations directory.
-
-    :return: None
-    """
-    output_dir = Path("./docs/visualizations")
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    source_dir = Path("./berg_agents")
+def process_package(pkg_name: str, source_dir: Path, output_dir: Path) -> None:  # ruff: ignore[complex-structure]
+    """Generate Mermaid diagrams for a specific package directory."""
+    if not source_dir.exists():
+        print(f"⚠️ Skipping '{pkg_name}': directory not found at {source_dir}")
+        return
     all_components = []
+    for root, dirs, files in os.walk(source_dir):
+        # Filter out ignored directories and hidden directories
+        dirs[:] = [
+            d for d in dirs if d not in IGNORED_DIRS and not d.startswith(".")
+        ]
 
-    for root, _, files in os.walk(source_dir):
         for file in files:
             if file.endswith(".py") and not file.startswith("."):
                 file_path = Path(root) / file
-                comps = parse_python_components(file_path, source_dir)
+                comps = parse_python_components(file_path, source_dir, pkg_name)
                 all_components.extend(comps)
+
+    if not all_components:
+        print(f"ℹ️ No Python components found in '{pkg_name}'.")
+        return
 
     known_entities = {c["name"]: c["submodule"] for c in all_components}
     for c in all_components:
@@ -158,19 +197,18 @@ def generate_mermaid() -> None:  # ruff: ignore[complex-structure]
     for mod_name, mod_comps in modules_map.items():
         mmd_lines = [
             "flowchart LR",
-            f"    %% Rich Component map focused on berg_agents.{mod_name} %%"]
+            f"    %% Rich Component map focused on {pkg_name}.{mod_name} %%"]
 
         external_dependencies = set()
         internal_nodes = []
 
         mmd_lines.extend((
-            f"    subgraph Internal_Structures [berg_agents.{mod_name} components]",
+            f"    subgraph Internal_Structures [{pkg_name}.{mod_name} components]",
             "        direction TB",
         ))
 
         for c in mod_comps:
             if c["type"] == "class":
-                # FIX: We use clean Markdown lines (character-based layout) instead of breaking HTML tags
                 header = f"class {c['name']}"
                 if c["bases"]:
                     header += f" ({', '.join(c['bases'])})"
@@ -185,7 +223,6 @@ def generate_mermaid() -> None:  # ruff: ignore[complex-structure]
                         f"  + {m['name']}()" for m in c["methods"][:6]
                     ])
 
-                # Double quotes and clean string compilation prevents rendering dropouts
                 full_label = "\\n".join(body_parts)
                 mmd_lines.append(f'        {c["name"]}["{full_label}"]')
                 internal_nodes.append(c["name"])
@@ -223,10 +260,10 @@ def generate_mermaid() -> None:  # ruff: ignore[complex-structure]
         for name in external_dependencies:
             mmd_lines.append(f"    class {name} externalNode;")
 
-        out_file = output_dir / f"packages_berg_agents.{mod_name}.mmd"
+        out_file = output_dir / f"packages_{pkg_name}.{mod_name}.mmd"
         out_file.write_text("\n".join(mmd_lines), encoding="utf-8")
         print(
-            f"✓ Created text-safe rich perspective map for: berg_agents.{mod_name}"
+            f"✓ Created text-safe rich perspective map for: {pkg_name}.{mod_name}"
         )
 
     # ====================================================================
@@ -234,10 +271,10 @@ def generate_mermaid() -> None:  # ruff: ignore[complex-structure]
     # ====================================================================
     global_lines = [
         "flowchart LR",
-        "    %% High-Level Subdirectory Overview %%"]
+        f"    %% High-Level Subdirectory Overview for {pkg_name} %%"]
 
     for mod_name in modules_map:
-        global_lines.append(f'    mod_{mod_name}["berg_agents.{mod_name}"]')
+        global_lines.append(f'    mod_{mod_name}["{pkg_name}.{mod_name}"]')
 
     cross_module_edges = set()
     for c in all_components:
@@ -254,9 +291,19 @@ def generate_mermaid() -> None:  # ruff: ignore[complex-structure]
     for mod_name in modules_map:
         global_lines.append(f"    class mod_{mod_name} moduleNode;")
 
-    global_file = output_dir / "packages_berg_agents.mmd"
+    global_file = output_dir / f"packages_{pkg_name}.mmd"
     global_file.write_text("\n".join(global_lines), encoding="utf-8")
-    print("✓ Created global architectural overview map!")
+    print(f"✓ Created global architectural overview map for {pkg_name}!")
+
+
+def generate_mermaid() -> None:
+    """Generate Mermaid diagrams for all configured packages."""
+    output_dir = Path("./docs/visualizations")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for pkg in PACKAGES:
+        print(f"\n--- Processing package: {pkg['name']} ---")
+        process_package(pkg["name"], pkg["path"], output_dir)
 
 
 if __name__ == "__main__":

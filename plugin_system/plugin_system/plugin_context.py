@@ -22,9 +22,8 @@
 from pathlib import Path
 from typing import Any
 
-from plugin_system.events.event_bus import EventBus
-
 from berg_agents import BergAgentsApp, Harness
+from plugin_system.events.event_bus import EventBus
 
 
 class PluginContext:

@@ -20,12 +20,14 @@
 """Event bus for plugin communication."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
 import contextlib
+import logging
+
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-import logging
 from typing import Any
+
 
 logger = logging.getLogger(__name__)
 

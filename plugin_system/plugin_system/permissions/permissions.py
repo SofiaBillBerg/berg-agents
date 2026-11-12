@@ -17,14 +17,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
+import logging
+
 # Permission Categories
 # Permission System
 from dataclasses import dataclass
 from enum import StrEnum
-import logging
 from typing import Any
 
 from plugin_system.discovery.plugin_registry import PluginRegistry
+
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +100,7 @@ class Permission:
     def _check_path_scope(self, path: str, allowed_patterns: list[str]) -> bool:
         """Check if path matches allowed patterns."""
         import fnmatch
+
         from pathlib import Path
 
         path_obj = Path(path)

@@ -30,6 +30,7 @@ from plugin_system.exceptions import PluginError
 from plugin_system.lifecycle.lifecycle_states import PluginState
 from plugin_system.plugin_contract import PluginCapability
 
+
 logger = logging.getLogger(__name__)
 
 

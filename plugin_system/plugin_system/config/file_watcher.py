@@ -22,10 +22,12 @@
 """File watching utilities for configuration hot-reloading."""
 
 import asyncio
-from collections.abc import Awaitable, Callable
 import contextlib
 import logging
+
+from collections.abc import Awaitable, Callable
 from pathlib import Path
+
 
 logger = logging.getLogger(__name__)
 
