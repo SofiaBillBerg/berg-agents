@@ -42,10 +42,29 @@ const nextConfig = {
   // mounts dist/"), which was true while the UI had no server behaviour of its
   // own; it does now.
   //
-  // Consequence to keep in mind: the UI is served by Next on its own port
-  // instead of being mounted by FastAPI, so the frontend reaches the Python
-  // backend through `NEXT_PUBLIC_API_BASE_URL` (the same variable `next dev`
-  // already used).
+  // ONE FRONT DOOR. The UI is served by Next now, but berg's API, sessions,
+  // specialists and workflow routes all live in the Python backend. Rather than
+  // make the user (or the browser) juggle two origins, Next proxies everything
+  // under /api/* that it does not handle itself through to Python.
+  //
+  // The split is by ownership, and it is deliberately narrow: a Next route file
+  // that exists (today only `app/api/orchestrator`) wins, because Next matches
+  // filesystem routes BEFORE rewrites. Everything else under /api/* is Python's.
+  // That is why `/api/orchestrator` must never be added to the exclusion list
+  // below — it would make the orchestrator unreachable.
+  //
+  // `BERG_BACKEND_URL` is where Python actually listens; the default matches
+  // berg's own default port. Under `next dev` the same value is passed to the
+  // client as NEXT_PUBLIC_API_BASE_URL, so streaming calls that bypass the
+  // proxy still reach the right place.
+  async rewrites() {
+    const backend = process.env.BERG_BACKEND_URL || "http://127.0.0.1:8001";
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${backend}/api/:path*`}];
+  },
+
   distDir: "./dist",
   reactStrictMode: false,
   turbopack: {

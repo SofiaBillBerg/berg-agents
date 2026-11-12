@@ -262,7 +262,10 @@ def create_app(
 
     app.state.run_registry = RunRegistry()
     router = create_router(
-        resolved_harness, sessions, providers=resolved_providers, web_port=web_port
+        resolved_harness,
+        sessions,
+        providers=resolved_providers,
+        web_port=web_port,
     )
     print(
         "DEBUG create_router routes:",
@@ -286,6 +289,21 @@ def create_app(
     # dist (observed as a 404 for a bundle that exists on disk).
     _mount_plugin_assets(app)
 
+    # DEPRECATED (2026-11-12) — retained intentionally, not yet removed.
+    #
+    # This block mounted the static export of the webapp on the API's own
+    # origin. It is now inert: `next.config.mjs` removed `output: "export"` so
+    # a real Next server can host the Workflow runtime (`withWorkflow`), and
+    # `dist/` is a server build with no `index.html` — so the condition below is
+    # false and this branch falls through to its warning.
+    #
+    # Sofia's instruction was explicit: keep it until the migration is complete
+    # and verified, then decide whether to archive or delete. Do not remove this
+    # block as leftover code — it is the fallback shape if the UI returns to
+    # being served by FastAPI.
+    #
+    # The rest of this module is NOT deprecated: `create_app` is imported by
+    # `berg_agents/app.py`, and `_mount_plugin_assets` above is still live.
     if _WEB_DIST.joinpath("index.html").is_file():
         # Production UI on the same origin (single :8001).
         # Mounted after the API router so /api/* always wins.
