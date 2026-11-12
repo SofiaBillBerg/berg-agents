@@ -7,13 +7,24 @@ SHELL := $(SHELL)
 # the berg-agents package through bun and uv.
 
 # ======= Berg-Agents package targets =======
+# Where the Python backend listens, and therefore where the UI proxies every
+# non-Next /api/* call. This is BAKED INTO THE UI BUILD, not read at run time:
+# Next freezes it into dist/routes-manifest.json as the rewrite destination
+# (verified 2026-11-12 — starting with a bogus value still hit :8001). So it is
+# exported here, before `next build`, and every run target uses the same number.
+BERG_BACKEND_PORT ?= 8001
+BERG_BACKEND_URL := http://127.0.0.1:$(BERG_BACKEND_PORT)
+# Where the UI is served. The UI is no longer mounted by FastAPI (its static
+# export is gone), so Next needs its own port; users open this one.
+BERG_UI_PORT ?= 3100
+
 bun-install: ## Install bun dependencies for Berg-Agents UI
 	@echo "Installing bun dependencies"
 	@bun install --cwd berg_agents/ui/webapp/
 
 build-ui: bun-install ## Use bun to build the frontend for Berg-Agents UI
-	@echo "Building Berg-Agents UI"
-	@bun --cwd berg_agents/ui/webapp next build
+	@echo "Building Berg-Agents UI (proxying /api/* to $(BERG_BACKEND_URL))"
+	@BERG_BACKEND_URL=$(BERG_BACKEND_URL) bun --cwd berg_agents/ui/webapp next build
 
 
 tsc-lint:  ## Use bun to lint the Berg-Agents UI
@@ -67,9 +78,24 @@ make-install-and-run: ## Run bash script install_and_run.sh to build and start B
 	@echo "Running install_and_run.sh script to build and start Berg-Agents web-ui"
 	@bash install_and_run.sh
 
-run-berg-agents-web: ## Quickstart berg-agents webui on port 8001
-	@echo "Running the Berg-Agents web-ui on port 8001"
-	@.venv/bin/uv run berg_agents --web --hot-reload  --debug --log-level=info --port 8001
+run-berg-agents-web: ## Start the WHOLE app: Python backend + Next UI, one browser URL
+	@echo "Starting Berg-Agents: backend on :$(BERG_BACKEND_PORT), UI on :$(BERG_UI_PORT)"
+	@echo "Open http://localhost:$(BERG_UI_PORT) in your browser."
+	@BERG_BACKEND_URL=$(BERG_BACKEND_URL) $(MAKE) -j 2 run-backend run-ui
+
+# The two halves, run in parallel by the target above. Kept as separate targets
+# so either can be started alone when debugging one side.
+run-backend: ## Start only the Python backend (API, sessions, specialists)
+	@echo "Starting the Berg-Agents backend on port $(BERG_BACKEND_PORT)"
+	@.venv/bin/uv run berg_agents --web --hot-reload --debug --log-level=info --port $(BERG_BACKEND_PORT)
+
+run-ui: ## Start only the Next UI (expects the backend already running)
+	@echo "Starting the Berg-Agents UI on port $(BERG_UI_PORT)"
+	@bun --cwd berg_agents/ui/webapp next start -p $(BERG_UI_PORT)
+
+run-ui-dev: ## Start only the Next UI in dev mode (hot reload)
+	@echo "Starting the Berg-Agents UI (dev) on port $(BERG_UI_PORT)"
+	@BERG_BACKEND_URL=$(BERG_BACKEND_URL) bun --cwd berg_agents/ui/webapp next dev -p $(BERG_UI_PORT)
 
 make-social-cheatsheet-app-dev: ## Add social-cheatsheet-app as root-dir to run berg-agents in that project
 	@BERG_AGENT_ROOT_DIR=/home/sofiabillberg/code-projects/social-cheatsheet-app/
@@ -80,17 +106,17 @@ run-social-cheatsheet-app-dev: ## Start dev environment with custom backend targ
 	@BERG_AGENT_ROOT_DIR=/home/sofiabillberg/code-projects/social-cheatsheet-app/
 	$(MAKE) -j 2 run-frontend-dev make-social-cheatsheet-app-dev
 
-run-backend-dev: ## Quickstart berg-agents webui on port 8007
-	@echo "Running the Berg-Agents web-ui on port 8007"
+run-backend-dev: ## Start the Python backend on a different port (8007) for side-by-side dev
+	@echo "Running the Berg-Agents backend on port 8007"
 	@.venv/bin/uv run berg_agents --web --hot-reload  --debug --log-level=info --port 8007
 
-run-frontend-dev: ## Quickstart berg-agents webui frontend dev server on port 3000
-	@echo "Running the Berg-Agents web-ui frontend dev server on port 3000"
-	@NEXT_PUBLIC_API_BASE_URL=http://localhost:8007 bun --cwd berg_agents/ui/webapp next dev
+run-frontend-dev: ## Start the Next UI in dev mode, proxying to the :8007 backend
+	@echo "Starting Berg Agents UI dev server on port $(BERG_UI_PORT), backend on :8007"
+	@BERG_BACKEND_URL=http://127.0.0.1:8007 bun --cwd berg_agents/ui/webapp next dev -p $(BERG_UI_PORT)
 
-run-berg-agents-dev: ## Start dev environment with custom backend target
-	@echo "Starting Berg Agents Development Environment, open http://localhost:3000 in your browser to access the dev web-ui"
-	$(MAKE) -j 2 run-frontend-dev run-backend-dev
+run-berg-agents-dev: ## Dev environment: Python backend + Next dev server, hot reload on both
+	@echo "Starting Berg Agents Dev Environment — open http://localhost:$(BERG_UI_PORT)"
+	@BERG_BACKEND_URL=http://127.0.0.1:8007 $(MAKE) -j 2 run-frontend-dev run-backend-dev
 stop-berg-agents: ## Find process that might be related to the Berg-Agents web-ui, list then and let the user chose
 					# which ones to stop, if any
 	# Search for any ports that the Berg-Agents web-ui might be running on
