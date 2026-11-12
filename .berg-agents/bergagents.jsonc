@@ -209,10 +209,10 @@
         "max_tokens": 64000
       },
       "standard": {
-        "models": [
+        "models": [            "gemma4:12b",
+        "ssfdre38/gemma4-turbo:12b",
+
           "bonsai-2:9b",
-          "ssfdre38/gemma4-turbo:12b",
-          "gemma4:12b",
           "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
           "sofia/free-routing",
           "auto/best-free",
@@ -223,11 +223,12 @@
         "max_tokens": 200000
       },
       "complex": {
-        "models": [
-          "gemma4:12b",
+        "models": [                "gemma4:12b",
+         "ssfdre38/gemma4-turbo:12b",
+     "logfare/logfare/auto",
+
           "bonsai-2:9b",
-          "ssfdre38/gemma4-turbo:12b",
-          "logfare/logfare/auto",
+         
           "auto/free-combo",
           "base-free-stack",
           "auto/best-free"
@@ -235,11 +236,11 @@
         "max_tokens": 230000
       },
       "critical": {
-        "models": [
+        "models": [            "auto/free-combo",
+        "ssfdre38/gemma4-turbo:12b",
+
           "gemma4:12b",
           "bonsai-2:9b",
-          "ssfdre38/gemma4-turbo:12b",
-          "auto/free-combo",
           "logfare/logfare/auto",
           "base-free-stack",
           "auto/best-free"

@@ -227,6 +227,125 @@ async def approve_specialist_async(
         "agent_name": str(served.get("agent_name") or "")}
 
 
+async def steer_specialist_async(run_id: str, text: str) -> dict[str, Any]:
+    """Send the user's instruction to a specialist that is still working.
+
+    Delivered through the turn's steer store, keyed on the run's token, so it
+    survives the process and is read by the specialist's next pass. It reaches
+    the model as a user turn (the SDK's own rule for content arriving at a
+    deferred-tool pause), and when it rides an approval it becomes a denial's
+    message so the model re-plans instead of keeping the args it committed.
+
+    :param run_id: The specialist's current run.
+    :param text: What the user wants it to do instead.
+    :return: ``{"run_id", "queued", "state", "delivered"}``. ``delivered`` is
+        False for a working specialist: its pass has already read the store, so
+        the text waits for a later pass rather than reaching this one.
+    :raises ValueError: When the text is empty.
+    """
+    text = text.strip()
+    if not text:
+        raise ValueError("a steer needs text")
+
+    from berg_agents.workflow.routes import _turn_token
+    from berg_agents.workflow.steering import append_steer
+
+    state = await specialist_state_async(run_id)
+    if state["state"] == "waiting":
+        # A parked specialist is answered, not steered: the steer rides the
+        # decision as the denial's message, which is what makes the model
+        # re-plan. Steering it into the store would only be read by a pass that
+        # has not started.
+        resumed = await approve_specialist_async(run_id, approved=True, steer=text)
+        return {"run_id": resumed["run_id"], "queued": True, "state": "waiting"}
+
+    # A WORKING specialist has already read its steer store for the pass it is
+    # running, and a pass reads it once. There is no second read point inside a
+    # pass, so text queued now is only seen by a pass that starts later — which
+    # for a one-pass turn means after the work is done. Observed exactly that:
+    # the steer sat unread in the store while the run finished (2026-11-11).
+    #
+    # So it is stored and reported as ``queued``, NOT claimed as delivered: the
+    # honest status is "waiting for its next pass". Making a working specialist
+    # take new input mid-pass needs the run to accept an enqueue, which the
+    # durable host does not have (``AgentRun.enqueue`` lives on a live run
+    # context). That is a design question for the orchestrator slice, not
+    # something to paper over here.
+    turn = _turn_token(run_id) or run_id
+    append_steer(turn, text)
+    return {
+        "run_id": run_id,
+        "queued": True,
+        "state": state["state"],
+        "delivered": False}
+
+
+def steer_specialist(run_id: str, text: str) -> dict[str, Any]:
+    """Synchronous door to :func:`steer_specialist_async`.
+
+    :param run_id: The specialist's current run.
+    :param text: What the user wants it to do instead.
+    :return: The dispatch result.
+    """
+    import asyncio
+
+    return asyncio.run(steer_specialist_async(run_id, text))
+
+
+async def stop_specialist_async(run_id: str, *, reason: str = "stopped by the user") -> dict[str, Any]:
+    """Stop a specialist, by whichever mechanism its state calls for.
+
+    There are **two** states and they need **two** mechanisms, which is why this
+    reads first: a run parked on a gate has already ENDED its pass (status
+    ``completed``), so ``Run.terminate`` has nothing to stop — it is withdrawn by
+    answering its gate with a rejection. A run actually mid-step is stopped with
+    ``Run.terminate``, which reaches in-flight work.
+
+    :param run_id: The specialist's run.
+    :param reason: Recorded with the outcome.
+    :return: ``{"run_id", "stopped", "how", "state"}``.
+    """
+    from vercel import workflow
+
+    state = await specialist_state_async(run_id)
+
+    if state["state"] == "waiting":
+        # Withdrawn, not terminated: the gate is answered with a denial that
+        # tells the specialist the task is off, and the passes that follow have
+        # nothing left to execute.
+        await approve_specialist_async(
+            run_id,
+            approved=False,
+            reason=f"The user stopped this task. {reason}",
+        )
+        return {"run_id": run_id, "stopped": True, "how": "gate-denied", "state": "waiting"}
+
+    if state["state"] == "done":
+        return {"run_id": run_id, "stopped": False, "how": "already-finished", "state": state["state"]}
+
+    try:
+        await workflow.Run(run_id).terminate(reason=reason)
+    except Exception as exc:  # ruff: ignore[blind-except] - reported, not hidden
+        return {
+            "run_id": run_id,
+            "stopped": False,
+            "how": f"terminate-refused: {type(exc).__name__}",
+            "state": state["state"]}
+    return {"run_id": run_id, "stopped": True, "how": "terminated", "state": state["state"]}
+
+
+def stop_specialist(run_id: str, *, reason: str = "stopped by the user") -> dict[str, Any]:
+    """Synchronous door to :func:`stop_specialist_async`.
+
+    :param run_id: The specialist's run.
+    :param reason: Recorded with the outcome.
+    :return: The stop result.
+    """
+    import asyncio
+
+    return asyncio.run(stop_specialist_async(run_id, reason=reason))
+
+
 async def _status_of(run_id: str) -> str:
     """A run's status string, or ``"unknown"`` when it cannot be read.
 
