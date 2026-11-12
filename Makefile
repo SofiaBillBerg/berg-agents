@@ -18,6 +18,68 @@ BERG_BACKEND_URL := http://127.0.0.1:$(BERG_BACKEND_PORT)
 # export is gone), so Next needs its own port; users open this one.
 BERG_UI_PORT ?= 3100
 
+# ======= Berg's own PostgreSQL (the orchestrator's durable world) =======
+#
+# The TS orchestrator stores its runs events and streams in PostgreSQL via
+# `@workflow/world-postgres` (see workflow-data-dir.mjs). It is BERG'S OWN
+# cluster — never hindsight's, never the system postgres — because coupling
+# berg's durability to another service's database would make that service's
+# migrations a berg outage.
+#
+# World credentials, matching the world-postgres default so no config is
+# needed: postgres://world:world@localhost:5434/world
+BERG_PG_PORT ?= 5434
+BERG_PG_DIR ?= .berg-agents/postgres
+BERG_PG_BIN ?= /usr/lib/postgresql/16/bin
+# $(TMPDIR) is unset under make, so the log and socket paths collapsed to
+# /berg-postgres.log and refused to start. Give them a make-local default.
+# Absolute: postgres resolves `unix_socket_directories` against its DATA
+# directory, not the shell's CWD, so a relative path never lands where the
+# server can write its lock file (verified: FATAL could not create lock file).
+BERG_PG_TMP ?= $(CURDIR)/.berg-agents/postgres/run
+
+# postgres-init: create the cluster on first run (idempotent — existing data
+# is left alone), so `make run-berg-agents-web` works on a clean checkout.
+postgres-init: ## Create berg's PostgreSQL cluster if it does not exist
+	@if [ -f "$(BERG_PG_DIR)/PG_VERSION" ]; then \
+		echo "PostgreSQL cluster already exists at $(BERG_PG_DIR)"; \
+	else \
+		echo "Creating PostgreSQL cluster at $(BERG_PG_DIR)"; \
+		mkdir -p "$(BERG_PG_DIR)"; \
+		$(BERG_PG_BIN)/initdb -D "$(BERG_PG_DIR)" -U postgres --auth=trust --encoding=UTF8 >/dev/null && \
+		echo "Cluster created"; \
+	fi
+	@mkdir -p "$(BERG_PG_TMP)"
+
+postgres-start: postgres-init ## Start berg's PostgreSQL (skipped if already listening)
+	@# The socket directory must exist before the server starts: postgres writes
+	@# .s.PGSQL.<port>.lock there and refuses to boot otherwise (verified: the
+	@# server FATALed on a missing lock file when this ran after pg_ctl).
+	@mkdir -p "$(BERG_PG_TMP)"
+	@if ss -ltn 2>/dev/null | grep -q ":$(BERG_PG_PORT) "; then \
+		echo "PostgreSQL already listening on :$(BERG_PG_PORT)"; \
+	else \
+		echo "Starting PostgreSQL on :$(BERG_PG_PORT)"; \
+		$(BERG_PG_BIN)/pg_ctl -D "$(BERG_PG_DIR)" \
+			-o "-p $(BERG_PG_PORT) -c listen_addresses=127.0.0.1 -c unix_socket_directories=$(BERG_PG_TMP)" \
+			-l "$(BERG_PG_TMP)/postgres.log" start >/dev/null; \
+		$(BERG_PG_BIN)/pg_isready -h 127.0.0.1 -p $(BERG_PG_PORT) || { tail -5 "$(BERG_PG_TMP)/postgres.log"; exit 1; }; \
+	fi
+	@# Idempotent: safe on every run, and required before the world's first run.
+	@psql "postgres://world:world@localhost:$(BERG_PG_PORT)/world" >/dev/null 2>&1 || \
+		(echo "Creating role/database world"; \
+		 psql -h 127.0.0.1 -p $(BERG_PG_PORT) -U postgres -d postgres -c "CREATE ROLE world LOGIN PASSWORD 'world';" >/dev/null; \
+		 psql -h 127.0.0.1 -p $(BERG_PG_PORT) -U postgres -d postgres -c "CREATE DATABASE world OWNER world;" >/dev/null)
+	@cd berg_agents/ui/webapp && WORKFLOW_POSTGRES_URL="postgres://world:world@localhost:$(BERG_PG_PORT)/world" \
+		bunx --package @workflow/world-postgres bootstrap >/dev/null 2>&1 && echo "Workflow tables ready"
+
+postgres-stop: ## Stop berg's PostgreSQL
+	@if [ -f "$(BERG_PG_DIR)/postmaster.pid" ]; then \
+		$(BERG_PG_BIN)/pg_ctl -D "$(BERG_PG_DIR)" stop -m fast; \
+	else \
+		echo "PostgreSQL not running"; \
+	fi
+
 bun-install: ## Install bun dependencies for Berg-Agents UI
 	@echo "Installing bun dependencies"
 	@bun install --cwd berg_agents/ui/webapp/
@@ -78,10 +140,16 @@ make-install-and-run: ## Run bash script install_and_run.sh to build and start B
 	@echo "Running install_and_run.sh script to build and start Berg-Agents web-ui"
 	@bash install_and_run.sh
 
-run-berg-agents-web: ## Start the WHOLE app: Python backend + Next UI, one browser URL
-	@echo "Starting Berg-Agents: backend on :$(BERG_BACKEND_PORT), UI on :$(BERG_UI_PORT)"
+run-berg-agents-web: ## Start the WHOLE app: PostgreSQL + Python backend + Next UI, one browser URL
+	@echo "Starting Berg-Agents: postgres :$(BERG_PG_PORT), backend :$(BERG_BACKEND_PORT), UI :$(BERG_UI_PORT)"
 	@echo "Open http://localhost:$(BERG_UI_PORT) in your browser."
-	@BERG_BACKEND_URL=$(BERG_BACKEND_URL) $(MAKE) -j 2 run-backend run-ui
+	@# postgres FIRST: the orchestrator's world reads and writes it, and without
+	@# it every orchestration run enqueues into a queue nothing drains — the turn
+	@# appears to start and then goes permanently silent.
+	@$(MAKE) postgres-start
+	@BERG_BACKEND_URL=$(BERG_BACKEND_URL) WORKFLOW_TARGET_WORLD="@workflow/world-postgres" \
+		WORKFLOW_POSTGRES_URL="postgres://world:world@localhost:$(BERG_PG_PORT)/world" \
+		$(MAKE) -j 2 run-backend run-ui
 
 # The two halves, run in parallel by the target above. Kept as separate targets
 # so either can be started alone when debugging one side.

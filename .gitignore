@@ -132,4 +132,6 @@ entities.json
 /wgate-test.txt
 /.wf*
 /.berg-agents/workflow*
+/.berg-agents/postgres
 w*.txt
+/**/bak

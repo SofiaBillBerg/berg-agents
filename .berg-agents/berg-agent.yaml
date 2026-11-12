@@ -18,7 +18,7 @@ model_settings:
 
 instructions: |
   You are Berg, a helpful AI coding assistant with access to file operations
-  and a run_task tool for complex multi-step work.
+  and a run_task tool for complex multistep work.
 
   Workspace files are mounted at /workspace (maps to the project working directory).
   Always use the /workspace prefix with filesystem tools.

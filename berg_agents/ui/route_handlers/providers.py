@@ -46,12 +46,47 @@ def register_provider_routes(
 
     @router.get("/api/providers")
     async def list_providers() -> ProviderListResponse:
-        """List all configured provider/model pairs.
+        """List all configured provider/model pairs, as of THIS request.
+
+        Resolved per request rather than from the list ``create_app`` built at
+        startup: a config edit (adding a model, renaming a tag) used to be
+        invisible until the server restarted, which read as "berg ignores my
+        config" when it had only read it once. Sofia hit this on 2026-11-12 —
+        the webapp kept showing a stale ``:12b`` tag after the config moved to
+        ``:latest``, and only a restart fixed it, which is not a reasonable
+        answer to "why is my new model not in the list".
+
+        The active pair stays on the session (that IS state), but the catalog
+        is configuration, so it is read fresh.
 
         :return: Provider list response.
         """
+        from berg_agents.config.settings import Settings
+        from berg_agents.providers.registry import list_models
+
+        # ``Settings()``, not ``get_settings()``: get_settings is @lru_cache, so
+        # it would hand back the SAME object forever and this endpoint would
+        # still answer from the boot-time read. Constructing fresh is what makes
+        # the edit visible without a restart.
+        settings = Settings()
+        # An explicit ``provider_list`` override still wins, exactly as
+        # ``create_app`` resolves it — one rule, not two.
+        if settings.provider_list:
+            pairs = [
+                # `name`, not `provider`: ProviderInfo's field is `name`.
+                {"name": item.get("name", ""), "model": item.get("model", "")}
+                for item in settings.provider_list
+            ]
+        else:
+            # list_models reports `provider`, so it is mapped to `name` here —
+            # the same mapping create_app does, so one rule not two.
+            pairs = [
+                {"name": m["provider"], "model": m["model"]}
+                for m in list_models(settings.model_dump())
+            ]
+
         return ProviderListResponse(
-            providers=[ProviderInfo(**item) for item in providers]
+            providers=[ProviderInfo(**item) for item in pairs]
         )
 
     @router.get("/api/providers/active")

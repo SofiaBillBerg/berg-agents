@@ -39,7 +39,6 @@
     "@streamdown/mermaid": "^1.0.3",
     "@tailwindcss/postcss": "^4.3.5",
     "@uiw/react-codemirror": "^4.25.12",
-    "@workflow-worlds/turso": "^0.2.2",
     "@workflow/world-postgres": "^5.2.0",
     "a2a-ai-provider": "^0.5.0-alpha.1",
     "ai": "^7.0.170",

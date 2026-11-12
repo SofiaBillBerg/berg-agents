@@ -529,43 +529,6 @@ _FILLER = frozenset({
     "not"})
 
 
-def intent_slug(text: str, *, max_words: int = 4, max_chars: int = 40) -> str:
-    """A short readable slug from the first meaningful user message.
-
-    Greetings ("hi", "hello", "test") are skipped — a session's title
-    should say what the session is *about*, which "hi" never does.
-    Filler words are dropped so the slug is the topic, not the phrasing.
-
-    :param text: First user text (as recorded in a subtitle).
-    :param max_words: Maximum words to keep.
-    :param max_chars: Maximum slug length after joining.
-    :return: Slug such as ``transcript autosave``; empty when nothing
-        meaningful remains (a pure greeting, or no text).
-    """
-    candidate = (text or "").strip().lower()
-    if not candidate:
-        return ""
-    # Words first, so a greeting can be recognized even when filler
-    # follows it ("hi there", "hello again").
-    words = re.findall(r"[a-z0-9]+", candidate)
-    if not words:
-        return ""
-    # Leading greeting + filler carry no intent: drop the leading run of
-    # them so the slug starts at the first real content word.
-    while words and words[0] in _GREETINGS:
-        words = words[1:]
-        # Then drop any filler immediately following the greeting.
-        while words and words[0] in _FILLER:
-            words = words[1:]
-    if not words:
-        return ""
-    kept = [w for w in words if w not in _FILLER and len(w) > 1][:max_words]
-    slug = " ".join(kept).strip()
-    if len(slug) > max_chars:
-        slug = slug[:max_chars].rsplit(" ", 1)[0].strip()
-    return slug
-
-
 def first_user_text(ui_messages: Any) -> str:
     """First user text in a Vercel AI message list (for subtitles)."""
     if not isinstance(ui_messages, list):
@@ -587,21 +550,25 @@ def first_user_text(ui_messages: Any) -> str:
 async def refine_session_title(
     store: Any, session_id: str, subtitle: str, workspace: str
 ) -> str | None:
-    """Append an intent slug to a generated title, once, after creation.
+    """Record the first user text as the subtitle; never touch the title.
 
-    Called after ``ensure_session`` with the first user text in hand:
-    the session is created with no text yet, so ``#N · date`` is all it
-    can honestly carry at that point. This refines it in place, without
-    touching the id, and never overwrites a title the user renamed.
+    The title is ``project · date`` — the honest thing a session can carry
+    before it has any content — so this sets the SUBTITLE to the user's own
+    words instead. That is where the topic belongs: the actual first message
+    is more informative than any summary of it, and it cannot be wrong the way
+    a mangled slug was.
+
+    A title the user renamed is left alone, and so is the subtitle once set,
+    so a resumed session keeps what it already shows.
 
     :param store: Conversation store.
     :param session_id: Session to refine.
-    :param subtitle: First user text (the intent source).
+    :param subtitle: First user text (the topic to show).
     :param workspace: Project display name (guard for the right session).
-    :return: The new title, or None when nothing needed refining.
+    :return: The new subtitle, or None when nothing needed refining.
     """
-    slug = intent_slug(subtitle)
-    if not slug:
+    text = (subtitle or "").strip()
+    if not text:
         return None
     try:
         saved = await store.get(conversation_id=session_id)
@@ -610,20 +577,18 @@ async def refine_session_title(
     summary = saved.summary
     if summary.workspace != workspace:
         return None
-    # A renamed title is the user's; never overwrite it.
-    if not summary.title.startswith(f"{workspace} #"):
+    # Already carrying this topic: a re-render must not churn the row.
+    if summary.subtitle.strip() == text:
         return None
-    if f"· {slug}" in summary.title:
-        return None  # Already refined with this intent.
-    new_title = f"{summary.title} · {slug}"
+    new_subtitle = text[:80]
     try:
         await store.name(
-            source=summary, title=new_title, subtitle=summary.subtitle
+            source=summary, title=summary.title, subtitle=new_subtitle
         )
     except Exception as exc:
         logger.warning("Session title refine skipped: %s", exc, exc_info=True)
         return None
-    return new_title
+    return new_subtitle
 
 
 async def ensure_session(
@@ -648,16 +613,20 @@ async def ensure_session(
         return saved.summary
     except LookupError:
         pass
-    # The database is global, so numbering must count within this
-    # workspace — otherwise a project's second session is titled #14
-    # because the user has sessions from three other projects.
-    existing = await store.listing(limit=10000)
-    seq = sum(1 for s in existing if s.workspace == workspace) + 1
+    # No sequence number: it counted within the workspace only because the
+    # database is global, and it told the user nothing they could act on.
+    # Sofia's call, 2026-11-12 — "project and date".
     date = datetime.now().date().isoformat()
     summary = ConversationSummary(
         id=session_id,
         workspace=workspace,
-        title=f"{workspace} #{seq} · {date}",
+        # "project · date" and nothing else. A sequence number told the user
+        # nothing and a slug derived from the first four words of an opening
+        # sentence was worse than nothing ("out features look how" was the
+        # literal front of a request about packaging). The topic lives in the
+        # subtitle, set by refine_session_title from the message itself, and a
+        # title the user renames always wins. Sofia's call, 2026-11-12.
+        title=f"{workspace} · {date}",
         subtitle=subtitle,
         model=model,
     )

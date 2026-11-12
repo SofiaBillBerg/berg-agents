@@ -116,8 +116,8 @@
         "hf.co/JackAgentLead/Jack-3.8-27B-Coder-16GB-VRAM:latest": {
           "name": "Jack-3.8-27B-Coder"
         },
-        "ssfdre38/gemma4-turbo:12b": {
-          "name": "ssfdre38/gemma4-turbo:12b"
+        "ssfdre38/gemma4-turbo:latest": {
+          "name": "ssfdre38/gemma4-turbo:latest"
         },
         "gemma4:12b": {
           "name": "gemma4:12b"
@@ -201,17 +201,17 @@
       "trivial": {
         "models": [
           "bonsai-2:9b",
-          "ssfdre38/gemma4-turbo:12b",
+          "ssfdre38/gemma4-turbo:latest",
           "gemma4:12b",
           "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
           "ornith:9b-q4_K_M"
         ],
-        "max_tokens": 64000
+        "max_tokens": 100000
       },
       "standard": {
-        "models": [            "gemma4:12b",
-        "ssfdre38/gemma4-turbo:12b",
-
+        "models": [
+          "ssfdre38/gemma4-turbo:latest",
+          "gemma4:12b",
           "bonsai-2:9b",
           "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
           "sofia/free-routing",
@@ -223,12 +223,11 @@
         "max_tokens": 200000
       },
       "complex": {
-        "models": [                "gemma4:12b",
-         "ssfdre38/gemma4-turbo:12b",
-     "logfare/logfare/auto",
-
+        "models": [
+          "ssfdre38/gemma4-turbo:latest",
+          "gemma4:12b",
+          "logfare/logfare/auto",
           "bonsai-2:9b",
-         
           "auto/free-combo",
           "base-free-stack",
           "auto/best-free"
@@ -236,9 +235,9 @@
         "max_tokens": 230000
       },
       "critical": {
-        "models": [            "auto/free-combo",
-        "ssfdre38/gemma4-turbo:12b",
-
+        "models": [
+          "ssfdre38/gemma4-turbo:latest",
+          "auto/free-combo",
           "gemma4:12b",
           "bonsai-2:9b",
           "logfare/logfare/auto",
