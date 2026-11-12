@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Any
 
 from berg_agents.agents.deps import AgentDeps
+from berg_agents.core.tool_spec import fill_tool_inventory
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,7 @@ def build_chat_agent(
     from pathlib import Path
 
     from berg_agents.agents.delegation import build_delegation_capabilities
+    from berg_agents.agents.factory import create_tools
     from berg_agents.agents.workspace_toolset import WorkspaceToolset
     from berg_agents.capabilities.context_capabilities import (
         build_context_capabilities,
@@ -177,6 +179,12 @@ def build_chat_agent(
             else settings.system_prompt
         )
     )
+    # The tool inventory's placeholder is filled from the specs THIS agent is
+    # actually built with, so the prompt cannot name a tool or a parameter the
+    # toolset does not have. Generated, never hand-maintained: a hand-written
+    # list goes stale, and a stale list makes the model send keys the tools
+    # reject - which is the stall this replaced.
+    system_prompt = fill_tool_inventory(system_prompt, create_tools(root_dir))
 
     # Active agent routing: when the user has chosen an agent (via
     # /api/agents/active), this turn runs as that agent - its persona

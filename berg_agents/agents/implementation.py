@@ -40,6 +40,8 @@ from typing import Any, Literal
 from berg_agents.agents.deps import AgentDeps, FileChange
 from berg_agents.capabilities.registry import ToolCatalog
 from berg_agents.capabilities.turn_shape import build_turn_shape_capability
+from berg_agents.config.settings import TOOL_SELECTION_BLOCK
+from berg_agents.core.tool_spec import fill_tool_inventory
 from berg_agents.providers.models import (
     resolve_model_instance,
     resolve_model_request_settings,
@@ -424,6 +426,13 @@ def build_implementation_agent(
         "You are an implementation agent that EXECUTES code changes, not just plans them. "
         "The task you receive IS the plan: a numbered list of steps, one per line. "
         "Work through it in order.\n\n"
+        # The ONE tool inventory, shared with the chat agent's prompt. This agent
+        # used to name its tools without naming their parameters, so every call
+        # it made was rejected as an unrecognised input before the tool ran -
+        # it could not progress, and answered with confabulated context instead.
+        # Verified against the real signatures in agents/factory.py and the
+        # harness subagent toolset; see the constant's own docstring.
+        f"{TOOL_SELECTION_BLOCK}\n\n"
         "For each step:\n"
         "1. Do the work with the file tools (read_file, list_files, search_code first; "
         "then write_file, edit_file, patch_file; bash for tests and commands).\n"
@@ -439,6 +448,11 @@ def build_implementation_agent(
     # The type parameters are repeated on the constructor: without them a
     # checker infers the deps slot as `object` and the annotation above is
     # reported as a mismatch.
+    # Imported here, not at module scope: agents.factory imports the
+    # orchestrator, which imports this module, so a top-level import is a cycle.
+    # The same function-local pattern chat_agent.py already uses.
+    from berg_agents.agents.factory import create_tools
+
     agent: Agent[AgentDeps, str] = Agent[AgentDeps, str](
         model,
         # Explicit name labels this agent's Logfire run span.
@@ -466,7 +480,7 @@ def build_implementation_agent(
         # schema would risk `UnexpectedModelBehavior` retry
         # exhaustion when the model cannot serialize the schema.
         retries={"output": OUTPUT_RETRIES},
-        instructions=(
+        instructions=fill_tool_inventory(
             # explicit instructions replace; extra_instructions append,
             # so a caller adding one rule does not copy the defaults.
             instructions
@@ -475,7 +489,11 @@ def build_implementation_agent(
                 f"{default_instructions}\n\n{extra_instructions}"
                 if extra_instructions
                 else default_instructions
-            )
+            ),
+            # THIS agent's real specs, so the implementer cannot be told a
+            # parameter name the tool rejects - the failure that made its calls
+            # fail validation and its turn stall.
+            create_tools(root_dir),
         ),
     )
 

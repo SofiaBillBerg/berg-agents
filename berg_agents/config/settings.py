@@ -170,6 +170,37 @@ if TYPE_CHECKING:
 # so the root is three parents up.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
+#: The workspace tool inventory, with each tool's EXACT parameter names.
+#
+# One source of truth, referenced by DEFAULT_SYSTEM_PROMPT and by the
+# implementation sub-agent's own instructions. A second copy is how the two
+# drift apart: the chat prompt carried parameter names and the implementer's
+# did not, so a delegated run's tool calls were rejected as unrecognised
+# inputs and the sub-agent stalled and confabulated. Verified against the real
+# signatures in berg_agents/agents/factory.py and the harness's subagent
+# toolset on 2026-11-12 — all nine match.
+#:
+#: Why the names are in the text at all: a call carrying any other key is
+#: rejected BEFORE the tool runs, so `list_files(path=...)` fails and
+#: `list_files(file_path=...)` runs. The model was guessing, and losing.
+#: The tool-inventory section of the base prompt: a heading, a
+#: ``{tool_inventory}`` placeholder, and the warning about parameter names.
+#:
+#: The inventory itself is NOT here. It is GENERATED from the tool specs the
+#: agent is actually built with (see ``core/tool_spec.render_tool_inventory``)
+#: and substituted per agent at build time. A hand-written list goes stale the
+#: moment a tool is renamed or gains a parameter, and a stale list is worse than
+#: none: the model sends a key the tool rejects and cannot make progress. That
+#: is the failure this replaced.
+TOOL_SELECTION_BLOCK = """TOOL SELECTION (complete inventory - the agent has exactly these tools):
+{tool_inventory}
+
+THE PARAMETER NAMES ABOVE ARE EXACT AND ARE THE WHOLE REASON THIS LIST
+CARRIES THEM. A call carrying any other key is rejected as an unrecognised
+input before the tool ever runs, so the turn is spent without doing the work.
+Optional arguments are marked with `?` and may be omitted. Send these keys,
+spelled this way."""
+
 #: Default system prompt used when none is supplied via .berg-agents / ``.env``.
 DEFAULT_SYSTEM_PROMPT = """You are a coding agent. Use tools for every filesystem action.
 
@@ -182,28 +213,7 @@ RULES:
 - Do not write long essays. Give concise, actionable answers.
 - For questions clearly outside filesystem/code tasks, reply directly.
 
-TOOL SELECTION (complete inventory - the agent has exactly these tools):
-- list_files(file_path): list a directory's contents (call this first to explore - use the exact paths it returns)
-- read_file(file_path): inspect file contents (files only, never directories)
-- search_code(pattern, directory?): find text across the codebase (literal match, e.g. definitions, references, error strings)
-- bash(command, timeout?): run shell commands - tests, builds, linters, inspection (e.g. "pytest -q", "ls"). Has a timeout; output is truncated. All shell needs go through bash.
-- write_file(file_path, content): create a new file or overwrite an existing one
-- edit_file(file_path, content): replace the contents of an existing file
-- patch_file(file_path, old_text, new_text): replace one exact text block inside a file (surgical
-  alternative to rewriting the whole file)
-- plan_task(description): decompose a task into an ordered step plan via the
-  planner subagent. Read-only. Call this before delegating the work on
-  any multistep plan so progress stays visible.
-- delegate_task(agent_name, task): hand a self-contained task to the named
-  sub-agent, which runs it and reports back. Execution needs human approval.
-
-THE PARAMETER NAMES ABOVE ARE EXACT AND ARE THE WHOLE REASON THIS LIST
-CARRIES THEM. A call carrying any other key is rejected as an unrecognised
-input before the tool ever runs, so the turn is spent without doing the work
-- `list_files(path=...)` fails and `list_files(file_path=...)` runs. The
-two that trip hardest: the directory tools take `file_path` (never `path`),
-and search takes `pattern` (never `query`). Send those keys, spelled that
-way. Optional arguments are marked with `?` and may be omitted.
+{TOOL_SELECTION_BLOCK}
 
 If a task seems to need anything outside this list, say plainly it
 cannot be done with the available tools. Calls to unknown tool
@@ -234,6 +244,14 @@ EXTERNAL MCP TOOLS (security policy):
   documentation.
 
 """
+
+# Interpolated here, not at .format() time: the prompt is later
+# formatted with root_dir, and an unknown key there raises. So the
+# inventory is spliced in by name and root_dir stays for the runtime.
+DEFAULT_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT.replace(
+    "{TOOL_SELECTION_BLOCK}", TOOL_SELECTION_BLOCK
+)
+
 
 
 def _annotation_is_complex(annotation: Any) -> bool:

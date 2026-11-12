@@ -602,3 +602,48 @@ def filter_specs_by_model(
     except ImportError:
         return list(tools)
     return list(filter_tools_by_exclusions(list(tools), model_id))
+
+
+def render_tool_inventory(specs: Iterable[ToolSpec]) -> str:
+    """Render a tool inventory whose parameter names are DERIVED, not written.
+
+    The reason this exists rather than a literal in a prompt: a hand-written
+    list goes stale the moment a tool is added, renamed, or changes a parameter,
+    and a stale list is worse than none - the model sends a key the tool rejects
+    and cannot make progress. That failure is what this replaced (2026-11-12: a
+    specialist burned its turn on `read_file(path=...)` against a tool that takes
+    `file_path`). Derived from the specs the tools are actually registered with,
+    so the prompt cannot disagree with the toolset.
+
+    Optional parameters are marked ``?`` and required ones are not, because a
+    model that omits an optional argument is fine and one that omits a required
+    one is not - the difference is worth a character.
+
+    :param specs: The tool specs to describe, as registered.
+    :return: Prompt-ready inventory lines, one per tool.
+    """
+    lines: list[str] = []
+    for spec in specs:
+        params = ", ".join(
+            param.name + ("" if param.required else "?")
+            for param in spec.params
+        )
+        lines.append(f"- {spec.name}({params}): {spec.description}")
+    return "\n".join(lines)
+
+
+def fill_tool_inventory(prompt: str, specs: Iterable[ToolSpec]) -> str:
+    """Substitute a prompt's ``{tool_inventory}`` placeholder with real tools.
+
+    One call at agent build time turns a static prompt into one that describes
+    the toolset the agent actually has. No placeholder in the text means the
+    prompt is returned unchanged, so callers that have nothing to fill pass a
+    prompt that already carries its inventory.
+
+    :param prompt: Base prompt, possibly carrying ``{tool_inventory}``.
+    :param specs: The specs the agent was built with.
+    :return: The prompt with the placeholder filled, or unchanged.
+    """
+    if "{tool_inventory}" not in prompt:
+        return prompt
+    return prompt.replace("{tool_inventory}", render_tool_inventory(specs))
