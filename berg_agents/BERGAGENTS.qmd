@@ -23,7 +23,7 @@ Next.js + FastAPI web UI that share the same commands and task lifecycle.
 - **Loop** (`berg_agents/core/loop.py`): framework-free LLM↔tool cycle yielding typed events, with HITL pause/resume,
   cancel, and `max_steps`.
   Adapters expose `chat(messages, *, tools, temperature)`.
-- **Tools** (`berg_agents/core/tool_spec.py`, `agents/factory.py`): native `ToolSpec` registry - `read_file` (low risk),
+- **Tools** (`tools/tool_spec.py`, `agents/factory.py`): native `ToolSpec` registry - `read_file` (low risk),
   `edit_file` / `write_file` (high risk) - wrapped as audited capabilities; MCP servers add `mcp_<server>__<tool>`
   tools.
 - **Providers** (`berg_agents/providers/registry.py`): the provider resolves FROM the model id.

@@ -20,7 +20,7 @@
 """Risk classification vocabulary for tools and capabilities.
 
 This is the single source of truth for risk levels - used by
-:class:`~berg_agents.core.tool_spec.ToolSpec` and the harness routing
+:class:`~berg_agents.tools.tool_spec.ToolSpec` and the harness routing
 layer to decide whether a tool call requires human-in-the-loop approval.
 """
 

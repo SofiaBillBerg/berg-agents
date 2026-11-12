@@ -31,7 +31,7 @@ from berg_agents.capabilities.registry import ToolCatalog
 from berg_agents.core.hitl import DEFAULT_INTERRUPT_TOOLS
 from berg_agents.core.interface import RiskLevel, TaskComplexity
 from berg_agents.core.router_stats import RouterStats
-from berg_agents.core.tool_spec import ToolSpec
+from berg_agents.tools.tool_spec import ToolSpec
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def _tool_is_mutating(tool_name: str) -> bool:
     """Check whether a planned tool can mutate state.
 
     ``"general"`` never mutates; tools whose names carry a
-    read-only hint (per :class:`berg_agents/core/tool_spec.ToolSpec.is_read_only`)
+    read-only hint (per :class:`berg_agents/tools/tool_spec.ToolSpec.is_read_only`)
     never mutate; anything in ``DEFAULT_INTERRUPT_TOOLS``
     or prefixed by one of its entries (``delete_file``,
     ``execute_command``) may mutate.

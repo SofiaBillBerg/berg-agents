@@ -20,7 +20,7 @@
 """Pydantic AI adapter for BergAgents tools and agent construction.
 
 Builds a :class:`~pydantic_ai.Agent` whose tools come from a single
-:class:`~berg_agents.agents.workspace_toolset.WorkspaceToolset` — file
+:class:`~berg_agents.tools.workspace_toolset.WorkspaceToolset` — file
 tools plus staged plan/implement subagent delegates. Used by the
 ``VercelAIAdapter`` streaming endpoint.
 """
@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any
 
 from berg_agents.agents.deps import AgentDeps
-from berg_agents.core.tool_spec import fill_tool_inventory
+from berg_agents.tools.tool_spec import fill_tool_inventory
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ def build_chat_agent(
     """Build a pydantic_ai ``Agent`` for the streaming chat endpoint.
 
     The agent receives a single
-    :class:`~berg_agents.agents.workspace_toolset.WorkspaceToolset`
+    :class:`~berg_agents.tools.workspace_toolset.WorkspaceToolset`
     (id ``"workspace"``): file/shell tools plus staged ``plan_task``
     / ``implement_task`` subagent delegates, with per-tool approval
     flags and a usage guide carried by the toolset itself. Enabled
@@ -131,12 +131,12 @@ def build_chat_agent(
 
     from berg_agents.agents.delegation import build_delegation_capabilities
     from berg_agents.agents.factory import create_tools
-    from berg_agents.agents.workspace_toolset import WorkspaceToolset
+    from berg_agents.tools.workspace_toolset import WorkspaceToolset
     from berg_agents.capabilities.context_capabilities import (
         build_context_capabilities,
     )
     from berg_agents.capabilities.delegation_gate import DelegationApprovalGate
-    from berg_agents.capabilities.mcp_toolsets import build_mcp_toolsets
+    from berg_agents.tools.mcp_toolsets import build_mcp_toolsets
     from berg_agents.capabilities.runaway_guard import RunawayGuard
     from berg_agents.capabilities.skills import load_skill_capabilities
     from berg_agents.capabilities.turn_shape import build_turn_shape_capability

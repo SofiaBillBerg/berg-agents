@@ -100,7 +100,7 @@ def register_tool_routes(
         :return: Dict with ``tools`` and ``mcp_servers`` lists.
         """
         from berg_agents.agents.factory import create_tools
-        from berg_agents.capabilities.mcp_toolsets import list_servers
+        from berg_agents.tools.mcp_toolsets import list_servers
 
         tools = [
             {
@@ -137,7 +137,7 @@ def register_tool_routes(
         """Execute one tool synchronously and return its output.
 
         Switches on the tool name and runs the matching
-        :class:`~berg_agents.core.tool_spec.ToolSpec` (file tools)
+        :class:`~berg_agents.tools.tool_spec.ToolSpec` (file tools)
         or the full harness pipeline (``run_task``). This is the
         endpoint the webapp's ``executeTool`` (slash commands like
         ``/read_file``) calls. Tool functions already return

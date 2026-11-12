@@ -79,7 +79,7 @@ from berg_agents.core.hitl import (
     default_interrupt_on,
     is_valid_decision,
 )
-from berg_agents.core.tool_spec import ToolRegistry, effective_risk_class
+from berg_agents.tools.tool_spec import ToolRegistry, effective_risk_class
 
 _LOGGER = logging.getLogger(__name__)
 

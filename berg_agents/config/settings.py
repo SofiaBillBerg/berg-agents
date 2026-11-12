@@ -187,7 +187,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 #: ``{tool_inventory}`` placeholder, and the warning about parameter names.
 #:
 #: The inventory itself is NOT here. It is GENERATED from the tool specs the
-#: agent is actually built with (see ``core/tool_spec.render_tool_inventory``)
+#: agent is actually built with (see ``tools/tool_spec.render_tool_inventory``)
 #: and substituted per agent at build time. A hand-written list goes stale the
 #: moment a tool is renamed or gains a parameter, and a stale list is worse than
 #: none: the model sends a key the tool rejects and cannot make progress. That

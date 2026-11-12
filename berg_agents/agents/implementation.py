@@ -41,7 +41,7 @@ from berg_agents.agents.deps import AgentDeps, FileChange
 from berg_agents.capabilities.registry import ToolCatalog
 from berg_agents.capabilities.turn_shape import build_turn_shape_capability
 from berg_agents.config.settings import TOOL_SELECTION_BLOCK
-from berg_agents.core.tool_spec import fill_tool_inventory
+from berg_agents.tools.tool_spec import fill_tool_inventory
 from berg_agents.providers.models import (
     resolve_model_instance,
     resolve_model_request_settings,
@@ -451,7 +451,7 @@ def build_implementation_agent(
     # Imported here, not at module scope: agents.factory imports the
     # orchestrator, which imports this module, so a top-level import is a cycle.
     # The same function-local pattern chat_agent.py already uses.
-    from berg_agents.agents.factory import create_tools
+    from berg_agents.tools.workspace_toolset import create_tools
 
     agent: Agent[AgentDeps, str] = Agent[AgentDeps, str](
         model,
@@ -493,7 +493,9 @@ def build_implementation_agent(
             # THIS agent's real specs, so the implementer cannot be told a
             # parameter name the tool rejects - the failure that made its calls
             # fail validation and its turn stall.
-            create_tools(root_dir),
+            # The inventory needs only names and parameters, which do not
+            # depend on the workspace root, so the default root is enough.
+            create_tools(),
         ),
     )
 

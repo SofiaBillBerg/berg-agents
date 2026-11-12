@@ -315,9 +315,11 @@ def _resolve_annotation(
 
     try:
         hints = _typing.get_type_hints(func, include_extras=False)
-    except Exception as exc:
+    except Exception:
         # Defensive: get_type_hints can fail if the function is in a module that is not fully imported or has other issues. In that case, we fall back to the original annotation.
-        logger.exception(f"Error resolving annotation for {name}: {exc}")
+        # The exception object is not passed to logger.exception: it already
+        # emits the active exception's traceback, so including it duplicates it.
+        logger.exception(f"Error resolving annotation for {name}")
         return annotation
     return hints.get(name, annotation)
 

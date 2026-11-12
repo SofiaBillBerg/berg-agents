@@ -1,7 +1,9 @@
+#  Copyright (c) 2026 Sofia Billger Bergström
+#
+
 # Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
 # The system follows a harness-based execution model with multiple specialized agents working together.
 #
-# Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 #
@@ -21,7 +23,7 @@
 
 Reads ``.berg-agents /mcp.json`` in its native ``{"mcpServers": {...}}``
 shape (Claude-style dict — *not* the list shape
-:func:`~berg_agents.core.mcp.load_mcp_server_configs` expects, which
+:func:`~berg_agents.tools.mcp.load_mcp_server_configs` expects, which
 is why that file was previously configured but consumed by nothing):
 
 - ``type: "remote"`` + ``url`` → streamed HTTP transport.
@@ -31,7 +33,7 @@ is why that file was previously configured but consumed by nothing):
 
 Every toolset is renamed to ``mcp_<server>__<tool>`` to match the
 documented tool contract the system prompt teaches, and tools from
-sensitive servers (see :func:`~berg_agents.core.mcp.is_sensitive_server`)
+sensitive servers (see :func:`~berg_agents.tools.mcp.is_sensitive_server`)
 are wrapped to require user approval — read-only servers stay
 approval-free. Toolsets are cached process-wide and built
 best-effort: a dead server logs a warning and is skipped, never
@@ -164,7 +166,7 @@ def build_mcp_toolsets(
         no rebuild and never disturbs live transports.
     :return: Toolsets ready for ``Agent(toolsets=[...])``.
     """
-    from berg_agents.core.mcp import is_sensitive_server
+    from berg_agents.tools.mcp import is_sensitive_server
     from pydantic_ai.mcp import (
         MCPToolset,
         StdioTransport,

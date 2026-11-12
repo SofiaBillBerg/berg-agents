@@ -40,10 +40,10 @@ Why dataclasses + a `Literal` action instead of an enum?  Two reasons:
    request and decision hashable and immutable - the loop can stash
    them into the snapshot dict without risk of mutation by callers.
 
-The risk vocabulary follows :data:`core.tool_spec.RiskClass`
+The risk vocabulary follows :data:`tools.tool_spec.RiskClass`
 (``"low" | "medium" | "high"``).  The design contract originally
 proposed four categories (``read/write/state/destructive``), but the
-shipped :mod:`core.tool_spec` uses three; we bridge by treating
+shipped :mod:`tools.tool_spec` uses three; we bridge by treating
 ``"high"`` as the always-interrupt bucket.  See ``default_interrupt_on``.
 """
 

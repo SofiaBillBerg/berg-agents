@@ -32,7 +32,7 @@ What lives here
   (urllib + SSE listen thread; no third-party deps).
 * **Client** - :class:`McpClient` and :class:`McpServerConfig` wrap a
   transport and present a one-line ``list_tools()`` / ``call_tool()``
-  surface that returns :class:`~berg_agents.core.tool_spec.ToolSpec`
+  surface that returns :class:`~berg_agents.tools.tool_spec.ToolSpec`
   objects the  loop can drop into its registry unchanged.
 
 Design notes
@@ -67,7 +67,7 @@ from typing import Any, Protocol
 from urllib import error as urllib_error
 from urllib import request as urllib_request
 
-from berg_agents.core.tool_spec import ToolParam, ToolSpec
+from berg_agents.tools.tool_spec import ToolParam, ToolSpec
 
 # ---------------------------------------------------------------------------
 # Naming convention (must match config/mcp.py byte-for-byte)

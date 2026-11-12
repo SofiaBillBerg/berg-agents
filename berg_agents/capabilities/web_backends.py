@@ -192,7 +192,7 @@ def _ordered_backends(
     names = order or DEFAULT_BACKEND_ORDER
     resolved = []
     for name in names:
-        backend = BACKENDS.get(str(name).strip().lower())
+        backend = BACKENDS.get(name.strip().lower())
         if backend is None:
             logger.warning("Unknown web backend %r, skipping", name)
             continue

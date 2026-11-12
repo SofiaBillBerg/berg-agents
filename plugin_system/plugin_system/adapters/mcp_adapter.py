@@ -24,7 +24,7 @@ no configuration file moves and no rewrites. Each server becomes one
 ``MCPPluginAdapter`` exposing an ``MCPCapability`` descriptor, so
 servers gain plugin lifecycle, events, and UI visibility while the
 chat agent keeps attaching their toolsets through the existing
-:mod:`berg_agents.capabilities.mcp_toolsets` path.
+:mod:`berg_agents.tools.mcp_toolsets` path.
 """
 
 from __future__ import annotations
@@ -88,8 +88,8 @@ class MCPPluginAdapter(BergPlugin):
             return
         # NOTE: Reuses the chat MCP config reader so transport rules
         # stay identical between the adapter and the chat agent.
-        from berg_agents.capabilities.mcp_toolsets import _load_config
-        from berg_agents.core.mcp import is_sensitive_server
+        from berg_agents.tools.mcp_toolsets import _load_config
+        from berg_agents.tools.mcp import is_sensitive_server
 
         entry = _load_config().get(server_name)
         if not isinstance(entry, dict):
@@ -173,8 +173,8 @@ def describe_mcp_server(server_name: str) -> dict[str, Any] | None:
     :param server_name: MCP server key from .berg-agents /mcp.json.
     :return: Capability-style descriptor, or None when unconfigured.
     """
-    from berg_agents.capabilities.mcp_toolsets import _load_config
-    from berg_agents.core.mcp import is_sensitive_server
+    from berg_agents.tools.mcp_toolsets import _load_config
+    from berg_agents.tools.mcp import is_sensitive_server
 
     entry = _load_config().get(server_name)
     if not isinstance(entry, dict):
@@ -200,7 +200,7 @@ async def register_mcp_plugins(manager: Any) -> list[str]:
     """
     # NOTE: Same config reader as the chat toolsets — adapter and chat
     # can never disagree about which servers exist.
-    from berg_agents.capabilities.mcp_toolsets import _load_config
+    from berg_agents.tools.mcp_toolsets import _load_config
     from plugin_system.exceptions import PluginError
 
     registered: list[str] = []
@@ -239,7 +239,7 @@ async def sync_mcp_config_states(manager: Any) -> None:
 
     :param manager: Initialized ``PluginManager`` with MCP plugins.
     """
-    from berg_agents.capabilities.mcp_toolsets import _load_config
+    from berg_agents.tools.mcp_toolsets import _load_config
 
     config = _load_config()
     for mcp_entry in manager.registry.list_plugins():
