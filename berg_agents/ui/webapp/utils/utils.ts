@@ -72,12 +72,109 @@ export interface ExportMessage {
   role: string;
   content: string;
   reasoning?: string;
-  toolCalls?: Array<{
-    tool: string;
-    input?: string;
-    output?: string;
-    state?: string;
-  }>;
+  toolCalls?: Array<ExportToolCall>;
+}
+
+/**
+ * One tool call for export, including work that ran *inside* it.
+ *
+ * `children` is not decoration: a delegated sub-agent's whole conversation
+ * (its text, its reasoning, its own tool calls) lives there. The export used to
+ * ignore it, so a delegation printed the dispatch call and silently dropped
+ * everything the sub-agent actually did — the one thing berg is built to show.
+ */
+export interface ExportToolCall {
+  tool: string;
+  input?: string;
+  output?: string;
+  state?: string;
+  /** Work that ran inside this call — a delegated sub-agent's own parts. */
+  children?: {
+    text?: string;
+    reasoning?: string;
+    toolCalls?: ExportToolCall[];
+  };
+}
+
+/**
+ * Render a fenced code block where every line belongs to a blockquote.
+ *
+ * A fence inside a `>` blockquote only parses when the prefix is on every line,
+ * including the opening and closing markers — this is why it is a helper rather
+ * than string interpolation at the call site.
+ *
+ * @param body - The code or text to fence.
+ * @param language - Fence language, or empty for a plain fence.
+ * @param quote - The blockquote prefix, already repeated to the right depth.
+ * @returns The lines of the fenced block, prefixes applied.
+ */
+function fenced(body: string, language: string, quote: string): string[] {
+  const out = [`${quote}\`\`\`${language}`.trimEnd()];
+  for (const line of body.split("\n")) {
+    out.push(`${quote}${line}`);
+  }
+  out.push(`${quote}\`\`\``);
+  return out;
+}
+
+/**
+ * Write one tool call, and any work nested inside it, as markdown.
+ *
+ * Depth is expressed as blockquote nesting (`>` per level) rather than headers,
+ * so a delegation tree reads as one visually-contained block and survives being
+ * pasted anywhere markdown is rendered. Code fences are indented by nothing —
+ * fence content must stay flush or it stops being code.
+ *
+ * @param lines - The output buffer, appended to in place.
+ * @param call - The tool call to write.
+ * @param depth - Nesting level; 0 for a top-level call.
+ */
+function writeToolCall(
+  lines: string[],
+  call: ExportToolCall,
+  depth: number,
+): void {
+  // One ">" per level puts the child inside the parent's blockquote.
+  const quote = "> ".repeat(depth);
+  const label = depth === 0 ? `**🔧 ${call.tool}**` : `**🔧 ${call.tool}**`;
+
+  lines.push(`${quote}${label}`, "");
+
+  if (call.state) {
+    lines.push(`${quote}_state: ${call.state}_`, "");
+  }
+  // Every line of a fenced block must carry the quote prefix, not just the
+  // fence markers — otherwise the body escapes the blockquote and the fence
+  // stops parsing as code at all.
+  if (call.input) {
+    lines.push(...fenced(call.input, "json", quote), "");
+  }
+  if (call.output) {
+    lines.push(...fenced(call.output, "", quote), "");
+  }
+
+  const nested = call.children;
+  if (!nested) return;
+
+  // The sub-agent's own words first, then its reasoning, then its calls —
+  // the same order the transcript shows them in.
+  if (nested.text && nested.text.trim() !== "") {
+    lines.push(`${quote}**Sub-agent said:**`, "");
+    for (const line of nested.text.trim().split("\n")) {
+      lines.push(`${quote}${line}`);
+    }
+    lines.push("");
+  }
+  if (nested.reasoning && nested.reasoning.trim() !== "") {
+    lines.push(`${quote}**🧠 Sub-agent thinking:**`, "");
+    for (const line of nested.reasoning.trim().split("\n")) {
+      lines.push(`${quote}> ${line}`);
+    }
+    lines.push("");
+  }
+  for (const child of nested.toolCalls ?? []) {
+    writeToolCall(lines, child, depth + 1);
+  }
 }
 
 /**
@@ -118,14 +215,10 @@ export function buildExportMarkdown(
         }
         lines.push("");
       }
+      // Recursive, because a delegation nests: the sub-agent's text, reasoning
+      // and own tool calls all ride inside the parent call's `children`.
       for (const call of msg.toolCalls ?? []) {
-        lines.push(`**🔧 ${call.tool}**`, "");
-        if (call.input) {
-          lines.push("```json", call.input, "```", "");
-        }
-        if (call.output) {
-          lines.push("```", call.output, "```", "");
-        }
+        writeToolCall(lines, call, 0);
       }
       lines.push("---", "");
     });

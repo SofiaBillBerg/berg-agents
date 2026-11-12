@@ -24,7 +24,9 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-root = ""
 module-name = ["berg_agents"]
-source-exclude = ["**/*.bin", ".*/*", "**/dist", "**/build", "**/_build", ".venv", "**/node_modules", "**/archive", "**/*cache*", "**/support-libs", "**/.next/**", "**/.ipynb_checkpoints/**", "berg_agent_outputs/**", "_extensions/**", "notes/**", "scripts/**", "project_utils/**", "tmp/**", "feat_dev/**", "berg_plugins/**",
+source-exclude = ["**/*.bin", ".*/*", "**/dist", "**/build", "**/_build", ".venv", "**/node_modules", "**/archive",
+    "**/*cache*", "**/support-libs", "**/.next/**", "**/.ipynb_checkpoints/**", "berg_agent_outputs/**",
+    "_extensions/**", "notes/**", "scripts/**", "project_utils/**", "tmp/**", "feat_dev/**", "berg_plugins/**",
     "suggestions/**", "_site/**", "**/.*/**"]
 
 [dependency-groups]
@@ -37,8 +39,7 @@ notebooks = ["ipykernel>=7.3.0",
     "matplotlib-inline>=0.2.2",
     "nbformat>=5.11.1",
     "notebook>=7.6.2"]
-agent-deps = [
-    "a2a-sdk[all]>=0.3.21",
+agent-deps = ["a2a-sdk[all]>=0.3.21",
     "agent-client-protocol>=0.11.1",
     "ai>=0.5.2",
     "authlib==1.9.2",
@@ -72,12 +73,10 @@ agent-deps = [
     "typesafe-sdk>=0.7.4",
     "uvicorn>=0.52.1",
     "vercel-workflow>=0.12.1 ; platform_python_implementation == 'CPython'"]
-docs = [
-    "pydoctor>=25.10.1",
+docs = ["pydoctor>=25.10.1",
     "quarto>=0.1.0"]
 
-dev = [
-    "black>=24.3.0",
+dev = ["black>=24.3.0",
     "deprecated>=3.0.1",
     "flake8>=7.3.0",
     "httpx2>=2.9.1",
@@ -95,8 +94,7 @@ dev = [
     "types-pyyaml>=6.0.12.20260906",
     "uv>=0.12.9",
     "wheel>=0.45.1"]
-tests = [
-    "coverage>=7.16.0",
+tests = ["coverage>=7.16.0",
     "hypothesis>=6.165.10",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
@@ -107,17 +105,12 @@ tests = [
 plugin-deps = ["plugin-system"]
 
 [optional-dependencies]
-dev-usage = [
-    "berg-plugin-shared-todo"]
-extra-features = [
-    "mempalace> = 3.11.0"]
+dev-usage = ["berg-plugin-shared-todo"]
+extra-features = ["mempalace> = 3.11.0"]
 # [project.scripts]
 # berg_agents = "berg_agents.cli:main"
 
 
-# This section configures uv to use the nightly PyTorch index and allow pre-releases.
-# It is the equivalent of running:
-# uv pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu130
 [tool.uv.extra-build-dependencies]
 nvidia-pyindex = ["appdirs"]
 
@@ -131,7 +124,7 @@ torch = [{ index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
     { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }]
 torchvision = [{ index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
     { index = "pytorch-cu130", marker = "sys_platform == 'linux'" }]
-berg-plugin-shared-todo = { path = "berg_plugins/shared_todo/dist/berg_plugin_shared_todo-0.0.1.tar.gz" }
+berg-plugin-shared-todo = { path = "berg_plugins/shared-todo/dist/berg_plugin_shared_todo-0.0.1.tar.gz" }
 plugin-system = { workspace = true }
 
 
@@ -152,14 +145,12 @@ default = true
 name = "default"
 
 [tool.uv.pip]
-extra-index-url = ["https://download.pytorch.org/whl/cu130"] # This will add the PyTorch index as an additional source for packages, which can help ensure that you have access to the latest versions of PyTorch and related packages.
+extra-index-url = ["https://download.pytorch.org/whl/cu130"]
 index-strategy = "unsafe-best-match"
 
 [tool.uv.workspace]
-members = [
-    "plugin_system",
-    "."
-]
+members = ["plugin_system",
+    "."]
 
 
 [tool.uv]
@@ -249,10 +240,10 @@ split-on-trailing-comma = false
 [tool.isort]
 dedup_headings = true
 ensure_newline_before_comments = true
-float_to_top = true # This will move imports that are only used in type annotations to the top of the import section.
-honor_noqa = true # This will allow isort to respect `# noqa` comments that are used to ignore specific linting errors.
-profile = "attrs" # This will set the isort profile to "attrs", which will configure isort to format imports in a way that is compatible with the Black code formatter.
-remove_redundant_aliases = true # This will remove redundant aliases from imports (e.g., `import numpy as np` when `np` is not used in the code).
+float_to_top = true # Move imports that are only used in type annotations to the top of the import section.
+honor_noqa = true # respect `# noqa` comments that are used to ignore specific linting errors.
+profile = "attrs" # isort profile compatible with the Black code formatter.
+remove_redundant_aliases = true # remove redundant aliases from imports when not used in the code.
 skip_glob = ["_build",
     "_extensions",
     ".*/",
@@ -263,14 +254,14 @@ skip_glob = ["_build",
     "dist",
     "build",
     ".ipynb_checkpoints",
-    "*support-libs"] # This will tell isort to skip these directories when sorting imports.
-sort_reexports = true # This will sort re-exports (e.g., `from . import module`) separately from regular imports,.
-src_paths = ["berg_agents", "plugin_system"] # This will tell isort to treat these directories as source paths, which will affect how imports are sorted.
+    "*support-libs"]
+sort_reexports = true # sort re-exports (e.g., `from . import module`) separately from regular imports,.
+src_paths = ["berg_agents", "plugin_system"] # treat these directories as source paths,
 
 
 [tool.ruff.format]
-docstring-code-format = true           # This will reformat code snippets in docstrings using the same formatting rules as regular code.
-line-ending = "lf"                     # This will ensure that all files use Unix-style line endings.
+docstring-code-format = true # reformat code snippets in docstrings using the same formatting rules as regular code.
+line-ending = "lf"
 preview = true
 docstring-code-line-length = "dynamic"
 quote-style = "double"
@@ -568,32 +559,3 @@ max_high = 7
 max_security = 0
 max_quality = 10
 strict = false
-
-
-# ===== DEV TIPS =====
-# The below commands is for reference and meant to be run as-is in the terminal from root of the project.
-# run formatters and vis docs with sh pre-hook
-
-# Individual commands to run code quality checks and generate reports
-#  pyrefly check --remove-unused-ignores --check-unannotated-defs=true --infer-return-types=checked --use-ignore-files=true --summary=full  --dependency-graph=./.code_quality_outputs/pyrefly_deps_graph.json --color=always --python-interpreter-path .venv/bin/python3 --verbose --output=.code_quality_outputs/pyrefly_report.txt
-
-#  pyrefly stubgen --output-dir ./stubs --include-docstrings --include-private --check-unannotated-defs=true --infer-return-types=checked --use-ignore-files=true --verbose --color=always --.berg-agents pyproject.toml --permissive-ignores=true
-
-# stubgen -p scripts -v --include-docstrings --include-private --out stubs
-
-# .venv/bin/sphinx-autobuild source _build
-
-# isort . -s .venv  -s ./node_modules/ --float-to-top
-
-# .venv/bin/uv tool run pyanalyze --config-file pyproject.toml --find-unused --find-unused-attributes --markdown-output=.code_quality_outputs/pyanalyze_reports_0.md --verbose --enable-all  --autofix
-
-# pyanalyze --config-file pyproject.toml --find-unused --find-unused-attributes  --markdown-output=./.code_quality_outputs/pyanalyze_report.txt --run-fixer
-
-# flake8   berg_agents --show-source --verbose --extend-exclude "_build, .venv, *cache*, node_modules, dist, build, .ipynb_checkpoints, *support-libs"  --enable-extensions pycodestyle --format=pylint --max-line-length 80   --output-file "./.code_quality_outputs/flake_report.txt" --max-doc-length 100 --statistics --tee --color always --count --doctests
-
-# skylos   berg_agents --model auto-free-stack --api-base http://localhost:20128/v1 --tree --output .code_quality_outputs/skylos.md --quality --trace --format rich --llm --verbose --ai-defects --config-file pyproject.toml --exclude=.*/**,.venv/,**/**/node_modules,**/data,**/*.json,**/.*
-
-# skylos . -i --comment-out
-
-# pytype berg_agents --config pyproject.toml -v 2 --use-fiddle-overlay --precise-return --protocols --overriding-renamed-parameter-count-checks  --unresolved
-# uv export --format requirements.txt --output-file requirements.txt
