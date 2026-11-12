@@ -66,7 +66,10 @@ How to work:
    specialist whose role matches. Say which one and why.
 3. A specialist may stop and ask for your decision. Its state becomes "waiting":
    tell the user what it wants and what you recommend, then answer it with
-   answer_specialist. Never answer on the user's behalf without saying so.
+   answer_specialist. Approving releases a gate the user put there, so the user
+   is asked to confirm before it happens — put the request in your own words
+   first, so they know what they are approving. Never imply you approved
+   something on their behalf.
 4. Report back what it actually did with specialist_report: its own words ("said")
    and the tool calls it made ("did"). Never claim work it did not do.
 5. Use stop_specialist when the user wants it to stop, and steer_specialist to
@@ -103,6 +106,11 @@ export const orchestratorTools = {
                         "specialist cannot ask you follow-ups unless it uses its own " +
                         "question surface.",
                 )}),
+        // Starting a specialist begins a real run with real tools in the user's
+        // project. It is reversible (stop_specialist), but the user should know
+        // a run is starting before it does — that is the difference between an
+        // advisor and a black box.
+        needsApproval: true,
         execute: async ({agent, task}) => startSpecialist(agent, task)}),
 
     specialist_state: tool({
@@ -131,6 +139,14 @@ export const orchestratorTools = {
                 .string()
                 .optional()
                 .describe("New instruction that replaces the pending action.")}),
+        // Letting a specialist proceed is the one action that carries the
+        // user's authority rather than the orchestrator's: it releases a gate
+        // the user put there. So approving asks the user first, and denying
+        // does not — withdrawing work needs no permission.
+        //
+        // The workflow pauses here and the run suspends until an answer
+        // arrives, which is exactly the capability this agent exists for.
+        needsApproval: ({approved}) => approved === true,
         execute: async ({runId, approved, reason, steer}) =>
             answerSpecialist(runId, {approved, reason, steer})}),
 

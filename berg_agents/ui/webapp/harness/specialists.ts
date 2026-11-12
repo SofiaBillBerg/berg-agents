@@ -67,6 +67,29 @@ export interface SpecialistReport {
 }
 
 /**
+ * The absolute origin to reach berg's API from *inside a workflow step*.
+ *
+ * `API_BASE` is empty in production on purpose — the browser and the server are
+ * same-origin, so a relative `/api/...` is correct there. But `workflow`'s
+ * `fetch` runs inside a step and requires an absolute URL; handed a relative
+ * path it fails with `Failed to parse URL from /api/agents` (found
+ * 2026-11-12, after the step-fetch change: this broke every specialist tool
+ * while the page still looked healthy).
+ *
+ * So: use `API_BASE` when set, otherwise name this server explicitly. The
+ * rewrite in `next.config.mjs` sends `/api/*` to Python, so pointing at our own
+ * origin goes through that same path and keeps one routing rule.
+ *
+ * @returns An origin with no trailing slash.
+ */
+function backendOrigin(): string {
+    if (API_BASE) return API_BASE;
+    const host = process.env.HOSTNAME || "127.0.0.1";
+    const port = process.env.PORT || "3100";
+    return `http://${host}:${port}`;
+}
+
+/**
  * One HTTP call to berg's backend, with a useful error when it fails.
  *
  * Two deliberate choices here:
@@ -84,7 +107,7 @@ async function call(
     path: string,
     init?: RequestInit,
 ): Promise<Record<string, unknown>> {
-    const response = await workflowFetch(`${API_BASE}${path}`, {
+    const response = await workflowFetch(`${backendOrigin()}${path}`, {
         ...init,
         headers: {"Content-Type": "application/json", ...(init?.headers ?? {})},
         cache: "no-store"});

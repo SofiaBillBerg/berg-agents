@@ -37,6 +37,8 @@ import { useState } from "react";
 
 import { useOrchestratorChat } from "@/harness/useOrchestratorChat";
 
+import { Navbar } from "../components/Navbar.tsx";
+
 /**
  * Pull the plain text out of a UI message.
  *
@@ -74,8 +76,15 @@ function toolsOf(
  * @returns The chat surface for the orchestrator.
  */
 export default function OrchestratorPage() {
-    const {messages, isStreaming, error, send, stop, lastRunId} =
-        useOrchestratorChat();
+    const {
+        messages,
+        isStreaming,
+        error,
+        send,
+        stop,
+        lastRunId,
+        pendingApprovals,
+        answerApproval} = useOrchestratorChat();
     const [input, setInput] = useState("");
 
     /**
@@ -91,7 +100,13 @@ export default function OrchestratorPage() {
     }
 
     return (
-        <div className="mx-auto flex h-full max-w-3xl flex-col gap-4 p-6">
+        <>
+            {/* The nav is rendered per page, not by the root layout (that is how
+                app/context/page.tsx and the others do it). Without it this route
+                was a bare screen with no way back — reported 2026-11-12. */}
+            <Navbar />
+            <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="mx-auto flex h-full max-w-3xl flex-col gap-4 p-6">
             <header className="flex items-baseline justify-between gap-4">
                 <div>
                     <h1 className="text-lg font-semibold">Orchestrator</h1>
@@ -156,6 +171,63 @@ export default function OrchestratorPage() {
                 })}
             </div>
 
+            {/* The orchestrator's pause, made answerable. Without this the
+                run stops and nothing releases it — the agent asks, the user
+                decides, and only then does the specialist start or its gate
+                open. */}
+            {pendingApprovals.length > 0 ? (
+                <div className="space-y-2 rounded border border-amber-500/40 p-3">
+                    <p className="text-sm font-medium">
+                        The orchestrator is waiting on you
+                    </p>
+                    {pendingApprovals.map((approval) => (
+                        <div key={approval.approvalId} className="space-y-1">
+                            <p className="text-xs opacity-70">
+                                It wants to run{" "}
+                                <code className="font-semibold">
+                                    {approval.toolName}
+                                </code>
+                                {approval.input ? (
+                                    <span className="opacity-80">
+                                        {" "}
+                                        —{" "}
+                                        {JSON.stringify(
+                                            approval.input,
+                                        ).slice(0, 300)}
+                                    </span>
+                                ) : null}
+                            </p>
+                            <div className="flex gap-2">
+                                <button
+                                    className="rounded border border-current/30 px-2 py-1 text-xs"
+                                    type="button"
+                                    onClick={() =>
+                                        answerApproval(
+                                            approval.approvalId,
+                                            true,
+                                        )
+                                    }
+                                >
+                                    Allow
+                                </button>
+                                <button
+                                    className="rounded border border-current/30 px-2 py-1 text-xs"
+                                    type="button"
+                                    onClick={() =>
+                                        answerApproval(
+                                            approval.approvalId,
+                                            false,
+                                        )
+                                    }
+                                >
+                                    Refuse
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+
             {error ? (
                 <p className="rounded border border-red-500/40 p-2 text-sm text-red-500">
                     {error}
@@ -186,7 +258,9 @@ export default function OrchestratorPage() {
                         Send
                     </button>
                 )}
-            </form>
-        </div>
+                </form>
+                </div>
+            </div>
+        </>
     );
 }

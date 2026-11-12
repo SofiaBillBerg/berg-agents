@@ -32,6 +32,11 @@ import { Suspense } from "react";
 
 /** Navigation items - links to the main pages. */
 const NAV_ITEMS = [
+  // The orchestrator leads: it is where work is planned WITH the agent, and
+  // everything else is either configuration or the raw chat surface. Without
+  // this entry the page existed at /orchestrator but was unreachable except by
+  // typing the URL (found 2026-11-12 from Sofia's screenshot of the nav).
+  { href: "/orchestrator", label: "Orchestrator", icon: "🧠" },
   { href: "/", label: "Chat", icon: "💬" },
   { href: "/agents", label: "Agents", icon: "🤖" },
   { href: "/context", label: "Context", icon: "📚" },
