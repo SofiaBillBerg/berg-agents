@@ -319,7 +319,7 @@ def _run_record(run_id: str) -> dict[str, Any] | None:
     """One run's stored record, read straight from its own file."""
     from berg_agents.workflow.registry import _workflow_data_dir
 
-    path = _workflow_data_dir() / Path("runs")/ f"{run_id}.json"
+    path = _workflow_data_dir() / Path("runs") / f"{run_id}.json"
     if not path.is_file():
         return None
     try:

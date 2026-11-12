@@ -253,7 +253,6 @@ DEFAULT_SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT.replace(
 )
 
 
-
 def _annotation_is_complex(annotation: Any) -> bool:
     """Return True when *annotation* is (or unions in) a ``list``/``dict`` type.
 

@@ -54,9 +54,9 @@ def register_context_routes(
         """
         from pathlib import Path
 
-        from berg_agents.tools.mcp_toolsets import list_servers
         from berg_agents.capabilities.skills import list_skills
         from berg_agents.config.settings import get_settings
+        from berg_agents.tools.mcp_toolsets import list_servers
 
         settings = get_settings()
         # Offload the blocking resolve off the event loop (async handlers

@@ -77,7 +77,7 @@ carry a task id, not the parent call id that opened them.
 from __future__ import annotations
 
 import logging
-from typing import Any, Literal
+from typing import Any
 import uuid
 
 logger = logging.getLogger(__name__)

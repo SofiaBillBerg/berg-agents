@@ -131,12 +131,10 @@ def build_chat_agent(
 
     from berg_agents.agents.delegation import build_delegation_capabilities
     from berg_agents.agents.factory import create_tools
-    from berg_agents.tools.workspace_toolset import WorkspaceToolset
     from berg_agents.capabilities.context_capabilities import (
         build_context_capabilities,
     )
     from berg_agents.capabilities.delegation_gate import DelegationApprovalGate
-    from berg_agents.tools.mcp_toolsets import build_mcp_toolsets
     from berg_agents.capabilities.runaway_guard import RunawayGuard
     from berg_agents.capabilities.skills import load_skill_capabilities
     from berg_agents.capabilities.turn_shape import build_turn_shape_capability
@@ -151,6 +149,8 @@ def build_chat_agent(
         resolve_model_instance,
         resolve_model_request_settings,
     )
+    from berg_agents.tools.mcp_toolsets import build_mcp_toolsets
+    from berg_agents.tools.workspace_toolset import WorkspaceToolset
     from pydantic_ai import Agent
     from pydantic_ai.capabilities import LocalWorkspace, WebFetch, WebSearch
     from pydantic_ai_harness.ask_user import AskUser

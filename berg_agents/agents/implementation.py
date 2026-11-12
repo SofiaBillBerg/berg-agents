@@ -41,7 +41,6 @@ from berg_agents.agents.deps import AgentDeps, FileChange
 from berg_agents.capabilities.registry import ToolCatalog
 from berg_agents.capabilities.turn_shape import build_turn_shape_capability
 from berg_agents.config.settings import TOOL_SELECTION_BLOCK
-from berg_agents.tools.tool_spec import fill_tool_inventory
 from berg_agents.providers.models import (
     resolve_model_instance,
     resolve_model_request_settings,
@@ -49,6 +48,7 @@ from berg_agents.providers.models import (
 )
 from berg_agents.providers.tiers import model_for_complexity
 from berg_agents.tools._io import _atomic_write, _normalize_target
+from berg_agents.tools.tool_spec import fill_tool_inventory
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.capabilities import ReinjectSystemPrompt
@@ -451,7 +451,7 @@ def build_implementation_agent(
     # Imported here, not at module scope: agents.factory imports the
     # orchestrator, which imports this module, so a top-level import is a cycle.
     # The same function-local pattern chat_agent.py already uses.
-    from berg_agents.tools.workspace_toolset import create_tools
+    from berg_agents.tools.specs import create_tools
 
     agent: Agent[AgentDeps, str] = Agent[AgentDeps, str](
         model,

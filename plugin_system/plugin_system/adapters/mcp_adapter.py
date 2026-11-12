@@ -88,8 +88,8 @@ class MCPPluginAdapter(BergPlugin):
             return
         # NOTE: Reuses the chat MCP config reader so transport rules
         # stay identical between the adapter and the chat agent.
-        from berg_agents.tools.mcp_toolsets import _load_config
         from berg_agents.tools.mcp import is_sensitive_server
+        from berg_agents.tools.mcp_toolsets import _load_config
 
         entry = _load_config().get(server_name)
         if not isinstance(entry, dict):
@@ -173,8 +173,8 @@ def describe_mcp_server(server_name: str) -> dict[str, Any] | None:
     :param server_name: MCP server key from .berg-agents /mcp.json.
     :return: Capability-style descriptor, or None when unconfigured.
     """
-    from berg_agents.tools.mcp_toolsets import _load_config
     from berg_agents.tools.mcp import is_sensitive_server
+    from berg_agents.tools.mcp_toolsets import _load_config
 
     entry = _load_config().get(server_name)
     if not isinstance(entry, dict):
