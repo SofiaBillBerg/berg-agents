@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -24,7 +24,6 @@
 import type { FailureNotice } from "@/harness";
 
 import { Button, Modal } from "@heroui/react";
-
 
 /**
  * FailureDialog - the ONE surface a failure is read on.
@@ -75,7 +74,9 @@ export function FailureDialog({
           <Modal.Header>
             <Modal.Heading
               className={
-                failure?.kind === "recovery" ? "" : "text-[var(--berg-status-error)]"
+                failure?.kind === "recovery"
+                  ? ""
+                  : "text-[var(--berg-status-error)]"
               }
             >
               {failure?.kind === "recovery" ? "🛠 " : "❌ "}

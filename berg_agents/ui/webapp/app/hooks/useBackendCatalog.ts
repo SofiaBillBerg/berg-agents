@@ -29,32 +29,32 @@
  * chrome down with it.
  */
 
-import type {AgentInfo} from "@/harness";
+import type { AgentInfo } from "@/harness";
 
-import {useEffect, useState} from "react";
+import { useEffect, useState } from "react";
 
-import {fetchAgents, fetchRouterStats} from "@/lib/backendCatalog";
+import { fetchAgents, fetchRouterStats } from "@/lib/backendCatalog";
 
 /** What the hook needs. */
 export interface UseBackendCatalogDeps {
-    /** Base URL of the Berg Agents API. */
-    apiBase: string;
+  /** Base URL of the Berg Agents API. */
+  apiBase: string;
 }
 
 /** The three catalogs, each independently loadable. */
 export interface BackendCatalog {
-    /** Workspace file tools, run_task, and the delegated plan/implement
+  /** Workspace file tools, run_task, and the delegated plan/implement
         entries, each with a one-line description. */
-    backendTools: Array<{name: string; description: string; source: string}>;
-    /** The agent list for the selector. */
-    agents: Array<{
-        name: string;
-        description?: string;
-        preferred_complexity?: string;
-        capabilities?: string[];
-    }>;
-    /** Router stats for the stats panel, or null before they arrive. */
-    routerStats: unknown;
+  backendTools: Array<{ name: string; description: string; source: string }>;
+  /** The agent list for the selector. */
+  agents: Array<{
+    name: string;
+    description?: string;
+    preferred_complexity?: string;
+    capabilities?: string[];
+  }>;
+  /** Router stats for the stats panel, or null before they arrive. */
+  routerStats: unknown;
 }
 
 /**
@@ -63,40 +63,36 @@ export interface BackendCatalog {
  * @param deps - The API base.
  * @returns The three catalogs (each empty or null until it loads).
  */
-export function useBackendCatalog(
-    deps: UseBackendCatalogDeps,
-): BackendCatalog {
-    const {apiBase} = deps;
+export function useBackendCatalog(deps: UseBackendCatalogDeps): BackendCatalog {
+  const { apiBase } = deps;
 
-    // Backend tool catalog (powers the slash palette + execution).
-    // Fetched once, before the palette below reads it: workspace file
-    // tools, run_task, and the delegated plan/implement entries, each
-    // with a one-line description.
-    const [backendTools, setBackendTools] = useState<
-        Array<{name: string; description: string; source: string}>
-    >([]);
-    useEffect(() => {
-        fetch(`${apiBase}/api/tools`)
-            .then((r) => (r.ok ? r.json() : null))
-            .then((data) => {
-                if (data && Array.isArray(data.tools)) setBackendTools(data.tools);
-            })
-            .catch(() => setBackendTools([]));
-    }, [apiBase]);
+  // Backend tool catalog (powers the slash palette + execution).
+  // Fetched once, before the palette below reads it: workspace file
+  // tools, run_task, and the delegated plan/implement entries, each
+  // with a one-line description.
+  const [backendTools, setBackendTools] = useState<
+    Array<{ name: string; description: string; source: string }>
+  >([]);
+  useEffect(() => {
+    fetch(`${apiBase}/api/tools`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && Array.isArray(data.tools)) setBackendTools(data.tools);
+      })
+      .catch(() => setBackendTools([]));
+  }, [apiBase]);
 
-    // Local agent list (fetched from /api/agents)
-    const [agents, setAgents] = useState<AgentInfo[]>([]);
-    useEffect(() => {
-        void fetchAgents().then(setAgents);
-         
-    }, []);
+  // Local agent list (fetched from /api/agents)
+  const [agents, setAgents] = useState<AgentInfo[]>([]);
+  useEffect(() => {
+    void fetchAgents().then(setAgents);
+  }, []);
 
-    // Fetch Router stats on mount
-    const [routerStats, setRouterStats] = useState<unknown>(null);
-    useEffect(() => {
-        void fetchRouterStats().then(setRouterStats);
-         
-    }, []);
+  // Fetch Router stats on mount
+  const [routerStats, setRouterStats] = useState<unknown>(null);
+  useEffect(() => {
+    void fetchRouterStats().then(setRouterStats);
+  }, []);
 
-    return {backendTools, agents, routerStats};
+  return { backendTools, agents, routerStats };
 }

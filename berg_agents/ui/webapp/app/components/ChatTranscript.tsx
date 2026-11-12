@@ -92,7 +92,9 @@ export function ChatTranscript({
               follow streaming output or pin the viewport to read back. */}
           <div className="flex items-center gap-1.5 mb-0.5">
             <button
-              aria-label={autoScroll ? "Disable auto-scroll" : "Enable auto-scroll"}
+              aria-label={
+                autoScroll ? "Disable auto-scroll" : "Enable auto-scroll"
+              }
               className="rounded-md border border-border bg-background px-2 py-0.5 text-xs"
               type="button"
               onClick={() => setAutoScroll((prev) => !prev)}

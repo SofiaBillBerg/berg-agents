@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -22,12 +22,12 @@
 import React from "react";
 
 export interface ErrorBoundaryProps {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }
 
 export interface ErrorBoundaryState {
-    hasError: boolean;
-    error: Error | null;
+  hasError: boolean;
+  error: Error | null;
 }
 
 /**
@@ -36,37 +36,37 @@ export interface ErrorBoundaryState {
  * a fallback error message without crashing the full application interface.
  */
 class ErrorBoundary extends React.Component<
-    ErrorBoundaryProps,
-    ErrorBoundaryState
+  ErrorBoundaryProps,
+  ErrorBoundaryState
 > {
-    constructor(props: ErrorBoundaryProps) {
-        super(props);
-        this.state = {hasError: false, error: null};
-    }
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
 
-    static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-        return {hasError: true, error};
-    }
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
 
-    componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-        console.error("React error boundary caught:", error, errorInfo);
-    }
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+    console.error("React error boundary caught:", error, errorInfo);
+  }
 
-    render() {
-        if (this.state.hasError) {
-            return (
-                <div className="p-8 text-[var(--berg-status-error,red)] font-mono">
-                    <h2 className="text-lg font-bold">Something went wrong</h2>
-                    <pre className="whitespace-pre-wrap text-sm">
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-[var(--berg-status-error,red)] font-mono">
+          <h2 className="text-lg font-bold">Something went wrong</h2>
+          <pre className="whitespace-pre-wrap text-sm">
             {this.state.error?.toString()}
-                        {"\n\n"}
-                        {this.state.error?.stack}
+            {"\n\n"}
+            {this.state.error?.stack}
           </pre>
-                </div>
-            );
-        }
-        return this.props.children;
+        </div>
+      );
     }
+    return this.props.children;
+  }
 }
 
 export default ErrorBoundary;

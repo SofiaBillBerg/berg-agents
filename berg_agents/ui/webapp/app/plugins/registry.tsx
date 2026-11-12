@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -40,40 +40,40 @@
 
 "use client";
 
-import type {ComponentType} from "react";
+import type { ComponentType } from "react";
 
 /** Props the host passes to any plugin surface. */
 export interface PluginSurfaceProps {
-    /** Side-panel (docked) or canvas (wide) presentation. */
-    view: "panel" | "canvas";
-    /** Bump to force a refetch (e.g. after an agent tool call). */
-    refreshKey: number;
-    /** Close the surface. */
-    onClose?: () => void;
-    /** Switch between panel and canvas views. */
-    onToggleView?: () => void;
-    /** Report a headline count for the host tool-bar badge. */
-    onCount?: (n: number) => void;
-    /** Layout classes from the host (e.g. width). */
-    className?: string;
-    /** Inline style from the host (e.g. manifest width). */
-    style?: React.CSSProperties;
+  /** Side-panel (docked) or canvas (wide) presentation. */
+  view: "panel" | "canvas";
+  /** Bump to force a refetch (e.g. after an agent tool call). */
+  refreshKey: number;
+  /** Close the surface. */
+  onClose?: () => void;
+  /** Switch between panel and canvas views. */
+  onToggleView?: () => void;
+  /** Report a headline count for the host tool-bar badge. */
+  onCount?: (n: number) => void;
+  /** Layout classes from the host (e.g. width). */
+  className?: string;
+  /** Inline style from the host (e.g. manifest width). */
+  style?: React.CSSProperties;
 }
 
 /** The UI declaration a plugin's manifest provides, as served. */
 export interface PluginUIDeclaration {
-    entry: string;
-    export: string;
-    entry_url?: string;
-    entry_built?: boolean;
-    placement?: string;
-    label?: string;
-    width?: number;
+  entry: string;
+  export: string;
+  entry_url?: string;
+  entry_built?: boolean;
+  placement?: string;
+  label?: string;
+  width?: number;
 }
 
 /** One loaded surface, ready to render. */
 export interface LoadedPluginSurface {
-    component: ComponentType<PluginSurfaceProps>;
+  component: ComponentType<PluginSurfaceProps>;
 }
 
 /** Cache of already-imported bundles (module URL → named export). */
@@ -90,11 +90,11 @@ const loadedModules = new Map<string, Promise<unknown>>();
  * @returns Promise of the module namespace object.
  */
 function importPluginBundle(entryUrl: string): Promise<unknown> {
-    const existing = loadedModules.get(entryUrl);
-    if (existing) return existing;
-    const pending = import(/* webpackIgnore: true */ entryUrl);
-    loadedModules.set(entryUrl, pending);
-    return pending;
+  const existing = loadedModules.get(entryUrl);
+  if (existing) return existing;
+  const pending = import(/* webpackIgnore: true */ entryUrl);
+  loadedModules.set(entryUrl, pending);
+  return pending;
 }
 
 /**
@@ -106,38 +106,38 @@ function importPluginBundle(entryUrl: string): Promise<unknown> {
  *     (bundle missing, wrong export, or a load failure).
  */
 export async function loadPluginSurface(
-    pluginId: string,
-    // Loose by design: this arrives as parsed JSON from /api/plugins, so
-    // its shape is whatever the plugin's manifest declared.
-    ui: Record<string, unknown> | PluginUIDeclaration | null | undefined,
+  pluginId: string,
+  // Loose by design: this arrives as parsed JSON from /api/plugins, so
+  // its shape is whatever the plugin's manifest declared.
+  ui: Record<string, unknown> | PluginUIDeclaration | null | undefined,
 ): Promise<LoadedPluginSurface | null> {
-    if (!ui || typeof ui.entry_url !== "string" || !ui.entry_url) {
-        return null;
+  if (!ui || typeof ui.entry_url !== "string" || !ui.entry_url) {
+    return null;
+  }
+  const exportName = typeof ui.export === "string" ? ui.export : "";
+  if (!exportName) {
+    return null;
+  }
+  try {
+    const module = (await importPluginBundle(ui.entry_url)) as Record<
+      string,
+      unknown
+    >;
+    const component = module[exportName];
+    if (typeof component !== "function") {
+      console.error(
+        `Plugin ${pluginId} bundle ${ui.entry_url} has no export "${exportName}".`,
+      );
+      return null;
     }
-    const exportName = typeof ui.export === "string" ? ui.export : "";
-    if (!exportName) {
-        return null;
-    }
-    try {
-        const module = (await importPluginBundle(ui.entry_url)) as Record<
-            string,
-            unknown
-        >;
-        const component = module[exportName];
-        if (typeof component !== "function") {
-            console.error(
-                `Plugin ${pluginId} bundle ${ui.entry_url} has no export "${exportName}".`,
-            );
-            return null;
-        }
-        return {component: component as ComponentType<PluginSurfaceProps>};
-    } catch (error) {
-        console.error(
-            `Failed to load plugin UI bundle for ${pluginId} (${ui.entry_url}):`,
-            error,
-        );
-        return null;
-    }
+    return { component: component as ComponentType<PluginSurfaceProps> };
+  } catch (error) {
+    console.error(
+      `Failed to load plugin UI bundle for ${pluginId} (${ui.entry_url}):`,
+      error,
+    );
+    return null;
+  }
 }
 
 /**
@@ -148,5 +148,5 @@ export async function loadPluginSurface(
  * @returns The same list as a Set.
  */
 export function pluginRefreshTools(tools: string[] | undefined): Set<string> {
-    return new Set(tools ?? []);
+  return new Set(tools ?? []);
 }

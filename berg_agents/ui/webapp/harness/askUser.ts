@@ -33,40 +33,40 @@ export const ASK_USER_TOOL_NAME = "ask_user_question";
 
 /** One offered choice, kept verbatim - the answer is keyed by label. */
 export interface PendingQuestionOption {
-    label: string;
-    /** What choosing this option means, when the model provided it. */
-    description?: string;
+  label: string;
+  /** What choosing this option means, when the model provided it. */
+  description?: string;
 }
 
 /** One question as the model declared it, normalized for the card. */
 export interface PendingQuestionData {
-    /** Short label naming the question; the answer is keyed by it. */
-    header: string;
-    /** The full question text. */
-    question: string;
-    /** Whether the user may pick more than one option. */
-    multiSelect: boolean;
-    options: PendingQuestionOption[];
+  /** Short label naming the question; the answer is keyed by it. */
+  header: string;
+  /** The full question text. */
+  question: string;
+  /** Whether the user may pick more than one option. */
+  multiSelect: boolean;
+  options: PendingQuestionOption[];
 }
 
 /** One answer inside a submitted response (wire keys are snake_case). */
 export interface PendingQuestionAnswer {
-    header: string;
-    selected: string[];
-    customAnswer?: string;
+  header: string;
+  selected: string[];
+  customAnswer?: string;
 }
 
 /** One ask_user_question call the user still has to answer. */
 export interface PendingQuestion {
-    /** Tool call id - pass back to respondToQuestion. */
-    id: string;
-    /** The call's questions, parsed from its args; empty when unreadable. */
-    questions: PendingQuestionData[];
-    /** True once an answer payload is written (badge until the resume
+  /** Tool call id - pass back to respondToQuestion. */
+  id: string;
+  /** The call's questions, parsed from its args; empty when unreadable. */
+  questions: PendingQuestionData[];
+  /** True once an answer payload is written (badge until the resume
         fires and the server overwrites the output with the result). */
-    answered: boolean;
-    /** True when the written payload declines the questions. */
-    declined: boolean;
+  answered: boolean;
+  /** True when the written payload declines the questions. */
+  declined: boolean;
 }
 
 /**
@@ -81,16 +81,16 @@ export interface PendingQuestion {
  * @returns True when the output is an answer payload awaiting its resume.
  */
 export function isQuestionAnswerPayload(output: unknown): boolean {
-    if (typeof output !== "object" || output === null) return false;
-    const o = output as Record<string, unknown>;
-    if (typeof o.cancelled !== "boolean") return false;
-    if (!Array.isArray(o.answers)) return false;
-    return o.answers.every(
-        (entry) =>
-            typeof entry === "object" &&
-            entry !== null &&
-            typeof (entry as Record<string, unknown>).header === "string",
-    );
+  if (typeof output !== "object" || output === null) return false;
+  const o = output as Record<string, unknown>;
+  if (typeof o.cancelled !== "boolean") return false;
+  if (!Array.isArray(o.answers)) return false;
+  return o.answers.every(
+    (entry) =>
+      typeof entry === "object" &&
+      entry !== null &&
+      typeof (entry as Record<string, unknown>).header === "string",
+  );
 }
 
 /**
@@ -104,33 +104,33 @@ export function isQuestionAnswerPayload(output: unknown): boolean {
  * @returns Normalized questions, or an empty array when unreadable.
  */
 export function parseQuestionCall(input: unknown): PendingQuestionData[] {
-    if (typeof input !== "object" || input === null) return [];
-    if (!Array.isArray((input as Record<string, unknown>).questions)) {
-        return [];
+  if (typeof input !== "object" || input === null) return [];
+  if (!Array.isArray((input as Record<string, unknown>).questions)) {
+    return [];
+  }
+  const out: PendingQuestionData[] = [];
+  for (const raw of (input as Record<string, unknown>).questions as unknown[]) {
+    if (typeof raw !== "object" || raw === null) return [];
+    const q = raw as Record<string, unknown>;
+    if (typeof q.header !== "string" || typeof q.question !== "string") {
+      return [];
     }
-    const out: PendingQuestionData[] = [];
-    for (const raw of (input as Record<string, unknown>).questions as unknown[]) {
-        if (typeof raw !== "object" || raw === null) return [];
-        const q = raw as Record<string, unknown>;
-        if (typeof q.header !== "string" || typeof q.question !== "string") {
-            return [];
-        }
-        if (!Array.isArray(q.options)) return [];
-        const options: PendingQuestionOption[] = [];
-        for (const opt of q.options) {
-            if (typeof opt !== "object" || opt === null) return [];
-            const o = opt as Record<string, unknown>;
-            if (typeof o.label !== "string") return [];
-            options.push({
-                label: o.label,
-                description:
-                    typeof o.description === "string" ? o.description : undefined});
-        }
-        out.push({
-            header: q.header,
-            question: q.question,
-            multiSelect: q.multi_select === true,
-            options});
+    if (!Array.isArray(q.options)) return [];
+    const options: PendingQuestionOption[] = [];
+    for (const opt of q.options) {
+      if (typeof opt !== "object" || opt === null) return [];
+      const o = opt as Record<string, unknown>;
+      if (typeof o.label !== "string") return [];
+      options.push({
+        label: o.label,
+        description:
+          typeof o.description === "string" ? o.description : undefined});
     }
-    return out;
+    out.push({
+      header: q.header,
+      question: q.question,
+      multiSelect: q.multi_select === true,
+      options});
+  }
+  return out;
 }

@@ -33,53 +33,51 @@
  * is exactly what these functions produce.
  */
 
-import type {TextUIPart, UIMessage} from "ai";
+import type { TextUIPart, UIMessage } from "ai";
 
-import {ASK_USER_TOOL_NAME} from "./askUser";
-import {SUBAGENT_MARKER_TYPE} from "./history";
+import { ASK_USER_TOOL_NAME } from "./askUser";
+import { SUBAGENT_MARKER_TYPE } from "./history";
 
 /** Max output chars kept per tool call for display/export. */
 const MAX_TOOL_OUTPUT_CHARS = 4000;
 
 /** One tool call as the UI renders it. */
 export interface MessageToolCall {
-    tool: string;
-    /** The tool call's id. A pending approval is answered by this id - the
+  tool: string;
+  /** The tool call's id. A pending approval is answered by this id - the
         tool name alone matches no resolver. */
-    toolCallId?: string;
-    input?: string;
-    output?: string;
-    state?: string;
-    /** Streamed work that ran INSIDE this call (a delegated subagent),
+  toolCallId?: string;
+  input?: string;
+  output?: string;
+  state?: string;
+  /** Streamed work that ran INSIDE this call (a delegated subagent),
         rendered nested under its card rather than as loose siblings. */
-    children?: MessageParts;
-    /** Set while the sub-agent delegated by this call is still running, so
+  children?: MessageParts;
+  /** Set while the sub-agent delegated by this call is still running, so
         its card can steer and stop the task. */
-    delegatedTask?: DelegatedTaskInCard;
+  delegatedTask?: DelegatedTaskInCard;
 }
 
 /** The UI-facing shape of one transcript message. */
 export interface ChatMessage {
-    id: string;
-    role: "user" | "assistant" | "system";
-    content: string;
-    /** Model's private reasoning trace (omitted when empty). */
-    reasoning?: string;
-    /** Completed tool calls, rendered as collapsible cards. */
-    toolCalls?: MessageToolCall[];
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  /** Model's private reasoning trace (omitted when empty). */
+  reasoning?: string;
+  /** Completed tool calls, rendered as collapsible cards. */
+  toolCalls?: MessageToolCall[];
 }
 
 /** What one pass over a message's parts yields. */
 export interface MessageParts {
-    /** Visible transcript: text parts plus a marker per in-flight call. */
-    text: string;
-    /** Reasoning trace, or undefined when the model produced none. */
-    reasoning?: string;
-    /** Every tool call (in flight and finished), or undefined when none. */
-    toolCalls?: ChatMessage["toolCalls"];
+  /** Visible transcript: text parts plus a marker per in-flight call. */
+  text: string;
+  /** Reasoning trace, or undefined when the model produced none. */
+  reasoning?: string;
+  /** Every tool call (in flight and finished), or undefined when none. */
+  toolCalls?: ChatMessage["toolCalls"];
 }
-
-
 
 /**
  * The parent tool call id a `data-subagent` part names, or null when the
@@ -89,41 +87,41 @@ export interface MessageParts {
  * @returns The parent call id, or null.
  */
 function subagentMarkerCallId(p: Record<string, unknown>): string | null {
-    if (p.type !== SUBAGENT_MARKER_TYPE) return null;
-    const data = p.data as {parentToolCallId?: unknown} | undefined;
-    return typeof data?.parentToolCallId === "string"
-        ? data.parentToolCallId
-        : null;
+  if (p.type !== SUBAGENT_MARKER_TYPE) return null;
+  const data = p.data as { parentToolCallId?: unknown } | undefined;
+  return typeof data?.parentToolCallId === "string"
+    ? data.parentToolCallId
+    : null;
 }
 
 /** Whether a `data-subagent` part opens a subagent's stream. */
 function isSubagentStart(p: Record<string, unknown>): boolean {
-    return (
-        subagentMarkerCallId(p) !== null &&
-        (p.data as {phase?: unknown}).phase === "start"
-    );
+  return (
+    subagentMarkerCallId(p) !== null &&
+    (p.data as { phase?: unknown }).phase === "start"
+  );
 }
 
 /** What the bracket pre-scan found. */
 interface SubagentScan {
-    /** Parts buffered per parent call id. */
-    bracketed: Map<string, UIMessage["parts"]>;
-    /** The part objects some call will claim (the walk skips them). */
-    claimed: Set<UIMessage["parts"][number]>;
-    /** Parts a bracket delimited but no call claimed. */
-    orphaned: UIMessage["parts"];
-    /** Bracketed task descriptors, by the parent call they belong to. */
-    tasks: Map<string, DelegatedTaskInCard>;
+  /** Parts buffered per parent call id. */
+  bracketed: Map<string, UIMessage["parts"]>;
+  /** The part objects some call will claim (the walk skips them). */
+  claimed: Set<UIMessage["parts"][number]>;
+  /** Parts a bracket delimited but no call claimed. */
+  orphaned: UIMessage["parts"];
+  /** Bracketed task descriptors, by the parent call they belong to. */
+  tasks: Map<string, DelegatedTaskInCard>;
 }
 
 /** A delegated task, as its parent call's card needs it. */
 export interface DelegatedTaskInCard {
-    /** The task's id: the handle a steer or a stop acts on. */
-    taskId: string;
-    /** Which sub-agent is running it, for the control's label. */
-    agentName: string;
-    /** Whether the bracket is still open, so the task is still live. */
-    open: boolean;
+  /** The task's id: the handle a steer or a stop acts on. */
+  taskId: string;
+  /** Which sub-agent is running it, for the control's label. */
+  agentName: string;
+  /** Whether the bracket is still open, so the task is still live. */
+  open: boolean;
 }
 
 /**
@@ -137,65 +135,64 @@ export interface DelegatedTaskInCard {
  * @returns The per-call buffers, the claimed set, and any leftovers.
  */
 function scanSubagentBrackets(parts: UIMessage["parts"]): SubagentScan {
-    const bracketed = new Map<string, UIMessage["parts"]>();
-    const claimed = new Set<UIMessage["parts"][number]>();
-    const orphaned: UIMessage["parts"] = [];
-    // Task descriptors keyed by parent call id, so the card can steer or
-    // stop the task whose work it is showing.
-    const tasks = new Map<string, DelegatedTaskInCard>();
-    let openId: string | null = null;
+  const bracketed = new Map<string, UIMessage["parts"]>();
+  const claimed = new Set<UIMessage["parts"][number]>();
+  const orphaned: UIMessage["parts"] = [];
+  // Task descriptors keyed by parent call id, so the card can steer or
+  // stop the task whose work it is showing.
+  const tasks = new Map<string, DelegatedTaskInCard>();
+  let openId: string | null = null;
 
-    for (const part of parts) {
-        if (typeof part !== "object" || part === null) continue;
-        const p = part as unknown as Record<string, unknown>;
-        if (p.type === SUBAGENT_MARKER_TYPE) {
-            const markerId = subagentMarkerCallId(p);
-            // The close bracket carries no task id (a settled task has
-            // none worth steering), so the extent is matched on the parent
-            // call both markers name - that is the bracket's own contract.
-            if (isSubagentStart(p)) {
-                openId = markerId;
-                if (openId) {
-                    const data = (p as {data?: Record<string, unknown>}).data ?? {};
-                    const taskId =
-                        typeof data.taskId === "string" ? data.taskId : "";
-                    if (taskId) {
-                        tasks.set(openId, {
-                            agentName:
-                                typeof data.agentName === "string" && data.agentName
-                                    ? data.agentName
-                                    : "the sub-agent",
-                            open: true,
-                            taskId});
-                    }
-                }
-            } else {
-                openId = null;
-                if (markerId && tasks.has(markerId)) {
-                    const settled = tasks.get(markerId)!;
-                    tasks.set(markerId, {...settled, open: false});
-                }
-            }
-            continue;
+  for (const part of parts) {
+    if (typeof part !== "object" || part === null) continue;
+    const p = part as unknown as Record<string, unknown>;
+    if (p.type === SUBAGENT_MARKER_TYPE) {
+      const markerId = subagentMarkerCallId(p);
+      // The close bracket carries no task id (a settled task has
+      // none worth steering), so the extent is matched on the parent
+      // call both markers name - that is the bracket's own contract.
+      if (isSubagentStart(p)) {
+        openId = markerId;
+        if (openId) {
+          const data = (p as { data?: Record<string, unknown> }).data ?? {};
+          const taskId = typeof data.taskId === "string" ? data.taskId : "";
+          if (taskId) {
+            tasks.set(openId, {
+              agentName:
+                typeof data.agentName === "string" && data.agentName
+                  ? data.agentName
+                  : "the sub-agent",
+              open: true,
+              taskId});
+          }
         }
-        if (openId === null) continue;
-        if (!bracketed.has(openId)) bracketed.set(openId, []);
-        bracketed.get(openId)!.push(part);
-        claimed.add(part);
+      } else {
+        openId = null;
+        if (markerId && tasks.has(markerId)) {
+          const settled = tasks.get(markerId)!;
+          tasks.set(markerId, { ...settled, open: false });
+        }
+      }
+      continue;
     }
+    if (openId === null) continue;
+    if (!bracketed.has(openId)) bracketed.set(openId, []);
+    bracketed.get(openId)!.push(part);
+    claimed.add(part);
+  }
 
-    // Whatever no call claimed is work that still has to reach the UI.
-    for (const [id, buffered] of bracketed) {
-        if (buffered.length === 0) continue;
-        const hasCall = parts.some(
-            (part) =>
-                typeof part === "object" &&
-                part !== null &&
-                (part as unknown as Record<string, unknown>).toolCallId === id,
-        );
-        if (!hasCall) orphaned.push(...buffered);
-    }
-    return {bracketed, claimed, orphaned, tasks};
+  // Whatever no call claimed is work that still has to reach the UI.
+  for (const [id, buffered] of bracketed) {
+    if (buffered.length === 0) continue;
+    const hasCall = parts.some(
+      (part) =>
+        typeof part === "object" &&
+        part !== null &&
+        (part as unknown as Record<string, unknown>).toolCallId === id,
+    );
+    if (!hasCall) orphaned.push(...buffered);
+  }
+  return { bracketed, claimed, orphaned, tasks };
 }
 
 /**
@@ -207,11 +204,11 @@ function scanSubagentBrackets(parts: UIMessage["parts"]): SubagentScan {
  * @returns The tool name, or "tool" when the part carries neither form.
  */
 export function partToolName(p: Record<string, unknown>): string {
-    const type = typeof p.type === "string" ? p.type : "";
-    return (
-        (typeof p.toolName === "string" && p.toolName) ||
-        (type.startsWith("tool-") ? type.slice("tool-".length) : "tool")
-    );
+  const type = typeof p.type === "string" ? p.type : "";
+  return (
+    (typeof p.toolName === "string" && p.toolName) ||
+    (type.startsWith("tool-") ? type.slice("tool-".length) : "tool")
+  );
 }
 
 /**
@@ -222,18 +219,18 @@ export function partToolName(p: Record<string, unknown>): string {
  * @returns `(k=v, ...)`, or an empty string when there is nothing to show.
  */
 function toolArgsSnippet(input: unknown): string {
-    if (input == null || typeof input !== "object") return "";
-    try {
-        const entries = Object.entries(input as Record<string, unknown>).map(
-            ([k, v]) => {
-                const s = typeof v === "string" ? v : JSON.stringify(v);
-                return `${k}=${s}`;
-            },
-        );
-        return entries.length > 0 ? `(${entries.join(", ")})` : "";
-    } catch {
-        return "";
-    }
+  if (input == null || typeof input !== "object") return "";
+  try {
+    const entries = Object.entries(input as Record<string, unknown>).map(
+      ([k, v]) => {
+        const s = typeof v === "string" ? v : JSON.stringify(v);
+        return `${k}=${s}`;
+      },
+    );
+    return entries.length > 0 ? `(${entries.join(", ")})` : "";
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -260,153 +257,152 @@ function toolArgsSnippet(input: unknown): string {
  * @returns The three renderings, any of them empty when absent.
  */
 export function readMessageParts(msg: UIMessage): MessageParts {
-    const textChunks: string[] = [];
-    const reasoningBits: string[] = [];
-    const toolCalls: NonNullable<ChatMessage["toolCalls"]> = [];
+  const textChunks: string[] = [];
+  const reasoningBits: string[] = [];
+  const toolCalls: NonNullable<ChatMessage["toolCalls"]> = [];
 
-    // A subagent's streamed parts arrive between two bracket markers that
-    // name the parent tool call. They are scanned out first, because the
-    // call's own part arrives BEFORE the parts that run inside it: by the
-    // time the walk meets the call, its children must already be known.
-    //
-    // `bracketed` is keyed by the parent call id; `claimed` holds the part
-    // objects that belong to some call, so the main walk skips them and
-    // nothing renders twice. `orphaned` keeps what a bracket delimited but
-    // no call claimed - a delegate whose card was replaced by a later dump
-    // still shows its work, at the end of the turn rather than in place.
-    const {bracketed, claimed, orphaned, tasks} = scanSubagentBrackets(msg.parts);
+  // A subagent's streamed parts arrive between two bracket markers that
+  // name the parent tool call. They are scanned out first, because the
+  // call's own part arrives BEFORE the parts that run inside it: by the
+  // time the walk meets the call, its children must already be known.
+  //
+  // `bracketed` is keyed by the parent call id; `claimed` holds the part
+  // objects that belong to some call, so the main walk skips them and
+  // nothing renders twice. `orphaned` keeps what a bracket delimited but
+  // no call claimed - a delegate whose card was replaced by a later dump
+  // still shows its work, at the end of the turn rather than in place.
+  const { bracketed, claimed, orphaned, tasks } = scanSubagentBrackets(
+    msg.parts,
+  );
 
-    for (const part of msg.parts) {
-        if (typeof part !== "object" || part === null) continue;
-        if (claimed.has(part)) continue;
-        const p = part as unknown as Record<string, unknown>;
-        const pType = typeof p.type === "string" ? p.type : "";
-        // The brackets never render, and never go back to the server
-        // either (see sanitizeHistory): they group the live stream only.
-        if (p.type === SUBAGENT_MARKER_TYPE) continue;
+  for (const part of msg.parts) {
+    if (typeof part !== "object" || part === null) continue;
+    if (claimed.has(part)) continue;
+    const p = part as unknown as Record<string, unknown>;
+    const pType = typeof p.type === "string" ? p.type : "";
+    // The brackets never render, and never go back to the server
+    // either (see sanitizeHistory): they group the live stream only.
+    if (p.type === SUBAGENT_MARKER_TYPE) continue;
 
-        // Reasoning: a typed part from one provider, an inline
-        // <think> block from another. Both become the same trace.
-        if (
-            pType === "reasoning" ||
-            pType.startsWith("thinking") ||
-            pType.startsWith("reasoning")
-        ) {
-            const text =
-                (typeof p.text === "string" && p.text) ||
-                (typeof p.reasoning === "string" && p.reasoning) ||
-                "";
-            if (text.trim() !== "") reasoningBits.push(text);
-            continue;
-        }
-
-        if (pType === "text") {
-            const raw = (part as unknown as TextUIPart).text;
-            const source = typeof raw === "string" ? raw : "";
-            // Inline thinking first: the block belongs to `reasoning`,
-            // never to the answer.
-            const matches = source.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi);
-            if (matches) {
-                for (const m of matches) {
-                    const inner = m
-                        .replace(/<\/?think>/gi, "")
-                        .trim();
-                    if (inner) reasoningBits.push(inner);
-                }
-            }
-            // Then the visible text, with those blocks removed.
-            const cleaned = source
-                .replace(/<think>[\s\S]*?<\/think>/gi, "")
-                .replace(/<\/?think>/gi, "")
-                .trim();
-            if (cleaned) textChunks.push(cleaned);
-            continue;
-        }
-
-        // Tool parts: `dynamic-tool` or `tool-<name>` shapes (v7).
-        if (pType === "dynamic-tool" || pType.startsWith("tool-")) {
-            const name = partToolName(p);
-            let input = "";
-            if (p.input != null) {
-                try {
-                    input =
-                        typeof p.input === "string"
-                            ? p.input
-                            : JSON.stringify(p.input, null, 2);
-                } catch {
-                    input = "";
-                }
-            }
-            let output: string | undefined;
-            const raw = (p as {output?: unknown}).output;
-            if (raw !== undefined && raw !== null) {
-                try {
-                    output =
-                        typeof raw === "string" ? raw : JSON.stringify(raw, null, 2);
-                } catch {
-                    output = String(raw);
-                }
-                if (output.length > MAX_TOOL_OUTPUT_CHARS) {
-                    output = `${output.slice(0, MAX_TOOL_OUTPUT_CHARS)}\n… (output truncated)`;
-                }
-            }
-            const callId =
-                typeof p.toolCallId === "string" ? (p.toolCallId as string) : "";
-            const nested = bracketed.get(callId);
-            const delegated = tasks.get(callId);
-            toolCalls.push({
-                tool: name,
-                toolCallId: callId || undefined,
-                input: input || undefined,
-                output,
-                state: typeof p.state === "string" ? (p.state as string) : undefined,
-                ...(nested && nested.length > 0
-                    ? {children: readMessageParts({...msg, parts: nested} as UIMessage)}
-                    : {}),
-                ...(delegated && delegated.open
-                    ? {delegatedTask: delegated}
-                    : {})});
-
-            // A call still in flight or awaiting a decision: the card
-            // downstream has no output to show, so the transcript keeps
-            // a one-line marker for it.
-            if (output === undefined) {
-                const approval = (p as {approval?: unknown}).approval as
-                    | {id?: unknown}
-                    | undefined;
-                const marker =
-                    name === ASK_USER_TOOL_NAME
-                        ? "❓ question pending"
-                        : (p as {state?: unknown}).state === "approval-requested"
-                          ? typeof approval?.id === "string"
-                              ? "⏳ needs approval"
-                              : "⏳ approval expired"
-                          : "🔧";
-                textChunks.push(`${marker} ${name}${toolArgsSnippet(p.input)}`);
-            }
-        }
+    // Reasoning: a typed part from one provider, an inline
+    // <think> block from another. Both become the same trace.
+    if (
+      pType === "reasoning" ||
+      pType.startsWith("thinking") ||
+      pType.startsWith("reasoning")
+    ) {
+      const text =
+        (typeof p.text === "string" && p.text) ||
+        (typeof p.reasoning === "string" && p.reasoning) ||
+        "";
+      if (text.trim() !== "") reasoningBits.push(text);
+      continue;
     }
 
-    // A bracket whose call is absent (a card replaced by a later dump)
-    // still owes its work to the transcript: it lands at the end rather
-    // than in place, which is the honest degradation.
-    let orphanedText = "";
-    let orphanedCalls = toolCalls;
-    if (orphaned.length > 0) {
-        const left = readMessageParts({...msg, parts: orphaned} as UIMessage);
-        orphanedText = left.text;
-        orphanedCalls = [...toolCalls, ...(left.toolCalls ?? [])];
+    if (pType === "text") {
+      const raw = (part as unknown as TextUIPart).text;
+      const source = typeof raw === "string" ? raw : "";
+      // Inline thinking first: the block belongs to `reasoning`,
+      // never to the answer.
+      const matches = source.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi);
+      if (matches) {
+        for (const m of matches) {
+          const inner = m.replace(/<\/?think>/gi, "").trim();
+          if (inner) reasoningBits.push(inner);
+        }
+      }
+      // Then the visible text, with those blocks removed.
+      const cleaned = source
+        .replace(/<think>[\s\S]*?<\/think>/gi, "")
+        .replace(/<\/?think>/gi, "")
+        .trim();
+      if (cleaned) textChunks.push(cleaned);
+      continue;
     }
 
-    return {
-        // Streamdown renders a single \n as a space, so separate text parts
-        // (e.g. the implementer's progress lines) would otherwise collapse
-        // onto one line.
-        text: [textChunks.filter(Boolean).join("\n\n"), orphanedText]
-            .filter((s) => s.length > 0)
-            .join("\n\n"),
-        reasoning: reasoningBits.length > 0 ? reasoningBits.join("\n") : undefined,
-        toolCalls: orphanedCalls.length > 0 ? orphanedCalls : undefined};
+    // Tool parts: `dynamic-tool` or `tool-<name>` shapes (v7).
+    if (pType === "dynamic-tool" || pType.startsWith("tool-")) {
+      const name = partToolName(p);
+      let input = "";
+      if (p.input != null) {
+        try {
+          input =
+            typeof p.input === "string"
+              ? p.input
+              : JSON.stringify(p.input, null, 2);
+        } catch {
+          input = "";
+        }
+      }
+      let output: string | undefined;
+      const raw = (p as { output?: unknown }).output;
+      if (raw !== undefined && raw !== null) {
+        try {
+          output = typeof raw === "string" ? raw : JSON.stringify(raw, null, 2);
+        } catch {
+          output = String(raw);
+        }
+        if (output.length > MAX_TOOL_OUTPUT_CHARS) {
+          output = `${output.slice(0, MAX_TOOL_OUTPUT_CHARS)}\n… (output truncated)`;
+        }
+      }
+      const callId =
+        typeof p.toolCallId === "string" ? (p.toolCallId as string) : "";
+      const nested = bracketed.get(callId);
+      const delegated = tasks.get(callId);
+      toolCalls.push({
+        tool: name,
+        toolCallId: callId || undefined,
+        input: input || undefined,
+        output,
+        state: typeof p.state === "string" ? (p.state as string) : undefined,
+        ...(nested && nested.length > 0
+          ? {
+              children: readMessageParts({
+                ...msg,
+                parts: nested} as UIMessage)}
+          : {}),
+        ...(delegated && delegated.open ? { delegatedTask: delegated } : {})});
+
+      // A call still in flight or awaiting a decision: the card
+      // downstream has no output to show, so the transcript keeps
+      // a one-line marker for it.
+      if (output === undefined) {
+        const approval = (p as { approval?: unknown }).approval as
+          { id?: unknown } | undefined;
+        const marker =
+          name === ASK_USER_TOOL_NAME
+            ? "❓ question pending"
+            : (p as { state?: unknown }).state === "approval-requested"
+              ? typeof approval?.id === "string"
+                ? "⏳ needs approval"
+                : "⏳ approval expired"
+              : "🔧";
+        textChunks.push(`${marker} ${name}${toolArgsSnippet(p.input)}`);
+      }
+    }
+  }
+
+  // A bracket whose call is absent (a card replaced by a later dump)
+  // still owes its work to the transcript: it lands at the end rather
+  // than in place, which is the honest degradation.
+  let orphanedText = "";
+  let orphanedCalls = toolCalls;
+  if (orphaned.length > 0) {
+    const left = readMessageParts({ ...msg, parts: orphaned } as UIMessage);
+    orphanedText = left.text;
+    orphanedCalls = [...toolCalls, ...(left.toolCalls ?? [])];
+  }
+
+  return {
+    // Streamdown renders a single \n as a space, so separate text parts
+    // (e.g. the implementer's progress lines) would otherwise collapse
+    // onto one line.
+    text: [textChunks.filter(Boolean).join("\n\n"), orphanedText]
+      .filter((s) => s.length > 0)
+      .join("\n\n"),
+    reasoning: reasoningBits.length > 0 ? reasoningBits.join("\n") : undefined,
+    toolCalls: orphanedCalls.length > 0 ? orphanedCalls : undefined};
 }
 
 /**
@@ -423,17 +419,17 @@ export function readMessageParts(msg: UIMessage): MessageParts {
  * @returns The delegated approval call ids, de-duplicated.
  */
 export function delegatedApprovalIds(msg: UIMessage): Set<string> {
-    const ids = new Set<string>();
-    if (!Array.isArray(msg.parts)) return ids;
-    const {claimed} = scanSubagentBrackets(msg.parts);
-    for (const part of msg.parts) {
-        if (!claimed.has(part)) continue;
-        const p = part as unknown as Record<string, unknown>;
-        if (p.state !== "approval-requested") continue;
-        const id = typeof p.toolCallId === "string" ? p.toolCallId : "";
-        if (id) ids.add(id);
-    }
-    return ids;
+  const ids = new Set<string>();
+  if (!Array.isArray(msg.parts)) return ids;
+  const { claimed } = scanSubagentBrackets(msg.parts);
+  for (const part of msg.parts) {
+    if (!claimed.has(part)) continue;
+    const p = part as unknown as Record<string, unknown>;
+    if (p.state !== "approval-requested") continue;
+    const id = typeof p.toolCallId === "string" ? p.toolCallId : "";
+    if (id) ids.add(id);
+  }
+  return ids;
 }
 
 /**
@@ -444,11 +440,11 @@ export function delegatedApprovalIds(msg: UIMessage): Set<string> {
  * @returns The ChatMessage for the transcript.
  */
 export function toChatMessage(msg: UIMessage): ChatMessage {
-    const {text, reasoning, toolCalls} = readMessageParts(msg);
-    return {
-        id: msg.id,
-        role: msg.role as ChatMessage["role"],
-        content: text,
-        reasoning,
-        toolCalls};
+  const { text, reasoning, toolCalls } = readMessageParts(msg);
+  return {
+    id: msg.id,
+    role: msg.role as ChatMessage["role"],
+    content: text,
+    reasoning,
+    toolCalls};
 }

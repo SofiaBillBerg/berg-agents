@@ -30,11 +30,10 @@
  * resurrect a blocking approval on reload. Moved byte-identical.
  */
 
-import {ASK_USER_TOOL_NAME, isQuestionAnswerPayload} from "./askUser";
-import {partToolName} from "./messageParts";
+import { ASK_USER_TOOL_NAME, isQuestionAnswerPayload } from "./askUser";
+import { partToolName } from "./messageParts";
 
 export const SUBAGENT_MARKER_TYPE = "data-subagent";
-
 
 /**
  * Sanitize a restored conversation so stale single-use state can never
@@ -53,7 +52,10 @@ export const SUBAGENT_MARKER_TYPE = "data-subagent";
  * them unanswerable — a reload can never resurrect a blocking
  * approval card again.
  */
-export function sanitizeHistory(msgs: unknown[], preserveLatest: boolean): unknown[] {
+export function sanitizeHistory(
+  msgs: unknown[],
+  preserveLatest: boolean,
+): unknown[] {
   return msgs
     .filter(
       (m): m is Record<string, unknown> =>

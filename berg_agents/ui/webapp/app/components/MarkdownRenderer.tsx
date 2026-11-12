@@ -27,9 +27,9 @@ import { mermaid } from "@streamdown/mermaid";
 import { math } from "@streamdown/math";
 
 export interface MarkdownRendererProps {
-    content?: string;
-    /** Animate code blocks while this message is still being streamed. */
-    isAnimating?: boolean;
+  content?: string;
+  /** Animate code blocks while this message is still being streamed. */
+  isAnimating?: boolean;
 }
 
 /**
@@ -43,27 +43,29 @@ export interface MarkdownRendererProps {
  * @param props - Component properties
  * @returns JSX element rendering the formatted markdown
  */
-export function MarkdownRenderer({content, isAnimating}: MarkdownRendererProps) {
-    // Guard empty content - render nothing
-    if (!content || content.trim() === "") {
-        return null;
-    }
+export function MarkdownRenderer({
+  content,
+  isAnimating}: MarkdownRendererProps) {
+  // Guard empty content - render nothing
+  if (!content || content.trim() === "") {
+    return null;
+  }
 
-    return (
-        <div className="markdown-content text-sm leading-relaxed">
-            <Streamdown
-                parseIncompleteMarkdown
-                controls={{
-                    code: { copy: true, download: true },
-                    mermaid: { copy: true, download: true }}}
-                isAnimating={isAnimating}
-                mode="streaming"
-                plugins={{ code, mermaid, math }}
-            >
-                {content}
-            </Streamdown>
-        </div>
-    );
+  return (
+    <div className="markdown-content text-sm leading-relaxed">
+      <Streamdown
+        parseIncompleteMarkdown
+        controls={{
+          code: { copy: true, download: true },
+          mermaid: { copy: true, download: true }}}
+        isAnimating={isAnimating}
+        mode="streaming"
+        plugins={{ code, mermaid, math }}
+      >
+        {content}
+      </Streamdown>
+    </div>
+  );
 }
 
 export default MarkdownRenderer;

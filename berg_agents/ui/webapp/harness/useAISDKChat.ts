@@ -57,8 +57,7 @@ import {
   answerDelegatedQuestion,
   delegationQuestionsFrom,
   type DelegationQuestion} from "./delegationQuestions";
-import {
-  storeSessionId} from "./sessionIdentity";
+import { storeSessionId } from "./sessionIdentity";
 
 import { API_BASE } from "@/envConfig";
 
@@ -166,9 +165,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
   // of capturing one render's closures. The handle itself lives in
   // ./sessions and is created after useChat, because it needs the SDK's
   // message setter.
-  const adoptSessionRef = useRef<(id: string | null) => void>(
-    () => {},
-  );
+  const adoptSessionRef = useRef<(id: string | null) => void>(() => {});
   const sessionIdHolderRef = useRef<{ current: string | null }>({
     current: null});
 
@@ -305,7 +302,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
   // Steering the agent has not read yet - the queue the transcript
   // cannot show. Sampled from the server, because the server owns the
   // answer (see ./steering).
-  const {pendingSteering, setPendingSteering} = usePendingSteering({
+  const { pendingSteering, setPendingSteering } = usePendingSteering({
     sessionId,
     isStreaming,
     apiBase: API_BASE});
@@ -360,16 +357,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
     setUIMessages([]);
   };
 
-
-
   // Failed-send recovery and the one failure surface - both live in
   // ./recovery. resetRecovery is what a new send calls: the user is
   // driving again, so the ids auto-rejected by the previous failure
   // are forgotten.
-  const {
-    failureNotice,
-    setFailureNotice,
-    resetRecovery} = useSendRecovery({
+  const { failureNotice, setFailureNotice, resetRecovery } = useSendRecovery({
     error,
     uiMessages,
     status,
@@ -408,12 +400,10 @@ export function useAISDKChat(): UseAISDKChatReturn {
     };
   }, [sessionId, sessionTitle, isStreaming]);
 
-
-
   // Follow and account for this session's runs from any tab, and check
   // how a run this client SENT ended - both in ./runWatch. stopFollowing
   // is what an explicit Stop calls: the run ended for good.
-  const {stopFollowing} = useRunWatch({
+  const { stopFollowing } = useRunWatch({
     sessionId,
     isStreaming,
     apiBase: API_BASE,

@@ -28,7 +28,7 @@
 
 "use client";
 
-import type {PluginInfo} from "@/lib/backendCatalog";
+import type { PluginInfo } from "@/lib/backendCatalog";
 
 import { useEffect, useState } from "react";
 import { Card, Chip, Spinner } from "@heroui/react";
@@ -37,7 +37,7 @@ import { RouterStatsPanel } from "../components/RouterStatsPanel.tsx";
 import { SharedContextEditor } from "../components/SharedContextEditor.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 
-import {fetchPlugins, fetchRouterStats} from "@/lib/backendCatalog";
+import { fetchPlugins, fetchRouterStats } from "@/lib/backendCatalog";
 import { API_BASE } from "@/envConfig";
 
 interface MemoryEntry {

@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -21,8 +21,8 @@
 
 import React from "react";
 
-import {useInitial} from "./useInitial";
+import { useInitial } from "./useInitial";
 
 const ComponentPreviews = React.lazy(() => import("./previews"));
 
-export {ComponentPreviews, useInitial};
+export { ComponentPreviews, useInitial };

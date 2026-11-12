@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,21 +19,25 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-import {Fragment} from "react";
-import {Category, Component, Palette, Variant} from "@react-buddy/ide-toolbox";
+import { Fragment } from "react";
+import {
+  Category,
+  Component,
+  Palette,
+  Variant} from "@react-buddy/ide-toolbox";
 
 export const PaletteTree = () => (
-    <Palette>
-        <Category name="App">
-            <Component name="Loader">
-                <Variant>
-                    <ExampleLoaderComponent/>
-                </Variant>
-            </Component>
-        </Category>
-    </Palette>
+  <Palette>
+    <Category name="App">
+      <Component name="Loader">
+        <Variant>
+          <ExampleLoaderComponent />
+        </Variant>
+      </Component>
+    </Category>
+  </Palette>
 );
 
 export function ExampleLoaderComponent() {
-    return <Fragment>Loading...</Fragment>;
+  return <Fragment>Loading...</Fragment>;
 }

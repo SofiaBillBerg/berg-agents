@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,7 +19,7 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-import {useEffect, useState} from "react";
+import { useEffect, useState } from "react";
 
 /**
  * ThemeToggle component.
@@ -40,11 +40,11 @@ const LEGACY_KEY = "berg-preset";
  * it. Single place so initial paint, effect sync, and click all agree.
  */
 function applyTheme(isDark: boolean) {
-    if (typeof document === "undefined") return;
-    const root = document.documentElement;
-    root.classList.toggle("dark", isDark);
-    root.setAttribute("data-theme", isDark ? "dark" : "light");
-    root.setAttribute("data-berg-preset", isDark ? "dark" : "light");
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  root.classList.toggle("dark", isDark);
+  root.setAttribute("data-theme", isDark ? "dark" : "light");
+  root.setAttribute("data-berg-preset", isDark ? "dark" : "light");
 }
 
 /**
@@ -53,56 +53,56 @@ function applyTheme(isDark: boolean) {
  * needs to setState after the fact.
  */
 function readInitialDark() {
-    if (typeof window === "undefined") return false;
-    const saved =
-        localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_KEY);
-    if (saved) return saved === "dark";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (typeof window === "undefined") return false;
+  const saved =
+    localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_KEY);
+  if (saved) return saved === "dark";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 function ThemeToggle() {
-    const [isDark, setIsDark] = useState(readInitialDark);
+  const [isDark, setIsDark] = useState(readInitialDark);
 
-    // Sync the external DOM theme from state; never setState here.
-    useEffect(() => {
-        applyTheme(isDark);
-    }, [isDark]);
+  // Sync the external DOM theme from state; never setState here.
+  useEffect(() => {
+    applyTheme(isDark);
+  }, [isDark]);
 
-    const toggle = () => {
-        const next = !isDark;
-        setIsDark(next);
-        try {
-            localStorage.setItem(THEME_KEY, next ? "dark" : "light");
-        } catch {
-            // Private-mode storage may throw - the in-memory state still applies.
-        }
-        applyTheme(next);
-    };
+  const toggle = () => {
+    const next = !isDark;
+    setIsDark(next);
+    try {
+      localStorage.setItem(THEME_KEY, next ? "dark" : "light");
+    } catch {
+      // Private-mode storage may throw - the in-memory state still applies.
+    }
+    applyTheme(next);
+  };
 
-    return (
-        <button
-            aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-            className={`theme-toggle flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border-2 border-[var(--berg-border)] text-[var(--berg-text)] cursor-pointer transition-all duration-300 shadow-sm text-sm font-medium min-w-[60px] hover:scale-105 hover:shadow-md ${
-                isDark
-                    ? "bg-gradient-to-br from-[#2d323b] to-[#1a1d23]"
-                    : "bg-gradient-to-br from-[#f8edf8] to-[#e8e0f0]"
-            }`}
-            title={isDark ? "Switch to light theme" : "Switch to dark theme"}
-            onClick={toggle}
-        >
-            {isDark ? (
-                <>
-                    <span className="text-base">🌙</span>
-                    <span className="text-[11px]">Dark</span>
-                </>
-            ) : (
-                <>
-                    <span className="text-base">☀️</span>
-                    <span className="text-[11px]">Light</span>
-                </>
-            )}
-        </button>
-    );
+  return (
+    <button
+      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      className={`theme-toggle flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border-2 border-[var(--berg-border)] text-[var(--berg-text)] cursor-pointer transition-all duration-300 shadow-sm text-sm font-medium min-w-[60px] hover:scale-105 hover:shadow-md ${
+        isDark
+          ? "bg-gradient-to-br from-[#2d323b] to-[#1a1d23]"
+          : "bg-gradient-to-br from-[#f8edf8] to-[#e8e0f0]"
+      }`}
+      title={isDark ? "Switch to light theme" : "Switch to dark theme"}
+      onClick={toggle}
+    >
+      {isDark ? (
+        <>
+          <span className="text-base">🌙</span>
+          <span className="text-[11px]">Dark</span>
+        </>
+      ) : (
+        <>
+          <span className="text-base">☀️</span>
+          <span className="text-[11px]">Light</span>
+        </>
+      )}
+    </button>
+  );
 }
 
 export default ThemeToggle;

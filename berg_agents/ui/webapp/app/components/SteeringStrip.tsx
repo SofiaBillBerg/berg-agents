@@ -23,12 +23,12 @@ import React from "react";
 
 /** Props for the steering strip. */
 export interface SteeringStripProps {
-    /**
-     * Messages the agent has NOT read yet, in the order they were sent.
-     * The list comes from the server, which owns the run, so an entry here
-     * is genuinely unread. An empty list renders nothing.
-     */
-    messages: string[];
+  /**
+   * Messages the agent has NOT read yet, in the order they were sent.
+   * The list comes from the server, which owns the run, so an entry here
+   * is genuinely unread. An empty list renders nothing.
+   */
+  messages: string[];
 }
 
 /**
@@ -43,32 +43,32 @@ export interface SteeringStripProps {
  * Rendered directly above the input bar so it reads as "this is still on its
  * way", not as something already said and answered.
  */
-export default function SteeringStrip({messages}: SteeringStripProps) {
-    if (messages.length === 0) return null;
+export default function SteeringStrip({ messages }: SteeringStripProps) {
+  if (messages.length === 0) return null;
 
-    return (
+  return (
+    <div
+      aria-label="Steering messages the agent has not read yet"
+      aria-live="polite"
+      className="mx-1 mb-1 flex flex-col gap-1"
+      role="status"
+    >
+      {messages.map((text, index) => (
         <div
-            aria-label="Steering messages the agent has not read yet"
-            aria-live="polite"
-            className="mx-1 mb-1 flex flex-col gap-1"
-            role="status"
+          key={`${index}-${text.slice(0, 24)}`}
+          className="flex items-start gap-2 rounded-md border border-dashed border-warning/50 bg-warning/10 px-3 py-1.5 text-sm"
         >
-            {messages.map((text, index) => (
-                <div
-                    key={`${index}-${text.slice(0, 24)}`}
-                    className="flex items-start gap-2 rounded-md border border-dashed border-warning/50 bg-warning/10 px-3 py-1.5 text-sm"
-                >
-                    <span
-                        className="mt-px shrink-0 text-[11px] font-medium uppercase tracking-wide text-warning"
-                        title="The agent has not read this yet"
-                    >
-                        queued
-                    </span>
-                    <span className="min-w-0 whitespace-pre-wrap break-words opacity-90">
-                        {text}
-                    </span>
-                </div>
-            ))}
+          <span
+            className="mt-px shrink-0 text-[11px] font-medium uppercase tracking-wide text-warning"
+            title="The agent has not read this yet"
+          >
+            queued
+          </span>
+          <span className="min-w-0 whitespace-pre-wrap break-words opacity-90">
+            {text}
+          </span>
         </div>
-    );
+      ))}
+    </div>
+  );
 }

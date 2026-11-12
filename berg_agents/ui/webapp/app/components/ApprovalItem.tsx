@@ -3,7 +3,6 @@ import type { PendingApproval } from "@/harness";
 import { useState } from "react";
 import { Button } from "@heroui/react";
 
-
 /**
  * One paused tool call inside an approval batch. Each item gets its
  * own approve / reject / edit controls so the user can approve one,

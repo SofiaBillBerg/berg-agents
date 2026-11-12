@@ -47,12 +47,12 @@ export const MAX_DELEGATION_ANSWER_CHARS = 2000;
 
 /** One delegated task's question, as the card renders it. */
 export interface DelegationQuestion {
-    /** The waiting task's id - pass back to answerDelegatedQuestion. */
-    taskId: string;
-    /** Which sub-agent is waiting (for the card's byline). */
-    agentName: string;
-    /** The question text, verbatim. */
-    question: string;
+  /** The waiting task's id - pass back to answerDelegatedQuestion. */
+  taskId: string;
+  /** Which sub-agent is waiting (for the card's byline). */
+  agentName: string;
+  /** The question text, verbatim. */
+  question: string;
 }
 
 /**
@@ -89,8 +89,7 @@ export function delegationQuestionsFrom(
           typeof data?.agentName === "string" && data.agentName
             ? data.agentName
             : "the sub-agent",
-        question:
-          typeof data?.question === "string" ? data.question : ""});
+        question: typeof data?.question === "string" ? data.question : ""});
     }
     // Only the last assistant message carries the live batch.
     break;
@@ -134,10 +133,10 @@ export async function answerDelegatedQuestion(
 
 /** One delegated task the UI can steer or stop, and whether it is live. */
 export interface LiveDelegatedTask {
-    /** The task's id, from the opening bracket. */
-    taskId: string;
-    /** Which sub-agent is running it, for the control's label. */
-    agentName: string;
+  /** The task's id, from the opening bracket. */
+  taskId: string;
+  /** Which sub-agent is running it, for the control's label. */
+  agentName: string;
 }
 
 /**

@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,7 +19,7 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-import {ComponentPreview, Previews} from "@react-buddy/ide-toolbox";
+import { ComponentPreview, Previews } from "@react-buddy/ide-toolbox";
 
 import App from "../app/App.tsx";
 import InputBar from "../app/components/InputBar.tsx";
@@ -27,31 +27,31 @@ import MarkdownRenderer from "../app/components/MarkdownRenderer.tsx";
 import MessageList from "../app/components/MessageList.tsx";
 import ProviderSelector from "../app/components/ProviderSelector.tsx";
 
-import {PaletteTree} from "./palette";
+import { PaletteTree } from "./palette";
 
 const ComponentPreviews = () => {
-    return (
-        <Previews palette={<PaletteTree/>}>
-            <ComponentPreview path="/App">
-                <App/>
-            </ComponentPreview>
-            <ComponentPreview path="/InputBar">
-                <InputBar/>
-            </ComponentPreview>
-            <ComponentPreview path="/MarkdownRenderer">
-                <MarkdownRenderer/>
-            </ComponentPreview>
-            <ComponentPreview path="/MessageList">
-                <MessageList/>
-            </ComponentPreview>
-            <ComponentPreview path="/ProviderSelector">
-                <ProviderSelector/>
-            </ComponentPreview>
-            <ComponentPreview path="/PaletteTree">
-                <PaletteTree/>
-            </ComponentPreview>
-        </Previews>
-    );
+  return (
+    <Previews palette={<PaletteTree />}>
+      <ComponentPreview path="/App">
+        <App />
+      </ComponentPreview>
+      <ComponentPreview path="/InputBar">
+        <InputBar />
+      </ComponentPreview>
+      <ComponentPreview path="/MarkdownRenderer">
+        <MarkdownRenderer />
+      </ComponentPreview>
+      <ComponentPreview path="/MessageList">
+        <MessageList />
+      </ComponentPreview>
+      <ComponentPreview path="/ProviderSelector">
+        <ProviderSelector />
+      </ComponentPreview>
+      <ComponentPreview path="/PaletteTree">
+        <PaletteTree />
+      </ComponentPreview>
+    </Previews>
+  );
 };
 
 export default ComponentPreviews;

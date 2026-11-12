@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,22 +19,22 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-import {Card, Chip, ProgressBar, Separator} from "@heroui/react";
+import { Card, Chip, ProgressBar, Separator } from "@heroui/react";
 
 export interface OutcomeRecord {
-    success?: number;
-    failure?: number;
+  success?: number;
+  failure?: number;
 }
 
 export interface RouterStats {
-    total?: number;
-    by_task_type?: Record<string, OutcomeRecord>;
-    by_model?: Record<string, OutcomeRecord>;
+  total?: number;
+  by_task_type?: Record<string, OutcomeRecord>;
+  by_model?: Record<string, OutcomeRecord>;
 }
 
 export interface RouterStatsPanelProps {
-    stats?: RouterStats | null;
-    compact?: boolean;
+  stats?: RouterStats | null;
+  compact?: boolean;
 }
 
 /**
@@ -44,10 +44,10 @@ export interface RouterStatsPanelProps {
  * @returns Rounded percentage of successful outcomes
  */
 function successRate(data: OutcomeRecord | undefined): number {
-    const success = data?.success || 0;
-    const failure = data?.failure || 0;
-    const total = success + failure;
-    return total > 0 ? Math.round((success / total) * 100) : 0;
+  const success = data?.success || 0;
+  const failure = data?.failure || 0;
+  const total = success + failure;
+  return total > 0 ? Math.round((success / total) * 100) : 0;
 }
 
 /**
@@ -57,14 +57,14 @@ function successRate(data: OutcomeRecord | undefined): number {
  * @returns Sum of successes and failures
  */
 function outcomeTotal(data: OutcomeRecord | undefined): number {
-    return (data?.success || 0) + (data?.failure || 0);
+  return (data?.success || 0) + (data?.failure || 0);
 }
 
 interface StatRowProps {
-    label: string;
-    rate: number;
-    total: number;
-    color: "accent" | "success";
+  label: string;
+  rate: number;
+  total: number;
+  color: "accent" | "success";
 }
 
 /**
@@ -73,26 +73,26 @@ interface StatRowProps {
  * @param props - Row properties
  * @returns JSX element rendering the stat row
  */
-function StatRow({label, rate, total, color}: StatRowProps) {
-    return (
-        <div className="my-1 flex items-center gap-2 text-xs">
-            <span className="w-24 shrink-0 truncate">{label}</span>
-            <ProgressBar
-                aria-label={`${label} success rate`}
-                className="min-w-0 flex-1"
-                color={color}
-                size="sm"
-                value={rate}
-            >
-                <ProgressBar.Track>
-                    <ProgressBar.Fill/>
-                </ProgressBar.Track>
-            </ProgressBar>
-            <span className="w-16 shrink-0 text-right text-muted tabular-nums">
+function StatRow({ label, rate, total, color }: StatRowProps) {
+  return (
+    <div className="my-1 flex items-center gap-2 text-xs">
+      <span className="w-24 shrink-0 truncate">{label}</span>
+      <ProgressBar
+        aria-label={`${label} success rate`}
+        className="min-w-0 flex-1"
+        color={color}
+        size="sm"
+        value={rate}
+      >
+        <ProgressBar.Track>
+          <ProgressBar.Fill />
+        </ProgressBar.Track>
+      </ProgressBar>
+      <span className="w-16 shrink-0 text-right text-muted tabular-nums">
         {rate}% ({total})
       </span>
-        </div>
-    );
+    </div>
+  );
 }
 
 /**
@@ -103,96 +103,98 @@ function StatRow({label, rate, total, color}: StatRowProps) {
  * @param props - Component properties
  * @returns JSX element rendering the router stats panel
  */
-export function RouterStatsPanel({stats, compact = false}: RouterStatsPanelProps) {
-    if (!stats || !stats.total || stats.total === 0) {
-        return (
-            <section aria-label="Router stats" className="router-stats empty">
-                <Card>
-                    <Card.Header>
-                        <Card.Title>Router Stats</Card.Title>
-                    </Card.Header>
-                    <Card.Content>
-                        <Card.Description>
-                            Nothing learned yet - run a task and this panel will show what
-                            worked, per task type and model.
-                        </Card.Description>
-                    </Card.Content>
-                </Card>
-            </section>
-        );
-    }
-
-    const byTaskType = stats.by_task_type || {};
-    const byModel = stats.by_model || {};
-
-    if (compact) {
-        return (
-            <div
-                aria-label="router stats"
-                className="router-stats-panel compact flex flex-wrap items-center gap-2 text-xs"
-            >
-                <Chip size="sm" variant="primary">
-                    {stats.total} tasks
-                </Chip>
-                {Object.entries(byModel).map(([model, data]) => (
-                    <Chip key={model} size="sm" variant="soft">
-                        {model}: {successRate(data)}%
-                    </Chip>
-                ))}
-            </div>
-        );
-    }
-
+export function RouterStatsPanel({
+  stats,
+  compact = false}: RouterStatsPanelProps) {
+  if (!stats || !stats.total || stats.total === 0) {
     return (
-        <section aria-label="Router stats" className="router-stats-panel">
-            <Card>
-                <Card.Header>
-                    <Card.Title>Router Stats</Card.Title>
-                    <Card.Description>
-                        Total tasks evaluated: {stats.total}
-                    </Card.Description>
-                </Card.Header>
-                <Card.Content className="flex flex-col gap-3">
-                    {Object.keys(byTaskType).length > 0 && (
-                        <div>
-                            <h5 className="m-0 mb-1.5 text-xs font-semibold tracking-wider text-muted uppercase">
-                                By Task Type
-                            </h5>
-                            {Object.entries(byTaskType).map(([type, data]) => (
-                                <StatRow
-                                    key={type}
-                                    color="accent"
-                                    label={type}
-                                    rate={successRate(data)}
-                                    total={outcomeTotal(data)}
-                                />
-                            ))}
-                        </div>
-                    )}
-
-                    {Object.keys(byTaskType).length > 0 &&
-                        Object.keys(byModel).length > 0 && <Separator/>}
-
-                    {Object.keys(byModel).length > 0 && (
-                        <div>
-                            <h5 className="m-0 mb-1.5 text-xs font-semibold tracking-wider text-muted uppercase">
-                                By Model
-                            </h5>
-                            {Object.entries(byModel).map(([model, data]) => (
-                                <StatRow
-                                    key={model}
-                                    color="success"
-                                    label={model}
-                                    rate={successRate(data)}
-                                    total={outcomeTotal(data)}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </Card.Content>
-            </Card>
-        </section>
+      <section aria-label="Router stats" className="router-stats empty">
+        <Card>
+          <Card.Header>
+            <Card.Title>Router Stats</Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <Card.Description>
+              Nothing learned yet - run a task and this panel will show what
+              worked, per task type and model.
+            </Card.Description>
+          </Card.Content>
+        </Card>
+      </section>
     );
+  }
+
+  const byTaskType = stats.by_task_type || {};
+  const byModel = stats.by_model || {};
+
+  if (compact) {
+    return (
+      <div
+        aria-label="router stats"
+        className="router-stats-panel compact flex flex-wrap items-center gap-2 text-xs"
+      >
+        <Chip size="sm" variant="primary">
+          {stats.total} tasks
+        </Chip>
+        {Object.entries(byModel).map(([model, data]) => (
+          <Chip key={model} size="sm" variant="soft">
+            {model}: {successRate(data)}%
+          </Chip>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <section aria-label="Router stats" className="router-stats-panel">
+      <Card>
+        <Card.Header>
+          <Card.Title>Router Stats</Card.Title>
+          <Card.Description>
+            Total tasks evaluated: {stats.total}
+          </Card.Description>
+        </Card.Header>
+        <Card.Content className="flex flex-col gap-3">
+          {Object.keys(byTaskType).length > 0 && (
+            <div>
+              <h5 className="m-0 mb-1.5 text-xs font-semibold tracking-wider text-muted uppercase">
+                By Task Type
+              </h5>
+              {Object.entries(byTaskType).map(([type, data]) => (
+                <StatRow
+                  key={type}
+                  color="accent"
+                  label={type}
+                  rate={successRate(data)}
+                  total={outcomeTotal(data)}
+                />
+              ))}
+            </div>
+          )}
+
+          {Object.keys(byTaskType).length > 0 &&
+            Object.keys(byModel).length > 0 && <Separator />}
+
+          {Object.keys(byModel).length > 0 && (
+            <div>
+              <h5 className="m-0 mb-1.5 text-xs font-semibold tracking-wider text-muted uppercase">
+                By Model
+              </h5>
+              {Object.entries(byModel).map(([model, data]) => (
+                <StatRow
+                  key={model}
+                  color="success"
+                  label={model}
+                  rate={successRate(data)}
+                  total={outcomeTotal(data)}
+                />
+              ))}
+            </div>
+          )}
+        </Card.Content>
+      </Card>
+    </section>
+  );
 }
 
 export default RouterStatsPanel;

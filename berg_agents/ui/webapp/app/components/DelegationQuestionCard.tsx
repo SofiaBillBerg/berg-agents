@@ -26,69 +26,69 @@ import { MAX_DELEGATION_ANSWER_CHARS } from "@/harness/delegationQuestions";
  * the same limit the server enforces.
  */
 export default function DelegationQuestionCard({
-    onAnswer,
-    question}: {
-    question: DelegationQuestion;
-    onAnswer: (taskId: string, answer: string) => Promise<boolean>;
+  onAnswer,
+  question}: {
+  question: DelegationQuestion;
+  onAnswer: (taskId: string, answer: string) => Promise<boolean>;
 }) {
-    const [answer, setAnswer] = useState("");
-    const [state, setState] = useState<"draft" | "sending" | "sent" | "failed">(
-        "draft",
-    );
+  const [answer, setAnswer] = useState("");
+  const [state, setState] = useState<"draft" | "sending" | "sent" | "failed">(
+    "draft",
+  );
 
-    const trimmed = answer.trim();
-    const canSend = trimmed.length > 0 && state !== "sending";
+  const trimmed = answer.trim();
+  const canSend = trimmed.length > 0 && state !== "sending";
 
-    const submit = async () => {
-        if (!canSend) return;
-        setState("sending");
-        // A false return is not an error to shout about: it means the task
-        // is no longer waiting (the run ended, or it was answered from
-        // elsewhere). The card keeps its text so the user can see what
-        // they tried, and says so plainly.
-        const ok = await onAnswer(question.taskId, trimmed);
-        setState(ok ? "sent" : "failed");
-    };
+  const submit = async () => {
+    if (!canSend) return;
+    setState("sending");
+    // A false return is not an error to shout about: it means the task
+    // is no longer waiting (the run ended, or it was answered from
+    // elsewhere). The card keeps its text so the user can see what
+    // they tried, and says so plainly.
+    const ok = await onAnswer(question.taskId, trimmed);
+    setState(ok ? "sent" : "failed");
+  };
 
-    return (
-        <div className="my-2 rounded-lg border border-default-200 bg-content1 p-3">
-            <div className="mb-1 text-sm font-medium">
-                {question.agentName} is waiting for your answer
-            </div>
-            <p className="mb-2 whitespace-pre-wrap text-sm text-default-600">
-                {question.question}
-            </p>
-            <textarea
-                className="w-full resize-y rounded-md border border-default-200 bg-transparent p-2 text-sm"
-                maxLength={MAX_DELEGATION_ANSWER_CHARS}
-                placeholder="Your answer…"
-                rows={2}
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void submit();
-                    }
-                }}
-            />
-            <div className="mt-2 flex items-center gap-2">
-                <Button
-                    isDisabled={!canSend}
-                    size="sm"
-                    variant="primary"
-                    onPress={() => void submit()}
-                >
-                    {state === "sending" ? "Sending…" : "Send answer"}
-                </Button>
-                <span className="text-xs text-default-400">
-                    {state === "sent"
-                        ? "Sent — the task will continue."
-                        : state === "failed"
-                          ? "Could not send — the task may have moved on. Check the run is still live."
-                          : "Enter sends, Shift+Enter adds a line."}
-                </span>
-            </div>
-        </div>
-    );
+  return (
+    <div className="my-2 rounded-lg border border-default-200 bg-content1 p-3">
+      <div className="mb-1 text-sm font-medium">
+        {question.agentName} is waiting for your answer
+      </div>
+      <p className="mb-2 whitespace-pre-wrap text-sm text-default-600">
+        {question.question}
+      </p>
+      <textarea
+        className="w-full resize-y rounded-md border border-default-200 bg-transparent p-2 text-sm"
+        maxLength={MAX_DELEGATION_ANSWER_CHARS}
+        placeholder="Your answer…"
+        rows={2}
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            void submit();
+          }
+        }}
+      />
+      <div className="mt-2 flex items-center gap-2">
+        <Button
+          isDisabled={!canSend}
+          size="sm"
+          variant="primary"
+          onPress={() => void submit()}
+        >
+          {state === "sending" ? "Sending…" : "Send answer"}
+        </Button>
+        <span className="text-xs text-default-400">
+          {state === "sent"
+            ? "Sent — the task will continue."
+            : state === "failed"
+              ? "Could not send — the task may have moved on. Check the run is still live."
+              : "Enter sends, Shift+Enter adds a line."}
+        </span>
+      </div>
+    </div>
+  );
 }

@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,24 +19,23 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-
 "use client";
 
-import {useState} from "react";
+import { useState } from "react";
 
 export interface ToolCardProps {
-    /** Name of the tool (e.g. 'read_file', 'run_task') */
-    tool: string;
-    /** Raw input argument string (optional) */
-    input?: string;
-    /** Output from the tool (any JSON-serializable value) */
-    output?: unknown;
-    /** Whether the card starts expanded */
-    expanded?: boolean;
-    /** Tool execution state (e.g. "output-available", "approval-requested") */
-    state?: string;
-    /** Callback to toggle expansion (optional) */
-    onToggle?: () => void;
+  /** Name of the tool (e.g. 'read_file', 'run_task') */
+  tool: string;
+  /** Raw input argument string (optional) */
+  input?: string;
+  /** Output from the tool (any JSON-serializable value) */
+  output?: unknown;
+  /** Whether the card starts expanded */
+  expanded?: boolean;
+  /** Tool execution state (e.g. "output-available", "approval-requested") */
+  state?: string;
+  /** Callback to toggle expansion (optional) */
+  onToggle?: () => void;
 }
 
 /**
@@ -47,82 +46,80 @@ export interface ToolCardProps {
  * can never push the conversation out of view.
  */
 export const ToolCard = ({
-                             tool,
-                             input,
-                             output,
-                             expanded,
-                             state,
-                             onToggle}: ToolCardProps) => {
-    const [open, setOpen] = useState(expanded ?? false);
-    const [copied, setCopied] = useState(false);
+  tool,
+  input,
+  output,
+  expanded,
+  state,
+  onToggle}: ToolCardProps) => {
+  const [open, setOpen] = useState(expanded ?? false);
+  const [copied, setCopied] = useState(false);
 
-    const toggle = () => {
-        setOpen((prev) => !prev);
-        onToggle?.();
-    };
+  const toggle = () => {
+    setOpen((prev) => !prev);
+    onToggle?.();
+  };
 
-    const outputText =
-        typeof output === "string" ? output : JSON.stringify(output, null, 2);
+  const outputText =
+    typeof output === "string" ? output : JSON.stringify(output, null, 2);
 
-    const copy = async () => {
-        try {
-            await navigator.clipboard.writeText(outputText);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-        } catch {
-            // Clipboard unavailable (permissions, insecure context) - no-op.
-        }
-    };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(outputText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable (permissions, insecure context) - no-op.
+    }
+  };
 
-    return (
-        <div className="rounded-md border border-border bg-surface-soft/50">
-            <div className="flex items-center gap-2 px-2 py-1">
+  return (
+    <div className="rounded-md border border-border bg-surface-soft/50">
+      <div className="flex items-center gap-2 px-2 py-1">
         <span className="font-mono text-xs truncate" title={tool}>
           🔧 {tool}
         </span>
-                {state && (
-                    <span className="text-[11px] text-muted-foreground shrink-0">
+        {state && (
+          <span className="text-[11px] text-muted-foreground shrink-0">
             · {state}
           </span>
-                )}
-                <span className="flex-1"/>
-                <button
-                    aria-label={open ? `Hide ${tool} details` : `Show ${tool} details`}
-                    className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
-                    type="button"
-                    onClick={toggle}
-                >
-                    {open ? "Hide" : "Show"}
-                </button>
-                {output !== undefined && (
-                    <button
-                        aria-label={`Copy ${tool} output`}
-                        className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
-                        type="button"
-                        onClick={copy}
-                    >
-                        {copied ? "Copied!" : "Copy"}
-                    </button>
-                )}
-            </div>
-            {open && (
-                <div className="flex flex-col gap-1 px-2 pb-1.5">
-                    {input && (
-                        <pre
-                            className="font-mono bg-surface-soft p-1.5 rounded text-[11px] overflow-auto max-h-40 whitespace-pre-wrap">
+        )}
+        <span className="flex-1" />
+        <button
+          aria-label={open ? `Hide ${tool} details` : `Show ${tool} details`}
+          className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+          type="button"
+          onClick={toggle}
+        >
+          {open ? "Hide" : "Show"}
+        </button>
+        {output !== undefined && (
+          <button
+            aria-label={`Copy ${tool} output`}
+            className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+            type="button"
+            onClick={copy}
+          >
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        )}
+      </div>
+      {open && (
+        <div className="flex flex-col gap-1 px-2 pb-1.5">
+          {input && (
+            <pre className="font-mono bg-surface-soft p-1.5 rounded text-[11px] overflow-auto max-h-40 whitespace-pre-wrap">
               {input}
             </pre>
-                    )}
-                    {output !== undefined && (
-                        <pre
-                            className="font-mono bg-surface-soft p-1.5 rounded text-[11px] overflow-auto max-h-64 whitespace-pre-wrap">
+          )}
+          {output !== undefined && (
+            <pre className="font-mono bg-surface-soft p-1.5 rounded text-[11px] overflow-auto max-h-64 whitespace-pre-wrap">
               {outputText}
             </pre>
-                    )}
-                </div>
-            )}
+          )}
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default ToolCard;

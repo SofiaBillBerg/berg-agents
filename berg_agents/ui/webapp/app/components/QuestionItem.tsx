@@ -143,9 +143,7 @@ export function QuestionItem({
                       className="mt-1"
                       id={inputId}
                       name={
-                        q.multiSelect
-                          ? undefined
-                          : `${question.id}-${q.header}`
+                        q.multiSelect ? undefined : `${question.id}-${q.header}`
                       }
                       type={q.multiSelect ? "checkbox" : "radio"}
                       onChange={() =>

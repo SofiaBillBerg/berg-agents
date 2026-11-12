@@ -589,10 +589,77 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         append_steer(turn or run_id, text)
         return JSONResponse({"run_id": run_id, "queued": True})
 
+    register_specialist_routes(router)
+
     @router.get("/api/workflow/pending")
     async def workflow_pending() -> JSONResponse:
         """Everything still in berg's queue, for diagnostics."""
         return JSONResponse({"pending": broker.pending()})
+
+
+def register_specialist_routes(router: APIRouter) -> None:
+    """Mount the routes an orchestrator uses to drive a specialist run.
+
+    Separated from ``register_workflow_routes`` for the same reason the
+    delegation routes are separated in ``chat.py``: these act on a *specialist*
+    rather than on the queue, and keeping them together is what keeps the main
+    registration under the complexity ceiling.
+
+    :param router: Router to attach endpoints to.
+    """
+    @router.get("/api/workflow/chat/{run_id}/state")
+    async def workflow_chat_state(run_id: str) -> JSONResponse:
+        """What a specialist run is doing, in the terms a caller acts on.
+
+        Exposed over HTTP because an orchestrator may not be this process: the
+        same three answers the Python helpers give — ``waiting`` / ``working`` /
+        ``pending`` / ``done`` — are what a caller needs before it decides
+        whether to answer a gate, terminate, or read a report.
+
+        :param run_id: The specialist's run id.
+        :return: Its state, status and pending calls.
+        """
+        from berg_agents.workflow.specialists import specialist_state_async
+
+        return JSONResponse(await specialist_state_async(run_id))
+
+    @router.get("/api/workflow/chat/{run_id}/report")
+    async def workflow_chat_report(run_id: str) -> JSONResponse:
+        """What a specialist said and did, from its durable record.
+
+        ``said`` and ``did`` rather than the raw pass record: a caller asks what
+        the specialist told it and what it touched. The raw record rides under
+        ``record`` for anything that needs it.
+
+        :param run_id: The specialist's run id.
+        :return: Its state, what it said, what it did, and the frame count.
+        """
+        from berg_agents.workflow.specialists import specialist_report_async
+
+        report = await specialist_report_async(run_id)
+        return JSONResponse(report)
+
+    @router.post("/api/workflow/chat/{run_id}/stop")
+    async def workflow_chat_stop(run_id: str, request: Request) -> JSONResponse:
+        """Stop a specialist, by whichever mechanism its state needs.
+
+        Two states, two mechanisms: a ``waiting`` run is withdrawn by denying its
+        gate (its pass has already ended, so there is nothing to terminate), and
+        a ``working`` run is stopped with ``Run.terminate``.
+
+        :param run_id: The specialist's run id.
+        :param request: Optional JSON body with ``reason``.
+        :return: How it was stopped, and from which state.
+        """
+        from berg_agents.workflow.specialists import stop_specialist_async
+
+        try:
+            body = await request.json()
+        except Exception:  # ruff: ignore[blind-except] - an empty body is allowed
+            body = {}
+        reason = str((body or {}).get("reason") or "stopped by the user")
+        return JSONResponse(await stop_specialist_async(run_id, reason=reason))
+
 
 
 def _as_json(result: Any) -> Any:

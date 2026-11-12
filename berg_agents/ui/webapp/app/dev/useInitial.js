@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,17 +19,17 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-import {useState} from "react";
+import { useState } from "react";
 
 export const useInitial = () => {
-    const [status, setStatus] = useState({
-        loading: false,
-        error: false});
-    /*
+  const [status, setStatus] = useState({
+    loading: false,
+    error: false});
+  /*
         Implement hook functionality here.
         If you need to execute async operation, set loading to true and when it's over, set loading to false.
         If you caught some errors, set error status to true.
         Initial hook is considered to be successfully completed if it will return {loading: false, error: false}.
       */
-    return status;
+  return status;
 };

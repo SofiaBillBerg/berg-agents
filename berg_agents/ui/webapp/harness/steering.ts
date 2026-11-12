@@ -32,24 +32,24 @@
  * not a gap.
  */
 
-import {useEffect, useState} from "react";
+import { useEffect, useState } from "react";
 
 /** What the hook needs from the chat hook's own render. */
 export interface UsePendingSteeringDeps {
-    /** Active session id, or null when none is adopted yet. */
-    sessionId: string | null;
-    /** Whether a run is streaming right now. */
-    isStreaming: boolean;
-    /** Base URL of the Berg Agents API. */
-    apiBase: string;
+  /** Active session id, or null when none is adopted yet. */
+  sessionId: string | null;
+  /** Whether a run is streaming right now. */
+  isStreaming: boolean;
+  /** Base URL of the Berg Agents API. */
+  apiBase: string;
 }
 
 /** The steering strip's contents. */
 export interface PendingSteering {
-    /** Texts queued on the run that the model has not read yet. */
-    pendingSteering: string[];
-    /** Clear the strip (a run that ended has nothing left to read). */
-    setPendingSteering: (texts: string[]) => void;
+  /** Texts queued on the run that the model has not read yet. */
+  pendingSteering: string[];
+  /** Clear the strip (a run that ended has nothing left to read). */
+  setPendingSteering: (texts: string[]) => void;
 }
 
 /**
@@ -60,51 +60,51 @@ export interface PendingSteering {
  *     it when the run it belonged to ends).
  */
 export function usePendingSteering(
-    deps: UsePendingSteeringDeps,
+  deps: UsePendingSteeringDeps,
 ): PendingSteering {
-    const {sessionId, isStreaming, apiBase} = deps;
-    const [pendingSteering, setPendingSteering] = useState<string[]>([]);
-    useEffect(() => {
-        if (!sessionId) {
-            setPendingSteering([]);
-            return;
-        }
-        let cancelled = false;
-        const poll = async () => {
-            try {
-                const resp = await fetch(
-                    `${apiBase}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
-                );
-                if (!resp.ok || cancelled) return;
-                const data = (await resp.json()) as {
-                    live?: unknown;
-                    steering?: unknown;
-                };
-                // The strip means "the agent is about to read this". Once the
-                // run is over nothing will be read in this turn, so the strip
-                // empties rather than outliving the run that gave it meaning.
-                const queued =
-                    data.live === true && Array.isArray(data.steering)
-                        ? data.steering.filter((t): t is string => typeof t === "string")
-                        : [];
-                if (!cancelled) setPendingSteering(queued);
-            } catch {
-                // Backend unreachable - keep showing what we know.
-            }
+  const { sessionId, isStreaming, apiBase } = deps;
+  const [pendingSteering, setPendingSteering] = useState<string[]>([]);
+  useEffect(() => {
+    if (!sessionId) {
+      setPendingSteering([]);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const resp = await fetch(
+          `${apiBase}/api/chat/status?session=${encodeURIComponent(sessionId)}`,
+        );
+        if (!resp.ok || cancelled) return;
+        const data = (await resp.json()) as {
+          live?: unknown;
+          steering?: unknown;
         };
-        void poll();
-        // Nothing to poll when no run is live; the strip is only ever
-        // non-empty inside a run.
-        if (!isStreaming)
-            return () => {
-                cancelled = true;
-            };
-        const timer = setInterval(() => void poll(), 1200);
-        return () => {
-            cancelled = true;
-            clearInterval(timer);
-        };
-    }, [sessionId, isStreaming, apiBase]);
+        // The strip means "the agent is about to read this". Once the
+        // run is over nothing will be read in this turn, so the strip
+        // empties rather than outliving the run that gave it meaning.
+        const queued =
+          data.live === true && Array.isArray(data.steering)
+            ? data.steering.filter((t): t is string => typeof t === "string")
+            : [];
+        if (!cancelled) setPendingSteering(queued);
+      } catch {
+        // Backend unreachable - keep showing what we know.
+      }
+    };
+    void poll();
+    // Nothing to poll when no run is live; the strip is only ever
+    // non-empty inside a run.
+    if (!isStreaming)
+      return () => {
+        cancelled = true;
+      };
+    const timer = setInterval(() => void poll(), 1200);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [sessionId, isStreaming, apiBase]);
 
-    return {pendingSteering, setPendingSteering};
+  return { pendingSteering, setPendingSteering };
 }

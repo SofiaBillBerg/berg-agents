@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,7 +19,6 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-
 /*
  * Barrel export for the harness module.
  * Simplified - uses AI SDK v7's useChat directly, no custom harness classes.
@@ -27,49 +26,51 @@
 
 // Re-export types used by components.
 export type {
-    AgentInfo,
-    HitlRequest,
-    TaskResult,
-    HarnessEvent,
-    HitlDecisionInput} from "./webhook";
+  AgentInfo,
+  HitlRequest,
+  TaskResult,
+  HarnessEvent,
+  HitlDecisionInput} from "./webhook";
 
 // Main chat hook - wraps AI SDK v7's useChat.
-export {useAISDKChat} from "./useAISDKChat";
-export type {ChatMessage, UseAISDKChatReturn} from "./useAISDKChat";
-export type {MessageToolCall} from "./messageParts";
+export { useAISDKChat } from "./useAISDKChat";
+export type { ChatMessage, UseAISDKChatReturn } from "./useAISDKChat";
+export type { MessageToolCall } from "./messageParts";
 
 // The ask_user vocabulary and the message-parts walker live in their own
 // modules; components keep importing them from the harness barrel.
 export type {
-    PendingQuestion,
-    PendingQuestionAnswer,
-    PendingQuestionData,
-    PendingQuestionOption} from "./askUser";
+  PendingQuestion,
+  PendingQuestionAnswer,
+  PendingQuestionData,
+  PendingQuestionOption} from "./askUser";
 
 // HITL: the approval/question card vocabulary.
-export type {PendingApproval} from "./hitl";
+export type { PendingApproval } from "./hitl";
 
 // A delegated sub-agent's question: read off the wire, answered in place.
 // Separate from the ask_user vocabulary above on purpose - that answers a
 // deferred call on the parent, this answers a question a child asked
 // while the parent is still streaming.
-export type {DelegationQuestion, LiveDelegatedTask} from "./delegationQuestions";
+export type {
+  DelegationQuestion,
+  LiveDelegatedTask} from "./delegationQuestions";
 export {
-    DELEGATION_MARKER_TYPE,
-    DELEGATION_QUESTION_TYPE,
-    answerDelegatedQuestion,
-    cancelDelegatedTask,
-    delegationQuestionsFrom,
-    liveDelegatedTasksFrom,
-    messageDelegatedTask} from "./delegationQuestions";
+  DELEGATION_MARKER_TYPE,
+  DELEGATION_QUESTION_TYPE,
+  answerDelegatedQuestion,
+  cancelDelegatedTask,
+  delegationQuestionsFrom,
+  liveDelegatedTasksFrom,
+  messageDelegatedTask} from "./delegationQuestions";
 
 // The failure dialog's notice, built by ./recovery.
-export type {FailureNotice} from "./recovery";
+export type { FailureNotice } from "./recovery";
 
 // The active session id and its storage: one path for every reader and
 // writer of that key (chat hook, history page, transport adoption).
 export {
-    SESSION_ID_KEY,
-    forgetStoredSessionId,
-    readStoredSessionId,
-    storeSessionId} from "./sessionIdentity";
+  SESSION_ID_KEY,
+  forgetStoredSessionId,
+  readStoredSessionId,
+  storeSessionId} from "./sessionIdentity";

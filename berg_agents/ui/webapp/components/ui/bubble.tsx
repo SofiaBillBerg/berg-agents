@@ -1,6 +1,6 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "cn";
 
 function BubbleGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -9,7 +9,7 @@ function BubbleGroup({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="bubble-group"
       {...props}
     />
-  )
+  );
 }
 
 const bubbleVariants = cva(
@@ -32,8 +32,8 @@ const bubbleVariants = cva(
         destructive:
           "*:data-[slot=bubble-content]:bg-destructive/10 *:data-[slot=bubble-content]:text-destructive dark:*:data-[slot=bubble-content]:bg-destructive/20 [&>[data-slot=bubble-content]:is(button,a):hover]:bg-destructive/20 dark:[&>[data-slot=bubble-content]:is(button,a):hover]:bg-destructive/30"}},
     defaultVariants: {
-      variant: "default"}}
-)
+      variant: "default"}},
+);
 
 function Bubble({
   variant = "default",
@@ -42,7 +42,7 @@ function Bubble({
   ...props
 }: React.ComponentProps<"div"> &
   VariantProps<typeof bubbleVariants> & {
-    align?: "start" | "end"
+    align?: "start" | "end";
   }) {
   return (
     <div
@@ -52,7 +52,7 @@ function Bubble({
       data-variant={variant}
       {...props}
     />
-  )
+  );
 }
 
 function BubbleContent({
@@ -61,7 +61,7 @@ function BubbleContent({
   children,
   ...props
 }: React.ComponentProps<"div"> & {
-  render?: (props: React.HTMLAttributes<HTMLElement>) => React.ReactNode
+  render?: (props: React.HTMLAttributes<HTMLElement>) => React.ReactNode;
 }) {
   if (render) {
     const renderProps = {
@@ -69,11 +69,11 @@ function BubbleContent({
       "data-slot": "bubble-content",
       className: cn(
         "w-fit max-w-full min-w-0 overflow-hidden rounded-xl border border-transparent px-3 py-2 text-sm leading-relaxed wrap-break-word group-data-[align=end]/bubble:self-end [button]:text-left [button,a]:transition-colors [button,a]:outline-none [button,a]:focus-visible:border-ring [button,a]:focus-visible:ring-3 [button,a]:focus-visible:ring-ring/50",
-        className
+        className,
       ),
-      children}
+      children};
 
-    return render(renderProps)
+    return render(renderProps);
   }
 
   return (
@@ -81,13 +81,13 @@ function BubbleContent({
       {...props}
       className={cn(
         "w-fit max-w-full min-w-0 overflow-hidden rounded-xl border border-transparent px-3 py-2 text-sm leading-relaxed wrap-break-word group-data-[align=end]/bubble:self-end [button]:text-left [button,a]:transition-colors [button,a]:outline-none [button,a]:focus-visible:border-ring [button,a]:focus-visible:ring-3 [button,a]:focus-visible:ring-ring/50",
-        className
+        className,
       )}
       data-slot="bubble-content"
     >
       {children}
     </div>
-  )
+  );
 }
 
 const bubbleReactionsVariants = cva(
@@ -102,8 +102,8 @@ const bubbleReactionsVariants = cva(
         end: "right-3"}},
     defaultVariants: {
       side: "bottom",
-      align: "end"}}
-)
+      align: "end"}},
+);
 
 function BubbleReactions({
   side = "bottom",
@@ -111,8 +111,8 @@ function BubbleReactions({
   className,
   ...props
 }: React.ComponentProps<"div"> & {
-  align?: "start" | "end"
-  side?: "top" | "bottom"
+  align?: "start" | "end";
+  side?: "top" | "bottom";
 }) {
   return (
     <div
@@ -122,7 +122,7 @@ function BubbleReactions({
       data-slot="bubble-reactions"
       {...props}
     />
-  )
+  );
 }
 
-export { BubbleGroup, Bubble, BubbleContent, BubbleReactions }
+export { BubbleGroup, Bubble, BubbleContent, BubbleReactions };

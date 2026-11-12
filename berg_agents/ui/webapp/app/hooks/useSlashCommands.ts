@@ -32,60 +32,63 @@
  * `no-explicit-any` errors that came with it were pre-existing).
  */
 
-import type {ChatMessage} from "@/harness";
-import type {ToolResult} from "../components/ChatTranscript";
+import type { ChatMessage } from "@/harness";
+import type { ToolResult } from "../components/ChatTranscript";
 
-import {useCallback, useEffect, useState} from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /** What the hook needs from the chat hook and the app shell. */
 export interface UseSlashCommandsDeps {
-    /** Base URL of the Berg Agents API. */
-    apiBase: string;
-    /** The backend tool catalog (the palette + execution). */
-    backendTools: Array<{name: string; description: string; source: string}>;
-    /** The agent list. */
-    agents: Array<{name: string; description?: string}>;
-    /** Router stats for /stats. */
-    routerStats: unknown;
-    /** Send a message to the model (the plan/implement commands). */
-    sendMessage: (content: string) => Promise<void>;
-    /** Clear the live chat (/clear). */
-    clearMessages: () => void;
-    /** The active session id (the plan/implement commands). */
-    sessionId: string | null;
-    /** Open a server-side session (/memory restores one). */
-    openSession: (id: string) => Promise<void>;
-    /** The live transcript (some commands summarise it). */
-    messages: readonly ChatMessage[];
-    /** The current text in the input box (/read_file reads it). */
-    input: string;
-    /** The active approval batch, for the auto-approve opt-in. */
-    approvalBatch: Array<{id: string; decided?: boolean; toolName: string}>;
-    /** Answer every pending approval (the auto-approve opt-in). */
-    respondToAllApprovals: (approved: boolean) => Promise<void>;
+  /** Base URL of the Berg Agents API. */
+  apiBase: string;
+  /** The backend tool catalog (the palette + execution). */
+  backendTools: Array<{ name: string; description: string; source: string }>;
+  /** The agent list. */
+  agents: Array<{ name: string; description?: string }>;
+  /** Router stats for /stats. */
+  routerStats: unknown;
+  /** Send a message to the model (the plan/implement commands). */
+  sendMessage: (content: string) => Promise<void>;
+  /** Clear the live chat (/clear). */
+  clearMessages: () => void;
+  /** The active session id (the plan/implement commands). */
+  sessionId: string | null;
+  /** Open a server-side session (/memory restores one). */
+  openSession: (id: string) => Promise<void>;
+  /** The live transcript (some commands summarise it). */
+  messages: readonly ChatMessage[];
+  /** The current text in the input box (/read_file reads it). */
+  input: string;
+  /** The active approval batch, for the auto-approve opt-in. */
+  approvalBatch: Array<{ id: string; decided?: boolean; toolName: string }>;
+  /** Answer every pending approval (the auto-approve opt-in). */
+  respondToAllApprovals: (approved: boolean) => Promise<void>;
 }
 
 /** The slash-command surface. */
 export interface SlashCommands {
-    /** True when mutating calls are auto-approved (persisted opt-in). */
-    autoApproveEdits: boolean;
-    /** Flip the opt-in (persisted so it survives reloads). */
-    toggleAutoApproveEdits: () => void;
-    /** Tool-result cards rendered below the transcript. */
-    toolResults: ToolResult[];
-    /** Dismissible answer cards above the transcript. */
-    cmdCards: Array<{id: number; text: string}>;
-    /** Add an answer card (the send handler uses this). */
-    addCmdCard: (text: string) => void;
-    /** Dismiss one answer card. */
-    dismissCmdCard: (id: number) => void;
-    /** Run one slash command; returns whether the app handled it. */
-    processSlashCommand: (text: string) => Promise<{
-        handled: boolean;
-        card?: string;
-    }>;
-    /** Execute a backend tool directly (the tool cards' path). */
-    executeTool: (tool: string, args: Record<string, unknown>) => Promise<ToolResult>;
+  /** True when mutating calls are auto-approved (persisted opt-in). */
+  autoApproveEdits: boolean;
+  /** Flip the opt-in (persisted so it survives reloads). */
+  toggleAutoApproveEdits: () => void;
+  /** Tool-result cards rendered below the transcript. */
+  toolResults: ToolResult[];
+  /** Dismissible answer cards above the transcript. */
+  cmdCards: Array<{ id: number; text: string }>;
+  /** Add an answer card (the send handler uses this). */
+  addCmdCard: (text: string) => void;
+  /** Dismiss one answer card. */
+  dismissCmdCard: (id: number) => void;
+  /** Run one slash command; returns whether the app handled it. */
+  processSlashCommand: (text: string) => Promise<{
+    handled: boolean;
+    card?: string;
+  }>;
+  /** Execute a backend tool directly (the tool cards' path). */
+  executeTool: (
+    tool: string,
+    args: Record<string, unknown>,
+  ) => Promise<ToolResult>;
 }
 
 /**
@@ -96,73 +99,76 @@ export interface SlashCommands {
  * @returns The cards, the opt-in, and the dispatcher.
  */
 export function useSlashCommands(deps: UseSlashCommandsDeps): SlashCommands {
-    const {
-        apiBase,
-        backendTools,
-        agents,
-        routerStats,
-        sendMessage,
-        clearMessages,
-        sessionId,
-        openSession,
-        messages,
-        input,
-        approvalBatch,
-        respondToAllApprovals} = deps;
+  const {
+    apiBase,
+    backendTools,
+    agents,
+    routerStats,
+    sendMessage,
+    clearMessages,
+    sessionId,
+    openSession,
+    messages,
+    input,
+    approvalBatch,
+    respondToAllApprovals} = deps;
 
-    // -------------------------------------------------------------------------
-    // Tool-result handling (used by ChatTranscript)
-    // -------------------------------------------------------------------------
-    const [toolResults, setToolResults] = useState<ToolResult[]>([]);
+  // -------------------------------------------------------------------------
+  // Tool-result handling (used by ChatTranscript)
+  // -------------------------------------------------------------------------
+  const [toolResults, setToolResults] = useState<ToolResult[]>([]);
 
-    // Session-scoped opt-in: when on, mutating tool calls / gated plans are
-    // auto-approved without pausing. Per-tool approval stays the default;
-    // this is a convenience for users who want to be lazy. Persisted so it
-    // survives reloads within the same browser.
-    const [autoApproveEdits, setAutoApproveEdits] = useState<boolean>(() => {
-        try {
-            return localStorage.getItem("berg_auto_approve_edits") === "1";
-        } catch {
-            return false;
-        }
+  // Session-scoped opt-in: when on, mutating tool calls / gated plans are
+  // auto-approved without pausing. Per-tool approval stays the default;
+  // this is a convenience for users who want to be lazy. Persisted so it
+  // survives reloads within the same browser.
+  const [autoApproveEdits, setAutoApproveEdits] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("berg_auto_approve_edits") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleAutoApproveEdits = () => {
+    setAutoApproveEdits((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("berg_auto_approve_edits", next ? "1" : "0");
+      } catch {
+        /* private mode */
+      }
+      return next;
     });
-    const toggleAutoApproveEdits = () => {
-        setAutoApproveEdits((prev) => {
-            const next = !prev;
-            try {
-                localStorage.setItem("berg_auto_approve_edits", next ? "1" : "0");
-            } catch {
-                /* private mode */
-            }
-            return next;
-        });
-    };
+  };
 
-    // Session-scoped opt-in: when auto-approve is on, approve all pending
-    // chat tool calls without showing the card. Per-tool approval stays
-    // the default when the toggle is off.
-    useEffect(() => {
-        if (!autoApproveEdits) return;
-        if (!approvalBatch || approvalBatch.length === 0) return;
-        const pending = approvalBatch.filter((a) => !a.decided);
-        if (pending.length === 0) return;
-        void respondToAllApprovals(true);
-    }, [autoApproveEdits, approvalBatch, respondToAllApprovals]);
+  // Session-scoped opt-in: when auto-approve is on, approve all pending
+  // chat tool calls without showing the card. Per-tool approval stays
+  // the default when the toggle is off.
+  useEffect(() => {
+    if (!autoApproveEdits) return;
+    if (!approvalBatch || approvalBatch.length === 0) return;
+    const pending = approvalBatch.filter((a) => !a.decided);
+    if (pending.length === 0) return;
+    void respondToAllApprovals(true);
+  }, [autoApproveEdits, approvalBatch, respondToAllApprovals]);
 
-    // Slash-command result cards: processSlashCommand answers locally
-    // (help, agents, stats, /memory, tool runs, ...) and the answer
-    // lands here as a dismissible card above the transcript instead
-    // of vanishing into the promise chain.
-    const [cmdCards, setCmdCards] = useState<Array<{id: number; text: string}>>(
-        [],
-    );
-    const addCmdCard = useCallback((text: string) => {
-        setCmdCards((prev) => [...prev, {id: Date.now(), text}]);
-    }, []);
-    const dismissCmdCard = useCallback((id: number) => {
-        setCmdCards((prev) => prev.filter((c) => c.id !== id));
-    }, []);
-  const executeTool = async (tool: string, args: Record<string, unknown>): Promise<ToolResult> => {
+  // Slash-command result cards: processSlashCommand answers locally
+  // (help, agents, stats, /memory, tool runs, ...) and the answer
+  // lands here as a dismissible card above the transcript instead
+  // of vanishing into the promise chain.
+  const [cmdCards, setCmdCards] = useState<Array<{ id: number; text: string }>>(
+    [],
+  );
+  const addCmdCard = useCallback((text: string) => {
+    setCmdCards((prev) => [...prev, { id: Date.now(), text }]);
+  }, []);
+  const dismissCmdCard = useCallback((id: number) => {
+    setCmdCards((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+  const executeTool = async (
+    tool: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> => {
     const resp = await fetch(`${apiBase}/api/tool/execute`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -250,7 +256,7 @@ export function useSlashCommands(deps: UseSlashCommandsDeps): SlashCommands {
           const toolArgs: Record<string, unknown> =
             parsedArgs && typeof parsedArgs === "object"
               ? (parsedArgs as Record<string, unknown>)
-              : {arg: parsedArgs};
+              : { arg: parsedArgs };
           await executeTool(tool.name, toolArgs);
           return { handled: true, card: `✅ ${tool.name} executed` };
         } catch (e) {
@@ -297,7 +303,7 @@ export function useSlashCommands(deps: UseSlashCommandsDeps): SlashCommands {
               (mem.length > 0
                 ? mem
                     .map(
-                      (m: {exists?: boolean; path?: string}) =>
+                      (m: { exists?: boolean; path?: string }) =>
                         `${m.exists ? "✅" : "❌"} ${m.path ?? ""}`,
                     )
                     .join("\n")
@@ -309,7 +315,7 @@ export function useSlashCommands(deps: UseSlashCommandsDeps): SlashCommands {
               (sk.length > 0
                 ? sk
                     .map(
-                      (s: {name?: string; description?: string}) =>
+                      (s: { name?: string; description?: string }) =>
                         `${s.name ?? ""} - ${s.description ?? ""}`,
                     )
                     .join("\n")
@@ -321,7 +327,7 @@ export function useSlashCommands(deps: UseSlashCommandsDeps): SlashCommands {
               (servers.length > 0
                 ? servers
                     .map(
-                      (s: {enabled?: boolean; name?: string}) =>
+                      (s: { enabled?: boolean; name?: string }) =>
                         `${s.enabled ? "✅" : "⛔"} ${s.name ?? ""}`,
                     )
                     .join("\n")
@@ -428,13 +434,13 @@ export function useSlashCommands(deps: UseSlashCommandsDeps): SlashCommands {
     [agents, backendTools, clearMessages, input, routerStats, messages],
   );
 
-    return {
-        autoApproveEdits,
-        toggleAutoApproveEdits,
-        toolResults,
-        cmdCards,
-        addCmdCard,
-        dismissCmdCard,
-        processSlashCommand,
-        executeTool};
+  return {
+    autoApproveEdits,
+    toggleAutoApproveEdits,
+    toolResults,
+    cmdCards,
+    addCmdCard,
+    dismissCmdCard,
+    processSlashCommand,
+    executeTool};
 }

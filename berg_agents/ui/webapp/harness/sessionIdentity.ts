@@ -42,13 +42,13 @@ export const SESSION_ID_KEY = "berg_session_id";
  *     when storage is unavailable.
  */
 export function readStoredSessionId(): string | null {
-    try {
-        return localStorage.getItem(SESSION_ID_KEY);
-    } catch {
-        // Storage blocked (private mode, disabled cookies): the server
-        // session is still reachable by its own id within this tab.
-        return null;
-    }
+  try {
+    return localStorage.getItem(SESSION_ID_KEY);
+  } catch {
+    // Storage blocked (private mode, disabled cookies): the server
+    // session is still reachable by its own id within this tab.
+    return null;
+  }
 }
 
 /**
@@ -57,12 +57,12 @@ export function readStoredSessionId(): string | null {
  * @param id - The server-side session id to remember.
  */
 export function storeSessionId(id: string): void {
-    try {
-        localStorage.setItem(SESSION_ID_KEY, id);
-    } catch {
-        // Private mode - the id stays in memory only, and the chat
-        // keeps working for this tab.
-    }
+  try {
+    localStorage.setItem(SESSION_ID_KEY, id);
+  } catch {
+    // Private mode - the id stays in memory only, and the chat
+    // keeps working for this tab.
+  }
 }
 
 /**
@@ -73,9 +73,9 @@ export function storeSessionId(id: string): void {
  * would resurrect it through the backend's lazy row-create.
  */
 export function forgetStoredSessionId(): void {
-    try {
-        localStorage.removeItem(SESSION_ID_KEY);
-    } catch {
-        // Nothing to forget when storage is unreachable.
-    }
+  try {
+    localStorage.removeItem(SESSION_ID_KEY);
+  } catch {
+    // Nothing to forget when storage is unreachable.
+  }
 }
