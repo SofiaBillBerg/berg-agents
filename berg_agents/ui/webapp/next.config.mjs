@@ -21,6 +21,10 @@
 
 /** @type {import('next').NextConfig} */
 
+// `withWorkflow` enables the "use workflow" and "use step" directives, which is
+// what lets the orchestrator run as a durable agent inside this app.
+import {withWorkflow} from "workflow/next";
+
 // Bundle analyzer for Phase 2 performance monitoring
 // Enable with: ANALYZE=true bun run build
 const withBundleAnalyzer =
@@ -31,8 +35,17 @@ const withBundleAnalyzer =
     : (config) => config;
 
 const nextConfig = {
-  // Static export only in production (FastAPI mounts dist/). In dev, Next needs server mode for HMR + API proxy.
-  output: process.env.NODE_ENV === "production" ? "export" : undefined,
+  // A real Next server, not a static export. The orchestrator is a
+  // `WorkflowAgent`, and the Workflow runtime starts and resumes runs from
+  // server routes — which a static export cannot host. The comment this
+  // replaces said the opposite ("static export only in production, FastAPI
+  // mounts dist/"), which was true while the UI had no server behaviour of its
+  // own; it does now.
+  //
+  // Consequence to keep in mind: the UI is served by Next on its own port
+  // instead of being mounted by FastAPI, so the frontend reaches the Python
+  // backend through `NEXT_PUBLIC_API_BASE_URL` (the same variable `next dev`
+  // already used).
   distDir: "./dist",
   reactStrictMode: false,
   turbopack: {
@@ -91,4 +104,4 @@ const nextConfig = {
   // eslint config now in separate file
 };
 
-export default withBundleAnalyzer(nextConfig);
+export default withWorkflow(withBundleAnalyzer(nextConfig));
