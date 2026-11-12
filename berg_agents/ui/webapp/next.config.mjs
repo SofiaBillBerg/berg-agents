@@ -23,7 +23,17 @@
 
 // `withWorkflow` enables the "use workflow" and "use step" directives, which is
 // what lets the orchestrator run as a durable agent inside this app.
-import {withWorkflow} from "workflow/next";
+
+// It MUST be imported AFTER ./workflow-data-dir.mjs, because that module sets
+// `WORKFLOW_LOCAL_DATA_DIR` and the Workflow plugin only applies its own default
+// (`.next/workflow-data`, inside the webapp) when the variable is UNSET. A
+// static `import` of withWorkflow above the assignment would be evaluated
+// first — ES module imports are hoisted — and the plugin's default would win,
+// which is exactly the bug this fixes. The dynamic import makes the order
+// explicit rather than relying on hoisting rules.
+await import("./workflow-data-dir.mjs");
+
+const {withWorkflow} = await import("workflow/next");
 
 // Bundle analyzer for Phase 2 performance monitoring
 // Enable with: ANALYZE=true bun run build
