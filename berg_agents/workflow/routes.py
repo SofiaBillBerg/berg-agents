@@ -28,6 +28,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 import contextlib
 import json
+from pathlib import Path
 from typing import Any
 
 from berg_agents.workflow import queue as broker
@@ -272,7 +273,7 @@ def _parked_pass(run_id: str) -> dict[str, Any] | None:
     """
     from berg_agents.workflow.registry import _workflow_data_dir
 
-    events_dir = _workflow_data_dir() / "events" / run_id
+    events_dir = _workflow_data_dir() / Path("events") / run_id
     if not events_dir.is_dir():
         return None
 
@@ -318,7 +319,7 @@ def _run_record(run_id: str) -> dict[str, Any] | None:
     """One run's stored record, read straight from its own file."""
     from berg_agents.workflow.registry import _workflow_data_dir
 
-    path = _workflow_data_dir() / "runs" / f"{run_id}.json"
+    path = _workflow_data_dir() / Path("runs")/ f"{run_id}.json"
     if not path.is_file():
         return None
     try:

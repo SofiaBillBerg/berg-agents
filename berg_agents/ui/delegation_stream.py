@@ -77,7 +77,7 @@ carry a task id, not the parent call id that opened them.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -233,7 +233,7 @@ def build_delegation_event_stream(sdk_version: int = 6) -> Any:  # ruff: ignore[
         put them.
         """
 
-        def __init__(self, sdk_version: int = 6) -> None:
+        def __init__(self, sdk_version=7) -> None:
             """Start with an empty delegation stack and no child encoders.
 
             :param sdk_version: Protocol version this encoder writes.

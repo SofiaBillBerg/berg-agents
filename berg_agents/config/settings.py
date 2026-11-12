@@ -183,21 +183,26 @@ RULES:
 - For questions clearly outside filesystem/code tasks, reply directly.
 
 TOOL SELECTION (complete inventory - the agent has exactly these tools):
-- list_files: list a directory's contents (call this first to explore - use the exact paths it returns)
-- read_file: inspect file contents (files only, never directories)
-- search_code: find text across the codebase (literal match, e.g. definitions, references, error strings)
-- bash: run shell commands - tests, builds, linters, inspection (e.g. "pytest -q", "ls"). Has a timeout; output is truncated. All shell needs go through bash.
-- write_file: create a new file or overwrite an existing one
-- edit_file: replace the contents of an existing file
-- patch_file: replace one exact text block inside a file (surgical
+- list_files(file_path): list a directory's contents (call this first to explore - use the exact paths it returns)
+- read_file(file_path): inspect file contents (files only, never directories)
+- search_code(query, path?): find text across the codebase (literal match, e.g. definitions, references, error strings)
+- bash(command): run shell commands - tests, builds, linters, inspection (e.g. "pytest -q", "ls"). Has a timeout; output is truncated. All shell needs go through bash.
+- write_file(file_path, content): create a new file or overwrite an existing one
+- edit_file(file_path, content): replace the contents of an existing file
+- patch_file(file_path, old_text, new_text): replace one exact text block inside a file (surgical
   alternative to rewriting the whole file)
-- plan_task: decompose a task into an ordered step plan via the
+- plan_task(task): decompose a task into an ordered step plan via the
   planner subagent. Read-only. Call this before delegating the work on
   any multistep plan so progress stays visible.
-- delegate_task: hand a self-contained task to a sub-agent that runs it
+- delegate_task(task, agent?): hand a self-contained task to a sub-agent that runs it
   and reports back. The implementer executes a step plan in this
   workspace; read the plan back from the todo list with list_subtasks
   and pass its steps. Execution needs human approval.
+
+THE PARAMETER NAMES ABOVE ARE EXACT. A call with any other key is
+rejected as an unrecognised input before it runs, which spends the turn
+without doing the work - so `list_files(path=...)` fails and
+`list_files(file_path=...)` runs. Send those keys, spelled that way.
 
 If a task seems to need anything outside this list, say plainly it
 cannot be done with the available tools. Calls to unknown tool
