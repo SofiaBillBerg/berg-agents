@@ -44,7 +44,7 @@ from vercel import workflow
 
 async def _stream_pass(
     *, chain: list[str], build_agent: Any, events: Any, writable: Any
-) -> tuple[int, BaseException | None]:
+) -> tuple[int, BaseException | None, str | None]:
     """Stream one pass, moving down the tier when a model fails.
 
     Kept out of ``run_pass`` as its own pass so that function stays within the
@@ -59,7 +59,9 @@ async def _stream_pass(
 
     :param chain: Models to try, in order. Empty means nothing to run.
     :param build_agent: Model id to an agent bound to it.
-    :param events: Agent and result-holder to its event iterator.
+    :param events: Zero-argument factory of the event iterator. It reads the
+        rebound ``agent`` closure variable, so building before calling it is
+        what selects the candidate.
     :param writable: The turn's durable frame stream.
     :return: Frames written, the last error when every candidate failed, and
         which model produced the committed frames (None when none did).
@@ -72,9 +74,8 @@ async def _stream_pass(
         buffered: list[Any] = []
         failed = False
         try:
-            async for frame in encode_run_stream(
-                events(build_agent(candidate), seen)
-            ):
+            build_agent(candidate)
+            async for frame in encode_run_stream(events()):
                 buffered.append(frame)
                 if '"finishReason":"error"' in str(frame):
                     failed = True
@@ -235,14 +236,18 @@ async def run_pass(
     chain = failover_chain(model_id) or ([model_id] if model_id else [])
 
     def _agent_for(candidate: str) -> Any:
-
-        return build_chat_agent(
+        # Assigns to the enclosing `agent`, rather than only returning one:
+        # `_events` reads that variable, so a failover candidate must rebind it
+        # or every retry would rerun the model that just failed.
+        nonlocal agent
+        agent = build_chat_agent(
             candidate,
             root_dir=root_dir,
             active_agent=active_agent,
             active_agent_description=active_agent_description,
             plugin_tools=plugin_tools,
         )
+        return agent
 
     agent = _agent_for(model_id) if model_id else None
     kwargs: dict[str, Any] = {
@@ -284,6 +289,8 @@ async def run_pass(
         whole pass — feeding it per event duplicates the wire. It also records
         the outcome it saw, so the pass is walked once and not twice.
         """
+        # `agent` is the closure variable rebound by the failover loop below,
+        # so each candidate's iterator runs against the agent built for it.
         async with agent.iter(prompt, **kwargs) as run:
             node = run.next_node
             while not _is_end(node):
@@ -296,7 +303,7 @@ async def run_pass(
             seen["messages"] = run.all_messages()
             yield _run_result_event(seen["result"])
 
-    frames, last_error = await _stream_pass(
+    frames, last_error, produced_by = await _stream_pass(
         chain=chain, build_agent=_agent_for, events=_events, writable=writable
     )
     if last_error is not None:
@@ -321,7 +328,10 @@ async def run_pass(
     return {
         "history": _dump_messages(seen["messages"]),
         "pending": pending,
-        "frames": frames}
+        "frames": frames,
+        # Which model produced these frames, so a failover reads as "this ran
+        # on the second model" rather than looking like nothing happened.
+        "model": produced_by}
 
 
 def _user_turn(text: str) -> Any:
