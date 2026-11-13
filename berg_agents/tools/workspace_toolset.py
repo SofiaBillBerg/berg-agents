@@ -143,6 +143,8 @@ class WorkspaceToolset(WrapperToolset[None]):
         """
         from pydantic_ai.toolsets import FunctionToolset
 
+        from berg_agents.tools.specs import create_tools
+
         inner: FunctionToolset[None] = FunctionToolset()
         # The planner subagent's read-only tool set: it may ground a plan
         # in the repo it plans for, but the plan itself is written by the

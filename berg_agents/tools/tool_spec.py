@@ -648,6 +648,14 @@ def fill_tool_inventory(prompt: str, specs: Iterable[ToolSpec]) -> str:
     :param specs: The specs the agent was built with.
     :return: The prompt with the placeholder filled, or unchanged.
     """
-    if "{tool_inventory}" not in prompt:
-        return prompt
-    return prompt.replace("{tool_inventory}", render_tool_inventory(specs))
+    # Both forms: the base prompt carries the ESCAPED `{{tool_inventory}}`,
+    # because it is later run through `.format(root_dir=...)` and an unescaped
+    # `{tool_inventory}` makes that call raise KeyError. A caller holding a
+    # prompt that was already formatted sees the plain single-brace form.
+    if "{tool_inventory}" in prompt:
+        return prompt.replace("{tool_inventory}", render_tool_inventory(specs))
+    if "{{tool_inventory}}" in prompt:
+        return prompt.replace(
+            "{{tool_inventory}}", render_tool_inventory(specs)
+        )
+    return prompt

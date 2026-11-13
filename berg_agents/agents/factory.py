@@ -35,8 +35,7 @@ from typing import Any
 from berg_agents.config.settings import DEFAULT_SYSTEM_PROMPT
 from berg_agents.core.checkpoint import Checkpointer
 from berg_agents.core.loop import BergLoop
-from berg_agents.tools.tool_spec import ToolRegistry, ToolSpec, make_tool_spec
-from berg_agents.tools._io import _atomic_write, _normalize_target
+from berg_agents.tools.tool_spec import ToolRegistry, ToolSpec
 
 __all__ = ["DEFAULT_SYSTEM_PROMPT", "build_agent", "build_loop", "create_tools"]
 
@@ -44,14 +43,13 @@ __all__ = ["DEFAULT_SYSTEM_PROMPT", "build_agent", "build_loop", "create_tools"]
 # import every existing caller uses -- keeps working. The definitions moved to
 # berg_agents/tools/specs.py so agents/implementation.py can read the tool
 # inventory without importing this module and closing an import cycle.
+# ToolSpec / RiskClass / make_tool_spec are already imported above; the
+# workspace tool specs themselves live in tools.specs.
 from berg_agents.tools.specs import (  # noqa: F401
-    RiskClass,
-    ToolSpec,
     _normalize_target,
     _resolve_root,
     create_tools,
-    make_tool_spec,
-            )
+)
 
 
 def build_loop(

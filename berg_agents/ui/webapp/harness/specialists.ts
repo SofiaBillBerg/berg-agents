@@ -30,7 +30,7 @@
  * its run on a pause, where berg's Python host ENDS the pass and resumes as a
  * new run. Suspension is what lets the user keep talking to the orchestrator
  * while it waits — and planning *with* the user mid-flight is the orchestrator's
- * whole job (decisions-log, 2026-11-12).
+ * whole job.
  *
  * Never npm here: `berg_agents/ui/webapp` is a bun project.
  */
@@ -67,25 +67,18 @@ export interface SpecialistReport {
 }
 
 /**
- * The absolute origin to reach berg's API from *inside a workflow step*.
+ * The absolute origin to reach berg's PYTHON backend, from inside a workflow
+ * step.
  *
- * `API_BASE` is empty in production on purpose — the browser and the server are
- * same-origin, so a relative `/api/...` is correct there. But `workflow`'s
- * `fetch` runs inside a step and requires an absolute URL; handed a relative
- * path it fails with `Failed to parse URL from /api/agents` (found
- * 2026-11-12, after the step-fetch change: this broke every specialist tool
- * while the page still looked healthy).
- *
- * So: use `API_BASE` when set, otherwise name this server explicitly. The
- * rewrite in `next.config.mjs` sends `/api/*` to Python, so pointing at our own
- * origin goes through that same path and keeps one routing rule.
- *
- * @returns An origin with no trailing slash.
+ * `API_BASE` is empty in production on purpose: the browser and this server are
+ * same-origin, so a relative `/api/...` resolves for the client. `workflow`'s
+ * `fetch` runs inside a step and requires an absolute URL, so the origin has to
+ * be named here instead.
  */
 function backendOrigin(): string {
     if (API_BASE) return API_BASE;
-    const host = process.env.HOSTNAME || "127.0.0.1";
-    const port = process.env.PORT || "3100";
+    const host = process.env.BERG_BACKEND_HOST || "127.0.0.1";
+    const port = process.env.BERG_BACKEND_PORT || "8001";
     return `http://${host}:${port}`;
 }
 
@@ -94,14 +87,12 @@ function backendOrigin(): string {
  *
  * Two deliberate choices here:
  *
- * - **`workflow`'s `fetch`, not the global one.** These calls are made from
- *   inside a workflow function (`WorkflowAgent` tool execution), where the
- *   runtime forbids global `fetch` — it fails with *"Global fetch is
- *   unavailable in workflow functions"*. `workflow`'s own `fetch` is hoisted
- *   into a step, so the call is durable and retried like the rest of the turn.
+ * - **`workflow`'s `fetch`, not the global one.** These calls run inside
+ *   workflow functions (WorkflowAgent tool execution), where the runtime
+ *   forbids global `fetch`. `workflow`'s own `fetch` is hoisted into a step, so
+ *   the call is durable and retried like the rest of the turn.
  * - **`API_BASE` rather than a second base-URL rule.** `envConfig` already
- *   resolves where the Python backend lives (same-origin in production,
- *   `NEXT_PUBLIC_API_BASE_URL` under `next dev`); only the fetch differs.
+ *   resolves where the Python backend lives; only the fetch differs.
  */
 async function call(
     path: string,

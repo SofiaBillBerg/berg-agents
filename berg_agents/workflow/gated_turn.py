@@ -132,11 +132,48 @@ async def run_pass(
     )
     from pydantic_ai.messages import ModelMessagesTypeAdapter
 
+    # The chat route (/api/chat/stream) hands build_chat_agent the
+    # session's plugin tools; this host did not, so every run started through
+    # /api/workflow/chat -- every specialist -- had none. The consequence was
+    # silent and severe: with no plan-store tools, WorkspaceToolset withholds
+    # plan_task and delegate_task (see tools/workspace_toolset.py), so a
+    # specialist had no delegation path at all and could only improvise. The
+    # log line "plan store tools missing (create_todo, add_subtask,
+    # list_subtasks)" is what this fixes.
+    #
+    # Fetched here, inside the step, rather than passed in: plugin tools hold
+    # bound stores and are not serialisable, so they cannot cross the workflow
+    # boundary as arguments -- the same reason the approval route sends plain
+    # decisions instead of tool objects.
+    #
+    # Role is "chat", the documented default for a plugin whose manifest
+    # declares no toolset_roles, and the role that carries the todo plugin's
+    # plan-store tools (verified: chat returns 11 including create_todo,
+    # add_subtask, list_subtasks; "implementation" returns 0).
+    plugin_tools: list[Any] = []
+    try:
+        import logging
+
+        from plugin_system import get_plugin_tools_for
+
+        plugin_tools = list(
+            await get_plugin_tools_for("chat", root_dir=root_dir)
+        )
+    except Exception as exc:  # ruff: ignore[blind-except] - plugin system optional
+        # Local import, not module scope: this module is re-imported inside the
+        # workflow sandbox, which forbids module-level side effects.
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Plugin tools unavailable for this pass: %s", exc
+        )
+
     agent = build_chat_agent(
         model_id,
         root_dir=root_dir,
         active_agent=active_agent,
         active_agent_description=active_agent_description,
+        plugin_tools=plugin_tools,
     )
     kwargs: dict[str, Any] = {
         "deps": AgentDeps(workspace_root=root_dir),

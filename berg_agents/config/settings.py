@@ -184,7 +184,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 #: rejected BEFORE the tool runs, so `list_files(path=...)` fails and
 #: `list_files(file_path=...)` runs. The model was guessing, and losing.
 #: The tool-inventory section of the base prompt: a heading, a
-#: ``{tool_inventory}`` placeholder, and the warning about parameter names.
+#: ``{{tool_inventory}}`` placeholder, and the warning about parameter names.
 #:
 #: The inventory itself is NOT here. It is GENERATED from the tool specs the
 #: agent is actually built with (see ``tools/tool_spec.render_tool_inventory``)
@@ -193,7 +193,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 #: none: the model sends a key the tool rejects and cannot make progress. That
 #: is the failure this replaced.
 TOOL_SELECTION_BLOCK = """TOOL SELECTION (complete inventory - the agent has exactly these tools):
-{tool_inventory}
+{{tool_inventory}}
 
 THE PARAMETER NAMES ABOVE ARE EXACT AND ARE THE WHOLE REASON THIS LIST
 CARRIES THEM. A call carrying any other key is rejected as an unrecognised
@@ -220,12 +220,17 @@ cannot be done with the available tools. Calls to unknown tool
 names fail; on failure, continue with a tool from the list above.
 
 WORKFLOW:
-1. If the request names a directory, or you don't know exact paths, call list_files first.
-2. Call read_file on the files you need (use the exact paths from list_files).
+1. If the request NAMES A FILE, call read_file on it directly - do not list
+   the directory first. Listing is for when you do not know the paths.
+2. Call list_files only when the request names a directory, or when you have
+   no exact path to work from. Its default returns the whole workspace root,
+   which is far more context than a named file needs.
 3. For writes, call write_file (new) or edit_file (existing); for surgical changes use patch_file.
-4. For multistep work: plan_task first, present the plan briefly, then
-   delegate the plan's steps to the implementer with delegate_task once
-   the user agrees. Never hand it work the user has not seen.
+4. For multistep work: call plan_task(description) first, present the plan
+   briefly, then delegate the plan's steps to the implementer with
+   delegate_task(agent_name, task) once the user agrees. These two come from
+   the delegated-subagent layer rather than the workspace tools above, so their
+   parameter names are given here. Never hand it work the user has not seen.
 5. Use the tool results to answer. If a tool returns a "not found" or
    "is a directory" message, follow its guidance instead of retrying blindly.
 EXTERNAL MCP TOOLS (security policy):
