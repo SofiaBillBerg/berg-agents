@@ -46,6 +46,7 @@ class SessionManager:
         active_provider: str = "ollama",
         active_model: str = "",
         active_agent: str | None = None,
+        delegate_model: str = "",
         root_dir: str = ".",
     ) -> None:
         """Initialize session state.
@@ -53,11 +54,19 @@ class SessionManager:
         :param active_provider: Initially selected provider name.
         :param active_model: Initially selected model identifier.
         :param active_agent: Initially selected agent (None = default chat agent).
+        :param delegate_model: Model delegated sub-agents run on. Empty means
+            the tier default from configuration, which is what a delegated run
+            resolved to before the choice existed.
         :param root_dir: Workspace root directory for file tools.
         """
         self.active_provider = active_provider
         self.active_model = active_model
         self.active_agent = active_agent
+        # Kept separate from ``active_model`` on purpose: the chat brain's model
+        # and a specialist's model are different choices. Sharing one field made
+        # the specialist's model an invisible side effect of editing the chat
+        # selector, which is not a choice anyone can see.
+        self.delegate_model = delegate_model
         self._root_dir = root_dir
 
     def _harness_root_dir(self) -> str:

@@ -1146,6 +1146,7 @@ def _resolve_session_agent(
             active_agent=active_agent,
             active_agent_description=active_agent_description,
             session_id=session_id,
+            delegate_model=getattr(sessions, "delegate_model", "") or None,
         )
     _track_context_usage(agent, session_id)
     if session_id:

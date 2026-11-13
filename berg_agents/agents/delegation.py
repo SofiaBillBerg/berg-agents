@@ -75,7 +75,7 @@ DELEGATE_NAME = "implementation"
 
 
 def build_delegation_capabilities(
-    plan_tools: dict[str, Any] | None = None,
+    plan_tools: dict[str, Any] | None = None, model_id: str | None = None
 ) -> list[Any]:
     """Build the delegation capabilities for the chat agent.
 
@@ -90,6 +90,9 @@ def build_delegation_capabilities(
 
     :param plan_tools: Session-bound plan-store tools, forwarded to the
         implementer exactly as ``_make_implement_task`` forwards them.
+    :param model_id: Model the delegated implementer runs on. None keeps
+        the tier default from configuration, which is what the implementer
+        resolved to before the choice existed; an explicit id overrides it.
     :return: The capability list, or an empty list when delegation is
         unavailable (the staged delegates carry the turn alone).
     """
@@ -142,6 +145,9 @@ def build_delegation_capabilities(
     )
     implementer = build_implementation_agent(
         plugin_tools=list((plan_tools or {}).values()),
+        # None keeps the tier default, so a session that never chose still
+        # behaves exactly as it did; a chosen model takes priority over it.
+        model_id=model_id or None,
         extra_instructions=delegation_instructions,
     )
     return [

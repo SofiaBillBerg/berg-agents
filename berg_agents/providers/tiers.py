@@ -56,7 +56,53 @@ def model_for_complexity(
     level = (complexity or DEFAULT_COMPLEXITY).strip().lower()
     if level not in COMPLEXITY_LEVELS:
         level = DEFAULT_COMPLEXITY
-    models = (
-        ((cfg.get("model_routing") or {}).get("models") or {}).get(level) or {}
-    ).get("models") or []
+    models = _level_models(cfg, level)
     return str(models[0]) if models else None
+
+
+def _level_models(cfg: dict[str, Any], level: str) -> list[str]:
+    """The models one complexity level declares, in order.
+
+    Args:
+        cfg: Plain configuration dictionary.
+        level: Complexity level name.
+
+    Returns:
+        The level's model ids in declaration order, best first.
+    """
+    return [
+        str(model)
+        for model in (
+            ((cfg.get("model_routing") or {}).get("models") or {}).get(level)
+            or {}
+        ).get("models")
+        or []
+    ]
+
+
+def failover_chain(
+    model_id: str | None, cfg: dict[str, Any] | None = None
+) -> list[str]:
+    """The models to try for a run, in order, starting from its own.
+
+    A tier's declared order is the failover order: the first entry is the
+    preference and the rest are the fallbacks, which is the only ordering
+    berg already maintains. A model that appears in no tier — a one-off the
+    caller named explicitly — has no fallback, so its chain is itself alone.
+
+    Args:
+        model_id: The model the run would use first.
+        cfg: Optional plain configuration dictionary.
+
+    Returns:
+        Models to try in order, first being ``model_id`` when it is set.
+    """
+    if cfg is None:
+        cfg = get_settings().model_dump()
+    if not model_id:
+        return []
+    for level in COMPLEXITY_LEVELS:
+        models = _level_models(cfg, level)
+        if model_id in models:
+            return models[models.index(model_id) :]
+    return [model_id]

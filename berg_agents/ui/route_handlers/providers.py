@@ -27,8 +27,11 @@ from typing import Any
 
 from berg_agents.ui.schemas import (
     ActiveProvider,
+    DelegateModel,
+    ModelTier,
     ProviderInfo,
     ProviderListResponse,
+    TierListResponse,
 )
 from berg_agents.ui.sessions import SessionManager
 from fastapi import APIRouter
@@ -48,16 +51,10 @@ def register_provider_routes(
     async def list_providers() -> ProviderListResponse:
         """List all configured provider/model pairs, as of THIS request.
 
-        Resolved per request rather than from the list ``create_app`` built at
-        startup: a config edit (adding a model, renaming a tag) used to be
-        invisible until the server restarted, which read as "berg ignores my
-        config" when it had only read it once. Sofia hit this on 2026-11-12 —
-        the webapp kept showing a stale ``:12b`` tag after the config moved to
-        ``:latest``, and only a restart fixed it, which is not a reasonable
-        answer to "why is my new model not in the list".
-
-        The active pair stays on the session (that IS state), but the catalog
-        is configuration, so it is read fresh.
+        Read fresh per request rather than from the list ``create_app`` built at
+        startup, so a config edit — a new model, a renamed tag — is visible
+        without a restart. The active pair stays on the session (that is state);
+        the catalog is configuration.
 
         :return: Provider list response.
         """
@@ -65,9 +62,8 @@ def register_provider_routes(
         from berg_agents.providers.registry import list_models
 
         # ``Settings()``, not ``get_settings()``: get_settings is @lru_cache, so
-        # it would hand back the SAME object forever and this endpoint would
-        # still answer from the boot-time read. Constructing fresh is what makes
-        # the edit visible without a restart.
+        # it hands back the same object forever. Constructing fresh is what
+        # makes the edit visible without a restart.
         settings = Settings()
         # An explicit ``provider_list`` override still wins, exactly as
         # ``create_app`` resolves it — one rule, not two.
@@ -89,6 +85,31 @@ def register_provider_routes(
             providers=[ProviderInfo(**item) for item in pairs]
         )
 
+    @router.get("/api/tiers")
+    async def list_tiers() -> TierListResponse:
+        """List the routing tiers and the models each offers, best first.
+
+        Read from configuration, as ``/api/providers`` is: a tier list is edited
+        in ``bergagents.jsonc`` and should be visible without a restart. This is
+        what makes tier routing steerable from the UI rather than something only
+        the config file decides — a delegated sub-agent resolves its model from
+        these lists, and until now nothing surfaced which one it would get.
+
+        :return: The tiers, in the order configuration declares them.
+        """
+        from berg_agents.config.settings import Settings
+
+        settings = Settings()
+        routing = settings.model_routing or {}
+        tiers = [
+            ModelTier(
+                name=str(tier),
+                models=[str(model) for model in (cfg or {}).get("models", [])],
+            )
+            for tier, cfg in routing.get("models", {}).items()
+        ]
+        return TierListResponse(tiers=tiers)
+
     @router.get("/api/providers/active")
     async def get_active_provider() -> ActiveProvider:
         """Get the currently active provider/model pair.
@@ -109,3 +130,28 @@ def register_provider_routes(
         sessions.active_provider = selection.provider
         sessions.active_model = selection.model
         return selection
+
+    @router.get("/api/providers/delegate")
+    async def get_delegate_model() -> DelegateModel:
+        """Read the model delegated sub-agents run on.
+
+        Empty means the tier default from configuration is still in charge, so a
+        caller can tell "explicitly set to X" from "not chosen yet".
+
+        :return: The chosen model, or empty when the tier default applies.
+        """
+        return DelegateModel(model=sessions.delegate_model)
+
+    @router.post("/api/providers/delegate")
+    async def set_delegate_model(selection: DelegateModel) -> DelegateModel:
+        """Choose the model delegated sub-agents run on.
+
+        An empty string clears the choice, handing the model back to the tier
+        default. Cleared rather than rejected, because "not chosen" is a real
+        state worth being able to return to.
+
+        :param selection: Model to run delegated sub-agents on.
+        :return: The activated model.
+        """
+        sessions.delegate_model = selection.model.strip()
+        return DelegateModel(model=sessions.delegate_model)

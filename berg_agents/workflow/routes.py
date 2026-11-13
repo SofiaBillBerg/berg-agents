@@ -435,8 +435,15 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         from berg_agents.workflow.gated_turn import gated_turn as turn_workflow
 
         sessions = request.app.state.sessions
+        # Order matters: an explicit model from the caller wins, then the model
+        # chosen for delegated work, then the chat session's model. The middle
+        # rung is what lets a specialist run on a chosen model without the
+        # orchestrator having to know about the choice.
         model_id = (
-            request.query_params.get("model") or sessions.active_model or ""
+            request.query_params.get("model")
+            or getattr(sessions, "delegate_model", "")
+            or sessions.active_model
+            or ""
         )
         # The session's own root dir, exactly as the chat path reads it.
         root_dir = str(sessions._harness_root_dir())

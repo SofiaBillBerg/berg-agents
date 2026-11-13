@@ -37,7 +37,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 /** What the page needs to render and drive the orchestrator. */
 export interface UseOrchestratorChatReturn {
@@ -57,6 +57,10 @@ export interface UseOrchestratorChatReturn {
     pendingApprovals: PendingApprovalRequest[];
     /** Answer one: let the paused call run, or refuse it. */
     answerApproval: (approvalId: string, approved: boolean) => void;
+    /** The model this run's brain is using. */
+    model: string;
+    /** Choose which model the orchestrator itself runs on. */
+    setModel: (model: string) => void;
 }
 
 /** One paused tool call, as the page needs it to ask the user. */
@@ -79,6 +83,14 @@ export function useOrchestratorChat(): UseOrchestratorChatReturn {
     // React does not — the callback fires outside render. State (not a ref) is
     // what makes the page re-render with the id once it lands.
     const [lastRunId, setLastRunId] = useState<string | null>(null);
+    // Which brain this conversation runs on. Empty means the configured
+    // default, so a user who never chooses behaves as before.
+    const [model, setModel] = useState<string>("");
+    // The chosen model, readable by a callback created in an earlier render:
+    // a transport callback captures one render's closures, so the ref is what
+    // keeps the latest choice reachable.
+    const modelRef = useRef<string>("");
+    modelRef.current = model;
 
     const {messages, sendMessage, status, error, stop, addToolApprovalResponse} =
         useChat({
@@ -87,6 +99,18 @@ export function useOrchestratorChat(): UseOrchestratorChatReturn {
             // API_BASE. Under the `/api/*` proxy this path is explicitly NOT
             // forwarded to Python — filesystem routes win rewrites.
             api: "/api/orchestrator",
+            /**
+             * Carry the chosen model with every send.
+             *
+             * Read from the ref rather than closed over, because a model picked
+             * mid-conversation must reach the NEXT send, not the one this
+             * callback was created during.
+             *
+             * @param options - The transport's send description.
+             * @returns The request body, model included.
+             */
+            prepareSendMessagesRequest: ({messages: toSend}) => ({
+                body: {messages: toSend, model: modelRef.current}}),
             /**
              * Adopt the workflow run id from the response.
              *
@@ -194,5 +218,7 @@ export function useOrchestratorChat(): UseOrchestratorChatReturn {
         stop,
         lastRunId,
         pendingApprovals,
-        answerApproval};
+        answerApproval,
+        model,
+        setModel};
 }

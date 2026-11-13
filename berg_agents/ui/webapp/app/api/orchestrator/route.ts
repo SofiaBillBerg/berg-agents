@@ -40,28 +40,34 @@ import {orchestratorTurn} from "@/workflows/orchestrator-turn";
  * `localModel` rather than a provider built here, because a `WorkflowAgent`
  * runs each model call as its own step and the model crosses that boundary as
  * data. The AI SDK's own providers serialize their config and lose `baseURL`
- * and the request `url` builder along the way (verified: both
- * `@ai-sdk/openai` and `@ai-sdk/openai-compatible` come back unable to make a
- * call), so the model has to carry plain strings and rebuild itself. berg's
- * endpoint is its own ollama — never a hosted gateway.
+ * and the request `url` builder along the way, so the model here carries plain
+ * strings and rebuilds itself. berg's endpoint is its own ollama — never a
+ * hosted gateway.
  *
+ * @param modelId - Chosen model, or undefined for the configured default.
  * @returns A model bound to berg's local endpoint, serializable across steps.
  */
-function orchestratorModel() {
-    return localModel();
+function orchestratorModel(modelId?: string) {
+    return localModel(modelId ? {modelId} : undefined);
 }
 
 /**
  * POST /api/orchestrator
  *
- * @param request - JSON body with `messages` (the UI's conversation).
+ * @param request - JSON body with `messages` (the UI's conversation) and an
+ *   optional `model` naming the brain this turn runs on.
  * @returns A UI message stream, and the run id for reconnection.
  */
 export async function POST(request: Request): Promise<Response> {
-    const body = (await request.json()) as { messages?: UIMessage[] };
+    const body = (await request.json()) as {
+        messages?: UIMessage[];
+        model?: string;
+    };
     const messages = Array.isArray(body.messages) ? body.messages : [];
 
-    const run = await start(orchestratorTurn, [messages, orchestratorModel()]);
+    const run = await start(orchestratorTurn, [
+        messages,
+        orchestratorModel(body.model?.trim() || undefined)]);
 
     return createUIMessageStreamResponse({
         stream: run.readable.pipeThrough(createModelCallToUIChunkTransform()),

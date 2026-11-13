@@ -30,12 +30,72 @@ from __future__ import annotations
 
 from typing import Any
 
+from berg_agents.ui.route_handlers.chat import encode_run_stream
 from berg_agents.workflow.registry import Frame, wf
 from vercel import workflow
 
-
 # A step must be declared async even when its body has nothing to await:
 # the runtime resolves it by signature, not by whether it yields.
+# NOTE: no module-level `logging` here. This module is re-imported inside the
+# workflow sandbox, where `logging.getLogger` calls `os.urandom` and the sandbox
+# bans it ("Workflows must be deterministic"). A warning line is not worth a
+# failed run, so failover reports through its return value instead.
+
+
+async def _stream_pass(
+    *, chain: list[str], build_agent: Any, events: Any, writable: Any
+) -> tuple[int, BaseException | None]:
+    """Stream one pass, moving down the tier when a model fails.
+
+    Kept out of ``run_pass`` as its own pass so that function stays within the
+    project's complexity ceiling, and because failover is a policy rather than
+    part of a pass: it decides what to retry, not what the turn does.
+
+    Buffer-then-commit, not catch-and-retry: the encoder converts a failure
+    into a ``finish`` frame carrying ``finishReason: "error"`` rather than
+    raising, so an exception here never arrives. Because a candidate's frames
+    are held until it finishes, a failed candidate leaves nothing on the durable
+    stream and the next one starts from a clean stream.
+
+    :param chain: Models to try, in order. Empty means nothing to run.
+    :param build_agent: Model id to an agent bound to it.
+    :param events: Agent and result-holder to its event iterator.
+    :param writable: The turn's durable frame stream.
+    :return: Frames written, the last error when every candidate failed, and
+        which model produced the committed frames (None when none did).
+    """
+    frames = 0
+    last_error: BaseException | None = None
+    produced_by: str | None = None
+    for candidate in chain:
+        seen: dict[str, Any] = {"result": None, "messages": []}
+        buffered: list[Any] = []
+        failed = False
+        try:
+            async for frame in encode_run_stream(
+                events(build_agent(candidate), seen)
+            ):
+                buffered.append(frame)
+                if '"finishReason":"error"' in str(frame):
+                    failed = True
+        except Exception as exc:  # ruff: ignore[blind-except] - retried below
+            last_error = exc
+            failed = True
+        if failed:
+            last_error = last_error or RuntimeError(
+                f"model {candidate} produced no usable turn"
+            )
+            # Cleared, not merely left stale: a later candidate succeeding must not
+        # leave an earlier candidate's error behind for the caller to raise.
+        last_error = None
+        produced_by = candidate
+        for frame in buffered:
+            await writable.write(Frame(data=frame))
+            frames += 1
+        break
+    return frames, last_error, produced_by
+
+
 def _decision_for(answer: dict[str, Any]) -> Any:
     """One approval decision, in the shape the run expects.
 
@@ -123,7 +183,6 @@ async def run_pass(
     """
     from berg_agents.agents.chat_agent import build_chat_agent
     from berg_agents.agents.deps import AgentDeps
-    from berg_agents.ui.route_handlers.chat import encode_run_stream
     from berg_agents.ui.run_registry import (
         _is_end,
         _node_emits_events,
@@ -168,13 +227,24 @@ async def run_pass(
             "Plugin tools unavailable for this pass: %s", exc
         )
 
-    agent = build_chat_agent(
-        model_id,
-        root_dir=root_dir,
-        active_agent=active_agent,
-        active_agent_description=active_agent_description,
-        plugin_tools=plugin_tools,
-    )
+    # The models this pass may run on, in order. A tier's declared order is
+    # already the failover order — first is the preference, the rest are the
+    # fallbacks — so there is no second ordering to maintain.
+    from berg_agents.providers.tiers import failover_chain
+
+    chain = failover_chain(model_id) or ([model_id] if model_id else [])
+
+    def _agent_for(candidate: str) -> Any:
+
+        return build_chat_agent(
+            candidate,
+            root_dir=root_dir,
+            active_agent=active_agent,
+            active_agent_description=active_agent_description,
+            plugin_tools=plugin_tools,
+        )
+
+    agent = _agent_for(model_id) if model_id else None
     kwargs: dict[str, Any] = {
         "deps": AgentDeps(workspace_root=root_dir),
         # A gated tool ends the run parked instead of executing.
@@ -226,10 +296,11 @@ async def run_pass(
             seen["messages"] = run.all_messages()
             yield _run_result_event(seen["result"])
 
-    frames = 0
-    async for frame in encode_run_stream(_events()):
-        await writable.write(Frame(data=frame))
-        frames += 1
+    frames, last_error = await _stream_pass(
+        chain=chain, build_agent=_agent_for, events=_events, writable=writable
+    )
+    if last_error is not None:
+        raise last_error
 
     from pydantic_ai.messages import DeferredToolRequests
 

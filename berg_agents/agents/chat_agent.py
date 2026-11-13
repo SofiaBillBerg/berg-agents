@@ -99,6 +99,7 @@ def build_chat_agent(
     active_agent: str | None = None,
     active_agent_description: str | None = None,
     session_id: str | None = None,
+    delegate_model: str | None = None,
     instructions: str | None = None,
     spec: Any | None = None,
 ) -> Any:
@@ -229,7 +230,10 @@ def build_chat_agent(
     # run dies at the retry limit. State the contract explicitly, taken from
     # the harness constants so the text cannot drift from what is enforced.
     try:
-        from pydantic_ai_harness.ask_user._types import (
+        # Private module: these constants are not re-exported publicly, and
+        # binding the prompt to them is what stops the text drifting from what
+        # the harness actually enforces.
+        from pydantic_ai_harness.ask_user._types import (  # ruff: ignore[import-private-name]
             MAX_HEADER_LENGTH,
             MAX_OPTIONS,
             MAX_QUESTION_LENGTH,
@@ -255,8 +259,10 @@ def build_chat_agent(
             "keys are rejected. Ask in prose instead of calling the tool when "
             "a short clarifying sentence would do."
         )
-    except Exception:  # NOTE: never let prompt text break agent build.
-        pass
+    except Exception as exc:  # NOTE: never let prompt text break agent build.
+        # Logged, not swallowed in silence: a silent failure here leaves the
+        # model with no ask_user contract and no sign of why.
+        logger.warning("ask_user contract unavailable: %s", exc)
 
     def write_shared_context(section: str, content: str, why: str) -> str:
         """Overwrite a shared-context section (project scope).
@@ -441,7 +447,9 @@ def build_chat_agent(
     # delegates on purpose (phase 1 of the migration): the hand-rolled
     # implement_task is retired only once this path is verified live.
     agent_kwargs["capabilities"].extend(
-        build_delegation_capabilities(plan_tools)
+        build_delegation_capabilities(
+            plan_tools, model_id=delegate_model or None
+        )
     )
     # A delegated implementer's writes are ungated, so the gate is on the
     # delegation itself - the one the staged implement_task carried.

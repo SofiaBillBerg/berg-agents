@@ -26,14 +26,15 @@
  * specialists that run as their own durable tasks in berg's Python backend.
  *
  * Deliberately minimal for now. It shows the conversation, the tool activity as
- * it happens, and the workflow run id — because an honest surface tells you
- * which run you are talking to. Rich rendering (specialist cards, gates you
- * answer inline) belongs in a later slice, built on what this proves.
+ * it happens, which brain it is running on, and the workflow run id — because
+ * an honest surface tells you which run and which model you are talking to.
+ * Rich rendering (specialist cards, gates you answer inline) belongs in a later
+ * slice, built on what this proves.
  */
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { API_BASE } from "@/envConfig";
 import { toChatMessage } from "@/harness/messageParts";
@@ -47,6 +48,12 @@ import { PluginCatalog } from "../components/PluginCatalog.tsx";
 import { PluginUISurface } from "../plugins/PluginUISurface.tsx";
 import { ProviderSelector } from "../components/ProviderSelector.tsx";
 import { usePluginSurface } from "../hooks/usePluginSurface";
+
+/** One routing tier and the models it offers, best first. */
+interface Tier {
+    name: string;
+    models: string[];
+}
 
 /**
  * Pull the plain text out of a UI message.
@@ -93,8 +100,13 @@ export default function OrchestratorPage() {
         stop,
         lastRunId,
         pendingApprovals,
-        answerApproval} = useOrchestratorChat();
+        answerApproval,
+        model,
+        setModel} = useOrchestratorChat();
     const [input, setInput] = useState("");
+    // The routing tiers, so the orchestrator's brain is a choice rather than
+    // an environment variable.
+    const [tiers, setTiers] = useState<Tier[]>([]);
 
     // The same side-surface machinery the chat page uses — one hook, so todos
     // and plugin surfaces behave identically here. It wants berg's ChatMessage
@@ -105,6 +117,25 @@ export default function OrchestratorPage() {
         () => messages.map((message) => toChatMessage(message)),
         [messages],
     );
+    // Loaded once, from berg's own endpoint: a tier list is configuration, and
+    // editing it should be visible without a rebuild.
+    useEffect(() => {
+        let alive = true;
+        void (async () => {
+            try {
+                const response = await fetch(`${API_BASE}/api/tiers`);
+                if (!response.ok) return;
+                const data = (await response.json()) as {tiers?: Tier[]};
+                if (alive) setTiers(data.tiers ?? []);
+            } catch {
+                // No tiers leaves the selector on its default, which is the
+                // behaviour before tiers were visible at all.
+            }
+        })();
+        return () => {
+            alive = false;
+        };
+    }, []);
     const {
         sidePluginId,
         setSidePluginId,
@@ -228,6 +259,28 @@ export default function OrchestratorPage() {
                         <span className="flex-1" />
                         <AgentSelector />
                         <ProviderSelector />
+                        {/* Which brain the orchestrator itself runs on. Grouped
+                            by tier so the ordering berg configures is visible,
+                            not just a flat list of names. */}
+                        <select
+                            aria-label="Orchestrator model"
+                            className="rounded border border-current/20 bg-transparent px-2 py-1 text-sm"
+                            onChange={(event) => setModel(event.target.value)}
+                            value={model}
+                        >
+                            <option value="">
+                                default ({tiers.flatMap((t) => t.models)[0] ?? "configured"})
+                            </option>
+                            {tiers.map((tier) => (
+                                <optgroup key={tier.name} label={tier.name}>
+                                    {tier.models.map((name) => (
+                                        <option key={name} value={name}>
+                                            {name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                        </select>
                         <button
                             className="rounded border border-current/30 px-2 py-1 text-xs"
                             type="button"

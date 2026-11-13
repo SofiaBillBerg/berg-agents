@@ -43,10 +43,29 @@ class ProviderListResponse(BaseModel):
     providers: list[ProviderInfo]
 
 
+class ModelTier(BaseModel):
+    """One routing tier and the models it offers, best first."""
+
+    name: str
+    models: list[str]
+
+
+class TierListResponse(BaseModel):
+    """Response from GET /api/tiers."""
+
+    tiers: list[ModelTier]
+
+
 class ActiveProvider(BaseModel):
     """Currently active provider/model pair."""
 
     provider: str
+    model: str
+
+
+class DelegateModel(BaseModel):
+    """The model delegated sub-agents run on."""
+
     model: str
 
 
