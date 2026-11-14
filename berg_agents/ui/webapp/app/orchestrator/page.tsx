@@ -196,7 +196,12 @@ export default function OrchestratorPage() {
                 was a bare screen with no way back — reported 2026-11-12. */}
             <Navbar />
             <div className="min-h-0 flex-1 overflow-y-auto">
-                <div className="mx-auto flex h-full max-w-3xl flex-col gap-4 p-6">
+                {/* Matches the main chat page (app/App.tsx: `w-full
+                    max-w-[95vw]`), which this page is the sibling of: a
+                    transcript plus a composer. `max-w-3xl` capped it at 768px —
+                    about a third of a wide screen — leaving the rest of the
+                    viewport empty next to a chat surface that wants the room. */}
+                <div className="mx-auto flex h-full w-full max-w-[95vw] flex-col gap-4 p-6">
                     <header className="flex items-baseline justify-between gap-4">
                         <div>
                             <h1 className="text-lg font-semibold">Orchestrator</h1>
