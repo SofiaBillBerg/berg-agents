@@ -99,6 +99,25 @@ bun-install: ## Install bun dependencies for Berg-Agents UI
 build-ui: bun-install ## Use bun to build the frontend for Berg-Agents UI
 	@echo "Building Berg-Agents UI (proxying /api/* to $(BERG_BACKEND_URL))"
 	@BERG_BACKEND_URL=$(BERG_BACKEND_URL) bun --cwd berg_agents/ui/webapp next build
+	@$(MAKE) --no-print-directory record-ui-port
+
+#: Where the UI build records the backend port its proxy destination was baked
+#: with. `next start` reads that destination from the build rather than from the
+#: environment (verified: exporting a different BERG_BACKEND_URL at run time
+#: changes nothing), so a build made for one port keeps proxying to it after
+#: another port is configured — the UI then reports ECONNREFUSED against a port
+#: nothing listens on. This file is the record that lets run-ui notice.
+UI_BUILD_PORT_FILE := berg_agents/ui/webapp/.next/berg-backend-port
+
+record-ui-port: ## Record which backend port the UI build proxies to
+	@# After the build, never before: the record lives inside .next, which a
+	@# build may replace. Both entry points build the UI (this Makefile and
+	@# install_and_run.sh), so the recording is one target they both call.
+	@if [ ! -d berg_agents/ui/webapp/.next ]; then \
+		echo "No .next to record — run 'make build-ui' first"; exit 1; \
+	fi
+	@printf '%s\n' "$(BERG_BACKEND_PORT)" > "$(UI_BUILD_PORT_FILE)"
+	@echo "Recorded: this build proxies /api/* to :$(BERG_BACKEND_PORT)"
 
 
 tsc-lint:  ## Use bun to lint the Berg-Agents UI
@@ -184,6 +203,20 @@ run-backend: ## Start only the Python backend (API, sessions, specialists)
 
 run-ui: ## Start only the Next UI (expects the backend already running)
 	@echo "Starting the Berg-Agents UI on port $(BERG_UI_PORT)"
+	@# The proxy destination lives in the build, not the environment, so a build
+	@# baked for another port must be rebuilt rather than served. Production
+	@# only: `next dev` (run-ui-dev) re-reads the config per request and needs no
+	@# such check — which is why the dev targets are left alone here.
+	@if [ -f "$(UI_BUILD_PORT_FILE)" ]; then \
+		baked=$$(cat "$(UI_BUILD_PORT_FILE)"); \
+		if [ "$$baked" != "$(BERG_BACKEND_PORT)" ]; then \
+			echo "This UI build proxies to :$$baked but the backend is on :$(BERG_BACKEND_PORT) — rebuilding."; \
+			$(MAKE) BERG_BACKEND_PORT=$(BERG_BACKEND_PORT) build-ui; \
+		fi; \
+	else \
+		echo "No UI build record at $(UI_BUILD_PORT_FILE) — building once so the proxy target is known."; \
+		$(MAKE) BERG_BACKEND_PORT=$(BERG_BACKEND_PORT) build-ui; \
+	fi
 	@bun --cwd berg_agents/ui/webapp next start -p $(BERG_UI_PORT)
 
 run-ui-dev: ## Start only the Next UI in dev mode (hot reload)
@@ -207,8 +240,14 @@ run-frontend-dev: ## Start the Next UI in dev mode, proxying to the :8007 backen
 	@echo "Starting Berg Agents UI dev server on port $(BERG_UI_PORT), backend on :8007"
 	@BERG_BACKEND_URL=http://127.0.0.1:8007 bun --cwd berg_agents/ui/webapp next dev -p $(BERG_UI_PORT)
 
-run-berg-agents-dev: ## Dev environment: Python backend + Next dev server, hot reload on both
+run-berg-agents-dev: postgres-start ## Dev environment: Python backend + Next dev server, hot reload on both
 	@echo "Starting Berg Agents Dev Environment — open http://localhost:$(BERG_UI_PORT)"
+	@# postgres-start FIRST, as in run-berg-agents-web: the Next server loads the
+	@# workflow world's instrumentation hook at boot, and without berg's database
+	@# on :5434 the dev server exits with code 1 right after printing "Ready".
+	@# Dev reads its config per request rather than baking it into a build, so the
+	@# backend port comes from the environment here and no build record is
+	@# involved — which is why this target needs no stale-build check.
 	@BERG_BACKEND_URL=http://127.0.0.1:8007 $(MAKE) -j 2 run-frontend-dev run-backend-dev
 stop-berg-agents: ## Find process that might be related to the Berg-Agents web-ui, list then and let the user chose
 					# which ones to stop, if any

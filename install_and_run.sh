@@ -175,6 +175,14 @@ if [ -d "$UI_DIR" ]; then
                 echo "❌ 'bun run next build' failed"
                 exit 1
         }
+        # Record which port this build proxies to, through the Makefile's own
+        # target so the recording is one place, not two. Without it a later
+        # `make run-berg-agents-web` (which bakes :8001) would serve this build
+        # and silently proxy to a port nothing listens on.
+        make --no-print-directory record-ui-port BERG_BACKEND_PORT="$bergport" || {
+                echo "❌ Could not record the UI build's backend port"
+                exit 1
+        }
         cd "$PROJECT_ROOT"
 else
         echo "❌ Frontend directory not found at $UI_DIR"
