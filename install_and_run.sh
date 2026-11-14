@@ -51,6 +51,23 @@ else
         }
 fi
 
+# 2b. Start berg's own PostgreSQL: the orchestrator's durable world.
+#
+# The TS orchestrator keeps its runs in PostgreSQL via `@workflow/world-postgres`
+# (see berg_agents/ui/webapp/workflow-data-dir.mjs), so without the cluster the
+# UI loads but nothing an orchestrator run produces survives. The Makefile owns
+# the cluster — initdb, pg_ctl, port and schema bootstrap — so this calls that
+# target rather than duplicating it, and its postgres-start is idempotent.
+if ! command -v make >/dev/null 2>&1; then
+        echo "⚠️  'make' not found on PATH — skipping PostgreSQL. The orchestrator needs it: run 'make postgres-start' from the repo root."
+else
+        echo "▶ Starting PostgreSQL (the orchestrator's durable world)..."
+        make postgres-start || {
+                echo "❌ PostgreSQL failed to start — the orchestrator cannot run without it"
+                exit 1
+        }
+fi
+
 # 3. Find a free port
 find_free_port() {
         local start_port=$1

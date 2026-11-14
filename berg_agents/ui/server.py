@@ -335,9 +335,19 @@ def create_app(
             "/", StaticFiles(directory=_WEB_DIST, html=True), name="webapp"
         )
     else:
-        logger.warning(
-            "Web UI not built (%s missing); API only. Run "
-            "'bun run next build' in berg_agents/ui/webapp/.",
+        # The steady state, not a failure. The UI is served by its own Next
+        # server (default http://localhost:3100) because `output: "export"`
+        # is gone from next.config.mjs — the Workflow runtime needs server
+        # routes and a static export cannot host them. So dist/ has no
+        # index.html, the condition above is false by design, and this branch
+        # runs on every start. Logged at info: a warning here reads like a
+        # broken install when nothing is wrong. Nothing to fix; this mount is
+        # only the fallback shape if the UI returns to FastAPI.
+        logger.info(
+            "The web UI is served by its own Next server (default "
+            "http://localhost:3100), not by this API. berg's static-UI mount "
+            "is deprecated and inert: %s is expected, because the static "
+            "export was replaced by a real Next server.",
             _WEB_DIST / "index.html",
         )
 

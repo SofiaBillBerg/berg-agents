@@ -66,12 +66,24 @@ postgres-start: postgres-init ## Start berg's PostgreSQL (skipped if already lis
 		$(BERG_PG_BIN)/pg_isready -h 127.0.0.1 -p $(BERG_PG_PORT) || { tail -5 "$(BERG_PG_TMP)/postgres.log"; exit 1; }; \
 	fi
 	@# Idempotent: safe on every run, and required before the world's first run.
-	@psql "postgres://world:world@localhost:$(BERG_PG_PORT)/world" >/dev/null 2>&1 || \
+	@# `-tAc "select 1"` matters: psql without -c opens an interactive session,
+	@# and its prompt is discarded below, so on a terminal it blocks forever
+	@# waiting for input — the run target then looks like it stops right after
+	@# PostgreSQL starts, with nothing after it.
+	@psql "postgres://world:world@localhost:$(BERG_PG_PORT)/world" -tAc "select 1" >/dev/null 2>&1 || \
 		(echo "Creating role/database world"; \
 		 psql -h 127.0.0.1 -p $(BERG_PG_PORT) -U postgres -d postgres -c "CREATE ROLE world LOGIN PASSWORD 'world';" >/dev/null; \
 		 psql -h 127.0.0.1 -p $(BERG_PG_PORT) -U postgres -d postgres -c "CREATE DATABASE world OWNER world;" >/dev/null)
-	@cd berg_agents/ui/webapp && WORKFLOW_POSTGRES_URL="postgres://world:world@localhost:$(BERG_PG_PORT)/world" \
-		bunx --package @workflow/world-postgres bootstrap >/dev/null 2>&1 && echo "Workflow tables ready"
+	@# Output stays visible on purpose: `>/dev/null 2>&1 && echo` aborts the
+	@# target with no clue why when the bootstrap fails. It is idempotent, so a
+	@# warm run prints only its short progress lines.
+	@if cd berg_agents/ui/webapp && WORKFLOW_POSTGRES_URL="postgres://world:world@localhost:$(BERG_PG_PORT)/world" \
+		bunx --package @workflow/world-postgres bootstrap; then \
+		echo "Workflow tables ready"; \
+	else \
+		echo "Workflow table bootstrap FAILED — the orchestrator has no durable world until this succeeds"; \
+		exit 1; \
+	fi
 
 postgres-stop: ## Stop berg's PostgreSQL
 	@if [ -f "$(BERG_PG_DIR)/postmaster.pid" ]; then \
