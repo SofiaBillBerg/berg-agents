@@ -147,13 +147,14 @@ export bergport=$TARGET_PORT
 # The UI port gets no interactive treatment: Next binds it directly, and a busy
 # one surfaces as a bare EADDRINUSE after every build has already run. Checked
 # here — before those builds — so the message names the port and its holder.
+# `ss`, not `lsof`: this listener is an IPv6 wildcard (*:3100), which lsof does
+# not report — an lsof check here passes while the port is in fact taken.
 UI_PORT="${BERG_UI_PORT:-3100}"
-if lsof -i ":$UI_PORT" >/dev/null 2>&1; then
-        proc_info=$(lsof -i ":$UI_PORT" -sTCP:LISTEN -t | xargs ps -o pid,comm= -p 2>/dev/null | awk '{print "PID: " $1 " (" $2 ")"}')
-        [ -z "$proc_info" ] && proc_info="unknown process"
-        echo "⚠️  UI port $UI_PORT is BUSY by: $proc_info"
-        echo "   The UI is probably already running — open http://localhost:$UI_PORT,"
-        echo "   or stop it first ('make stop-berg-agents') and run this script again."
+if ss -ltn 2>/dev/null | grep -q ":$UI_PORT "; then
+        echo "⚠️  UI port $UI_PORT is BUSY — the UI is probably already running:"
+        ss -ltnp 2>/dev/null | grep ":$UI_PORT " | sed 's/^/    /'
+        echo "    Open http://localhost:$UI_PORT, or stop the old one first"
+        echo "    ('make stop-berg-agents') and run this script again."
         exit 1
 fi
 
