@@ -144,6 +144,19 @@ echo "▶ Checking available ports..."
 check_and_select_port 8001
 export bergport=$TARGET_PORT
 
+# The UI port gets no interactive treatment: Next binds it directly, and a busy
+# one surfaces as a bare EADDRINUSE after every build has already run. Checked
+# here — before those builds — so the message names the port and its holder.
+UI_PORT="${BERG_UI_PORT:-3100}"
+if lsof -i ":$UI_PORT" >/dev/null 2>&1; then
+        proc_info=$(lsof -i ":$UI_PORT" -sTCP:LISTEN -t | xargs ps -o pid,comm= -p 2>/dev/null | awk '{print "PID: " $1 " (" $2 ")"}')
+        [ -z "$proc_info" ] && proc_info="unknown process"
+        echo "⚠️  UI port $UI_PORT is BUSY by: $proc_info"
+        echo "   The UI is probably already running — open http://localhost:$UI_PORT,"
+        echo "   or stop it first ('make stop-berg-agents') and run this script again."
+        exit 1
+fi
+
 # 4. Install and build frontend (Next.js)
 UI_DIR="$PROJECT_ROOT/berg_agents/ui/webapp"
 if [ -d "$UI_DIR" ]; then

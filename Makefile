@@ -155,6 +155,19 @@ make-install-and-run: ## Run bash script install_and_run.sh to build and start B
 run-berg-agents-web: ## Start the WHOLE app: PostgreSQL + Python backend + Next UI, one browser URL
 	@echo "Starting Berg-Agents: postgres :$(BERG_PG_PORT), backend :$(BERG_BACKEND_PORT), UI :$(BERG_UI_PORT)"
 	@echo "Open http://localhost:$(BERG_UI_PORT) in your browser."
+	@# Preflight: a busy port is the one failure that arrives as a bare
+	@# EADDRINUSE from Next or Uvicorn, naming neither the port nor the process
+	@# holding it, after everything else has already started. Checking first
+	@# turns that crash into a sentence that says who to talk to.
+	@busy=0; for port in $(BERG_BACKEND_PORT) $(BERG_UI_PORT); do \
+		if ss -ltn 2>/dev/null | grep -q ":$$port "; then \
+			echo "Port $$port is already in use — Berg-Agents is probably already running:"; \
+			ss -ltnp 2>/dev/null | grep ":$$port " | sed 's/^/    /'; \
+			echo "    Open http://localhost:$(BERG_UI_PORT), or stop the old one with 'make stop-berg-agents'."; \
+			busy=1; \
+		fi; \
+	done; \
+	if [ "$$busy" = "1" ]; then exit 1; fi
 	@# postgres FIRST: the orchestrator's world reads and writes it, and without
 	@# it every orchestration run enqueues into a queue nothing drains — the turn
 	@# appears to start and then goes permanently silent.
