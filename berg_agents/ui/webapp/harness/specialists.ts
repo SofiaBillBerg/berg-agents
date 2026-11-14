@@ -46,6 +46,8 @@ export interface SpecialistRun {
     agentName: string;
     /** The turn token, which is what a steer and a gate answer are keyed on. */
     token: string;
+    /** Which model the route resolved for this run; empty when unknown. */
+    model: string;
 }
 
 /** What a specialist is doing, in the terms a caller acts on. */
@@ -137,7 +139,10 @@ export async function startSpecialist(
     return {
         runId: String(started.run_id ?? ""),
         token: String(started.token ?? ""),
-        agentName};
+        agentName,
+        // The model the route resolved for this run, so the specialist that just
+        // started can be announced with its brain instead of being a black box.
+        model: String(started.model ?? "")};
 }
 
 /** Read what a specialist is doing right now. */
@@ -186,7 +191,10 @@ export async function answerSpecialist(
     return {
         runId: String(answered.run_id ?? ""),
         token: String(answered.token ?? ""),
-        agentName: String(answered.agent_name ?? "")};
+        agentName: String(answered.agent_name ?? ""),
+        // The approval route starts the follow-up run and reports the model
+        // that run got, so a resumed specialist stays announced consistently.
+        model: String(answered.model ?? "")};
 }
 
 /** Send the user's instruction to a specialist's turn. */

@@ -136,6 +136,99 @@ export default function OrchestratorPage() {
             alive = false;
         };
     }, []);
+
+    // Which model the specialists this page delegates to run on. Loaded from
+    // berg's own endpoint and saved back through it, so the choice is the
+    // session's (one place) rather than a second copy living in this page.
+    // Empty means "not chosen": the backend falls back to its tier default,
+    // which is the behaviour before this control existed.
+    const [delegateModel, setDelegateModel] = useState<string>("");
+    useEffect(() => {
+        let alive = true;
+        void (async () => {
+            try {
+                const response = await fetch(`${API_BASE}/api/providers/delegate`);
+                if (!response.ok) return;
+                const data = (await response.json()) as {model?: string};
+                if (alive) setDelegateModel(data.model ?? "");
+            } catch {
+                // Leaving it empty is the default; a failed read must not
+                // pretend a choice was made.
+            }
+        })();
+        return () => {
+            alive = false;
+        };
+    }, []);
+
+    /**
+     * Choose which brain the delegated specialists run on.
+     *
+     * Sent straight to berg rather than held in page state only: the choice
+     * has to reach the Python side, because that is where a specialist run is
+     * started (and where it was already being read from before this control
+     * existed — no second mechanism).
+     *
+     * @param value - The chosen model id, or "" for the backend's default.
+     */
+    async function onDelegateModelChange(value: string): Promise<void> {
+        setDelegateModel(value);
+        try {
+            await fetch(`${API_BASE}/api/providers/delegate`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({model: value})});
+        } catch {
+            // The selection stays as chosen locally; the next save attempt is
+            // the user's, so a failed write must not silently persist.
+        }
+    }
+
+    // Which specialists this conversation has started, and on what. Read out of
+    // the completed `start_specialist` tool calls — the same results the
+    // transcript already renders — so what is announced is what actually
+    // happened, not a restatement of what was requested.
+    const startedSpecialists = useMemo(() => {
+        const rows: {agent: string; model: string; runId: string}[] = [];
+        for (const message of messages) {
+            for (const part of message.parts ?? []) {
+                if (
+                    part.type !== "tool-start_specialist" ||
+                    // "output-available" is the AI SDK's state for a tool call
+                    // that has produced its result — the moment the specialist
+                    // is genuinely running, which is what is worth announcing.
+                    part.state !== "output-available" ||
+                    !part.output
+                ) {
+                    continue;
+                }
+                // The tool's output arrives either as the object the tool
+                // returned or as its JSON text, depending on the transport.
+                let output: Record<string, unknown> = {};
+                if (typeof part.output === "string") {
+                    try {
+                        output = JSON.parse(part.output) as Record<
+                            string,
+                            unknown
+                        >;
+                    } catch {
+                        // Unparseable output still leaves the agent name, which
+                        // the tool call's input carries.
+                    }
+                } else if (typeof part.output === "object") {
+                    output = part.output as Record<string, unknown>;
+                }
+                const agent =
+                    String(output.agentName ?? "") ||
+                    String((part.input as {agent?: string})?.agent ?? "");
+                rows.push({
+                    agent,
+                    model: String(output.model ?? ""),
+                    runId: String(output.runId ?? "")});
+            }
+        }
+        return rows;
+    }, [messages]);
     const {
         sidePluginId,
         setSidePluginId,
@@ -264,6 +357,32 @@ export default function OrchestratorPage() {
                         <span className="flex-1" />
                         <AgentSelector />
                         <ProviderSelector />
+                        {/* Which brain the *specialists* run on — a separate
+                            choice from the orchestrator's own model above, and
+                            saved through berg's delegate endpoint rather than
+                            kept in this page. */}
+                        <select
+                            aria-label="Specialists run on"
+                            className="rounded border border-current/20 bg-transparent px-2 py-1 text-sm"
+                            onChange={(event) => {
+                                void onDelegateModelChange(event.target.value);
+                            }}
+                            title="Which model the delegated specialists run on"
+                            value={delegateModel}
+                        >
+                            <option value="">
+                                specialists: default (tier)
+                            </option>
+                            {tiers.map((tier) => (
+                                <optgroup key={tier.name} label={tier.name}>
+                                    {tier.models.map((name) => (
+                                        <option key={name} value={name}>
+                                            {name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                        </select>
                         {/* Which brain the orchestrator itself runs on. Grouped
                             by tier so the ordering berg configures is visible,
                             not just a flat list of names. */}
@@ -300,6 +419,39 @@ export default function OrchestratorPage() {
                         own flex column so heights match, and a drag divider
                         lets the surface be widened. */}
                     <div className="mb-2 flex min-h-0 flex-1 gap-0">
+                    {/* What has been delegated, and to what — one line per
+                        started specialist, from its actual tool result. A run
+                        used to start silently: the only trace was a tool card
+                        whose output you had to open, and nothing named the
+                        model. Empty until the first specialist starts. */}
+                    {startedSpecialists.length > 0 ? (
+                        <ul className="mb-2 flex flex-wrap items-center gap-2 text-xs opacity-80">
+                            {startedSpecialists.map((row, index) => (
+                                <li
+                                    className="flex items-center gap-1.5 rounded border border-current/20 px-2 py-1"
+                                    key={`${row.runId || row.agent}-${index}`}
+                                >
+                                    <span className="font-medium">
+                                        {row.agent || "specialist"}
+                                    </span>
+                                    {row.model ? (
+                                        <span className="opacity-70">
+                                            on {row.model}
+                                        </span>
+                                    ) : (
+                                        <span className="opacity-70">
+                                            on the tier default
+                                        </span>
+                                    )}
+                                    {row.runId ? (
+                                        <code className="opacity-60">
+                                            {row.runId}
+                                        </code>
+                                    ) : null}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
                     <div className="flex min-w-0 flex-1 flex-col">
                         {/* The real transcript, not a reimplementation: it is
                             what gives chat its Streamdown rendering (markdown,

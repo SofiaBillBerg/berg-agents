@@ -89,7 +89,10 @@ def start_specialist(
     return {
         "run_id": str(started.get("run_id", "")),
         "token": str(started.get("token", token)),
-        "agent_name": agent_name}
+        "agent_name": agent_name,
+        # What the run actually got: the route resolves the model when the
+        # caller does not name one, so this is reported rather than assumed.
+        "model": str(started.get("model", ""))}
 
 
 def _post_json(path: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -398,6 +401,10 @@ async def specialist_report_async(run_id: str) -> dict[str, Any]:
     record = await _outcome_of(run_id)
     report["said"] = _said(record)
     report["did"] = _did(record)
+    # Which model actually produced the turn, read from the pass record the run
+    # wrote — not from what the caller believes it asked for. Top level because
+    # "what did it run on" is a question about the run, not about its raw record.
+    report["model"] = record.get("model") if isinstance(record, dict) else None
     report["frames"] = len(await _transcript_of(run_id))
     report["record"] = record
     return report
