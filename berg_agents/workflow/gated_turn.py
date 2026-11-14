@@ -86,7 +86,8 @@ async def _stream_pass(
             last_error = last_error or RuntimeError(
                 f"model {candidate} produced no usable turn"
             )
-            # Cleared, not merely left stale: a later candidate succeeding must not
+            continue
+        # Cleared, not merely left stale: a later candidate succeeding must not
         # leave an earlier candidate's error behind for the caller to raise.
         last_error = None
         produced_by = candidate
@@ -234,6 +235,10 @@ async def run_pass(
     from berg_agents.providers.tiers import failover_chain
 
     chain = failover_chain(model_id) or ([model_id] if model_id else [])
+
+    # Bound BEFORE the factory, so its `nonlocal agent` has a slot to write
+    # to. Declaring it after would make `nonlocal` a SyntaxError at import.
+    agent: Any = None
 
     def _agent_for(candidate: str) -> Any:
         # Assigns to the enclosing `agent`, rather than only returning one:
