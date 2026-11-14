@@ -102,7 +102,40 @@ _IDLE_POLL_SECONDS = 0.5
 #: One registry per namespace. Two registries in one process both subscribe to
 #: ``__wkf_workflow_*`` and the second raises DuplicateSubscriptionError, so
 #: berg keeps exactly one.
-wf = workflow.Workflows(as_vercel_job=False)
+#
+#: The sandbox policy is the part that makes berg's workflows runnable at all.
+#: The runtime re-imports the workflow's module inside a deterministic sandbox
+#: on every replay, and that sandbox forbids nondeterministic calls —
+#: ``os.urandom``, ``random.getrandbits``, ``datetime.now``, ``io.open``,
+#: socket creation — *including at import time*. berg's agent stack cannot be
+#: imported under those rules: ``opentelemetry.context`` calls ``uuid4()``
+#: while importing, ``pydantic_ai._utils`` builds ``TypeAdapter(datetime)``,
+#: ``pydantic_ai_harness``'s ``deprecated``/``wrapt`` chain re-executes, and
+#: berg's settings read the config file. Any of those kills the run before the
+#: first step.
+#:
+#: ``passthrough_modules`` is the SDK's own mechanism for this: the named
+#: modules (and their submodules) are served from the host instead of being
+#: re-imported into the sandbox, so their import-time code and their calls
+#: later keep the host references that work. ``pydantic_ai`` and
+#: ``pydantic_ai_harness`` are the agent frameworks; ``berg_agents`` is berg's
+#: own package, so its modules are not freshly re-imported either.
+#:
+#: The trade, stated plainly: calls made *through* these modules are no longer
+#: guarded by the sandbox, so the workflow body can read and write files and
+#: open sockets. That costs berg nothing it was relying on — durability comes
+#: from the runtime recording each step's result, and the safety property (no
+#: write without a decision) is berg's own HITL gate in
+#: ``berg_agents/capabilities/delegation_gate.py``, not this sandbox.
+wf = workflow.Workflows(
+    as_vercel_job=False,
+    sandbox_policy=workflow.sandbox.SandboxPolicy(
+        passthrough_modules=frozenset({
+            "pydantic_ai",
+            "pydantic_ai_harness",
+            "berg_agents"})
+    ),
+)
 
 
 class Frame(pydantic.BaseModel):
