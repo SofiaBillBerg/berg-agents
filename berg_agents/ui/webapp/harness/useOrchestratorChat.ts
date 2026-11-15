@@ -97,7 +97,7 @@ export function useOrchestratorChat(
     const modelRef = useRef<string>("");
     modelRef.current = model;
 
-    const {messages, sendMessage, status, error, stop, addToolApprovalResponse} =
+    const {messages, sendMessage, status, error, stop, addToolApprovalResponse, resumeStream} =
         useChat({
         transport: new DefaultChatTransport({
             // Same origin: this is a Next route in this app, so it needs no
@@ -117,6 +117,21 @@ export function useOrchestratorChat(
             prepareSendMessagesRequest: ({messages: toSend}) => ({
                 body: {messages: toSend, model: modelRef.current}}),
             /**
+             * Point the reconnect at where a run's recorded stream lives.
+             *
+             * The default reconnect URL is `${api}/${chatId}/stream`, and under
+             * `/api/*` a DYNAMIC segment is claimed by the proxy rewrite before
+             * its handler runs (measured: a route at
+             * `/api/orchestrator/x/[id]` never executes, while the static ones
+             * beside it do). berg's replay route therefore sits outside `/api`,
+             * so the exact URL is named here rather than derived from `api`.
+             *
+             * @param options - The transport's reconnect description.
+             * @returns The absolute URL to GET, response headers untouched.
+             */
+            prepareReconnectToStreamRequest: ({id}) => ({
+                api: `/orchestrator/${id}/stream`}),
+            /**
              * Adopt the workflow run id from the response.
              *
              * The server returns it as `x-workflow-run-id`; keeping it lets a
@@ -134,6 +149,9 @@ export function useOrchestratorChat(
                 if (runId) setLastRunId(runId);
                 return response;
             }}),
+        // Adopting the run means adopting its id: the SDK addresses a reconnect
+        // by chat id, and a run id is what identifies the recorded turn.
+        id: resumeRunId,
         // Resume the suspended run once the user has answered.
         //
         // Answering an approval only marks the part "approval-responded"; it
@@ -214,6 +232,19 @@ export function useOrchestratorChat(
         },
         [addToolApprovalResponse],
     );
+
+    // Restore, on mount only. The SDK's own resume path reconnects to the run's
+    // durable stream and folds the chunks through the same accumulator a live
+    // turn uses — so the transcript that comes back is the recorded one, not a
+    // reconstruction. Keyed on the run id so a page that opens without one does
+    // nothing (and a fresh conversation stays fresh).
+    const resumedFor = useRef<string | null>(null);
+    useEffect(() => {
+        if (!resumeRunId || resumedFor.current === resumeRunId) return;
+        resumedFor.current = resumeRunId;
+        setLastRunId(resumeRunId);
+        void resumeStream();
+    }, [resumeRunId, resumeStream]);
 
     return {
         messages,

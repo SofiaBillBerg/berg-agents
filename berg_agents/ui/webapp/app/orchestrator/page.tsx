@@ -42,6 +42,7 @@ import { useOrchestratorChat } from "@/harness/useOrchestratorChat";
 import { buildExportMarkdown } from "@/utils/utils";
 
 import AgentSelector from "../components/AgentSelector.tsx";
+import ThemeToggle from "../components/ThemeToggle.tsx";
 import { ChatTranscript } from "../components/ChatTranscript.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 import { PluginCatalog } from "../components/PluginCatalog.tsx";
@@ -113,6 +114,17 @@ export default function OrchestratorPage() {
     const [pastRuns, setPastRuns] = useState<
         {id: string; status: string; created_at: string}[]
     >([]);
+    // Which past run to adopt as this conversation, from the URL: `?run=<id>`.
+    // Read once at mount, because adopting changes the conversation's identity
+    // (the SDK addresses a reconnect by chat id), so it is a navigation rather
+    // than a mid-flight switch. A page opened without it starts fresh.
+    const [resumeRunId] = useState<string | undefined>(() => {
+        if (typeof window === "undefined") return undefined;
+        return (
+            new URLSearchParams(window.location.search).get("run") ??
+            undefined
+        );
+    });
     useEffect(() => {
         let alive = true;
         void (async () => {
@@ -348,7 +360,11 @@ export default function OrchestratorPage() {
                             <summary className="cursor-pointer opacity-80">
                                 Past orchestration runs ({pastRuns.length})
                             </summary>
-                            <ul className="mt-2 flex flex-col gap-1">
+                            {/* Capped and scrolling on its own: 29 runs would otherwise push the
+                            whole page past its scroll container and freeze the
+                            layout. The outer page scrolls for the conversation,
+                            not for this list. */}
+                            <ul className="mt-2 flex max-h-64 flex-col gap-1 overflow-y-auto">
                                 {pastRuns.map((run) => (
                                     <li
                                         className="flex items-baseline justify-between gap-3"
@@ -419,16 +435,18 @@ export default function OrchestratorPage() {
                         <AgentSelector />
                         <ProviderSelector />
                         {/* Which brain the *specialists* run on — a separate
-                            choice from the orchestrator's own model above, and
-                            saved through berg's delegate endpoint rather than
-                            kept in this page. */}
+                            choice from the orchestrator's own model, and saved
+                            through berg's delegate endpoint rather than kept in
+                            this page. Labelled, because three model selects in one
+                            row otherwise read as "which model is this one?" */}
+                        <span className="text-xs opacity-70">Specialists</span>
                         <select
                             aria-label="Specialists run on"
                             className="rounded border border-current/20 bg-transparent px-2 py-1 text-sm"
                             onChange={(event) => {
                                 void onDelegateModelChange(event.target.value);
                             }}
-                            title="Which model the delegated specialists run on"
+                            title="Which model every specialist this conversation starts runs on. Unset means your configured tier default."
                             value={delegateModel}
                         >
                             <option value="">
@@ -446,7 +464,9 @@ export default function OrchestratorPage() {
                         </select>
                         {/* Which brain the orchestrator itself runs on. Grouped
                             by tier so the ordering berg configures is visible,
-                            not just a flat list of names. */}
+                            not just a flat list of names. Labelled for the same
+                            reason as the specialists' select. */}
+                        <span className="text-xs opacity-70">Orchestrator</span>
                         <select
                             aria-label="Orchestrator model"
                             className="rounded border border-current/20 bg-transparent px-2 py-1 text-sm"
@@ -466,6 +486,11 @@ export default function OrchestratorPage() {
                                 </optgroup>
                             ))}
                         </select>
+                        {/* The same toggle the chat page carries: the theme is a
+                            property of the app, not of one route, and the
+                            orchestrator page used to be the only one without it
+                            (dark mode here meant switching to Chat first). */}
+                        <ThemeToggle />
                         <button
                             className="rounded border border-current/30 px-2 py-1 text-xs"
                             type="button"
