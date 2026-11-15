@@ -33,7 +33,7 @@
 // explicit rather than relying on hoisting rules.
 await import("./workflow-data-dir.mjs");
 
-const {withWorkflow} = await import("workflow/next");
+const { withWorkflow } = await import("workflow/next");
 
 // Bundle analyzer for Phase 2 performance monitoring
 // Enable with: ANALYZE=true bun run build
@@ -49,7 +49,7 @@ const nextConfig = {
   // `WorkflowAgent`, and the Workflow runtime starts and resumes runs from
   // server routes — which a static export cannot host. The comment this
   // replaces said the opposite ("static export only in production, FastAPI
-  // mounts dist/"), which was true while the UI had no server behaviour of its
+  // mounts dist/"), which was true while the UI had no server behavior of its
   // own; it does now.
   //
   // ONE FRONT DOOR. The UI is served by Next now, but berg's API, sessions,

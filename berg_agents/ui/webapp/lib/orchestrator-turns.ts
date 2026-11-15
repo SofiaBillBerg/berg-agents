@@ -6,12 +6,12 @@ import {Client} from "pg";
  * Why it exists: a workflow run's durable stream records what the AGENT wrote,
  * not what the user said. Restoring from that stream alone produces a transcript
  * missing the user's own turns — which is exactly the half that makes a
- * conversation a conversation. The AI SDK's documented answer is to keep
+ * `conversation` a conversation. The AI SDK's documented answer is to keep
  * `UIMessage[]` as the source of truth (there is no reverse conversion from what
  * a run records), so the turn boundary writes the messages here, keyed by the
  * run it started.
  *
- * Durable on purpose: these rows are Sofia's conversations, so they live in
+ * Durable on purpose: these rows live in
  * berg's own PostgreSQL rather than in browser memory that a reload clears.
  *
  * The connection is the workflow world's (set by `workflow-data-dir.mjs` before
@@ -94,14 +94,34 @@ export interface StoredTurn {
     status: string;
     /** When the turn was sent. */
     createdAt: string | null;
+    /**
+     * Whether berg holds the conversation for this run.
+     *
+     * False for turns started before the store existed: the world still has the
+     * agent's log (so the run can be replayed from its stream) but there is no
+     * conversation of Sofia's to restore or delete. The flag is what lets the
+     * page offer restore-without-conversation and drop the delete button,
+     * rather than offering a delete that would remove nothing of hers.
+     */
+    hasConversation: boolean;
 }
 
 /**
  * The turns berg has recorded, newest first.
  *
- * The status comes from the workflow world's runs table so the list shows what
- * a run is actually doing, while the conversation itself comes from berg's own
- * table — one query, no second round trip.
+ * Two sources, one list, because they answer different halves of "what did we
+ * do together":
+ *
+ * - berg's store: the conversation, so a run can be restored with both sides and
+ *   deleted — but it only holds turns sent since it existed.
+ * - the workflow world: every orchestration run ever started, which is the
+ *   agent's own log. Reading only berg's store made that history disappear from
+ *   the page the day the store arrived (found 2026-11-15 from a screenshot: a
+ *   panel that used to list 29 runs listed none), which is the regression this
+ *   union repairs.
+ *
+ * The world's rows come second, and only where berg has no conversation of its
+ * own, so nothing is listed twice.
  *
  * @returns The stored turns, newest first.
  */
@@ -110,16 +130,23 @@ export async function listTurns(): Promise<StoredTurn[]> {
     if (!client) return [];
     try {
         const result = await client.query(
-            `SELECT t.run_id, t.created_at, r.status
-               FROM ${TURNS_TABLE} t
-               LEFT JOIN workflow.workflow_runs r ON r.id = t.run_id
-              ORDER BY t.created_at DESC
+            `SELECT run_id, status, created_at, TRUE AS has_conversation
+               FROM ${TURNS_TABLE}
+              UNION ALL
+             SELECT r.id, r.status, r.created_at, FALSE
+               FROM workflow.workflow_runs r
+              WHERE r.name LIKE '%orchestrator-turn%'
+                AND NOT EXISTS (
+                    SELECT 1 FROM ${TURNS_TABLE} t WHERE t.run_id = r.id
+                )
+              ORDER BY created_at DESC
               LIMIT 50`,
         );
         return result.rows.map((row) => ({
             runId: String(row.run_id),
             status: String(row.status ?? "unknown"),
-            createdAt: row.created_at ? String(row.created_at) : null}));
+            createdAt: row.created_at ? String(row.created_at) : null,
+            hasConversation: Boolean(row.has_conversation)}));
     } finally {
         await client.end().catch(() => undefined);
     }

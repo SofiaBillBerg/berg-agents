@@ -18,7 +18,7 @@ import {getRun} from "workflow/api";
  * rewrite is `afterFiles`. A trivial probe route (`/api/orchestrator/pingx/[id]`)
  * behaved identically, so it is the pattern, not this file. Static segments
  * under the same prefix are served normally. Keeping the replay outside `/api`
- * sidesteps that instead of guessing at Next's matcher; if a future Next
+ * sidesteps that instead of guessing at Next.js matcher; if a future Next
  * version fixes the precedence, this can move under `/api` and stay equivalent.
  *
  * @param request - The incoming request.

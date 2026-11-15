@@ -55,7 +55,7 @@ class ErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="p-8 text-[var(--berg-status-error,red)] font-mono">
+        <div className="p-8 text-(--berg-status-error,red) font-mono">
           <h2 className="text-lg font-bold">Something went wrong</h2>
           <pre className="whitespace-pre-wrap text-sm">
             {this.state.error?.toString()}

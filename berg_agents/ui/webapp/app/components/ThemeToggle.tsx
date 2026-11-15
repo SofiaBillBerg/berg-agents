@@ -82,10 +82,10 @@ function ThemeToggle() {
   return (
     <button
       aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      className={`theme-toggle flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border-2 border-[var(--berg-border)] text-[var(--berg-text)] cursor-pointer transition-all duration-300 shadow-sm text-sm font-medium min-w-[60px] hover:scale-105 hover:shadow-md ${
+      className={`theme-toggle flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border-2 border-(--berg-border) text-(--berg-text) cursor-pointer transition-all duration-300 shadow-sm text-sm font-medium min-w-15 hover:scale-105 hover:shadow-md ${
         isDark
-          ? "bg-gradient-to-br from-[#2d323b] to-[#1a1d23]"
-          : "bg-gradient-to-br from-[#f8edf8] to-[#e8e0f0]"
+          ? "bg-linear-to-br from-[#2d323b] to-[#1a1d23]"
+          : "bg-linear-to-br from-[#f8edf8] to-[#e8e0f0]"
       }`}
       title={isDark ? "Switch to light theme" : "Switch to dark theme"}
       onClick={toggle}

@@ -89,7 +89,7 @@ export const SlashCommandAutocomplete = ({
               {matches.map((cmd) => (
                 <ListBox.Item
                   key={cmd.name}
-                  className="p-0 border-none bg-transparent shadow-none data-[focused]:bg-transparent data-[hovered]:bg-transparent"
+                  className="p-0 border-none bg-transparent shadow-none data-focused:bg-transparent data-hovered:bg-transparent"
                   id={cmd.name}
                   textValue={cmd.name}
                 >

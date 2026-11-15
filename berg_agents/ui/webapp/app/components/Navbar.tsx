@@ -82,7 +82,7 @@ function NavLinks() {
 export function Navbar() {
   return (
     // Brand banner: Sofia's purple → blue → teal gradient, same as the
-    // docs header. White text both modes; the gradient pops on its own
+    // docs' header. White text both modes; the gradient pops on its own
     // so no surface tokens are used here.
     <nav
       className="px-4 py-1.5 flex items-center justify-between"

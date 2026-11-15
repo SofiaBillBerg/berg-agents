@@ -35,7 +35,7 @@ export interface SteeringStripProps {
  * SteeringStrip - the unread break between the user and the agent.
  *
  * A message typed while the agent works steers it; it reaches the model at
- * the agent's next step. Until then it belongs HERE, not in the transcript,
+ * the agent's next step. Until then, it belongs HERE, not in the transcript,
  * because the transcript shows what the agent has actually seen. Once the
  * model receives it, the server reports it consumed and the message appears
  * in the transcript at its real position - never in both places at once.
@@ -64,7 +64,7 @@ export default function SteeringStrip({ messages }: SteeringStripProps) {
           >
             queued
           </span>
-          <span className="min-w-0 whitespace-pre-wrap break-words opacity-90">
+          <span className="min-w-0 whitespace-pre-wrap wrap-break-word opacity-90">
             {text}
           </span>
         </div>

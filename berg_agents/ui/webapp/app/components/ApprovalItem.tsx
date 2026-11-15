@@ -5,7 +5,7 @@ import { Button } from "@heroui/react";
 
 /**
  * One paused tool call inside an approval batch. Each item gets its
- * own approve / reject / edit controls so the user can approve one,
+ * own `approve` / `reject` / `edit` controls so the user can approve one,
  * reject another, and edit the next. Decided items stay visible with
  * a badge + undo until the batch resumes.
  *

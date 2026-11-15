@@ -27,13 +27,13 @@
  * the `UIMessageChunk`s that berg's chat surface already renders.
  */
 
-import {createModelCallToUIChunkTransform} from "@ai-sdk/workflow";
-import {createUIMessageStreamResponse, type UIMessage} from "ai";
-import {saveTurn} from "@/lib/orchestrator-turns";
-import {start} from "workflow/api";
+import { createModelCallToUIChunkTransform } from "@ai-sdk/workflow";
+import { createUIMessageStreamResponse, type UIMessage } from "ai";
+import { start } from "workflow/api";
 
-import {localModel} from "@/harness/local-model";
-import {orchestratorTurn} from "@/workflows/orchestrator-turn";
+import { saveTurn } from "@/lib/orchestrator-turns";
+import { localModel } from "@/harness/local-model";
+import { orchestratorTurn } from "@/workflows/orchestrator-turn";
 
 /**
  * The orchestrator's model.
@@ -42,14 +42,14 @@ import {orchestratorTurn} from "@/workflows/orchestrator-turn";
  * runs each model call as its own step and the model crosses that boundary as
  * data. The AI SDK's own providers serialize their config and lose `baseURL`
  * and the request `url` builder along the way, so the model here carries plain
- * strings and rebuilds itself. berg's endpoint is its own ollama — never a
+ * strings and rebuilds itself. berg's endpoint is its own Ollama — never a
  * hosted gateway.
  *
  * @param modelId - Chosen model, or undefined for the configured default.
  * @returns A model bound to berg's local endpoint, serializable across steps.
  */
 function orchestratorModel(modelId?: string) {
-    return localModel(modelId ? {modelId} : undefined);
+  return localModel(modelId ? { modelId } : undefined);
 }
 
 /**
@@ -60,26 +60,26 @@ function orchestratorModel(modelId?: string) {
  * @returns A UI message stream, and the run id for reconnection.
  */
 export async function POST(request: Request): Promise<Response> {
-    const body = (await request.json()) as {
-        messages?: UIMessage[];
-        model?: string;
-    };
-    const messages = Array.isArray(body.messages) ? body.messages : [];
+  const body = (await request.json()) as {
+    messages?: UIMessage[];
+    model?: string;
+  };
+  const messages = Array.isArray(body.messages) ? body.messages : [];
 
-    const run = await start(orchestratorTurn, [
-        messages,
-        orchestratorModel(body.model?.trim() || undefined)]);
+  const run = await start(orchestratorTurn, [
+    messages,
+    orchestratorModel(body.model?.trim() || undefined)]);
 
-    // The conversation, recorded against the run it became. This is the only
-    // moment both exist together: the run id comes back from `start`, and the
-    // messages are what the UI just sent. Without it a resume has no source of
-    // truth for the USER's turns — a workflow stream records only what the agent
-    // wrote (see lib/orchestrator-turns.ts).
-    await saveTurn(run.runId, messages);
+  // The conversation, recorded against the run it became. This is the only
+  // moment both exist together: the run id comes back from `start`, and the
+  // messages are what the UI just sent. Without it a resume has no source of
+  // truth for the USER's turns — a workflow stream records only what the agent
+  // wrote (see lib/orchestrator-turns.ts).
+  await saveTurn(run.runId, messages);
 
-    return createUIMessageStreamResponse({
-        stream: run.readable.pipeThrough(createModelCallToUIChunkTransform()),
-        // The id is what lets the client resume from where it left off instead
-        // of rebuilding the turn — the reason this is a workflow at all.
-        headers: {"x-workflow-run-id": run.runId}});
+  return createUIMessageStreamResponse({
+    stream: run.readable.pipeThrough(createModelCallToUIChunkTransform()),
+    // The id is what lets the client resume from where it left off instead
+    // of rebuilding the turn — the reason this is a workflow at all.
+    headers: { "x-workflow-run-id": run.runId }});
 }

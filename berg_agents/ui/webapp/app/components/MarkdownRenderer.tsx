@@ -38,10 +38,10 @@ export interface MarkdownRendererProps {
  * streaming) with GFM, syntax-highlighted code blocks (via @streamdown/code),
  * mermaid diagrams (via @streamdown/mermaid), and math all built in.
  * Catches rendering exceptions gracefully and displays plain text if
- * markdown parsing fails.
+ * Markdown parsing fails.
  *
  * @param props - Component properties
- * @returns JSX element rendering the formatted markdown
+ * @returns JSX element rendering the formatted Markdown
  */
 export function MarkdownRenderer({
   content,

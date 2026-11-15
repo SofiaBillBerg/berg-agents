@@ -96,7 +96,7 @@ export function AgentPanel({
               key={agent.name}
               aria-pressed={isActive}
               className={`cursor-pointer rounded-full transition hover:opacity-90 ${
-                isActive ? "ring-2 ring-[var(--success)]" : ""
+                isActive ? "ring-2 ring-success" : ""
               }`}
               type="button"
               onClick={() => onSelect(agent.name)}
@@ -169,8 +169,8 @@ export function AgentPanel({
               <button
                 key={agent.name}
                 aria-pressed={isActive}
-                className={`block w-full rounded-lg text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus)] ${
-                  isActive ? "ring-2 ring-[var(--success)]" : "hover:opacity-95"
+                className={`block w-full rounded-lg text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                  isActive ? "ring-2 ring-success" : "hover:opacity-95"
                 }`}
                 type="button"
                 onClick={() => onSelect(agent.name)}

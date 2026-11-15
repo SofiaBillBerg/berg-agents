@@ -22,8 +22,8 @@
  *
  * A slash command is either answered locally (help, /agents, /stats,
  * /memory, a backend tool run) or handed to the model when the app does
- * not recognise it. The dispatcher is the biggest single function in the
- * app and it belongs to neither the chat hook nor the layout: it is its
+ * not recognize it. The dispatcher is the biggest single function in the
+ * app, and it belongs to neither the chat hook nor the layout: it is its
  * own concern, so it lives here with the two card lists it fills and the
  * auto-approve opt-in that pairs with tool execution.
  *
@@ -55,7 +55,7 @@ export interface UseSlashCommandsDeps {
   sessionId: string | null;
   /** Open a server-side session (/memory restores one). */
   openSession: (id: string) => Promise<void>;
-  /** The live transcript (some commands summarise it). */
+  /** The live transcript (some commands summarize it). */
   messages: readonly ChatMessage[];
   /** The current text in the input box (/read_file reads it). */
   input: string;
@@ -386,7 +386,9 @@ export function useSlashCommands(deps: UseSlashCommandsDeps): SlashCommands {
       if (cmdLower === "help") {
         return {
           handled: true,
-          card: `Type a message to chat with Berg, the AI agent.\nFor complex tasks, the agent will automatically use tools (read_file, write_file, edit_file, run_task).\nUse /task <description> to explicitly trigger the full harness pipeline.`};
+          card: `Type a message to chat with Berg, the AI agent.\n
+           For complex tasks, the agent will automatically use tools (read_file, write_file, edit_file, run_task).\n
+           Use /task <description> to explicitly trigger the full harness pipeline.`};
       }
       if (cmdLower === "clear") {
         clearMessages();

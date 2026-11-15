@@ -23,7 +23,7 @@
 
 import type { PluginInfo } from "@/lib/backendCatalog";
 
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Button, Card, Chip } from "@heroui/react";
 
 import { API_BASE } from "@/envConfig";

@@ -95,7 +95,7 @@ export default function PluginDevPage() {
   }, [reloadPlugins]);
 
   // Auto-select the first plugin once the catalog arrives; explicit
-  // selections (setSelectedId + reset) override afterwards.
+  // selections (setSelectedId + reset) override afterward.
   const selected =
     plugins.find((p) => p.id === selectedId) ?? plugins[0] ?? null;
 

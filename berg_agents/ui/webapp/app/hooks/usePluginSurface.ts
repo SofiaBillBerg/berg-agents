@@ -32,7 +32,7 @@
 
 import type { ChatMessage } from "@/harness";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchPlugins } from "@/lib/backendCatalog";
 

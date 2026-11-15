@@ -175,7 +175,7 @@ export function SharedContextEditor() {
           })}
         </div>
 
-        {/* Scope, why (the what/why discipline), and the save controls. */}
+        {/* Scope, `why` (the `what`/`why` discipline), and the save controls. */}
         <div className="flex flex-wrap items-center gap-2">
           <Chip size="sm" variant="soft">
             scope: {scope}
@@ -189,7 +189,7 @@ export function SharedContextEditor() {
           </Button>
           <input
             aria-label="Why (what/why discipline)"
-            className="flex-1 min-w-[12rem] rounded-md border border-border bg-background px-2 py-1 text-sm"
+            className="flex-1 min-w-48 rounded-md border border-border bg-background px-2 py-1 text-sm"
             id="shared-context-why"
             name="shared-context-why"
             placeholder="why (the what/why discipline)"
@@ -242,13 +242,13 @@ export function SharedContextEditor() {
             <div className="px-2 py-1 text-[11px] text-muted-foreground border-b border-border">
               Preview
             </div>
-            <div className="min-h-[320px] flex-1 overflow-y-auto p-3 text-sm leading-relaxed">
+            <div className="min-h-80 flex-1 overflow-y-auto p-3 text-sm leading-relaxed">
               <Streamdown>{content}</Streamdown>
             </div>
           </div>
         </div>
 
-        {/* The section's what/why history, newest first. */}
+        {/* The sections what/why history, newest first. */}
         {history.length > 0 && (
           <div className="flex flex-col gap-1">
             <h4 className="m-0 text-xs font-semibold uppercase tracking-wider text-muted">

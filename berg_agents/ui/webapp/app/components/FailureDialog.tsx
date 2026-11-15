@@ -28,7 +28,7 @@ import { Button, Modal } from "@heroui/react";
 /**
  * FailureDialog - the ONE surface a failure is read on.
  *
- * Every fatal failure lands here as a {@link FailureNotice}: a send that
+ * Every fatal failure lands here as a {@link FailureNotice}: a `send` that
  * failed, a run that died, or the system's recovery of one (the old
  * systemNotice alert's content). The dialog is modal and dismiss-when-read
  * (backdrop click, ESC, or the Got it button) - it demands attention once,
@@ -74,9 +74,7 @@ export function FailureDialog({
           <Modal.Header>
             <Modal.Heading
               className={
-                failure?.kind === "recovery"
-                  ? ""
-                  : "text-[var(--berg-status-error)]"
+                failure?.kind === "recovery" ? "" : "text-(--berg-status-error)"
               }
             >
               {failure?.kind === "recovery" ? "🛠 " : "❌ "}

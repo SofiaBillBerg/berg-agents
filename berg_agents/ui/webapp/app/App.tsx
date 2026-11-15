@@ -349,7 +349,7 @@ function ChatContent() {
             every spare pixel. */}
         <div className="mb-1 flex items-center gap-1 flex-wrap shrink-0">
           <h1
-            className="m-0 whitespace-nowrap text-base font-bold bg-gradient-to-r from-[#7d029c] via-[#3b528b] to-[#21908c] bg-clip-text text-transparent"
+            className="m-0 whitespace-nowrap text-base font-bold bg-linear-to-r from-[#7d029c] via-[#3b528b] to-[#21908c] bg-clip-text text-transparent"
             title="The agent that learns with you."
           >
             Berg Agents Chat

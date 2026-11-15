@@ -118,12 +118,12 @@ function fenced(body: string, language: string, quote: string): string[] {
 }
 
 /**
- * Write one tool call, and any work nested inside it, as markdown.
+ * Write one tool call, and any work nested inside it, as Markdown.
  *
  * Depth is expressed as blockquote nesting (`>` per level) rather than headers,
  * so a delegation tree reads as one visually-contained block and survives being
- * pasted anywhere markdown is rendered. Code fences are indented by nothing —
- * fence content must stay flush or it stops being code.
+ * pasted anywhere Markdown is rendered. Code fences are indented by nothing —
+ * fence content must stay flush, or it stops being code.
  *
  * @param lines - The output buffer, appended to in place.
  * @param call - The tool call to write.
@@ -178,7 +178,7 @@ function writeToolCall(
 }
 
 /**
- * Build session export as markdown.
+ * Build session export as Markdown.
  */
 export function buildExportMarkdown(
   transcript: Array<ExportMessage>,

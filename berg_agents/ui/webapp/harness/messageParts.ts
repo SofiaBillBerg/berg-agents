@@ -25,7 +25,7 @@
  * visible text, the model's reasoning trace, and the tool calls as
  * cards. Those used to be three separate loops over the same array, so
  * every new part kind (a nested subagent stream above all) had to be
- * taught to all three or it silently vanished from one of them. There
+ * taught to all three, or it silently vanished from one of them. There
  * is now one loop that fills all three in a single pass, and this module
  * is the only place that knows the part shapes.
  *
