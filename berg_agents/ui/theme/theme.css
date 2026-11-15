@@ -25,12 +25,12 @@
  * tokens and components in the correct order, and applies the default
  * (light) preset last so it can be overridden.
  */
-@import url("./components/base.css");
-@import url("./tokens/colors.css");
-@import url("./tokens/typography.css");
-@import url("./tokens/spacing.css");
-@import url("./components/banner.css");
-@import url("./components/footer.css");
+@import "./components/base.css";
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./components/banner.css";
+@import "./components/footer.css";
 
 /* Default: Light Theme (applied when no preset is set) */
 :root {

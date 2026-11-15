@@ -29,6 +29,7 @@
 
 import {createModelCallToUIChunkTransform} from "@ai-sdk/workflow";
 import {createUIMessageStreamResponse, type UIMessage} from "ai";
+import {saveTurn} from "@/lib/orchestrator-turns";
 import {start} from "workflow/api";
 
 import {localModel} from "@/harness/local-model";
@@ -68,6 +69,13 @@ export async function POST(request: Request): Promise<Response> {
     const run = await start(orchestratorTurn, [
         messages,
         orchestratorModel(body.model?.trim() || undefined)]);
+
+    // The conversation, recorded against the run it became. This is the only
+    // moment both exist together: the run id comes back from `start`, and the
+    // messages are what the UI just sent. Without it a resume has no source of
+    // truth for the USER's turns — a workflow stream records only what the agent
+    // wrote (see lib/orchestrator-turns.ts).
+    await saveTurn(run.runId, messages);
 
     return createUIMessageStreamResponse({
         stream: run.readable.pipeThrough(createModelCallToUIChunkTransform()),

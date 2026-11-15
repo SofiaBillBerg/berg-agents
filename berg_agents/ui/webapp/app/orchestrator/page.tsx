@@ -126,6 +126,9 @@ export default function OrchestratorPage() {
     const [pastRuns, setPastRuns] = useState<
         {id: string; status: string; created_at: string}[]
     >([]);
+    // The run awaiting a second click to be deleted. Null means no delete is
+    // pending, so no row shows its "for real" button.
+    const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
     useEffect(() => {
         let alive = true;
         void (async () => {
@@ -384,12 +387,11 @@ export default function OrchestratorPage() {
                                                   ).toLocaleString()
                                                 : ""}
                                         </span>
-                                        {/* Restore, not just view: the page
-                                            navigates with this run's id, and on
-                                            mount the hook adopts the run's
-                                            durable stream as this conversation
-                                            — so the next message continues it
-                                            rather than starting a new turn. */}
+                                        {/* Restore, not just view: the page navigates with this
+                                            run's id, and on mount the hook
+                                            adopts the stored conversation — so the
+                                            next message continues this turn rather
+                                            than starting a new one beside it. */}
                                         <button
                                             className="rounded border border-current/30 px-2 py-0.5 text-xs"
                                             type="button"
@@ -401,6 +403,48 @@ export default function OrchestratorPage() {
                                         >
                                             Restore
                                         </button>
+                                        {/* Delete, in two steps on purpose: the
+                                            first click asks, the second does it.
+                                            Removing a conversation is Sofia's
+                                            decision, and a single mis-click is
+                                            not one. */}
+                                        {confirmDelete === run.id ? (
+                                            <button
+                                                className="rounded border border-danger px-2 py-0.5 text-xs text-danger"
+                                                type="button"
+                                                onClick={() => {
+                                                    void (async () => {
+                                                        await fetch(
+                                                            `/orchestrator/runs/${encodeURIComponent(run.id)}`,
+                                                            {method: "DELETE"},
+                                                        );
+                                                        setConfirmDelete(null);
+                                                        setPastRuns(
+                                                            (runs) =>
+                                                                runs.filter(
+                                                                    (
+                                                                        r,
+                                                                    ) =>
+                                                                        r.id !==
+                                                                        run.id,
+                                                                ),
+                                                        );
+                                                    })();
+                                                }}
+                                            >
+                                                Delete for real
+                                            </button>
+                                        ) : (
+                                            <button
+                                                className="rounded border border-current/30 px-2 py-0.5 text-xs"
+                                                type="button"
+                                                onClick={() =>
+                                                    setConfirmDelete(run.id)
+                                                }
+                                            >
+                                                Delete
+                                            </button>
+                                        )}
                                     </li>
                                 ))}
                             </ul>

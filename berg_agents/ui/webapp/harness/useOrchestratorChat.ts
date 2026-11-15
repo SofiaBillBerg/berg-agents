@@ -97,7 +97,7 @@ export function useOrchestratorChat(
     const modelRef = useRef<string>("");
     modelRef.current = model;
 
-    const {messages, sendMessage, status, error, stop, addToolApprovalResponse, resumeStream} =
+    const {messages, setMessages, sendMessage, status, error, stop, addToolApprovalResponse, resumeStream} =
         useChat({
         transport: new DefaultChatTransport({
             // Same origin: this is a Next route in this app, so it needs no
@@ -119,12 +119,16 @@ export function useOrchestratorChat(
             /**
              * Point the reconnect at where a run's recorded stream lives.
              *
-             * The default reconnect URL is `${api}/${chatId}/stream`, and under
+             * Kept for interrupted turns: this is the path that continues a
+             * stream that was cut off mid-flight. Restoring a *finished* turn
+             * does not come through here at all — the page loads berg's stored
+             * conversation (lib/orchestrator-turns.ts) and adopts it directly,
+             * because a workflow stream records only what the agent wrote.
+             *
+             * The URL is named rather than derived from `api`, because under
              * `/api/*` a DYNAMIC segment is claimed by the proxy rewrite before
-             * its handler runs (measured: a route at
-             * `/api/orchestrator/x/[id]` never executes, while the static ones
-             * beside it do). berg's replay route therefore sits outside `/api`,
-             * so the exact URL is named here rather than derived from `api`.
+             * its handler runs (measured 2026-11-15), so the replay route sits
+             * outside `/api`.
              *
              * @param options - The transport's reconnect description.
              * @returns The absolute URL to GET, response headers untouched.
@@ -224,6 +228,39 @@ export function useOrchestratorChat(
      * @param approvalId - Which request to answer.
      * @param approved - Whether the call may run.
      */
+    // Whether a turn is in flight — the edge the persist below watches.
+    const streaming = status === "streaming" || status === "submitted";
+
+    // Persist the conversation when a turn finishes, so a restore has BOTH sides.
+    // The turn route already wrote the messages the turn started with; this adds
+    // what the agent replied, which that write cannot see because the reply
+    // arrives on the stream rather than in the next request. One edge, one route:
+    // from streaming to not-streaming, once, with the run id the turn reported.
+    const wasStreaming = useRef(false);
+    useEffect(() => {
+        if (streaming) {
+            wasStreaming.current = true;
+            return;
+        }
+        if (!wasStreaming.current || !lastRunId) return;
+        wasStreaming.current = false;
+        void (async () => {
+            try {
+                await fetch(
+                    `/orchestrator/runs/${encodeURIComponent(lastRunId)}`,
+                    {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({messages})},
+                );
+            } catch {
+                // A failed write loses the agent's half until the next turn
+                // re-writes the whole conversation; it must never break the turn
+                // that just finished.
+            }
+        })();
+    }, [streaming, lastRunId, messages]);
+
     const answerApproval = useCallback(
         (approvalId: string, approved: boolean): void => {
             // The SDK resolves the paused part and resumes the turn, which is
@@ -233,18 +270,40 @@ export function useOrchestratorChat(
         [addToolApprovalResponse],
     );
 
-    // Restore, on mount only. The SDK's own resume path reconnects to the run's
-    // durable stream and folds the chunks through the same accumulator a live
-    // turn uses — so the transcript that comes back is the recorded one, not a
-    // reconstruction. Keyed on the run id so a page that opens without one does
-    // nothing (and a fresh conversation stays fresh).
+    // Restore, on mount only, and in the order that matters: berg's stored
+    // conversation first (it holds BOTH sides of the turn), and the durable
+    // stream only when there is no stored copy — which is the case for turns
+    // sent before the store existed, and for a turn that was cut off mid-flight
+    // and never reached its boundary write. Keyed on the run id so a page that
+    // opens without one does nothing, and a fresh conversation stays fresh.
     const resumedFor = useRef<string | null>(null);
     useEffect(() => {
         if (!resumeRunId || resumedFor.current === resumeRunId) return;
         resumedFor.current = resumeRunId;
         setLastRunId(resumeRunId);
-        void resumeStream();
-    }, [resumeRunId, resumeStream]);
+        void (async () => {
+            try {
+                const response = await fetch(
+                    `/orchestrator/runs/${encodeURIComponent(resumeRunId)}`,
+                );
+                if (response.ok) {
+                    const data = (await response.json()) as {
+                        messages?: unknown[];
+                    };
+                    if (Array.isArray(data.messages)) {
+                        // Adopting the conversation wholesale: the transcript is
+                        // restored as it was, so the next message continues this
+                        // turn rather than starting a new one beside it.
+                        setMessages(data.messages as UIMessage[]);
+                        return;
+                    }
+                }
+            } catch {
+                // A failed read falls through to the stream below.
+            }
+            void resumeStream();
+        })();
+    }, [resumeRunId, resumeStream, setMessages]);
 
     return {
         messages,
