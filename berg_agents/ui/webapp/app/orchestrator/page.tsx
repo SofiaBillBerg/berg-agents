@@ -242,14 +242,15 @@ export default function OrchestratorPage() {
     const rows: { agent: string; model: string; runId: string }[] = [];
     for (const message of messages) {
       for (const part of message.parts ?? []) {
-        if (
-          part.type !== "tool-start_specialist" ||
-          // "output-available" is the AI SDK's state for a tool call
-          // that has produced its result — the moment the specialist
-          // is genuinely running, which is what is worth announcing.
-          part.state !== "output-available" ||
-          !part.output
-        ) {
+        // Any state, not only `output-available`: a gated tool call passes
+        // through input-streaming → approval-requested → approval-responded →
+        // output-available, and a strip that waits for the LAST one renders
+        // nothing at all while the specialist is genuinely running (found in
+        // Sofia's own transcript, where the part sat at approval-responded and
+        // the session link never appeared). The agent name is known from the
+        // call's input the moment it is parsed, so the chip can show then; the
+        // link needs the run id, which only the output carries.
+        if (part.type !== "tool-start_specialist") {
           continue;
         }
         // The tool's output arrives either as the object the tool
@@ -265,9 +266,12 @@ export default function OrchestratorPage() {
         } else if (typeof part.output === "object") {
           output = part.output as Record<string, unknown>;
         }
+        const input = (part.input ?? {}) as {agent?: string};
         const agent =
-          String(output.agentName ?? "") ||
-          String((part.input as { agent?: string })?.agent ?? "");
+          String(input.agent ?? "") || String(output.agentName ?? "");
+        // Without an agent there is nothing to name yet — the call has not
+        // been fully described by the model.
+        if (!agent) continue;
         rows.push({
           agent,
           model: String(output.model ?? ""),
@@ -569,8 +573,13 @@ export default function OrchestratorPage() {
                   <span className="font-medium">
                     {row.agent || "specialist"}
                   </span>
+                  {/* Before the run id lands the specialist is starting rather
+                      than running on any particular model — saying so is more
+                      useful than naming a default it has not used yet. */}
                   <span className="opacity-70">
-                    on {row.model || "the tier default"}
+                    {row.runId
+                      ? `on ${row.model || "the tier default"}`
+                      : "starting…"}
                   </span>
                   {/* The link IS the point of this strip. Delegating used to mean
                       hiding a run's id in a tool card and summarizing what came
