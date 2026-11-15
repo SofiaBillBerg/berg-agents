@@ -479,40 +479,44 @@ export default function OrchestratorPage() {
                         the chat page lays them out: the transcript keeps its
                         own flex column so heights match, and a drag divider
                         lets the surface be widened. */}
-                    <div className="mb-2 flex min-h-0 flex-1 gap-0">
-                    {/* What has been delegated, and to what — one line per
-                        started specialist, from its actual tool result. A run
-                        used to start silently: the only trace was a tool card
-                        whose output you had to open, and nothing named the
-                        model. Empty until the first specialist starts. */}
+                    {/* What has been delegated, and to what — one line per started
+                        specialist, from its actual tool result. A run used to
+                        start silently: the only trace was a tool card whose
+                        output you had to open, and nothing named the model.
+                        Empty until the first specialist starts.
+
+                        OUTSIDE the transcript row on purpose: inside it these
+                        became a flex item whose long run ids could not shrink,
+                        and a narrow window squeezed the transcript — and the
+                        composer, and Stop — out of the viewport. The run id is
+                        truncated here and complete in the tooltip. */}
                     {startedSpecialists.length > 0 ? (
                         <ul className="mb-2 flex flex-wrap items-center gap-2 text-xs opacity-80">
                             {startedSpecialists.map((row, index) => (
                                 <li
-                                    className="flex items-center gap-1.5 rounded border border-current/20 px-2 py-1"
+                                    className="flex min-w-0 items-center gap-1.5 rounded border border-current/20 px-2 py-1"
                                     key={`${row.runId || row.agent}-${index}`}
                                 >
                                     <span className="font-medium">
                                         {row.agent || "specialist"}
                                     </span>
-                                    {row.model ? (
-                                        <span className="opacity-70">
-                                            on {row.model}
-                                        </span>
-                                    ) : (
-                                        <span className="opacity-70">
-                                            on the tier default
-                                        </span>
-                                    )}
+                                    <span className="opacity-70">
+                                        on {row.model || "the tier default"}
+                                    </span>
                                     {row.runId ? (
-                                        <code className="opacity-60">
-                                            {row.runId}
+                                        <code
+                                            className="overflow-hidden text-ellipsis whitespace-nowrap opacity-60"
+                                            title={row.runId}
+                                        >
+                                            {row.runId.slice(0, 14)}…
                                         </code>
                                     ) : null}
                                 </li>
                             ))}
                         </ul>
                     ) : null}
+
+                    <div className="mb-2 flex min-h-0 flex-1 gap-0">
                     <div className="flex min-w-0 flex-1 flex-col">
                         {/* The real transcript, not a reimplementation: it is
                             what gives chat its Streamdown rendering (markdown,

@@ -204,17 +204,12 @@ async def _resume_parked(
         _decisions=approvals,
         _history=parked["history"],
     )
-    # An object, the same shape the start route answers with — not the bare run
-    # id this returned before. A bare id left `run_id` undefined on the caller's
-    # side, which threw away the handle to the run that was now carrying the
-    # turn: the resumed run became unreachable through the tool that started it.
-    # The model rides along because a resumed turn reuses the parked one's
-    # model, and the caller announces that rather than assuming a default.
-    return JSONResponse({
-        "run_id": run.run_id,
-        "token": str(parked["token"]),
-        "agent_name": str(parked.get("active_agent") or ""),
-        "model": str(parked.get("model_id") or "")})
+    # The plain id, and only that. This helper is shared by the approval route
+    # and the orchestrator's approve path, and both wrap it themselves — putting
+    # a response object here made the caller serialise a JSONResponse as data
+    # (`Object of type JSONResponse is not JSON serializable ... run_id`), which
+    # turned every approval into a 500 while the resumed run still wrote.
+    return str(run.run_id)
 
 
 def _turn_token(run_id: str) -> str | None:
@@ -572,11 +567,16 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
             reason=reason,
             steer=steer,
         )
+        # Plain data only, the shape the start route answers with: a resumed run
+        # is a new run, so the caller needs its id to keep reporting on it. The
+        # model rides along because the resumed turn reuses the parked one's
+        # model, and the caller announces that rather than assuming a default.
         return JSONResponse({
             "run_id": resumed,
             "decision": decision,
             "token": parked.get("token", ""),
-            "agent_name": parked.get("active_agent") or ""})
+            "agent_name": parked.get("active_agent") or "",
+            "model": str(parked.get("model_id") or "")})
 
     @router.post("/api/workflow/chat/{run_id}/steer")
     async def workflow_chat_steer(

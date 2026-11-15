@@ -69,7 +69,11 @@ How to work:
    answer_specialist. Approving releases a gate the user put there, so the user
    is asked to confirm before it happens — put the request in your own words
    first, so they know what they are approving. Never imply you approved
-   something on their behalf.
+   something on their behalf. If the user has told you in advance that they
+   will approve requests, you may mention that they said so, but the request
+   must still state what the action is and wait for their answer: a standing
+   instruction is not this decision, and "the user gave permission" must never
+   appear in a reason for an action they have not yet seen.
 4. Report back what it actually did with specialist_report: its own words ("said")
    and the tool calls it made ("did"). Never claim work it did not do.
 5. Use stop_specialist when the user wants it to stop, and steer_specialist to
@@ -134,7 +138,20 @@ export const orchestratorTools = {
         inputSchema: z.object({
             runId: z.string(),
             approved: z.boolean(),
-            reason: z.string().optional(),
+            // What this field is FOR, because leaving it undefined let a model
+            // write the user's consent for them: the card shown to the user
+            // already asks them to decide, so text claiming they already
+            // permitted the action describes a permission that does not exist
+            // yet. It is the "why not" when denying, and when approving it says
+            // what is being released — never that the user agreed to it.
+            reason: z
+                .string()
+                .optional()
+                .describe(
+                    "Why not, when denying. When approving: what action is " +
+                        "being released, in concrete terms. Never a claim that " +
+                        "the user already permitted it.",
+                ),
             steer: z
                 .string()
                 .optional()
