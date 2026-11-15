@@ -1,7 +1,13 @@
+"use client";
+
+// A client component, like every page that renders a live session: the stream,
+// the polling and the actions all run in the browser.
+
+import {use, useState} from "react";
+
 import ChatTranscript from "@/app/components/ChatTranscript";
 import {Navbar} from "@/app/components/Navbar";
 import {useSpecialistSession} from "@/harness/useSpecialistSession";
-import {use, useState} from "react";
 
 /**
  * A specialist's session, as a place you can be.
@@ -61,8 +67,8 @@ export default function SpecialistSessionPage({
                         <ul className="flex flex-col gap-2">
                             {session.pending.map((call) => (
                                 <li
-                                    className="rounded border border-warning p-3 text-sm"
                                     key={call.tool_call_id}
+                                    className="rounded border border-warning p-3 text-sm"
                                 >
                                     <p className="mb-2 font-medium">
                                         {session.state === "waiting"
@@ -129,9 +135,9 @@ export default function SpecialistSessionPage({
                     >
                         <input
                             className="flex-1 rounded border border-current/20 bg-transparent px-3 py-2 text-sm"
-                            onChange={(event) => setSteerText(event.target.value)}
                             placeholder="Send into this session…"
                             value={steerText}
+                            onChange={(event) => setSteerText(event.target.value)}
                         />
                         <button
                             className="rounded border border-current/30 px-3 py-2 text-sm"

@@ -35,8 +35,9 @@
  * Never npm here: `berg_agents/ui/webapp` is a bun project.
  */
 
-import {API_BASE} from "@/envConfig";
 import {fetch as workflowFetch} from "workflow";
+
+import {API_BASE} from "@/envConfig";
 
 /** One specialist run, as the backend reports it. */
 export interface SpecialistRun {

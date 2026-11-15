@@ -1,7 +1,8 @@
-import {toChatMessage} from "@/harness/messageParts";
 import {useChat} from "@ai-sdk/react";
 import {DefaultChatTransport, type UIMessage} from "ai";
 import {useCallback, useEffect, useRef, useState} from "react";
+
+import {toChatMessage} from "@/harness/messageParts";
 
 /** What a specialist is doing, in the terms its session surface acts on. */
 export type SpecialistSessionState =
