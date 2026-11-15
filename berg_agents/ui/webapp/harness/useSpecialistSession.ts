@@ -148,6 +148,27 @@ export function useSpecialistSession(runId: string): SpecialistSession {
                 // A `write` or a steer changes what the run is waiting on, so the
                 // next poll should see the new shape immediately.
                 if (path === "approval" || path === "steer") setLive(true);
+
+                // An answer does not resume THIS run — it ends it and starts the
+                // next one carrying the decision (berg's durable gate: the pass
+                // has already ended, so a decision arrives as a new run). The
+                // session therefore follows its own continuation, and the URL
+                // keeps naming the run currently being addressed rather than the
+                // parked one whose gate just cleared.
+                if (path === "approval") {
+                    const raw = await response.text();
+                    try {
+                        const resumed = JSON.parse(raw) as {run_id?: string};
+                        if (resumed.run_id && resumed.run_id !== runId) {
+                            window.location.assign(
+                                `/specialist/${encodeURIComponent(resumed.run_id)}`,
+                            );
+                        }
+                    } catch {
+                        // No JSON body: the session stays where it is and the
+                        // next poll reports what changed.
+                    }
+                }
             } catch (err) {
                 setError(`${path} failed: ${String(err)}`);
             }
