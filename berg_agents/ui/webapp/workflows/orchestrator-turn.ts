@@ -33,6 +33,7 @@
 
 import {buildOrchestrator} from "@/harness/orchestrator";
 import type {ModelCallStreamPart} from "@ai-sdk/workflow";
+import {isStepCount} from "ai";
 import {convertToModelMessages, type LanguageModel, type UIMessage} from "ai";
 import {getWritable} from "workflow";
 
@@ -64,7 +65,15 @@ export async function orchestratorTurn(
         messages: modelMessages,
         // Raw model parts on the workflow stream; the route converts them to UI
         // chunks with `createModelCallToUIChunkTransform`.
-        writable: getWritable<ModelCallStreamPart>()});
+        writable: getWritable<ModelCallStreamPart>(),
+        // A bound, because `stream()` has no default one: a model that keeps
+        // calling its tools can make an unlimited number of model calls, and
+        // every one of them is a real call against Sofia's local models. 20 is
+        // the same ceiling `generate()` applies, and it is far above what a
+        // planning turn needs (plan, a delegation, a state check, a report).
+        // berg's Python side has its own RunawayGuard; this is the orchestrator's
+        // half of the same idea, on this side of the language boundary.
+        stopWhen: isStepCount(20)});
 
     return {messages: result.messages};
 }

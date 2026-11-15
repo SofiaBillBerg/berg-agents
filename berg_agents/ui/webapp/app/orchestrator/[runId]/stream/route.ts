@@ -40,20 +40,32 @@ export async function GET(
         return new Response("unknown run", {status: 404});
     }
 
-    // `startIndex` is the resume contract the SDK's own transport speaks
-    // (`?startIndex=0` replays from the beginning): honour it so a client that
-    // already consumed part of a run can ask for the rest. `readable` is a
-    // property holding the default stream; `getReadable(options)` is the
-    // options-taking form, so the whole stream is only asked for when no index
-    // was given.
-    const startIndex = Number(new URL(request.url).searchParams.get("startIndex"));
-    const readable =
-        Number.isInteger(startIndex) && startIndex >= 0
-            ? run.getReadable({startIndex})
-            : run.readable;
+    // The resume contract `WorkflowChatTransport` speaks: a client that already
+    // consumed part of a run asks for the rest by UI cursor. 0 means "replay it
+    // all", which is what restoring a past run into a fresh page wants.
+    const startIndex = Number(
+        new URL(request.url).searchParams.get("startIndex") ?? "0",
+    );
+    if (!Number.isSafeInteger(startIndex) || startIndex < 0) {
+        return Response.json(
+            {error: "startIndex must be a non-negative safe integer"},
+            {status: 400},
+        );
+    }
+
+    // The durable stream holds raw `ModelCallStreamPart` objects while the
+    // client speaks `UIMessageChunk`, so the raw stream is replayed from index 0
+    // and the UI cursor is applied inside the transform. Replaying the raw
+    // stream *from* startIndex would skip raw chunks the UI cursor has not
+    // reached yet: the two index spaces are not interchangeable.
+    const readable = run
+        .getReadable({startIndex: 0})
+        .pipeThrough(
+            createModelCallToUIChunkTransform({uiStartIndex: startIndex}),
+        );
 
     return createUIMessageStreamResponse({
-        stream: readable.pipeThrough(createModelCallToUIChunkTransform()),
+        stream: readable,
         // Carried so a client that adopts this run as its own conversation can
         // address the next turn to it.
         headers: {"x-workflow-run-id": runId}});

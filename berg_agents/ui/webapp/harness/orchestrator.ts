@@ -193,8 +193,25 @@ export const orchestratorTools = {
  * @returns A `WorkflowAgent` to run inside a workflow.
  */
 export function buildOrchestrator(model: string | object): WorkflowAgent<any> {
+    // Signed approvals, and only when a secret is actually configured: the SDK
+    // signs the approval id, tool call and validated input so that a modified
+    // client history cannot forge an approval that releases a real write on the
+    // Python side. With no secret the behaviour is exactly what it was, so
+    // enabling this is a deliberate act rather than a default.
+    //
+    // To enable: export TOOL_APPROVAL_SECRET with at least 32 bytes of
+    // high-entropy value, on every worker that can issue or resume an approval.
+    // Only the variable NAME crosses into the steps; the value is read from each
+    // worker's own environment and never lands in step arguments or the stream.
+    const approvalSecret = process.env.TOOL_APPROVAL_SECRET;
+
     return new WorkflowAgent({
         model: model as never,
         instructions: ORCHESTRATOR_INSTRUCTIONS,
-        tools: orchestratorTools});
+        tools: orchestratorTools,
+        ...(approvalSecret
+            ? {
+                  experimental_toolApprovalSecret: {
+                      environmentVariable: "TOOL_APPROVAL_SECRET"}}
+            : {})});
 }

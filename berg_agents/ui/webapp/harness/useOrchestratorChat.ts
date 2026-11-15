@@ -76,9 +76,14 @@ export interface PendingApprovalRequest {
 /**
  * Drive the orchestrator's conversation.
  *
+ * @param resumeRunId - A run to adopt as this conversation on mount, so a
+ * reloaded page picks up a past orchestration instead of starting empty. Omit
+ * it for a fresh conversation.
  * @returns The messages, the send/stop controls, and the last run id.
  */
-export function useOrchestratorChat(): UseOrchestratorChatReturn {
+export function useOrchestratorChat(
+    resumeRunId?: string,
+): UseOrchestratorChatReturn {
     // The run id arrives on a response header, which the transport sees but
     // React does not — the callback fires outside render. State (not a ref) is
     // what makes the page re-render with the id once it lands.

@@ -117,6 +117,10 @@ async function call(
 
 /** The specialists berg registers, so the orchestrator offers real names. */
 export async function listSpecialists(): Promise<string[]> {
+    // A step even though it only reads: the docs' point is that a tool without
+    // it re-executes on replay, so a replayed turn could report a specialist
+    // list that has since changed. Recorded, the turn is consistent with itself.
+    "use step";
     const agents = (await call("/api/agents")) as unknown;
     if (!Array.isArray(agents)) return [];
     return agents
@@ -130,6 +134,12 @@ export async function startSpecialist(
     task: string,
     rootDir = ".",
 ): Promise<SpecialistRun> {
+    // A step, not an inline call. Starting a specialist begins a real run in
+    // the Python backend, and a tool that is not a step re-executes on replay —
+    // which would start a SECOND specialist for one instruction after a crash or
+    // a retry. As a step its result is recorded, so a replay reads back the run
+    // id that was already reported instead of starting another one.
+    "use step";
     const started = await call("/api/workflow/chat", {
         method: "POST",
         body: JSON.stringify({
@@ -149,6 +159,9 @@ export async function startSpecialist(
 export async function specialistState(
     runId: string,
 ): Promise<{ state: SpecialistState; status: string; pending: SpecialistReport["pending"] }> {
+    // A step for the same reason as the list read: a replay then reports the state
+    // the turn actually acted on rather than a fresh one.
+    "use step";
     const state = await call(`/api/workflow/chat/${runId}/state`);
     return {
         state: String(state.state ?? "pending") as SpecialistState,
@@ -160,6 +173,9 @@ export async function specialistState(
 export async function specialistReport(
     runId: string,
 ): Promise<SpecialistReport> {
+    // A step for the same reason as the state read: the report a turn cites is the
+    // one it actually read.
+    "use step";
     const report = await call(`/api/workflow/chat/${runId}/report`);
     return {
         runId: String(report.run_id ?? runId),
@@ -182,6 +198,10 @@ export async function answerSpecialist(
     runId: string,
     options: { approved: boolean; reason?: string; steer?: string },
 ): Promise<SpecialistRun> {
+    // A step, for the same reason as start: answering releases a real write in
+    // the Python side. Recorded as a step, a replay reuses the recorded decision
+    // rather than approving the same write twice.
+    "use step";
     const answered = await call(`/api/workflow/chat/${runId}/approval`, {
         method: "POST",
         body: JSON.stringify({
@@ -202,6 +222,9 @@ export async function steerSpecialist(
     runId: string,
     text: string,
 ): Promise<{ runId: string; delivered: boolean }> {
+    // A step: a steer is stored state on the Python side, and an unrecorded
+    // re-execution would deliver the same instruction twice.
+    "use step";
     const steered = await call(`/api/workflow/chat/${runId}/steer`, {
         method: "POST",
         body: JSON.stringify({ text })});
@@ -221,6 +244,9 @@ export async function stopSpecialist(
     runId: string,
     reason = "stopped by the user",
 ): Promise<{ stopped: boolean; how: string }> {
+    // A step: stopping is idempotent at the backend, but recording the call keeps
+    // the turn's history honest about what it did.
+    "use step";
     const stopped = await call(`/api/workflow/chat/${runId}/stop`, {
         method: "POST",
         body: JSON.stringify({ reason })});
