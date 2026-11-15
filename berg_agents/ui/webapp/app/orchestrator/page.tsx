@@ -572,13 +572,18 @@ export default function OrchestratorPage() {
                   <span className="opacity-70">
                     on {row.model || "the tier default"}
                   </span>
+                  {/* The link IS the point of this strip. Delegating used to mean
+                      hiding a run's id in a tool card and summarizing what came
+                      back; the run id is now the door into that specialist's
+                      session — follow it in, work there, and come back. */}
                   {row.runId ? (
-                    <code
-                      className="overflow-hidden text-ellipsis whitespace-nowrap opacity-60"
-                      title={row.runId}
+                    <a
+                      className="overflow-hidden text-ellipsis whitespace-nowrap underline opacity-70 hover:opacity-100"
+                      href={`/specialist/${encodeURIComponent(row.runId)}`}
+                      title={`Open ${row.agent}'s session (${row.runId})`}
                     >
-                      {row.runId.slice(0, 14)}…
-                    </code>
+                      open session →
+                    </a>
                   ) : null}
                 </li>
               ))}
