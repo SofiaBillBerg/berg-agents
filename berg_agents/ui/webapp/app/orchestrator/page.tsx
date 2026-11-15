@@ -107,6 +107,31 @@ export default function OrchestratorPage() {
     // The routing tiers, so the orchestrator's brain is a choice rather than
     // an environment variable.
     const [tiers, setTiers] = useState<Tier[]>([]);
+    // Past orchestration runs. They live in the workflow world's database, not
+    // in Python's sessions, so the History tab can never show them — this is
+    // their surface. A reload used to lose the run entirely.
+    const [pastRuns, setPastRuns] = useState<
+        {id: string; status: string; created_at: string}[]
+    >([]);
+    useEffect(() => {
+        let alive = true;
+        void (async () => {
+            try {
+                const response = await fetch(`/api/orchestrator/runs`);
+                if (!response.ok) return;
+                const data = (await response.json()) as {
+                    runs?: {id: string; status: string; created_at: string}[];
+                };
+                if (alive) setPastRuns(data.runs ?? []);
+            } catch {
+                // No list leaves the panel empty; the live conversation is
+                // unaffected either way.
+            }
+        })();
+        return () => {
+            alive = false;
+        };
+    }, []);
 
     // The same side-surface machinery the chat page uses — one hook, so todos
     // and plugin surfaces behave identically here. It wants berg's ChatMessage
@@ -311,6 +336,42 @@ export default function OrchestratorPage() {
                             </code>
                         ) : null}
                     </header>
+
+                    {/* The record of what has been orchestrated before, because a
+                        reload used to leave no trace of it. Read from the
+                        workflow world's own tables, so what is listed is what
+                        actually ran. Restoring a chosen run into the
+                        conversation is the next step and deliberately not
+                        pretended here. */}
+                    {pastRuns.length > 0 ? (
+                        <details className="rounded border border-current/20 px-3 py-2 text-xs">
+                            <summary className="cursor-pointer opacity-80">
+                                Past orchestration runs ({pastRuns.length})
+                            </summary>
+                            <ul className="mt-2 flex flex-col gap-1">
+                                {pastRuns.map((run) => (
+                                    <li
+                                        className="flex items-baseline justify-between gap-3"
+                                        key={run.id}
+                                    >
+                                        <code className="opacity-70">
+                                            {run.id}
+                                        </code>
+                                        <span className="opacity-60">
+                                            {run.status}
+                                        </span>
+                                        <span className="opacity-60">
+                                            {run.created_at
+                                                ? new Date(
+                                                      run.created_at,
+                                                  ).toLocaleString()
+                                                : ""}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </details>
+                    ) : null}
 
                     {/* The same controls the chat page offers, because the
                         orchestrator is where planning happens: which model,
