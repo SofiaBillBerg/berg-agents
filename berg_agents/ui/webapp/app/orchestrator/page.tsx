@@ -93,6 +93,18 @@ function toolsOf(
  * @returns The chat surface for the orchestrator.
  */
 export default function OrchestratorPage() {
+    // Which past run to adopt as this conversation, from the URL: `?run=<id>`.
+    // Read once at mount, because adopting changes the conversation's identity
+    // (the SDK addresses a reconnect by chat id), so it is a navigation rather
+    // than a mid-flight switch. A page opened without it starts fresh.
+    // Declared before the hook that takes it.
+    const [resumeRunId] = useState<string | undefined>(() => {
+        if (typeof window === "undefined") return undefined;
+        return (
+            new URLSearchParams(window.location.search).get("run") ??
+            undefined
+        );
+    });
     const {
         messages,
         isStreaming,
@@ -103,7 +115,7 @@ export default function OrchestratorPage() {
         pendingApprovals,
         answerApproval,
         model,
-        setModel} = useOrchestratorChat();
+        setModel} = useOrchestratorChat(resumeRunId);
     const [input, setInput] = useState("");
     // The routing tiers, so the orchestrator's brain is a choice rather than
     // an environment variable.
@@ -114,17 +126,6 @@ export default function OrchestratorPage() {
     const [pastRuns, setPastRuns] = useState<
         {id: string; status: string; created_at: string}[]
     >([]);
-    // Which past run to adopt as this conversation, from the URL: `?run=<id>`.
-    // Read once at mount, because adopting changes the conversation's identity
-    // (the SDK addresses a reconnect by chat id), so it is a navigation rather
-    // than a mid-flight switch. A page opened without it starts fresh.
-    const [resumeRunId] = useState<string | undefined>(() => {
-        if (typeof window === "undefined") return undefined;
-        return (
-            new URLSearchParams(window.location.search).get("run") ??
-            undefined
-        );
-    });
     useEffect(() => {
         let alive = true;
         void (async () => {
@@ -383,6 +384,23 @@ export default function OrchestratorPage() {
                                                   ).toLocaleString()
                                                 : ""}
                                         </span>
+                                        {/* Restore, not just view: the page
+                                            navigates with this run's id, and on
+                                            mount the hook adopts the run's
+                                            durable stream as this conversation
+                                            — so the next message continues it
+                                            rather than starting a new turn. */}
+                                        <button
+                                            className="rounded border border-current/30 px-2 py-0.5 text-xs"
+                                            type="button"
+                                            onClick={() => {
+                                                window.location.assign(
+                                                    `/orchestrator?run=${run.id}`,
+                                                );
+                                            }}
+                                        >
+                                            Restore
+                                        </button>
                                     </li>
                                 ))}
                             </ul>

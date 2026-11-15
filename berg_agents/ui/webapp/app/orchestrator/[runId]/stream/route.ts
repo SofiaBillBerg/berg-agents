@@ -58,6 +58,21 @@ export async function GET(
     // and the UI cursor is applied inside the transform. Replaying the raw
     // stream *from* startIndex would skip raw chunks the UI cursor has not
     // reached yet: the two index spaces are not interchangeable.
+    // The durable stream holds raw `ModelCallStreamPart` objects while the client
+    // speaks `UIMessageChunk`, so the raw stream is replayed from index 0 and the
+    // UI cursor is applied inside the transform. Replaying the raw stream *from*
+    // startIndex would skip raw chunks the UI cursor has not reached yet: the two
+    // index spaces are not interchangeable.
+    //
+    // Known limit, recorded rather than papered over: a turn whose model step
+    // retried can leave the recorded stream holding a tool's OUTPUT with no
+    // matching INPUT chunks (measured on the run that was cut off mid-turn on
+    // 2026-11-14: 474 chunks, 3 tool outputs, 2 tool inputs). A live turn repairs
+    // that with the `reset-step` the transform forwards; on replay the client's
+    // accumulator reports "No tool invocation found for tool call ID" and the
+    // restored transcript shows that line. `normalizeUIMessageStreamParts` does
+    // NOT close this hole (tried), so the next place to look is what a retried
+    // step owes the durable stream.
     const readable = run
         .getReadable({startIndex: 0})
         .pipeThrough(

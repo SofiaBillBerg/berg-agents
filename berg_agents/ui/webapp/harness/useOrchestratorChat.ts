@@ -37,7 +37,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /** What the page needs to render and drive the orchestrator. */
 export interface UseOrchestratorChatReturn {
