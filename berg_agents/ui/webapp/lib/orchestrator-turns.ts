@@ -129,9 +129,16 @@ export async function listTurns(): Promise<StoredTurn[]> {
     const client = await connect();
     if (!client) return [];
     try {
+        // Each branch selects only columns its own table has: berg's table is
+        // (run_id, messages, created_at) and carries no `status`, so the first
+        // branch LEFT JOINs the world's run for it. Selecting `status` from
+        // berg's table — which is what this query did first — is a parse error
+        // ("column \"status\" does not exist"), and it took the whole panel down
+        // rather than one row.
         const result = await client.query(
-            `SELECT run_id, status, created_at, TRUE AS has_conversation
-               FROM ${TURNS_TABLE}
+            `SELECT t.run_id, r.status, t.created_at, TRUE AS has_conversation
+               FROM ${TURNS_TABLE} t
+               LEFT JOIN workflow.workflow_runs r ON r.id = t.run_id
               UNION ALL
              SELECT r.id, r.status, r.created_at, FALSE
                FROM workflow.workflow_runs r

@@ -25,13 +25,14 @@ synchronous tool-execution endpoint the webapp's slash commands use.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Any
 
 from berg_agents.core.harness import Harness
 from berg_agents.ui.schemas import ToolExecuteRequest, ToolExecuteResponse
 from berg_agents.ui.sessions import SessionManager
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,210 @@ async def _run_task_tool(
         except (TypeError, ValueError):
             output = str(result)
     return ToolExecuteResponse(tool="run_task", output=output)
+
+
+#: The MCP surfaces an agent may use DIRECTLY, without a specialist run.
+#
+# Sofia's decision (2026-11-16): an advisor that can only read the files is half
+# an advisor, so the orchestrator can also look things up — documentation, code
+# intelligence, her memory — without delegating. Two ways an MCP server can be
+# listed here:
+#
+# - **autonomous** — every tool from this server may be called directly. That is
+#   berg's existing `READONLY_SERVERS` policy (`codegraph`, `context7`), which is
+#   already the "safe to run without asking" set, plus the two knowledge stores
+#   Sofia chose to open fully (`memory`, `mempalace-light`) — writing to her own
+#   memory is not a workspace write, and the file gate was never protecting it.
+# - **reads** — only the named tools may be called. Used for `github`, where
+#   Sofia chose reads-only: searching an issue is a lookup, opening one is not.
+#
+# MCP schemas do not declare which of their tools mutate, so an explicit list is
+# the only honest mechanism — `READONLY_SERVERS` says as much about a whole
+# server, and here it is said tool by tool.
+AUTONOMOUS_MCP_SERVERS: frozenset[str] = frozenset({
+    "codegraph",
+    "context7",
+    "memory",
+    "mempalace-light"})
+
+#: GitHub's read-only tools, named explicitly (the server cannot say which of
+#: its tools mutate).
+GITHUB_READ_TOOLS: frozenset[str] = frozenset({
+    "get_issue",
+    "get_pull_request",
+    "get_pull_request_diff",
+    "get_pull_request_files",
+    "list_issues",
+    "list_pull_requests",
+    "list_commits",
+    "search_code",
+    "search_issues",
+    "search_users"})
+
+
+#: How far to unwrap berg's toolset wrappers looking for the MCP client. Two is
+#: what today's stacking needs (prefixed → resilient → MCP toolset); the bound
+#: is there so a future wrapper cannot make this walk forever.
+_MAX_TOOLSET_UNWRAP = 5
+
+
+def _mcp_client(toolset: Any) -> Any:
+    """The MCP client behind berg's wrapped toolset.
+
+    ``_ResilientToolset`` wraps the real toolset (a ``WrapperToolset``), so
+    ``client`` — the MCP server, with ``list_tools``/``call_tool`` — is one
+    ``wrapped`` away. Reaching it is what lets a route ask a server directly,
+    without a run context.
+
+    :param toolset: A toolset as :func:`named_mcp_toolsets` returns one.
+    :return: The MCP client, or None when it cannot be reached.
+    """
+    seen = 0
+    candidate = toolset
+    while candidate is not None and seen < _MAX_TOOLSET_UNWRAP:
+        client = getattr(candidate, "client", None)
+        if client is not None:
+            return client
+        candidate = getattr(candidate, "wrapped", None)
+        seen += 1
+    return None
+
+
+def _allowed_mcp_call(server: str, tool: str) -> bool:
+    """Whether *server*'s *tool* may be called directly, outside an agent run.
+
+    Deliberately a deny-by-default: an unnamed server or tool is not allowed,
+    because the alternative is that a new MCP server appears in the config and
+    becomes callable by an agent that never asks.
+
+    :param server: The MCP server key.
+    :param tool: The tool name as the server advertises it.
+    :return: Whether the call is permitted here.
+    """
+    if server in AUTONOMOUS_MCP_SERVERS:
+        return True
+    if server == "github":
+        return tool in GITHUB_READ_TOOLS
+    return False
+
+
+async def _list_mcp_tools() -> dict[str, Any]:
+    """List the MCP tools an agent may call directly, with their schemas.
+
+    Built from the live toolsets (cached process-wide, best-effort: a dead
+    server is skipped rather than failing the list), because tool names and
+    arguments are the SERVER's to define — hard-coding them here would mean a
+    list that silently drifts from the servers it describes.
+
+    Only servers on the direct-call allowlist are listed, so what a caller sees
+    is what it may actually call.
+
+    :return: ``{tools: [...]}``, one entry per allowed tool.
+    """
+    from berg_agents.tools.mcp_toolsets import named_mcp_toolsets
+
+    tools: list[dict[str, Any]] = []
+    for server, toolset in named_mcp_toolsets():
+        client = _mcp_client(toolset)
+        if client is None:
+            continue
+        try:
+            # The toolset's `client` is the MCP server itself. Asking the
+            # toolset (`get_tools(ctx)`) would need a live run context that only
+            # an agent turn has; asking the client needs nothing, which is what
+            # a direct route is for.
+            async with client as entered:
+                specs = await entered.list_tools()
+                rows = [
+                    (
+                        str(getattr(t, "name", "")),
+                        str(getattr(t, "description", "") or ""),
+                    )
+                    for t in specs
+                ]
+        except Exception as exc:  # A dead server must not break the list.
+            logger.warning("MCP listing skipped for %s: %s", server, exc)
+            continue
+        for bare, description in rows:
+            if not _allowed_mcp_call(server, bare):
+                continue
+            tools.append({
+                "server": server,
+                "tool": bare,
+                "description": description})
+    return {"tools": tools}
+
+
+async def _execute_mcp_tool(
+    server: str, tool: str, request: Request
+) -> dict[str, Any]:
+    """Run one MCP tool directly and return its output.
+
+    The route that makes an MCP server reachable outside an agent run — the
+    point being that the orchestrator can look things up (documentation, code,
+    her own memory) without starting a specialist for a read. The allowlist is
+    enforced HERE, in berg, rather than trusted from the caller: what may run
+    unattended is berg's decision, not the client's.
+
+    :param server: The MCP server key.
+    :param tool: The tool name as the server advertises it.
+    :param request: JSON body with ``args`` (the tool's arguments).
+    :return: The tool's output as text, and the server/tool that ran it.
+    :raises HTTPException: 403 when that server's tool is not on the
+        direct-call allowlist, 404 for an unknown server or tool.
+    """
+    from berg_agents.tools.mcp_toolsets import named_mcp_toolsets
+
+    if not _allowed_mcp_call(server, tool):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"{server}.{tool} is not on the direct-call allowlist. "
+                "Reads that answer the question are; anything that changes "
+                "something belongs in a specialist, behind a gate."
+            ),
+        )
+
+    body = await request.json()
+    args = body.get("args") if isinstance(body, dict) else {}
+    if not isinstance(args, dict):
+        args = {}
+
+    for name, toolset in named_mcp_toolsets():
+        if name != server:
+            continue
+        client = _mcp_client(toolset)
+        if client is None:
+            continue
+        try:
+            # Ask the MCP server itself, not the toolset: `call_tool` on the
+            # toolset needs a run context, and the client's does not.
+            async with client as entered:
+                specs = await entered.list_tools()
+                known = {str(getattr(t, "name", "")) for t in specs}
+                if tool not in known:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"{server} has no tool named {tool!r}",
+                    )
+                result = await client.call_tool(tool, args)
+                text = (
+                    result
+                    if isinstance(result, str)
+                    else json.dumps(result, default=str)
+                )
+                return {"server": server, "tool": tool, "output": text}
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("MCP call %s.%s failed: %s", server, tool, exc)
+            raise HTTPException(
+                status_code=502, detail=f"{server}.{tool} unavailable: {exc}"
+            ) from exc
+
+    raise HTTPException(
+        status_code=404, detail=f"No MCP server named {server!r}"
+    )
 
 
 def register_tool_routes(
@@ -131,6 +336,27 @@ def register_tool_routes(
                 ),
                 "source": "delegate"}])
         return {"tools": tools, "mcp_servers": list_servers()}
+
+    @router.get("/api/mcp/tools")
+    async def list_mcp_tools() -> dict[str, Any]:
+        """The MCP tools an agent may call directly, with their schemas.
+
+        :return: ``{tools: [...]}``, one entry per allowed tool.
+        """
+        return await _list_mcp_tools()
+
+    @router.post("/api/mcp/{server}/tools/{tool}")
+    async def execute_mcp_tool(
+        server: str, tool: str, request: Request
+    ) -> dict[str, Any]:
+        """Run one MCP tool directly and return its output.
+
+        :param server: The MCP server key.
+        :param tool: The tool name as the server advertises it.
+        :param request: JSON body with ``args``.
+        :return: The tool's output, and the server/tool that ran it.
+        """
+        return await _execute_mcp_tool(server, tool, request)
 
     @router.post("/api/tool/execute")
     async def execute_tool(request: ToolExecuteRequest) -> ToolExecuteResponse:

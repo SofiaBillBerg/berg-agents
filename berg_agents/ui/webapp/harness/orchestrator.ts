@@ -45,6 +45,11 @@ import {
   startSpecialist,
   steerSpecialist,
   stopSpecialist} from "./specialists";
+import {
+  listWorkspaceFiles,
+  readWorkspaceFile,
+  searchWorkspaceCode} from "./workspace-tools";
+import {listMcpTools, useMcpTool} from "./mcp-tools";
 
 /**
  * The orchestrator's instructions.
@@ -62,8 +67,18 @@ full-scale specialists, and each one runs as its own task with its own record.
 How to work:
 1. Plan with the user. Ask what they actually want and how it fits together.
    Agree on the shape before delegating anything.
-2. Delegate one self-contained job at a time with start_specialist, naming the
-   specialist whose role matches. Say which one and why.
+2. Use your OWN tools for anything a read answers. You can read files, list
+   directories and search the code yourself — a question about the project is
+   not specialist work, and delegating it wastes a turn and hides the answer.
+   Check what is actually there before you promise anything about it.
+3. Delegate one self-contained job at a time with start_specialist, naming the
+   specialist whose role matches. Say which one and why. Delegate WORK — edits,
+   builds, multi-step jobs — not LOOKUPS.
+4. You also have lookup tools beyond the workspace: documentation (context7),
+   code intelligence (codegraph), and your memory. list_mcp_tools tells you
+   what is available; use_mcp_tool calls one. Use them when a question needs a
+   source you do not have — a library's API, what a symbol does, something
+   already learned — instead of guessing or delegating the lookup.
 3. A specialist may stop and ask for your decision. Its state becomes "waiting":
    tell the user what it wants and what you recommend, then answer it with
    answer_specialist. Approving releases a gate the user put there, so the user
@@ -84,6 +99,71 @@ user changes direction, plan again.`;
 
 /** The tools the orchestrator may call, each one a call into the Python side. */
 export const orchestratorTools = {
+  // The orchestrator's own eyes. Read-only on purpose: a read is a second of
+  // local work, so it happens HERE rather than as a delegated job — and writing,
+  // which cannot be cheap, stays with the specialists where Sofia's gate
+  // protects it.
+  read_workspace_file: tool({
+    description:
+      "Read a file from the project yourself. Use this instead of delegating " +
+      "when the answer is one read away: answering a question about a file is " +
+      "not specialist work.",
+    inputSchema: z.object({
+      file_path: z.string().describe("Path relative to the workspace root.")}),
+    execute: async ({file_path}) => readWorkspaceFile(file_path)}),
+
+  list_workspace_files: tool({
+    description:
+      "List a directory in the project yourself, to see what is there before " +
+      "promising anything about it.",
+    inputSchema: z.object({
+      directory: z
+        .string()
+        .optional()
+        .describe("Path relative to the workspace root; the root when absent.")}),
+    execute: async ({directory}) => listWorkspaceFiles(directory)}),
+
+  search_workspace_code: tool({
+    description:
+      "Search file contents in the project yourself, to find where something " +
+      "is defined or used.",
+    inputSchema: z.object({
+      pattern: z.string().describe("The text to look for."),
+      directory: z
+        .string()
+        .optional()
+        .describe("Where to look; the whole workspace when absent.")}),
+    execute: async ({pattern, directory}) =>
+      searchWorkspaceCode(pattern, directory)}),
+
+  // Looking things up beyond the workspace: documentation, the code graph, her
+  // own memory. What is allowed is berg's decision (see AUTONOMOUS_MCP_SERVERS
+  // and GITHUB_READ_TOOLS in ui/route_handlers/tools.py), so these name a
+  // server and a tool and berg permits or refuses — the policy is not trusted
+  // from this side, because this is the agent that runs unattended.
+  list_mcp_tools: tool({
+    description:
+      "List the lookup tools you have beyond the workspace: documentation " +
+      "(context7), code intelligence (codegraph), your memory. Call this " +
+      "first when a question needs a source you do not have.",
+    inputSchema: z.object({}),
+    execute: async () => ({tools: await listMcpTools()})}),
+
+  use_mcp_tool: tool({
+    description:
+      "Call one of your lookup tools with its arguments. Reads and lookups " +
+      "only — if a call would change something, delegate it to a specialist " +
+      "instead so the user decides.",
+    inputSchema: z.object({
+      server: z.string().describe("The server, e.g. context7, codegraph."),
+      tool: z.string().describe("The tool name from list_mcp_tools."),
+      args: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe("The tool's arguments.")}),
+    execute: async ({server, tool, args}) =>
+      useMcpTool(server, tool, (args ?? {}) as Record<string, unknown>)}),
+
   list_specialists: tool({
     description:
       "List the specialists available to delegate work to. Call this before " +

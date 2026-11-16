@@ -241,4 +241,19 @@ def mcp_toolset_names() -> list[str]:
     return list(_LAST_NAMES)
 
 
-__all__ = ["build_mcp_toolsets", "mcp_toolset_names"]
+def named_mcp_toolsets() -> list[tuple[str, Any]]:
+    """The built toolsets WITH their server names, newest build first.
+
+    The name is not an attribute of the toolset — it is the key it is cached
+    under, because a toolset is a wrapper around a transport and the server
+    identity never reaches it. Callers that need to address one server (the
+    direct-call route does: ``/api/mcp/{server}/tools/{tool}``) would otherwise
+    be guessing at attributes that do not exist.
+
+    :return: ``[(server_name, toolset), ...]``.
+    """
+    build_mcp_toolsets()
+    return list(_CACHE.items())
+
+
+__all__ = ["build_mcp_toolsets", "mcp_toolset_names", "named_mcp_toolsets"]

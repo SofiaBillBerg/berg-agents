@@ -48,6 +48,7 @@ import { usePluginSurface } from "../hooks/usePluginSurface";
 import { buildExportMarkdown } from "@/utils/utils";
 import { useOrchestratorChat } from "@/harness/useOrchestratorChat";
 import { toChatMessage } from "@/harness/messageParts";
+import { useSpecialistStates } from "@/harness/useSpecialistStates";
 import { API_BASE } from "@/envConfig";
 
 /** One routing tier and the models it offers, the best first. */
@@ -88,6 +89,29 @@ function toolsOf(
 }
 
 /**
+ * What a specialist's chip says about what it is doing.
+ *
+ * One place, so the words are the same everywhere a specialist is named: the
+ * whole point of the strip is that working, parked-on-you, finished and stuck
+ * no longer look identical.
+ *
+ * @param runId - The run being described, if its id has landed.
+ * @param state - Its latest state, if it has been read.
+ * @returns The label to show.
+ */
+function liveStateLabel(
+    runId: string,
+    state: string | undefined,
+): string {
+    if (!runId) return "starting…";
+    if (!state) return "starting…";
+    if (state === "waiting") return "waiting on you";
+    if (state === "working" || state === "pending") return "working…";
+    if (state === "done") return "done";
+    return state;
+}
+
+/**
  * The orchestrator conversation page.
  *
  * @returns The chat surface for the orchestrator.
@@ -114,6 +138,61 @@ export default function OrchestratorPage() {
     model,
     setModel} = useOrchestratorChat(resumeRunId);
   const [input, setInput] = useState("");
+    // The specialists this conversation has started, and what each is doing
+    // right now. Watched by the page rather than by the orchestrator's goodwill:
+    // a specialist used to be invisible until the model chose to look, so the
+    // user sat with a finished (or parked, or stuck) specialist and no way to
+    // tell which.
+    const startedSpecialists = useMemo(() => {
+        const rows: { agent: string; model: string; runId: string }[] = [];
+        for (const message of messages) {
+            for (const part of message.parts ?? []) {
+                // Any state, not only `output-available`: a gated tool call passes
+                // through input-streaming → approval-requested → approval-responded →
+                // output-available, and a strip that waits for the LAST one renders
+                // nothing at all while the specialist is genuinely running (found in
+                // Sofia's own transcript, where the part sat at approval-responded and
+                // the session link never appeared). The agent name is known from the
+                // call's input the moment it is parsed, so the chip can show then; the
+                // link needs the run id, which only the output carries.
+                if (part.type !== "tool-start_specialist") {
+                    continue;
+                }
+                // The tool's output arrives either as the object the tool
+                // returned or as its JSON text, depending on the transport.
+                let output: Record<string, unknown> = {};
+                if (typeof part.output === "string") {
+                    try {
+                        output = JSON.parse(part.output) as Record<string, unknown>;
+                    } catch {
+                        // Unparseable output still leaves the agent name, which
+                        // the tool call's input carries.
+                    }
+                } else if (typeof part.output === "object") {
+                    output = part.output as Record<string, unknown>;
+                }
+                const input = (part.input ?? {}) as {agent?: string};
+                const agent =
+                    String(input.agent ?? "") || String(output.agentName ?? "");
+                // Without an agent there is nothing to name yet — the call has not
+                // been fully described by the model.
+                if (!agent) continue;
+                rows.push({
+                    agent,
+                    model: String(output.model ?? ""),
+                    runId: String(output.runId ?? "")});
+            }
+        }
+        return rows;
+    }, [messages]);
+    const specialistRunIds = useMemo(
+        () =>
+            startedSpecialists
+                .map((row) => row.runId)
+                .filter((id): id is string => Boolean(id)),
+        [startedSpecialists],
+    );
+    const specialistStates = useSpecialistStates(specialistRunIds);
   // The routing tiers, so the orchestrator's brain is a choice rather than
   // an environment variable.
   const [tiers, setTiers] = useState<Tier[]>([]);
@@ -234,52 +313,6 @@ export default function OrchestratorPage() {
     }
   }
 
-  // Which specialists this conversation has started, and on what. Read out of
-  // the completed `start_specialist` tool calls — the same results the
-  // transcript already renders — so what is announced is what actually
-  // happened, not a restatement of what was requested.
-  const startedSpecialists = useMemo(() => {
-    const rows: { agent: string; model: string; runId: string }[] = [];
-    for (const message of messages) {
-      for (const part of message.parts ?? []) {
-        // Any state, not only `output-available`: a gated tool call passes
-        // through input-streaming → approval-requested → approval-responded →
-        // output-available, and a strip that waits for the LAST one renders
-        // nothing at all while the specialist is genuinely running (found in
-        // Sofia's own transcript, where the part sat at approval-responded and
-        // the session link never appeared). The agent name is known from the
-        // call's input the moment it is parsed, so the chip can show then; the
-        // link needs the run id, which only the output carries.
-        if (part.type !== "tool-start_specialist") {
-          continue;
-        }
-        // The tool's output arrives either as the object the tool
-        // returned or as its JSON text, depending on the transport.
-        let output: Record<string, unknown> = {};
-        if (typeof part.output === "string") {
-          try {
-            output = JSON.parse(part.output) as Record<string, unknown>;
-          } catch {
-            // Unparseable output still leaves the agent name, which
-            // the tool call's input carries.
-          }
-        } else if (typeof part.output === "object") {
-          output = part.output as Record<string, unknown>;
-        }
-        const input = (part.input ?? {}) as {agent?: string};
-        const agent =
-          String(input.agent ?? "") || String(output.agentName ?? "");
-        // Without an agent there is nothing to name yet — the call has not
-        // been fully described by the model.
-        if (!agent) continue;
-        rows.push({
-          agent,
-          model: String(output.model ?? ""),
-          runId: String(output.runId ?? "")});
-      }
-    }
-    return rows;
-  }, [messages]);
   const {
     sidePluginId,
     setSidePluginId,
@@ -573,13 +606,13 @@ export default function OrchestratorPage() {
                   <span className="font-medium">
                     {row.agent || "specialist"}
                   </span>
-                  {/* Before the run id lands the specialist is starting rather
-                      than running on any particular model — saying so is more
-                      useful than naming a default it has not used yet. */}
+                  {/* What it is doing, live. Until this was watched by the page,
+                      a specialist was invisible from the moment it was
+                      delegated to the moment the orchestrator happened to look:
+                      working, waiting on a decision, finished, and stuck all
+                      read exactly the same — nothing. */}
                   <span className="opacity-70">
-                    {row.runId
-                      ? `on ${row.model || "the tier default"}`
-                      : "starting…"}
+                    {liveStateLabel(row.runId, specialistStates[row.runId])}
                   </span>
                   {/* The link IS the point of this strip. Delegating used to mean
                       hiding a run's id in a tool card and summarizing what came

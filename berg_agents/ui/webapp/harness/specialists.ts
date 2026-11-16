@@ -97,7 +97,27 @@ function backendOrigin(): string {
  * - **`API_BASE` rather than a second base-URL rule.** `envConfig` already
  *   resolves where the Python backend lives; only the fetch differs.
  */
-async function call(
+/**
+ * One HTTP call to berg's Python backend, with a useful error when it fails.
+ *
+ * Exported because it is THE seam: the orchestrator's own tools (workspace
+ * reads, and the MCP and context surfaces) reach berg through here too, rather
+ * than each module growing its own copy of the origin and the fetch rules.
+ *
+ * Two deliberate choices here:
+ *
+ * - **`workflow`'s `fetch`, not the global one.** These calls run inside
+ *   workflow functions (WorkflowAgent tool execution), where the runtime
+ *   forbids global `fetch`. `workflow`'s own `fetch` is hoisted into a step, so
+ *   the call is durable and retried like the rest of the turn.
+ * - **`API_BASE` rather than a second base-URL rule.** `envConfig` already
+ *   resolves where the Python backend lives; only the fetch differs.
+ *
+ * @param path - The path, relative to the backend's origin.
+ * @param init - The request init, when the call carries a body.
+ * @returns The parsed JSON body, or an empty object for an empty one.
+ */
+export async function callBackend(
     path: string,
     init?: RequestInit,
 ): Promise<Record<string, unknown>> {
@@ -122,7 +142,7 @@ export async function listSpecialists(): Promise<string[]> {
     // it re-executes on replay, so a replayed turn could report a specialist
     // list that has since changed. Recorded, the turn is consistent with itself.
     "use step";
-    const agents = (await call("/api/agents")) as unknown;
+    const agents = (await callBackend("/api/agents")) as unknown;
     if (!Array.isArray(agents)) return [];
     return agents
         .map((entry) => String((entry as { name?: unknown })?.name ?? ""))
@@ -141,7 +161,7 @@ export async function startSpecialist(
     // a retry. As a step its result is recorded, so a replay reads back the run
     // id that was already reported instead of starting another one.
     "use step";
-    const started = await call("/api/workflow/chat", {
+    const started = await callBackend("/api/workflow/chat", {
         method: "POST",
         body: JSON.stringify({
             prompt: task,
@@ -163,7 +183,7 @@ export async function specialistState(
     // A step for the same reason as the list read: a replay then reports the state
     // the turn actually acted on rather than a fresh one.
     "use step";
-    const state = await call(`/api/workflow/chat/${runId}/state`);
+    const state = await callBackend(`/api/workflow/chat/${runId}/state`);
     return {
         state: String(state.state ?? "pending") as SpecialistState,
         status: String(state.status ?? "unknown"),
@@ -177,7 +197,7 @@ export async function specialistReport(
     // A step for the same reason as the state read: the report a turn cites is the
     // one it actually read.
     "use step";
-    const report = await call(`/api/workflow/chat/${runId}/report`);
+    const report = await callBackend(`/api/workflow/chat/${runId}/report`);
     return {
         runId: String(report.run_id ?? runId),
         state: String(report.state ?? "pending") as SpecialistState,
@@ -203,7 +223,7 @@ export async function answerSpecialist(
     // the Python side. Recorded as a step, a replay reuses the recorded decision
     // rather than approving the same write twice.
     "use step";
-    const answered = await call(`/api/workflow/chat/${runId}/approval`, {
+    const answered = await callBackend(`/api/workflow/chat/${runId}/approval`, {
         method: "POST",
         body: JSON.stringify({
             decision: options.approved ? "approved" : "rejected",
@@ -226,7 +246,7 @@ export async function steerSpecialist(
     // A step: a steer is stored state on the Python side, and an unrecorded
     // re-execution would deliver the same instruction twice.
     "use step";
-    const steered = await call(`/api/workflow/chat/${runId}/steer`, {
+    const steered = await callBackend(`/api/workflow/chat/${runId}/steer`, {
         method: "POST",
         body: JSON.stringify({ text })});
     return {
@@ -248,7 +268,7 @@ export async function stopSpecialist(
     // A step: stopping is idempotent at the backend, but recording the call keeps
     // the turn's history honest about what it did.
     "use step";
-    const stopped = await call(`/api/workflow/chat/${runId}/stop`, {
+    const stopped = await callBackend(`/api/workflow/chat/${runId}/stop`, {
         method: "POST",
         body: JSON.stringify({ reason })});
     return {
