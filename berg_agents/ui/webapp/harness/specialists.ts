@@ -49,6 +49,8 @@ export interface SpecialistRun {
     token: string;
     /** Which model the route resolved for this run; empty when unknown. */
     model: string;
+    /** Why the call did not happen, when it did not. */
+    error?: string;
 }
 
 /** What a specialist is doing, in the terms a caller acts on. */
@@ -215,6 +217,26 @@ export async function specialistReport(
  * makes the specialist re-plan instead of executing arguments it had already
  * committed — proven against the Python host.
  */
+/**
+ * A run id this session can act on, or an explanation when there isn't one.
+ *
+ * A tool that builds a URL from whatever it was given will happily ask berg for
+ * `/api/workflow/chat//approval` — an empty id, a 404, and a failed step after
+ * three retries, all because the model did not have a run id in hand. Refusing
+ * here names what is missing instead: the run id `start_specialist` returned.
+ *
+ * @param runId - The id the model supplied.
+ * @returns The id to use, or null when there is none.
+ */
+//: What the model is told when it acts on a specialist it never started.
+const requireRunIdMessage =
+    "No run id. Use the one start_specialist returned for that specialist - "
+    "you cannot act on a specialist you did not start.";
+function requireRunId(runId: string): string | null {
+    const trimmed = (runId ?? "").trim();
+    return trimmed === "" ? null : trimmed;
+}
+
 export async function answerSpecialist(
     runId: string,
     options: { approved: boolean; reason?: string; steer?: string },
@@ -223,7 +245,16 @@ export async function answerSpecialist(
     // the Python side. Recorded as a step, a replay reuses the recorded decision
     // rather than approving the same write twice.
     "use step";
-    const answered = await callBackend(`/api/workflow/chat/${runId}/approval`, {
+    const target = requireRunId(runId);
+    if (target === null) {
+        return {
+            runId: "",
+            token: "",
+            agentName: "",
+            model: "",
+            error: requireRunIdMessage};
+    }
+    const answered = await callBackend(`/api/workflow/chat/${target}/approval`, {
         method: "POST",
         body: JSON.stringify({
             decision: options.approved ? "approved" : "rejected",
@@ -242,11 +273,15 @@ export async function answerSpecialist(
 export async function steerSpecialist(
     runId: string,
     text: string,
-): Promise<{ runId: string; delivered: boolean }> {
+): Promise<{ runId: string; delivered: boolean; error?: string }> {
     // A step: a steer is stored state on the Python side, and an unrecorded
     // re-execution would deliver the same instruction twice.
     "use step";
-    const steered = await callBackend(`/api/workflow/chat/${runId}/steer`, {
+    const target = requireRunId(runId);
+    if (target === null) {
+        return {runId: "", delivered: false, error: requireRunIdMessage};
+    }
+    const steered = await callBackend(`/api/workflow/chat/${target}/steer`, {
         method: "POST",
         body: JSON.stringify({ text })});
     return {
@@ -264,11 +299,15 @@ export async function steerSpecialist(
 export async function stopSpecialist(
     runId: string,
     reason = "stopped by the user",
-): Promise<{ stopped: boolean; how: string }> {
+): Promise<{ stopped: boolean; how: string; error?: string }> {
     // A step: stopping is idempotent at the backend, but recording the call keeps
     // the turn's history honest about what it did.
     "use step";
-    const stopped = await callBackend(`/api/workflow/chat/${runId}/stop`, {
+    const target = requireRunId(runId);
+    if (target === null) {
+        return {stopped: false, how: "", error: requireRunIdMessage};
+    }
+    const stopped = await callBackend(`/api/workflow/chat/${target}/stop`, {
         method: "POST",
         body: JSON.stringify({ reason })});
     return {

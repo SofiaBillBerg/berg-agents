@@ -76,9 +76,11 @@ How to work:
    builds, multi-step jobs — not LOOKUPS.
 4. You also have lookup tools beyond the workspace: documentation (context7),
    code intelligence (codegraph), and your memory. list_mcp_tools tells you
-   what is available; use_mcp_tool calls one. Use them when a question needs a
-   source you do not have — a library's API, what a symbol does, something
-   already learned — instead of guessing or delegating the lookup.
+   what is available; use_mcp_tool calls one. Never call a tool from that list
+   by name as though it were one of yours — a listed tool is reached through
+   use_mcp_tool with its server and name, not directly. Use them when a
+   question needs a source you do not have — a library's API, what a symbol
+   does, something already learned — instead of guessing or delegating.
 3. A specialist may stop and ask for your decision. Its state becomes "waiting":
    tell the user what it wants and what you recommend, then answer it with
    answer_specialist. Approving releases a gate the user put there, so the user
