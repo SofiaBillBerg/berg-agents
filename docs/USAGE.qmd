@@ -124,7 +124,7 @@ Nothing todo-specific remains in host routes.
 
 ## 5. Human-in-the-loop
 
-Tool risk classes (`berg_agents/agents/factory.py`) decide the pause: `low` (`list_directory`, `read_file`, `search_code`, `plan_task`) runs unattended; `high` (`bash`, `edit_file`, `patch_file`, `write_file`, `implement_task`, sensitive MCP) pauses.
+Tool risk classes (`berg_agents/agents/factory.py`) decide the pause: `low` (`list_directory`, `read_file`, `grep`, `plan_task`) runs unattended; `high` (`run_command`, `edit_file`, `write_file`, `implement_task`, sensitive MCP) pauses.
 
 - **TUI**: the result panel shows review reasons, then `Approve and resume? [y/N]:` --- approval re-executes with `hitl_decision: approve` in metadata, anything else fails the task as rejected.
 - **Web**: the HITL surface shows tool name plus arguments with Approve / Reject / Edit (edit rewrites the args before the tool runs).

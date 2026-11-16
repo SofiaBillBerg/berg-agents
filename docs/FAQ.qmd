@@ -215,9 +215,9 @@ absent from the schema, so there is nothing to approve.
 ### Are path escapes possible from `read_file`?
 
 No --- paths are normalized in `berg_agents/tools/_io.py`: `..`, `~`, and
-absolute paths outside the root are rejected, including for `bash`.
+absolute paths outside the root are rejected, including for `run_command`.
 
-### Is `bash` sandboxed in any way?
+### Is `run_command` sandboxed in any way?
 
 The working directory is the workspace root, and each call has a bounded
 timeout (30s default).

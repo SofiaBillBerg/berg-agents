@@ -58,4 +58,4 @@ For single synchronous tool runs outside chat, use the REST endpoint above.
   | Plan before implementing (`plan_task`, then `implement_task`) | Keeps multi-step work reviewable; implementation is approval-gated.                                                       |
   | Validate before mutating                                      | High-risk tools pause — have the arguments right before approving.                                                        |
   | Watch output length                                           | Session persistence is budgeted (bounded parts, newest survives); write long results to a file instead of the transcript. |
-  | Read-only first                                               | Explore with `list_directory` / `read_file` / `search_code` before touching anything.                                         |
+  | Read-only first                                               | Explore with `list_directory` / `read_file` / `grep` before touching anything.                                         |

@@ -119,7 +119,7 @@ Any OpenAI-compatible endpoint (Unsloth, OmniRoute, a local GGUF server) is adde
     }
   },
   "hitl_rules": {
-    "auto_execute": ["read_file", "list_directory", "search_code"],
+    "auto_execute": ["read_file", "list_directory", "grep"],
     "notify_after": ["edit_file", "new_file", "generate_test"],
     "ask_before":   ["delete_file", "execute_command", "refactor"],
     "human_leads":  ["security_change", "production_deploy", "data_migration"]
