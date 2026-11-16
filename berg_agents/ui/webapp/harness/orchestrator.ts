@@ -105,7 +105,7 @@ export const orchestratorTools = {
   // local work, so it happens HERE rather than as a delegated job — and writing,
   // which cannot be cheap, stays with the specialists where Sofia's gate
   // protects it.
-  read_workspace_file: tool({
+  read_file: tool({
     description:
       "Read a file from the project yourself. Use this instead of delegating " +
       "when the answer is one read away: answering a question about a file is " +
@@ -114,7 +114,7 @@ export const orchestratorTools = {
       file_path: z.string().describe("Path relative to the workspace root.")}),
     execute: async ({file_path}) => readWorkspaceFile(file_path)}),
 
-  list_workspace_files: tool({
+  list_directory: tool({
     description:
       "List a directory in the project yourself, to see what is there before " +
       "promising anything about it.",
@@ -125,10 +125,10 @@ export const orchestratorTools = {
         .describe("Path relative to the workspace root; the root when absent.")}),
     execute: async ({directory}) => listWorkspaceFiles(directory)}),
 
-  search_workspace_code: tool({
+  grep: tool({
     description:
       "Search file contents in the project yourself, to find where something " +
-      "is defined or used.",
+      "is defined or used. The pattern is literal text, not a regex.",
     inputSchema: z.object({
       pattern: z.string().describe("The text to look for."),
       directory: z

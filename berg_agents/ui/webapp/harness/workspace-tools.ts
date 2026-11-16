@@ -86,7 +86,7 @@ export async function searchWorkspaceCode(
     directory?: string,
 ): Promise<ToolResult> {
     "use step";
-    return runWorkspaceTool("search_code", {
+    return runWorkspaceTool("grep", {
         pattern,
         ...(directory ? {directory} : {})});
 }
