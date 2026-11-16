@@ -434,8 +434,8 @@ def build_implementation_agent(
         # harness subagent toolset; see the constant's own docstring.
         f"{TOOL_SELECTION_BLOCK}\n\n"
         "For each step:\n"
-        "1. Do the work with the file tools (read_file, list_directory, search_code first; "
-        "then write_file, edit_file, patch_file; bash for tests and commands).\n"
+        "1. Do the work with the file tools (read_file, list_directory, grep first; "
+        "then write_file, edit_file; run_command for tests and commands).\n"
         "2. Check the step off with set_subtask_done(todo_id=<id from the plan heading>, "
         "index=<the step's index>), so the human sees real progress, not narration.\n"
         "3. Move to the next step.\n\n"
@@ -635,7 +635,7 @@ def build_implementation_agent(
         return "\n".join(lines) + extra if lines else "(empty directory)"
 
     @agent.tool
-    def bash(
+    def run_command(
         ctx: RunContext[AgentDeps], command: str, timeout: int = 30
     ) -> str:
         """Run a shell command in the workspace root.
@@ -688,7 +688,7 @@ def build_implementation_agent(
         return f"[exit {proc.returncode}]\n{combined}".strip()
 
     @agent.tool
-    def search_code(
+    def grep(
         ctx: RunContext[AgentDeps], pattern: str, directory: str = "."
     ) -> str:
         """Search file contents under a workspace directory.
@@ -791,25 +791,6 @@ def build_implementation_agent(
 
         @agent.tool(requires_approval=True)
         def edit_file(
-            ctx: RunContext[AgentDeps], file_path: str, content: str
-        ) -> str:
-            """Replace the contents of an existing file in the workspace.
-
-            :param ctx: Run context carrying implementation deps.
-            :param file_path: Path to the file, relative to workspace root
-                or prefixed with /workspace.
-            :param content: New file contents.
-
-            :return: Confirmation message with the edited path.
-            """
-            root = ctx.deps.workspace_root or "."
-            target = _normalize_target(file_path, root)
-            _atomic_write(target, content)
-            _record_change(ctx, "edit", target, root)
-            return f"Edited {target}"
-
-        @agent.tool(requires_approval=True)
-        def patch_file(
             ctx: RunContext[AgentDeps],
             file_path: str,
             old_text: str,
@@ -818,7 +799,8 @@ def build_implementation_agent(
             """Replace one block of text inside an existing file.
 
             Surgical alternative to rewriting the whole file: only
-            the first occurrence of ``old_text`` is replaced.
+            the first occurrence of ``old_text`` is replaced, where
+            write_file replaces the whole file.
 
             :param ctx: Run context carrying implementation deps.
             :param file_path: Path to the file, relative to workspace
@@ -857,13 +839,13 @@ def build_implementation_agent(
                 )
             remaining = text.count(old_text) - 1
             _atomic_write(target, text.replace(old_text, new_text, 1))
-            _record_change(ctx, "patch", target, root)
+            _record_change(ctx, "edit", target, root)
             note = (
                 f" ({remaining} identical block(s) left untouched)"
                 if remaining
                 else ""
             )
-            return f"Patched {target}{note}"
+            return f"Edited {target}{note}"
 
     return agent
 

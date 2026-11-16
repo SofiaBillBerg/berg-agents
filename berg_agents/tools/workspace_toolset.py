@@ -49,8 +49,6 @@ from pathlib import Path
 import re
 from typing import Any, override
 
-from berg_agents.tools._io import _atomic_write, _normalize_target
-from berg_agents.tools.tool_spec import ToolSpec, make_tool_spec
 from pydantic_ai.toolsets.wrapper import WrapperToolset
 
 logger = logging.getLogger(__name__)
@@ -72,12 +70,13 @@ Workspace tools (toolset `workspace`) - how to work the filesystem:
   at paths; use the exact paths list_directory returns.
 - Directories are not files: read_file on a directory tells you so -
   follow its guidance instead of retrying.
-- SEARCH before assuming: use search_code to find definitions,
+- SEARCH before assuming: use grep to find definitions,
   references, or error strings instead of reading trees by hand.
-- RUN things with bash (tests, builds, inspection). It has a timeout
-  and truncated output; long jobs should be split or backgrounded by
-  the caller. There is no other shell tool.
-- WRITE with intent: write_file creates, edit_file replaces. Both
+- RUN things with run_command (tests, builds, inspection). It has a
+  timeout and truncated output; long jobs should be split or
+  backgrounded by the caller. There is no other shell tool.
+- WRITE with intent: write_file creates or overwrites a whole file,
+  edit_file replaces one block inside an existing file. Both
   need human approval in chat - the user sees an approve/reject
   dialog, so say what you are about to do before calling.
 - COMPLEX work (multistep plans, refactors, research) starts with
@@ -110,7 +109,7 @@ class WorkspaceToolset(WrapperToolset[None]):
         search) are registered - the model cannot change files even
         if it tries. Mutating tools are withheld, not merely
         instructed away.
-    :param allow_shell: When False, the ``bash`` tool is withheld
+    :param allow_shell: When False, the ``run_command`` tool is withheld
         (safe default for untrusted deployments).
     """
 
@@ -129,7 +128,7 @@ class WorkspaceToolset(WrapperToolset[None]):
             search) are registered - the model cannot change files even
             if it tries. Mutating tools are withheld, not merely
             instructed away.
-        :param allow_shell: When False, the ``bash`` tool is withheld
+        :param allow_shell: When False, the ``run_command`` tool is withheld
             (safe default for untrusted deployments).
         :param plan_tools: The session-bound plan-store tools, keyed by
             the names the delegates call (``create_todo``,
@@ -141,9 +140,8 @@ class WorkspaceToolset(WrapperToolset[None]):
             write a plan would otherwise hand back prose that the
             implementer has to guess at, which is the seam this replaced.
         """
-        from pydantic_ai.toolsets import FunctionToolset
-
         from berg_agents.tools.specs import create_tools
+        from pydantic_ai.toolsets import FunctionToolset
 
         inner: FunctionToolset[None] = FunctionToolset()
         # The planner subagent's read-only tool set: it may ground a plan
@@ -161,7 +159,7 @@ class WorkspaceToolset(WrapperToolset[None]):
             risk = spec.risk_class or "medium"
             if read_only and risk != "low":
                 continue
-            if not allow_shell and spec.name == "bash":
+            if not allow_shell and spec.name == "run_command":
                 continue
             if risk == "low":
                 read_tools.append(spec.execute)

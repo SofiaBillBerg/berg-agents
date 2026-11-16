@@ -57,7 +57,7 @@ def _delegation_gate_enabled() -> bool:
 
 
 def _shell_allowed() -> bool:
-    """Whether the ``bash`` tool may be offered to the model.
+    """Whether the ``run_command`` tool may be offered to the model.
 
     Kill-switch for untrusted deployments: set
     ``BERG_AGENT_ALLOW_SHELL=0`` (or false/no/off) to withhold the
@@ -336,7 +336,7 @@ def build_chat_agent(
         # Two output retries so one malformed tool call gets a
         # recovery chance instead of failing the whole turn.
         # NOTE: no approval-handling capability here on purpose.
-        # Tools flagged requires_approval (bash, edit_file,
+        # Tools flagged requires_approval (run_command, edit_file,
         # write_file, implement_task) pause the run as
         # DeferredToolRequests; the chat endpoint declares that
         # output type so the VercelAIAdapter streams an approval

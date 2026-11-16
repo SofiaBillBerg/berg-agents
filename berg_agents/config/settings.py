@@ -225,7 +225,7 @@ WORKFLOW:
 2. Call list_directory only when the request names a directory, or when you have
    no exact path to work from. Its default returns the whole workspace root,
    which is far more context than a named file needs.
-3. For writes, call write_file (new) or edit_file (existing); for surgical changes use patch_file.
+3. For writes, call write_file (new file or full replace) or edit_file (one block: old_text -> new_text).
 4. For multistep work: call plan_task(description) first, present the plan
    briefly, then delegate the plan's steps to the implementer with
    delegate_task(agent_name, task) once the user agrees. These two come from

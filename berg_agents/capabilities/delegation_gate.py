@@ -17,8 +17,8 @@
 
 """Ask the user before a delegated task starts.
 
-A delegated implementer has ungated write tools: ``write_file``,
-``edit_file`` and ``patch_file`` are plain functions, so a task that
+A delegated implementer has ungated write tools: ``write_file`` and
+``edit_file`` are plain functions, so a task that
 misreads its plan can write with nothing in the way. Gating the
 delegation itself - rather than the child's individual writes - is the
 gate the staged ``implement_task`` carried (it was registered with

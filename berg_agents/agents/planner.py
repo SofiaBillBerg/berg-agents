@@ -103,7 +103,7 @@ _PLANNER_INSTRUCTIONS = (
 PLANNER_PLAN_INSTRUCTIONS = (
     "You are a planning subagent. Break the requested task into an "
     "ordered list of concrete steps. You may inspect the repository "
-    "with the read-only tools (list_directory, read_file, search_code) to "
+    "with the read-only tools (list_directory, read_file, grep) to "
     "ground the plan in what actually exists, but never create, edit, "
     "or write anything: you have no write tools, and your caller "
     "stores the plan. Reply with only the plan — one numbered step "

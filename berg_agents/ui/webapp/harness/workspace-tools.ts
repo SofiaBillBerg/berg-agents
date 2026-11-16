@@ -17,7 +17,7 @@ import {callBackend} from "./specialists";
  * - It is the safety property. Writing goes through a specialist, where berg's
  *   HITL gate makes Sofia decide. If the orchestrator could write directly, the
  *   gate would be bypassed by the one agent that never asks. So `write_file`,
- *   `edit_file`, `patch_file` and `bash` are deliberately NOT given to it.
+ *   `edit_file` and `run_command` are deliberately NOT given to it.
  *
  * Each is a step, so a replayed turn reads the same thing it read the first time
  * rather than re-reading (or re-running) on every replay.

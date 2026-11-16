@@ -35,9 +35,6 @@ from typing import Any
 from berg_agents.config.settings import DEFAULT_SYSTEM_PROMPT
 from berg_agents.core.checkpoint import Checkpointer
 from berg_agents.core.loop import BergLoop
-from berg_agents.tools.tool_spec import ToolRegistry, ToolSpec
-
-__all__ = ["DEFAULT_SYSTEM_PROMPT", "build_agent", "build_loop", "create_tools"]
 
 # Re-exported so `from berg_agents.agents.factory import create_tools` -- the
 # import every existing caller uses -- keeps working. The definitions moved to
@@ -45,11 +42,14 @@ __all__ = ["DEFAULT_SYSTEM_PROMPT", "build_agent", "build_loop", "create_tools"]
 # inventory without importing this module and closing an import cycle.
 # ToolSpec / RiskClass / make_tool_spec are already imported above; the
 # workspace tool specs themselves live in tools.specs.
-from berg_agents.tools.specs import (  # noqa: F401
+from berg_agents.tools.specs import (  # ruff: ignore[unused-import]
     _normalize_target,
     _resolve_root,
     create_tools,
 )
+from berg_agents.tools.tool_spec import ToolRegistry, ToolSpec
+
+__all__ = ["DEFAULT_SYSTEM_PROMPT", "build_agent", "build_loop", "create_tools"]
 
 
 def build_loop(
@@ -70,7 +70,7 @@ def build_loop(
     :param max_steps: Hard step limit.
     :param checkpointer: Optional checkpointer.
     :return: Configured BergLoop.
-        """
+    """
     from berg_agents.core.hitl import default_interrupt_on
 
     registry = ToolRegistry()
@@ -81,7 +81,7 @@ def build_loop(
         dict(interrupt_on)
         if interrupt_on is not None
         else default_interrupt_on(dict(registry._tools.items()))
-        )
+    )
 
     return BergLoop(
         adapter=adapter,
@@ -89,7 +89,7 @@ def build_loop(
         interrupt_on=effective_interrupt,
         max_steps=max_steps,
         checkpointer=checkpointer,
-            )
+    )
 
 
 def build_agent(
@@ -115,7 +115,7 @@ def build_agent(
     :param max_steps: Hard step limit.
     :param checkpointer: Optional checkpointer.
     :return: Configured BergLoop with ``system_prompt`` attribute.
-        """
+    """
     loop = build_loop(
         adapter=adapter,
         tools=tools,
@@ -123,7 +123,7 @@ def build_agent(
         interrupt_on=interrupt_on,
         max_steps=max_steps,
         checkpointer=checkpointer,
-            )
+    )
     loop.system_prompt = (
         system_prompt if system_prompt is not None else DEFAULT_SYSTEM_PROMPT
     )  # type: ignore[attr-defined]

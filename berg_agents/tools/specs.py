@@ -29,15 +29,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from berg_agents.tools.tool_spec import ToolSpec, make_tool_spec
 from berg_agents.tools._io import _atomic_write, _normalize_target
+from berg_agents.tools.tool_spec import ToolSpec, make_tool_spec
 
 
 def _resolve_root(root_dir: str | Path) -> Path:
     return Path(root_dir).expanduser().resolve()
-
-
-
 
 
 def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[complex-structure]
@@ -81,16 +78,10 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
         except UnicodeDecodeError:
             return f"Could not read {file_path}: not a UTF-8 text file."
 
-    def _edit(file_path: str, content: str) -> str:
-        """Edit an existing file (replace contents).
-
-        :param file_path: Path to the file.
-        :param content: New file contents.
-        """
-        target = _normalize_target(file_path, root)
-        _atomic_write(target, content)
-        return f"Edited {file_path}"
-
+    # ONE full-replace tool, write_file. This body used to exist twice
+    # (as _edit and _write) under two different tool names; the surgical
+    # counterpart below is edit_file, so the two halves of "change a file"
+    # each have exactly one name and one meaning.
     def _write(file_path: str, content: str) -> str:
         """Create or overwrite a file.
 
@@ -101,7 +92,9 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
         _atomic_write(target, content)
         return f"Wrote {file_path}"
 
-    def _patch(file_path: str, old_text: str, new_text: str) -> str:
+    # The surgical half of "change a file": edit_file replaces one
+    # block, write_file (above) replaces the whole file.
+    def _edit(file_path: str, old_text: str, new_text: str) -> str:
         """Replace one block of text inside an existing file.
 
         Surgical alternative to rewriting the whole file: only the
@@ -145,7 +138,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
             if remaining
             else ""
         )
-        return f"Patched {file_path}{note}"
+        return f"Edited {file_path}{note}"
 
     def _list(file_path: str = ".") -> str:
         """List files and subdirectories in a workspace directory.
@@ -246,6 +239,11 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
         :param directory: Where to search, relative to the
             workspace root (default: the root itself).
         """
+        # NOTE: literal matching for now. The harness's grep is
+        # ripgrep-backed (regex unless literal=True) once FileSystem
+        # replaces this body; until then the docstring must keep
+        # saying "not a regex", or the model burns retries on
+        # patterns ripgrep would accept and this walk rejects.
         base = _normalize_target(directory, root)
         if not base.exists():
             return (
@@ -305,9 +303,8 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
     return [
         make_tool_spec(_list, name="list_directory", risk_class="low"),  # type: ignore[arg-type]
         make_tool_spec(_read, name="read_file", risk_class="low"),  # type: ignore[arg-type]
-        make_tool_spec(_search, name="search_code", risk_class="low"),  # type: ignore[arg-type]
-        make_tool_spec(_bash, name="bash", risk_class="high"),  # type: ignore[arg-type]
-        make_tool_spec(_edit, name="edit_file", risk_class="high"),  # type: ignore[arg-type]
-        make_tool_spec(_patch, name="patch_file", risk_class="high"),  # type: ignore[arg-type]
+        make_tool_spec(_search, name="grep", risk_class="low"),  # type: ignore[arg-type]
+        make_tool_spec(_bash, name="run_command", risk_class="high"),  # type: ignore[arg-type]
         make_tool_spec(_write, name="write_file", risk_class="high"),  # type: ignore[arg-type]
+        make_tool_spec(_edit, name="edit_file", risk_class="high"),  # type: ignore[arg-type]
     ]
