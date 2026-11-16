@@ -68,8 +68,8 @@ WORKSPACE_TOOLSET_ID = "workspace"
 _WORKSPACE_INSTRUCTIONS = """\
 Workspace tools (toolset `workspace`) - how to work the filesystem:
 
-- EXPLORE FIRST: call list_files before reading anything. Never guess
-  at paths; use the exact paths list_files returns.
+- EXPLORE FIRST: call list_directory before reading anything. Never guess
+  at paths; use the exact paths list_directory returns.
 - Directories are not files: read_file on a directory tells you so -
   follow its guidance instead of retrying.
 - SEARCH before assuming: use search_code to find definitions,

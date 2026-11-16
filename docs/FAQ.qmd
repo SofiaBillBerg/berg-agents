@@ -205,7 +205,7 @@ allows CORS from `localhost`/`127.0.0.1` on those two ports).
 `risk_class=high` tools (`bash`, `edit_file`, `patch_file`, `write_file`,
 `implement_task`) pause for approval --- a prompt in the TUI, an
 Approve / Reject / Edit card in the web UI.
-Low-risk (`list_files`, `read_file`, `search_code`,
+Low-risk (`list_directory`, `read_file`, `search_code`,
 `plan_task`) run immediately.
 
 Read-only deployments withhold mutating tools at registration when

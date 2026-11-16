@@ -56,7 +56,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
 
         Returns a helpful message instead of raising when the
         path is a directory or does not exist, so the model
-        can recover (e.g. by calling ``list_files``) instead
+        can recover (e.g. by calling ``list_directory``) instead
         of derailing into an error loop.
 
         :param file_path: Path to the file, may be /workspace-prefixed.
@@ -65,13 +65,13 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
         if target.is_dir():
             return (
                 f"{file_path} is a directory, not a file. "
-                f"Call list_files with file_path={file_path!r} "
+                f"Call list_directory with file_path={file_path!r} "
                 f"to see its contents."
             )
         if not target.exists():
             return (
                 f"File not found: {file_path}. "
-                f"Call list_files on the parent directory to see "
+                f"Call list_directory on the parent directory to see "
                 f"what exists."
             )
         try:
@@ -117,13 +117,13 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
         if target.is_dir():
             return (
                 f"{file_path} is a directory, not a file. "
-                f"Call list_files with file_path={file_path!r} "
+                f"Call list_directory with file_path={file_path!r} "
                 f"to see its contents."
             )
         if not target.exists():
             return (
                 f"File not found: {file_path}. "
-                f"Call list_files on the parent directory to see "
+                f"Call list_directory on the parent directory to see "
                 f"what exists."
             )
         try:
@@ -162,7 +162,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
         if not target.exists():
             return (
                 f"Directory not found: {file_path}. "
-                f"Call list_files with file_path='.' to start "
+                f"Call list_directory with file_path='.' to start "
                 f"from the workspace root."
             )
         if not target.is_dir():
@@ -250,7 +250,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
         if not base.exists():
             return (
                 f"Directory not found: {directory}. "
-                f"Call list_files with file_path='.' to start "
+                f"Call list_directory with file_path='.' to start "
                 f"from the workspace root."
             )
         if not base.is_dir():
@@ -303,7 +303,7 @@ def create_tools(root_dir: str | Path = ".") -> list[ToolSpec]:  # ruff: ignore[
         return "\n".join(hits) + extra
 
     return [
-        make_tool_spec(_list, name="list_files", risk_class="low"),  # type: ignore[arg-type]
+        make_tool_spec(_list, name="list_directory", risk_class="low"),  # type: ignore[arg-type]
         make_tool_spec(_read, name="read_file", risk_class="low"),  # type: ignore[arg-type]
         make_tool_spec(_search, name="search_code", risk_class="low"),  # type: ignore[arg-type]
         make_tool_spec(_bash, name="bash", risk_class="high"),  # type: ignore[arg-type]

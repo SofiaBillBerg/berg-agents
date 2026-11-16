@@ -181,8 +181,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 # toolset on 2026-11-12 — all nine match.
 #:
 #: Why the names are in the text at all: a call carrying any other key is
-#: rejected BEFORE the tool runs, so `list_files(path=...)` fails and
-#: `list_files(file_path=...)` runs. The model was guessing, and losing.
+#: rejected BEFORE the tool runs, so `list_directory(path=...)` fails and
+#: `list_directory(file_path=...)` runs. The model was guessing, and losing.
 #: The tool-inventory section of the base prompt: a heading, a
 #: ``{{tool_inventory}}`` placeholder, and the warning about parameter names.
 #:
@@ -222,7 +222,7 @@ names fail; on failure, continue with a tool from the list above.
 WORKFLOW:
 1. If the request NAMES A FILE, call read_file on it directly - do not list
    the directory first. Listing is for when you do not know the paths.
-2. Call list_files only when the request names a directory, or when you have
+2. Call list_directory only when the request names a directory, or when you have
    no exact path to work from. Its default returns the whole workspace root,
    which is far more context than a named file needs.
 3. For writes, call write_file (new) or edit_file (existing); for surgical changes use patch_file.

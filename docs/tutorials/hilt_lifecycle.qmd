@@ -13,7 +13,7 @@ Code: `berg_agents/core/hitl.py` (`HitlRequest`, `HitlDecision`), tool risk clas
 ## 1. When does a pause happen?
 
 Each tool carries a `risk_class`.
-**Low-risk** tools (`list_files`, `read_file`, `search_code`, `plan_task`) run unattended.
+**Low-risk** tools (`list_directory`, `read_file`, `search_code`, `plan_task`) run unattended.
 **High-risk** tools (`bash`, `edit_file`, `patch_file`, `write_file`, `implement_task`, sensitive MCP tools) pause for approval.
 
 `hitl_rules` in `bergagents.jsonc` names which families fall where:
@@ -21,7 +21,7 @@ Each tool carries a `risk_class`.
 ```jsonc
 {
   "hitl_rules": {
-    "auto_execute": ["read_file", "list_files", "search_code"],
+    "auto_execute": ["read_file", "list_directory", "search_code"],
     "notify_after": ["edit_file", "new_file", "generate_test"],
     "ask_before":   ["delete_file", "execute_command", "refactor"],
     "human_leads":  ["security_change", "production_deploy", "data_migration"]

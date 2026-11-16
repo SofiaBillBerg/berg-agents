@@ -434,7 +434,7 @@ def build_implementation_agent(
         # harness subagent toolset; see the constant's own docstring.
         f"{TOOL_SELECTION_BLOCK}\n\n"
         "For each step:\n"
-        "1. Do the work with the file tools (read_file, list_files, search_code first; "
+        "1. Do the work with the file tools (read_file, list_directory, search_code first; "
         "then write_file, edit_file, patch_file; bash for tests and commands).\n"
         "2. Check the step off with set_subtask_done(todo_id=<id from the plan heading>, "
         "index=<the step's index>), so the human sees real progress, not narration.\n"
@@ -561,7 +561,7 @@ def build_implementation_agent(
 
         Returns a helpful message instead of raising when the
         path is a directory or does not exist, so the model
-        can recover (e.g. by calling ``list_files``).
+        can recover (e.g. by calling ``list_directory``).
 
         Args:
             ctx: Run context carrying implementation deps.
@@ -576,13 +576,13 @@ def build_implementation_agent(
         if target.is_dir():
             return (
                 f"{file_path} is a directory, not a file. "
-                f"Call list_files with file_path={file_path!r} "
+                f"Call list_directory with file_path={file_path!r} "
                 f"to see its contents."
             )
         if not target.exists():
             return (
                 f"File not found: {file_path}. "
-                f"Call list_files on the parent directory to see "
+                f"Call list_directory on the parent directory to see "
                 f"what exists."
             )
         try:
@@ -593,7 +593,7 @@ def build_implementation_agent(
             return f"Could not read {file_path}: not a UTF-8 text file."
 
     @agent.tool
-    def list_files(ctx: RunContext[AgentDeps], file_path: str = ".") -> str:
+    def list_directory(ctx: RunContext[AgentDeps], file_path: str = ".") -> str:
         """List files and subdirectories in a workspace directory.
 
         Use this to explore the project layout before reading
@@ -612,7 +612,7 @@ def build_implementation_agent(
         if not target.exists():
             return (
                 f"Directory not found: {file_path}. "
-                f"Call list_files with file_path='.' to start "
+                f"Call list_directory with file_path='.' to start "
                 f"from the workspace root."
             )
         if not target.is_dir():
@@ -708,7 +708,7 @@ def build_implementation_agent(
         if not base.exists():
             return (
                 f"Directory not found: {directory}. "
-                f"Call list_files with file_path='.' to start "
+                f"Call list_directory with file_path='.' to start "
                 f"from the workspace root."
             )
         if not base.is_dir():
@@ -834,13 +834,13 @@ def build_implementation_agent(
             if target.is_dir():
                 return (
                     f"{file_path} is a directory, not a file. "
-                    f"Call list_files with file_path={file_path!r} "
+                    f"Call list_directory with file_path={file_path!r} "
                     f"to see its contents."
                 )
             if not target.exists():
                 return (
                     f"File not found: {file_path}. "
-                    f"Call list_files on the parent directory to see "
+                    f"Call list_directory on the parent directory to see "
                     f"what exists."
                 )
             try:

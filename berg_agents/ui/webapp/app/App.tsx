@@ -173,7 +173,9 @@ function ChatContent() {
     { name: "/mcps", description: "Show MCP server status" },
     { name: "/exit", description: "Exit chat" },
     { name: "/read_file", description: "Read a file via the backend" },
-    { name: "/list_files", description: "List a directory via the backend" }];
+    {
+      name: "/list_directory",
+      description: "List a directory via the backend"}];
 
   // Total questions across the active question batch (one call can carry
   // several), for the question card's header copy.

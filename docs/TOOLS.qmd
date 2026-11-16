@@ -47,7 +47,7 @@ is rejected.
 
   | Tool               | Risk class   | Signature                                                           | Notes                                                                                                        |
   | ------------------ | ------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-  | `list_files`       | low          | `list_files(file_path: str = ".") -> str`                           | Bounded recursive listing; skips `.git`, `node_modules`, `__pycache__`, `.venv`, `.next`, `dist`, `.turbo`   |
+  | `list_directory`       | low          | `list_directory(file_path: str = ".") -> str`                           | Bounded recursive listing; skips `.git`, `node_modules`, `__pycache__`, `.venv`, `.next`, `dist`, `.turbo`   |
   | `read_file`        | low          | `read_file(file_path: str) -> str`                                  | `ValueError` path errors are reported as strings                                                             |
   | `search_code`      | low          | `search_code(pattern: str, directory: str = ".") -> str`            | Simple string substring match; 50 hit cap, 2000 scanned files, 1M file size limit                            |
   | `bash`             | high         | `bash(command: str, timeout: int = 30) -> str`                      | Runs with `stderr=STDOUT` inside the workspace root; requires approval                                       |

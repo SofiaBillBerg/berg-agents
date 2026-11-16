@@ -252,7 +252,7 @@
   "hitl_rules": {
     "auto_execute": [
       "read_file",
-      "list_files",
+      "list_directory",
       "search_code"
     ],
     "notify_after": [
@@ -302,7 +302,7 @@
   //# "toolsets": {
   //#   "default": ["read-only"],
   //#   "builtin": {
-  //#     "read-only": {"includes": ["read_file", "list_files", "search_code"]},
+  //#     "read-only": {"includes": ["read_file", "list_directory", "search_code"]},
   //#   },
   //#   "custom": {},
   //# },

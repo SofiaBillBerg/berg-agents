@@ -97,7 +97,7 @@ MEDIUM_RISK_PATTERNS: list[str] = [
 # block of ``.berg-agents/bergagents.jsonc`` (the .berg-agents is the
 # source of truth; these are import-safe fallbacks so the
 # pure decision functions never need file access).
-AUTO_EXECUTE: list[str] = ["read_file", "list_files", "search_code"]
+AUTO_EXECUTE: list[str] = ["read_file", "list_directory", "search_code"]
 NOTIFY_AFTER: list[str] = ["edit_file", "new_file"]
 ASK_BEFORE: list[str] = ["delete_file", "execute_command", "refactor"]
 HUMAN_LEADS: list[str] = [

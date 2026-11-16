@@ -71,7 +71,7 @@ export async function listWorkspaceFiles(
     directory?: string,
 ): Promise<ToolResult> {
     "use step";
-    return runWorkspaceTool("list_files", {file_path: directory ?? "."});
+    return runWorkspaceTool("list_directory", {file_path: directory ?? "."});
 }
 
 /**
