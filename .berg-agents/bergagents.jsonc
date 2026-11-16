@@ -253,7 +253,7 @@
     "auto_execute": [
       "read_file",
       "list_directory",
-      "search_code"
+      "grep"
     ],
     "notify_after": [
       "edit_file",
@@ -302,7 +302,7 @@
   //# "toolsets": {
   //#   "default": ["read-only"],
   //#   "builtin": {
-  //#     "read-only": {"includes": ["read_file", "list_directory", "search_code"]},
+  //#     "read-only": {"includes": ["read_file", "list_directory", "grep"]},
   //#   },
   //#   "custom": {},
   //# },

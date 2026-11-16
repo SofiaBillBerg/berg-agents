@@ -202,14 +202,14 @@ allows CORS from `localhost`/`127.0.0.1` on those two ports).
 
 ### Why do high-risk tools pause for approval?
 
-`risk_class=high` tools (`bash`, `edit_file`, `patch_file`, `write_file`,
+`risk_class=high` tools (`run_command`, `edit_file`, `write_file`,
 `implement_task`) pause for approval --- a prompt in the TUI, an
 Approve / Reject / Edit card in the web UI.
-Low-risk (`list_directory`, `read_file`, `search_code`,
+Low-risk (`list_directory`, `read_file`, `grep`,
 `plan_task`) run immediately.
 
 Read-only deployments withhold mutating tools at registration when
-`read_only=True` (and `bash` when `allow_shell=False`) --- the tools are
+`read_only=True` (and `run_command` when `allow_shell=False`) --- the tools are
 absent from the schema, so there is nothing to approve.
 
 ### Are path escapes possible from `read_file`?

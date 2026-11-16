@@ -21,7 +21,7 @@ arrives in chat as an `error`-status message --- never as a traceback.
 
   | Layer                        | Source module                                           | When it attaches                                                                    | Filter switches                                                           |
   | ---------------------------- | -----------------------------------------------------   | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-  | Workspace file tools         | `berg_agents/agents/factory.py` (`create_tools`)        | Always in `WorkspaceToolset`                                                        | `read_only=True` hides mutating tools; `allow_shell=False` hides `bash`   |
+  | Workspace file tools         | `berg_agents/agents/factory.py` (`create_tools`)        | Always in `WorkspaceToolset`                                                        | `read_only=True` hides mutating tools; `allow_shell=False` hides `run_command`   |
   | Plan / implement delegates   | `../berg_agents/tools/workspace_toolset.py`               | Non-read-only mode                                                                  | Uses `PlannerDeps` and `ImplementationDeps`                               |
   | Web helpers                  | `berg_agents/capabilities/web_backends.py`              | If `BERG_AGENT_WEB_SEARCH_BACKENDS` is configured to at least one working backend   | Backends without dependencies are skipped                                 |
   | Memory (notebook)            | `../berg_agents/capabilities/context_capabilities.py`   | When the `Memory` capability is available                                           | Degrades to SQLite if `FileStore` fails                                   |
@@ -49,11 +49,10 @@ is rejected.
   | ------------------ | ------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
   | `list_directory`       | low          | `list_directory(file_path: str = ".") -> str`                           | Bounded recursive listing; skips `.git`, `node_modules`, `__pycache__`, `.venv`, `.next`, `dist`, `.turbo`   |
   | `read_file`        | low          | `read_file(file_path: str) -> str`                                  | `ValueError` path errors are reported as strings                                                             |
-  | `search_code`      | low          | `search_code(pattern: str, directory: str = ".") -> str`            | Simple string substring match; 50 hit cap, 2000 scanned files, 1M file size limit                            |
-  | `bash`             | high         | `bash(command: str, timeout: int = 30) -> str`                      | Runs with `stderr=STDOUT` inside the workspace root; requires approval                                       |
-  | `edit_file`        | high         | `edit_file(file_path: str, content: str) -> str`                    | Whole-file overwrite (see *Harness note* below)                                                              |
-  | `patch_file`       | high         | `patch_file(file_path: str, old_text: str, new_text: str) -> str`   | Single contiguous replacement; target occurrence count must be 1                                             |
-  | `write_file`       | high         | `write_file(file_path: str, content: str) -> str`                   | Create/overwrite using atomic writes                                                                         |
+  | `grep`             | low          | `grep(pattern: str, directory: str = ".") -> str`                  | Literal string match (not a regex); 50 hit cap, 2000 scanned files, 1M file size limit                       |
+  | `run_command`      | high         | `run_command(command: str, timeout: int = 30) -> str`              | Runs with `stderr=STDOUT` inside the workspace root; requires approval                                       |
+  | `write_file`       | high         | `write_file(file_path: str, content: str) -> str`                  | Create/overwrite a whole file using atomic writes                                                            |
+  | `edit_file`        | high         | `edit_file(file_path: str, old_text: str, new_text: str) -> str`   | Single contiguous block replacement; target occurrence count must be 1                                       |
   | `plan_task`        | low          | `plan_task(description: str) -> str`                                | Read-only, isolated planner agent (`PlannerDeps`); call this before any multi-step `implement_task`          |
   | `implement_task`   | high         | `implement_task(plan: str, task_type: str = "generic") -> str`      | Isolated implementation agent with workspace tools; needs explicit user approval before use                  |
 
@@ -64,7 +63,7 @@ Restricting mutating tools is supported in two ways:
 
 - Read-only mode (`read_only=True`) drops every mutating tool at
   registration, not only with prompting.
-- `allow_shell=False` drops `bash`.
+- `allow_shell=False` drops `run_command`.
   Both are per-deployment flags.
 
 ### Path safety
