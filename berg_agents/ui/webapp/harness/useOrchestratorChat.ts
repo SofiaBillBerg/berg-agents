@@ -74,6 +74,39 @@ export interface PendingApprovalRequest {
 }
 
 /**
+ * A failed turn, in words a person can act on.
+ *
+ * The SDK's raw text is provider-layer plumbing ("Response stream ended without
+ * a finish reason"), which tells the user neither what happened nor what to do.
+ * Two conditions are worth naming, because both are ordinary:
+ *
+ * - the model's stream closed mid-answer — common with a local model, and
+ *   recoverable by sending again;
+ * - a network drop — same advice.
+ *
+ * Anything else is passed through: an unexplained failure is more useful shown
+ * as it was than paraphrased into something vaguer.
+ *
+ * @param error - The error the SDK reported.
+ * @returns What to show the user.
+ */
+function describeTurnError(error: unknown): string {
+    const raw = String((error as {message?: unknown})?.message ?? error);
+    if (/ended without a finish reason/i.test(raw)) {
+        return (
+            "The model's reply ended without finishing — its stream closed " +
+            "mid-answer, which a local model does when it stops early or its " +
+            "connection drops. Send again to continue; if it keeps happening, " +
+            "the model or its endpoint is the thing to look at."
+        );
+    }
+    if (/fetch failed|network|ECONNREFUSED|terminated/i.test(raw)) {
+        return `Lost contact while streaming: ${raw}. Send again to continue.`;
+    }
+    return raw;
+}
+
+/**
  * Drive the orchestrator's conversation.
  *
  * @param resumeRunId - A run to adopt as this conversation on mount, so a
@@ -308,7 +341,7 @@ export function useOrchestratorChat(
     return {
         messages,
         isStreaming: status === "streaming" || status === "submitted",
-        error: error ? String(error.message ?? error) : null,
+        error: error ? describeTurnError(error) : null,
         send,
         stop,
         lastRunId,

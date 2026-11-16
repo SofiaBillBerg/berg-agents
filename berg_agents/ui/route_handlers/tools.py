@@ -122,6 +122,37 @@ GITHUB_READ_TOOLS: frozenset[str] = frozenset({
 _MAX_TOOLSET_UNWRAP = 5
 
 
+def _tool_schema(tool: Any) -> dict[str, Any]:
+    """One MCP tool's argument schema, in berg's own JSON-Schema dialect.
+
+    Uses berg's existing conversion (`_params_from_schema`, `ToolSpec.to_openai_tool`)
+    rather than a second hand-written passthrough: the dialect the whole webapp
+    already speaks, and the MCP → ToolParam translation that already existed.
+
+    :param tool: A tool object as the MCP client lists one.
+    :return: ``parameters`` in berg's schema shape, empty when the tool
+        advertises none.
+    """
+    from collections.abc import Mapping
+
+    from berg_agents.tools.mcp import _params_from_schema
+    from berg_agents.tools.tool_spec import ToolSpec
+
+    # `input_schema` is the MCP SDK v2 name; `inputSchema` is the deprecated
+    # alias, so both are read.
+    raw = getattr(tool, "input_schema", None)
+    if raw is None:
+        raw = getattr(tool, "inputSchema", None)
+    if not isinstance(raw, Mapping):
+        return {}
+    spec = ToolSpec(
+        name=str(getattr(tool, "name", "")),
+        description=str(getattr(tool, "description", "") or ""),
+        params=_params_from_schema(raw),
+    )
+    return spec.to_openai_tool()["function"]["parameters"]
+
+
 def _mcp_client(toolset: Any) -> Any:
     """The MCP client behind berg's wrapped toolset.
 
@@ -193,19 +224,29 @@ async def _list_mcp_tools() -> dict[str, Any]:
                     (
                         str(getattr(t, "name", "")),
                         str(getattr(t, "description", "") or ""),
+                        # The argument SCHEMAS, not just the name. A model cannot
+                        # infer nested argument names from a one-line
+                        # description, so a generic "call any tool" surface
+                        # without these is a trap: it will guess, fail, and
+                        # burn its step budget retrying.
+                        #
+                        # `input_schema` is the MCP SDK v2 name; `inputSchema`
+                        # is the deprecated alias, so both are read.
+                        _tool_schema(t),
                     )
                     for t in specs
                 ]
         except Exception as exc:  # A dead server must not break the list.
             logger.warning("MCP listing skipped for %s: %s", server, exc)
             continue
-        for bare, description in rows:
+        for bare, description, schema in rows:
             if not _allowed_mcp_call(server, bare):
                 continue
             tools.append({
                 "server": server,
                 "tool": bare,
-                "description": description})
+                "description": description,
+                "parameters": schema})
     return {"tools": tools}
 
 

@@ -144,8 +144,9 @@ export const orchestratorTools = {
   list_mcp_tools: tool({
     description:
       "List the lookup tools you have beyond the workspace: documentation " +
-      "(context7), code intelligence (codegraph), your memory. Call this " +
-      "first when a question needs a source you do not have.",
+      "(context7), code intelligence (codegraph), your memory. Each entry " +
+      "carries that tool's argument schema, so you can call it correctly " +
+      "without guessing argument names. Call it before using a tool here.",
     inputSchema: z.object({}),
     execute: async () => ({tools: await listMcpTools()})}),
 
