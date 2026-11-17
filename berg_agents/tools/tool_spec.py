@@ -63,6 +63,10 @@ _READ_ONLY_HINTS: tuple[str, ...] = (
     "get",
     "explain",
     "inspect",
+    # The harness's ripgrep-backed search. Read-only by definition, so a
+    # name-based classifier must say so or every search is classified as a
+    # mutating "medium" and gated as one.
+    "grep",
 )
 
 
@@ -634,6 +638,114 @@ def render_tool_inventory(specs: Iterable[ToolSpec]) -> str:
         )
         lines.append(f"- {spec.name}({params}): {spec.description}")
     return "\n".join(lines)
+
+
+def _clean_tool_description(description: str) -> str:
+    """One line of model-facing text from a tool's raw description.
+
+    The harness's tools document themselves in a tagged docstring format
+    (``<summary>``, ``<returns>``, ``<description>``), and ``tool_def``
+    carries that markup verbatim. Printed into a prompt inventory it reads
+    as broken XML, so take the summary when there is one, drop the rest of
+    the tags, and flatten the whitespace.
+
+    :param description: The tool definition's description, as registered.
+    :return: A single-line description, tags removed.
+    """
+    import re
+
+    text = description or ""
+    match = re.search(r"<summary>(.*?)</summary>", text, re.DOTALL)
+    if match:
+        text = match.group(1)
+    else:
+        text = re.sub(
+            r"</?(summary|returns|description|example)\b[^>]*>", "", text
+        )
+    text = re.sub(r"<[^>]+>", " ", text)
+    return " ".join(text.split())
+
+
+def specs_from_toolset(toolset: Any) -> list[ToolSpec]:
+    """Describe a pydantic-ai toolset as ToolSpecs, for the prompt inventory.
+
+    A FunctionToolset (the harness's FileSystem toolset is one) holds its
+    tools in a public ``tools`` dict whose ``tool_def`` carries the name,
+    the model-facing description and the JSON-Schema parameters — read
+    synchronously, no run context needed. Wrappers around one (approval
+    gating, prefixing) are followed to the function toolset underneath.
+
+    Reading them here means the inventory in the system prompt is DERIVED
+    from the very toolset the agent is built with, so it cannot name a
+    parameter the tool rejects (the stall :func:`render_tool_inventory`
+    exists to prevent).
+
+    No ``execute`` is attached: these specs describe, they do not run. The
+    executable is the toolset itself, registered on the agent.
+
+    :param toolset: A toolset as ``FileSystem().get_toolset()`` returns,
+        possibly wrapped.
+    :return: One spec per registered tool, in registration order.
+    """
+    specs: list[ToolSpec] = []
+    seen: set[int] = set()
+    pending: list[Any] = [toolset]
+    while pending:
+        current = pending.pop(0)
+        if current is None or id(current) in seen:
+            continue
+        seen.add(id(current))
+        tools = getattr(current, "tools", None)
+        if isinstance(tools, dict) and tools:
+            specs.extend(_tool_specs_from_tools(tools))
+        # Follow the wrapper chain (approval_required, prefixed, ...).
+        pending.extend(
+            wrapped
+            for wrapped in (getattr(current, "wrapped", None),)
+            if wrapped is not None
+        )
+    return specs
+
+
+def _tool_specs_from_tools(tools: dict[str, Any]) -> list[ToolSpec]:
+    """Specs from a FunctionToolset's public ``tools`` mapping.
+
+    :param tools: The toolset's name -> Tool mapping.
+    :return: One spec per tool that carries a definition.
+    """
+    specs: list[ToolSpec] = []
+    for name, tool in tools.items():
+        tool_def = getattr(tool, "tool_def", None)
+        if tool_def is None:
+            continue
+        schema = tool_def.parameters_json_schema or {}
+        properties = schema.get("properties") or {}
+        required = set(schema.get("required") or [])
+        specs.append(
+            ToolSpec(
+                name=name,
+                description=_clean_tool_description(tool_def.description or ""),
+                params=[
+                    ToolParam(
+                        name=param_name,
+                        type=str(prop.get("type", "string"))
+                        if isinstance(prop, dict)
+                        else "string",
+                        description=str(prop.get("description", ""))
+                        if isinstance(prop, dict)
+                        else "",
+                        required=param_name in required,
+                        enum=prop.get("enum")
+                        if isinstance(prop, dict)
+                        else None,
+                    )
+                    for param_name, prop in properties.items()
+                ],
+                execute=None,
+                risk_class=infer_risk_class(name),
+            )
+        )
+    return specs
 
 
 def fill_tool_inventory(prompt: str, specs: Iterable[ToolSpec]) -> str:

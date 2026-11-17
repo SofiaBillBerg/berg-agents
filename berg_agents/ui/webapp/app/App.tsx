@@ -172,10 +172,11 @@ function ChatContent() {
     { name: "/skills", description: "List agent skills" },
     { name: "/mcps", description: "Show MCP server status" },
     { name: "/exit", description: "Exit chat" },
-    { name: "/read_file", description: "Read a file via the backend" },
-    {
-      name: "/list_directory",
-      description: "List a directory via the backend"}];
+    // Workspace tools are NOT hand-listed here: the spread above derives
+    // one command per tool from the backend catalog, with the tool's own
+    // description. A hardcoded entry for a tool that the backend also
+    // serves duplicates it in the palette (same React key, two entries).
+  ];
 
   // Total questions across the active question batch (one call can carry
   // several), for the question card's header copy.

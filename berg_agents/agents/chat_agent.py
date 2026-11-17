@@ -131,7 +131,6 @@ def build_chat_agent(
     from pathlib import Path
 
     from berg_agents.agents.delegation import build_delegation_capabilities
-    from berg_agents.agents.factory import create_tools
     from berg_agents.capabilities.context_capabilities import (
         build_context_capabilities,
     )
@@ -151,7 +150,11 @@ def build_chat_agent(
         resolve_model_request_settings,
     )
     from berg_agents.tools.mcp_toolsets import build_mcp_toolsets
-    from berg_agents.tools.workspace_toolset import WorkspaceToolset
+    from berg_agents.tools.tool_spec import specs_from_toolset
+    from berg_agents.tools.workspace_toolset import (
+        WorkspaceFileSystem,
+        WorkspaceToolset,
+    )
     from pydantic_ai import Agent
     from pydantic_ai.capabilities import LocalWorkspace, WebFetch, WebSearch
     from pydantic_ai_harness.ask_user import AskUser
@@ -180,12 +183,26 @@ def build_chat_agent(
             else settings.system_prompt
         )
     )
-    # The tool inventory's placeholder is filled from the specs THIS agent is
-    # actually built with, so the prompt cannot name a tool or a parameter the
-    # toolset does not have. Generated, never hand-maintained: a hand-written
-    # list goes stale, and a stale list makes the model send keys the tools
-    # reject - which is the stall this replaced.
-    system_prompt = fill_tool_inventory(system_prompt, create_tools(root_dir))
+    # The workspace toolset is built BEFORE the prompt, because the tool
+    # inventory is derived from it: the specs THIS agent is actually built
+    # with, so the prompt cannot name a tool or a parameter the toolset does
+    # not have. Generated, never hand-maintained — a hand-written list goes
+    # stale, and a stale list makes the model send keys the tools reject,
+    # which is the stall this replaced. (The file tools themselves are the
+    # harness's FileSystem toolset; see tools/workspace_toolset.py.)
+    plan_tools = {
+        getattr(tool, "name", ""): getattr(tool, "function", tool)
+        for tool in (plugin_tools or [])
+        if getattr(tool, "name", "")
+    }
+    toolset = WorkspaceToolset(
+        root_dir, allow_shell=_shell_allowed(), plan_tools=plan_tools
+    )
+    files = WorkspaceFileSystem(root_dir)
+    system_prompt = fill_tool_inventory(
+        system_prompt,
+        [*specs_from_toolset(files.get_toolset()), *toolset.inventory_specs()],
+    )
 
     # Active agent routing: when the user has chosen an agent (via
     # /api/agents/active), this turn runs as that agent - its persona
@@ -304,20 +321,6 @@ def build_chat_agent(
 
     shared_context_tools = [write_shared_context, append_shared_context]
 
-    # Shared workspace root for file tools and subagent delegates. The
-    # plan tools are the session-bound ones from the todo plugin: the
-    # staged delegates write and read the plan there, so it is the same
-    # list the user edits — one plan authority, not a string passed from
-    # stage to stage.
-    plan_tools = {
-        getattr(tool, "name", ""): getattr(tool, "function", tool)
-        for tool in (plugin_tools or [])
-        if getattr(tool, "name", "")
-    }
-    toolset = WorkspaceToolset(
-        root_dir, allow_shell=_shell_allowed(), plan_tools=plan_tools
-    )
-
     # A spec agent is assembled by pydantic-ai's own from_spec, so its
     # declared capabilities (WebSearch, Thinking, an MCP server, ...) are
     # built by the library and MERGED with berg's list below - one
@@ -433,7 +436,24 @@ def build_chat_agent(
     # authored files and manifest with its own file tools and bypass
     # validation entirely.
     agent_kwargs["capabilities"].extend([
-        LocalWorkspace(root_dir),
+        # The workspace the harness's file tools act on (every file tool
+        # resolves against it; containment, .git/.env protection and the
+        # hash-based conflict checks are enforced against it per call).
+        # The path_authority entry grants the authored-capabilities
+        # directory — outside the workspace on purpose — the 'operator'
+        # authority CapabilityCreation demands, without loosening the
+        # workspace root itself.
+        LocalWorkspace(
+            root_dir,
+            path_authority={str(authored_capabilities_dir()): "operator"},
+        ),
+        # The file tools themselves, as a capability: they emit capability
+        # events (FileReadEvent, FileWrittenEvent, ...), which pydantic-ai
+        # accepts only from capability-contributed tools — and the
+        # approval gate over the writes rides this capability's toolset
+        # (see WorkspaceFileSystem), landing in the same approval batch
+        # as every other user decision.
+        files,
         CapabilityCreation(directory=authored_capabilities_dir()),
         ToolGuardrail(
             guard=lambda _call: GuardrailResult.approve(),

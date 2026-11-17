@@ -26,6 +26,19 @@ const BERG_SCHEMA = "berg";
 const TURNS_TABLE = `${BERG_SCHEMA}.orchestrator_turns`;
 
 /**
+ * The table recording runs removed from the list.
+ *
+ * Delete has to mean "gone on the next reload too", and the union in
+ * listTurns is what breaks that: the workflow world lists EVERY run, so a
+ * run whose berg row was deleted simply reappears through the world's
+ * branch (she deleted 15 rows and watched the panel return to 50). A
+ * tombstone closes that hole without touching the world's own record —
+ * the run's event log stays exactly as it was, and only berg's list stops
+ * showing it.
+ */
+const DELETED_TABLE = `${BERG_SCHEMA}.orchestrator_turns_deleted`;
+
+/**
  * Create berg's table if it is missing.
  *
  * Idempotent, and safe to run on every boot: the alternative is a migration
@@ -40,6 +53,12 @@ async function ensureTable(client: Client): Promise<void> {
             run_id      text PRIMARY KEY,
             messages    jsonb NOT NULL,
             created_at  timestamptz NOT NULL DEFAULT now()
+        )
+    `);
+    await client.query(`
+        CREATE TABLE IF NOT EXISTS ${DELETED_TABLE} (
+            run_id      text PRIMARY KEY,
+            deleted_at  timestamptz NOT NULL DEFAULT now()
         )
     `);
 }
@@ -121,7 +140,9 @@ export interface StoredTurn {
  *   union repairs.
  *
  * The world's rows come second, and only where berg has no conversation of its
- * own, so nothing is listed twice.
+ * own, so nothing is listed twice. Runs Sofia deleted are excluded from both
+ * branches: a tombstone (DELETED_TABLE) is what "delete" leaves behind, so a
+ * deleted run cannot reappear through the world's branch on the next load.
  *
  * @returns The stored turns, newest first.
  */
@@ -145,6 +166,9 @@ export async function listTurns(): Promise<StoredTurn[]> {
               WHERE r.name LIKE '%orchestrator-turn%'
                 AND NOT EXISTS (
                     SELECT 1 FROM ${TURNS_TABLE} t WHERE t.run_id = r.id
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM ${DELETED_TABLE} d WHERE d.run_id = r.id
                 )
               ORDER BY created_at DESC
               LIMIT 50`,
@@ -187,23 +211,35 @@ export async function loadTurn(
  * Delete one turn's conversation.
  *
  * By id, one run, because deleting a conversation is Sofia's decision and a
- * wildcard or a bulk path would make it anyone else's. Only berg's own copy is
- * removed: the workflow world's event log is the run's record of what the agent
- * did, and it stays — so "delete" empties her list without rewriting history
- * she did not ask to lose.
+ * wildcard or a bulk path would make it anyone else's. Two writes, in
+ * berg's own tables only: the conversation row goes, and a tombstone records
+ * that this run is to stay out of the list — without it the union's second
+ * branch would re-list the run through the workflow world on the next load,
+ * which is the "delete did nothing" this replaces. The world's event log is
+ * the run's record of what the agent did, and it stays: emptying her list
+ * must not rewrite history she did not ask to lose.
+ *
+ * Idempotent: deleting an already-deleted run confirms rather than 404s, so
+ * the second click on a stale row is not an error.
  *
  * @param runId - The run whose conversation should be deleted.
- * @returns True when a row was removed, false when there was nothing to delete.
+ * @returns True once the run is out of the list.
  */
 export async function deleteTurn(runId: string): Promise<boolean> {
     const client = await connect();
     if (!client) return false;
     try {
-        const result = await client.query(
+        await client.query(
             `DELETE FROM ${TURNS_TABLE} WHERE run_id = $1`,
             [runId],
         );
-        return (result.rowCount ?? 0) > 0;
+        await client.query(
+            `INSERT INTO ${DELETED_TABLE} (run_id)
+             VALUES ($1)
+             ON CONFLICT (run_id) DO NOTHING`,
+            [runId],
+        );
+        return true;
     } finally {
         await client.end().catch(() => undefined);
     }

@@ -25,6 +25,7 @@ synchronous tool-execution endpoint the webapp's slash commands use.
 from __future__ import annotations
 
 import asyncio
+from functools import lru_cache
 import json
 import logging
 from typing import Any
@@ -322,6 +323,124 @@ async def _execute_mcp_tool(
     )
 
 
+#: The workspace tools this seam serves through the harness's FileSystem
+#: toolset. Read, list, grep (ripgrep), write, edit — the same six the
+#: specialist agents carry, so the route and the agents are one surface.
+_SEAM_FILE_TOOLS: frozenset[str] = frozenset({
+    "read_file",
+    "list_directory",
+    "grep",
+    "write_file",
+    "edit_file"})
+
+#: One-line descriptions for the palette/`/api/tools` listing. These are UI
+#: strings, not the model-facing contract: the model reads the tool's own
+#: definition from the toolset when it runs.
+_SEAM_TOOL_DESCRIPTIONS: dict[str, str] = {
+    "read_file": "Read a file from the workspace.",
+    "list_directory": "List a workspace directory.",
+    "grep": "Search file contents (ripgrep; literal at this seam).",
+    "write_file": "Create or overwrite a file.",
+    "edit_file": "Replace one block of text inside a file.",
+    "run_command": "Run a shell command in the workspace root."}
+
+
+@lru_cache(maxsize=1)
+def _file_toolset() -> Any:
+    """The harness FileSystem toolset, built once and reused.
+
+    Stateless — every call passes its own LocalWorkspaceBackend, so one
+    instance serves every root. All ten tools are registered (reads,
+    writes, edits, searches, listings) so the seam is not a subset that
+    later has to grow; which ones the route serves is
+    :data:`_SEAM_FILE_TOOLS` plus the ``run_command`` bridge.
+
+    :return: The toolset, or None when the harness is unavailable.
+    """
+    try:
+        from pydantic_ai_harness import FileSystem
+
+        return FileSystem(
+            tools=[
+                "read_file",
+                "write_file",
+                "edit_file",
+                "list_directory",
+                "search_files",
+                "find_files",
+                "create_directory",
+                "file_info",
+                "list_files",
+                "grep"]
+        ).get_toolset()
+    except Exception as exc:  # a missing harness must not 500 the route
+        logger.warning("FileSystem toolset unavailable: %s", exc)
+        return None
+
+
+def _harness_args(tool: str, args: dict[str, Any]) -> dict[str, Any]:
+    """Map berg's wire names onto the harness tool's parameter names.
+
+    The wire contract stays berg's (``file_path``, ``directory``) — the
+    slash palette, the orchestrator's TS tools and the system prompt all
+    speak it — while the harness underneath takes ``path``. This boundary
+    is where the translation lives, in one place.
+
+    :param tool: The seam tool name.
+    :param args: The arguments as the caller sent them.
+    :return: The kwargs for the harness toolset method.
+    """
+    file_path = args.get("file_path", args.get("path"))
+    if tool == "read_file":
+        return {"path": file_path}
+    if tool == "list_directory":
+        return {"path": file_path or "."}
+    if tool == "grep":
+        # literal=True: berg's search contract is literal text, and the
+        # callers (TS tool description, prompt) say so. The harness's grep
+        # is ripgrep regex by default, which would reject patterns literal
+        # callers send and accept ones they do not mean.
+        return {
+            "pattern": args.get("pattern", ""),
+            "path": args.get("directory") or ".",
+            "literal": True}
+    if tool == "write_file":
+        return {"path": file_path, "content": args.get("content", "")}
+    return {
+        "path": file_path,
+        "old_text": args.get("old_text", ""),
+        "new_text": args.get("new_text", "")}
+
+
+async def _run_file_tool(tool: str, args: dict[str, Any], root_dir: str) -> str:
+    """Run one workspace tool through the harness's FileSystem toolset.
+
+    The out-of-run pattern the harness documents: call the toolset method
+    directly with a workspace backend built from berg's resolved root
+    (``settings.root_dir`` — bergagents.jsonc / BERG_AGENT_ROOT_DIR — via
+    ``SessionManager._harness_root_dir``), never a hardcoded path.
+
+    :param tool: The seam tool name.
+    :param args: The arguments as the caller sent them.
+    :param root_dir: The resolved workspace root.
+    :return: The tool's output.
+    """
+    from pydantic_ai.workspaces import LocalWorkspaceBackend
+
+    toolset = _file_toolset()
+    if toolset is None:
+        raise RuntimeError("workspace tools unavailable")
+    method = getattr(toolset, tool, None)
+    if method is None or not callable(method):
+        raise LookupError(f"unknown workspace tool {tool!r}")
+    return str(
+        await method(
+            workspace=LocalWorkspaceBackend(root_dir),
+            **_harness_args(tool, args),
+        )
+    )
+
+
 def register_tool_routes(
     router: APIRouter, *, harness: Harness, sessions: SessionManager
 ) -> None:
@@ -336,25 +455,31 @@ def register_tool_routes(
     async def list_tools() -> dict[str, Any]:
         """List tools the ``/api/tool/execute`` endpoint can run.
 
-        Workspace file tools (name + one-line description) plus the
-        harness entry points. ``plan_task`` / ``implement_task`` are
-        marked ``delegated``: they run inside the chat turn as chat
+        The workspace file tools (now the harness's FileSystem toolset,
+        served under berg's wire names) plus the ``run_command`` bridge,
+        then the harness entry points. ``plan_task`` / ``implement_task``
+        are marked ``delegated``: they run inside the chat turn as chat
         tools, so the web UI routes ``/plan`` / ``/implement`` as chat
         messages instead of executing them directly. MCP *servers* are
         listed separately - their live tool names need a running session.
 
         :return: Dict with ``tools`` and ``mcp_servers`` lists.
         """
-        from berg_agents.agents.factory import create_tools
         from berg_agents.tools.mcp_toolsets import list_servers
 
         tools = [
             {
-                "name": spec.name,
-                "description": spec.description,
+                "name": name,
+                "description": _SEAM_TOOL_DESCRIPTIONS[name],
                 "source": "workspace"}
-            for spec in create_tools(root_dir=sessions._harness_root_dir())
-            if spec.execute is not None
+            for name in (
+                "read_file",
+                "list_directory",
+                "grep",
+                "run_command",
+                "write_file",
+                "edit_file",
+            )
         ]
         tools.extend([
             {
@@ -403,13 +528,14 @@ def register_tool_routes(
     async def execute_tool(request: ToolExecuteRequest) -> ToolExecuteResponse:
         """Execute one tool synchronously and return its output.
 
-        Switches on the tool name and runs the matching
-        :class:`~berg_agents.tools.tool_spec.ToolSpec` (file tools)
-        or the full harness pipeline (``run_task``). This is the
+        Switches on the tool name: the workspace file tools run through
+        the harness's FileSystem toolset (see :func:`_run_file_tool`),
+        ``run_command`` through berg's one remaining bridge, and
+        ``run_task`` through the full harness pipeline. This is the
         endpoint the webapp's ``executeTool`` (slash commands like
-        ``/read_file``) calls. Tool functions already return
-        human-readable messages instead of raising, so failures
-        arrive as ``status="error"`` output - never tracebacks.
+        ``/read_file``) and the orchestrator's own read tools call. Tool
+        functions return human-readable messages instead of raising, so
+        failures arrive as ``status="error"`` output - never tracebacks.
 
         :param request: Tool name plus arguments (mapping, or a bare
             string treated as ``file_path``).
@@ -428,6 +554,26 @@ def register_tool_routes(
         if name == "run_task":
             return await _run_task_tool(harness, args)
 
+        if name in _SEAM_FILE_TOOLS:
+            # The harness's FileSystem toolset, called directly with
+            # berg's resolved root (see _run_file_tool). Containment,
+            # .git/.env protection and ripgrep-backed grep come from the
+            # harness; this route owns only the wire-name translation.
+            try:
+                output = await _run_file_tool(
+                    name, args, sessions._harness_root_dir()
+                )
+                return ToolExecuteResponse(tool=name, output=output)
+            except Exception as exc:
+                logger.warning("File tool %s failed: %s", name, exc)
+                return ToolExecuteResponse(
+                    tool=name, output=f"{name} failed: {exc}", status="error"
+                )
+
+        # run_command is the one tool with no harness home at the route
+        # level yet (Shell's run_command needs a run context), so it reuses
+        # the single existing closure in create_tools rather than a second
+        # body. The Shell capability replaces this bridge in the next pass.
         specs = {
             spec.name: spec
             for spec in create_tools(root_dir=sessions._harness_root_dir())
@@ -437,7 +583,8 @@ def register_tool_routes(
             raise HTTPException(
                 status_code=404,
                 detail=f"Unknown tool '{name}'. "
-                f"Available: {', '.join(sorted(specs))}, run_task.",
+                f"Available: {', '.join(sorted({*_SEAM_FILE_TOOLS, 'run_command'}))}"
+                ", run_task.",
             )
         try:
             result = spec.execute(**args)
@@ -446,11 +593,14 @@ def register_tool_routes(
             output = result if isinstance(result, str) else str(result)
             return ToolExecuteResponse(tool=name, output=output)
         except TypeError as exc:
-            # Wrong kwargs (e.g. missing content for write_file).
+            # Wrong kwargs (e.g. missing content for write_file, or the
+            # old_text/new_text pair for edit_file).
             return ToolExecuteResponse(
                 tool=name,
                 output=f"Bad arguments for {name}: {exc}. "
-                f'Send {{"file_path": ..., "content": ...}} where needed.',
+                f'Send {{"file_path": ..., "content": ...}} (write_file) '
+                f'or {{"file_path": ..., "old_text": ..., "new_text": ...}} '
+                f"(edit_file).",
                 status="error",
             )
         except Exception as exc:  # Defensive: never leak tracebacks.

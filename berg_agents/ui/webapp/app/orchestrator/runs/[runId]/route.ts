@@ -30,16 +30,6 @@ export async function GET(
 }
 
 /**
- * Delete one turn's conversation.
- * A bulk or wildcard path would make a destructive act someone else's decision,
- * so there is none. The workflow world's record of what the agent did stays —
- * emptying her list must not rewrite history she did not ask to lose.
- *
- * @param request - The incoming request.
- * @param context - The route context, carrying the run id from the path.
- * @returns 204 when the row is gone, 404 when there was nothing to delete.
- */
-/**
  * Record a turn's conversation once it is complete.
  *
  * The turn route writes the conversation a run STARTS with; this writes what it
@@ -66,14 +56,16 @@ export async function POST(
 /**
  * Delete one turn's conversation.
  *
- * Deletes exactly what the path names: berg's copy of that one conversation.
- * A bulk or wildcard path would make a destructive act someone else's decision,
- * so there is none. The workflow world's record of what the agent did stays —
- * emptying her list must not rewrite history she did not ask to lose.
+ * Deletes exactly what the path names: berg's copy of that one conversation,
+ * plus the tombstone that keeps it out of the list across reloads (see
+ * deleteTurn). A bulk or wildcard path would make a destructive act someone
+ * else's decision, so there is none. The workflow world's record of what the
+ * agent did stays — emptying her list must not rewrite history she did not
+ * ask to lose.
  *
  * @param request - The incoming request.
  * @param context - The route context, carrying the run id from the path.
- * @returns 204 when the row is gone, 404 when there was nothing to delete.
+ * @returns 204 once the run is out of the list.
  */
 export async function DELETE(
     request: Request,

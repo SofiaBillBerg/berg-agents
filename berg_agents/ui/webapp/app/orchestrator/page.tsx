@@ -112,11 +112,11 @@ function liveStateLabel(
 }
 
 /**
- * The orchestrator conversation page.
+ * The orchestrator conversation page, once the browser has taken over.
  *
  * @returns The chat surface for the orchestrator.
  */
-export default function OrchestratorPage() {
+function OrchestratorConversation() {
   // Which past run to adopt as this conversation, from the URL: `?run=<id>`.
   // Read once at mount, because adopting changes the conversation's identity
   // (the SDK addresses a reconnect by chat id), so it is a navigation rather
@@ -387,13 +387,31 @@ export default function OrchestratorPage() {
                 tasks.
               </p>
             </div>
-            {/* The run id is shown, not hidden: it is what identifies this
+            <div className="flex items-center gap-3">
+              {/* The run id is shown, not hidden: it is what identifies this
                             orchestration on a reload or a reconnect. */}
-            {lastRunId ? (
-              <code className="text-xs opacity-60" title="workflow run id">
-                {lastRunId}
-              </code>
-            ) : null}
+              {lastRunId ? (
+                <code className="text-xs opacity-60" title="workflow run id">
+                  {lastRunId}
+                </code>
+              ) : null}
+              {/* The way out of a restored run. The `?run=` param is sticky
+                            across sends, so a restored conversation had no
+                            exit: every next message continued the restored
+                            turn. Shown exactly when one is being continued. */}
+              {resumeRunId ? (
+                <button
+                  className="rounded border border-current/30 px-2 py-0.5 text-xs"
+                  type="button"
+                  title="Leave this restored run and start a fresh conversation"
+                  onClick={() => {
+                    window.location.assign("/orchestrator");
+                  }}
+                >
+                  New conversation
+                </button>
+              ) : null}
+            </div>
           </header>
 
           {/* The record of what has been orchestrated before, because a
@@ -428,18 +446,33 @@ export default function OrchestratorPage() {
                                             run's id, and on mount the hook
                                             adopts the stored conversation — so the
                                             next message continues this turn rather
-                                            than starting a new one beside it. */}
-                    <button
-                      className="rounded border border-current/30 px-2 py-0.5 text-xs"
-                      type="button"
-                      onClick={() => {
-                        window.location.assign(
-                          `/orchestrator?run=${run.runId}`,
-                        );
-                      }}
-                    >
-                      Restore
-                    </button>
+                                            than starting a new one beside it.
+                                            Offered only where a conversation
+                                            exists: a run from before the store
+                                            has the agent's log and nothing of
+                                            Sofia's to restore, and clicking
+                                            Restore there produced a 404 read and
+                                            a hydration crash. */}
+                    {run.hasConversation ? (
+                      <button
+                        className="rounded border border-current/30 px-2 py-0.5 text-xs"
+                        type="button"
+                        onClick={() => {
+                          window.location.assign(
+                            `/orchestrator?run=${run.runId}`,
+                          );
+                        }}
+                      >
+                        Restore
+                      </button>
+                    ) : (
+                      <span
+                        className="text-xs opacity-50"
+                        title="This run has the agent's log in the workflow world, but no stored conversation — there is nothing to restore."
+                      >
+                        log only
+                      </span>
+                    )}
                     {/* Delete, in two steps on purpose: the
                                             first click asks, the second does it.
                                             Removing a conversation is Sofia's
@@ -781,4 +814,34 @@ export default function OrchestratorPage() {
       </div>
     </>
   );
+}
+
+/**
+ * The page: the conversation, after the browser has taken over.
+ *
+ * The mount guard is not decoration. The conversation's identity comes from
+ * the URL (`?run=<id>`), and only the browser can read it — the server pass
+ * has no `window`, so it renders a fresh conversation while the client's
+ * first render adopts a past one. That divergence is a React #418 hydration
+ * mismatch (it hit every restored run that had no stored conversation), and
+ * the `useChat` hook keyed by that id re-initializes on the mismatch instead
+ * of restoring. Rendering the placeholder until mounted makes both passes
+ * identical; the real page then mounts ONCE, on the client, with the param
+ * already in hand and the chat id correct from its first render.
+ *
+ * @returns The chat surface for the orchestrator.
+ */
+export default function OrchestratorPage() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  if (!mounted) {
+    return (
+      <div className="p-6 text-sm opacity-60">
+        Loading the orchestrator…
+      </div>
+    );
+  }
+  return <OrchestratorConversation />;
 }

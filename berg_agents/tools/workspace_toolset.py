@@ -21,25 +21,31 @@
 
 """Workspace toolset for berg_agents chat agents.
 
-Wraps the framework-free :class:`~berg_agents.tools.tool_spec.ToolSpec`
-instances from :func:`~berg_agents.agents.factory.create_tools` in a
-single named pydantic-ai toolset, following the documented custom-toolset
+The file tools are the harness's, not berg's: a
+:class:`~pydantic_ai_harness.FileSystem` toolset (ripgrep-backed grep,
+containment to ``root_dir``, ``.git``/``.env``/secrets protected by
+default, content hashes and optimistic-concurrency writes) wrapped here
+for what berg adds on top, following the documented custom-toolset
 pattern (subclass :class:`~pydantic_ai.toolsets.WrapperToolset`,
-override the extension points you need, delegate the rest).
-
-Why a toolset instead of loose ``tool_plain`` registrations:
+override the extension points you need, delegate the rest):
 
 - One stable ``id`` (``"workspace"``) identifying every instruction
   and tool the workspace contributes - addressable as
   ``toolset:workspace`` and safe for durable execution.
-- One ``get_instructions`` block teaching explore-first usage, instead
-  of repeating usage guidance per tool and in the system prompt.
-- Dynamic membership: ``read_only`` / ``allow_shell`` constructor
-  flags select the registered subset per deployment, and ``call_tool``
-  is the single audit/logging switch for every invocation.
-- The harness loop and ``POST /api/tool/execute`` keep using the raw
-  :class:`ToolSpec` list - this toolset is the pydantic-ai view of
-  the same single source, not a second one.
+- One ``get_instructions`` block teaching explore-first usage in the
+  harness tools' own terms (regex-vs-literal grep, hashes, exact-string
+  edits), instead of repeating usage guidance per tool and in the prompt.
+- Selective approval: the mutating tools (``write_file``,
+  ``edit_file``, ``create_directory``) pause for the user through the
+  framework's own ``approval_required``, so berg's HITL surface stays
+  the one pydantic-ai already drives for the chat approval cards.
+- Dynamic membership: ``read_only`` / ``allow_shell`` constructor flags
+  select the registered subset per deployment, and ``call_tool`` is
+  the single audit/logging switch for every invocation.
+- The two tools berg still owns alongside it: ``plan_task`` (the
+  staged delegate that writes the plan into the session's todo list)
+  and the ``run_command`` bridge - berg's one shell function until the
+  Shell capability replaces it.
 """
 
 from __future__ import annotations
@@ -47,17 +53,127 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 import re
-from typing import Any, override
+from typing import TYPE_CHECKING, Any
 
+from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai.toolsets.wrapper import WrapperToolset
+from pydantic_ai_harness import FileSystem
+
+if TYPE_CHECKING:
+    from berg_agents.tools.tool_spec import ToolSpec
 
 logger = logging.getLogger(__name__)
 
-#: Stable toolset id. Instruction parts from
-#: :meth:`WorkspaceToolset.get_instructions` are addressable as
-#: ``toolset:workspace``; keep it constant - durable execution and
-#: log readers key off this string, never the wording.
-WORKSPACE_TOOLSET_ID = "workspace"
+#: Cap on one command's combined output. A command that prints more is
+#: truncated with a note rather than flooding the model's context.
+_MAX_OUTPUT_CHARS = 8000
+
+#: The workspace tools whose calls pause for the user's approval. Reads,
+#: searches and listings run unattended; anything that changes the tree
+#: does not. Names, not risk classes: the harness's toolset is the source
+#: of the membership, and this is the gate berg puts on it.
+_APPROVAL_TOOLS: frozenset[str] = frozenset({
+    "write_file",
+    "edit_file",
+    "create_directory"})
+
+
+def _needs_approval(ctx: Any, tool_def: Any, tool_args: Any) -> bool:
+    """Whether one workspace call must wait for Sofia's decision.
+
+    The predicate the framework's ApprovalRequiredToolset calls per tool
+    call. Only the mutating tools answer yes — a search or a read that
+    paused for approval would make the agent unusable, and a write that
+    did not would be the "AI running loose" this exists to prevent.
+
+    :param ctx: The run context (unused — the policy is per tool name).
+    :param tool_def: The tool definition about to run.
+    :param tool_args: Its arguments (unused — the policy is per tool).
+    :return: True when the call pauses for approval.
+    """
+    _ = ctx, tool_args
+    return tool_def.name in _APPROVAL_TOOLS
+
+
+def _run_command_tool(root_dir: str | Path) -> Any:
+    """Berg's one shell function, bound to *root_dir*.
+
+    The bridge: the harness's Shell capability is the eventual home for
+    command execution, but its ``run_command`` needs a run context this
+    route/toolset level does not have, and until it lands there must be
+    exactly one shell implementation, not two. This is that one — the
+    same body the ``/api/tool/execute`` seam serves.
+
+    :param root_dir: The workspace root the command runs in.
+    :return: The ``run_command`` tool function.
+    """
+    import subprocess
+
+    def run_command(command: str, timeout: int = 30) -> str:
+        """Run a shell command in the workspace root.
+
+        Use this to run tests, builds, linters, or inspect the system
+        (e.g. ``pytest -q``, ``ls``, ``python --version``). There is no
+        other shell/terminal tool - this is it.
+
+        Paths: relative paths resolve from the workspace root. A
+        ``/workspace/...`` spelling — the mount name older prompts
+        advertised — is rewritten to the root, because there is no
+        ``/workspace`` on disk and the command would otherwise read a
+        path that does not exist.
+
+        Safety: commands run with ``cwd`` bound to the workspace root, a
+        timeout (default 30s, capped at 120s), and output truncated at
+        8000 characters. Every invocation is logged.
+
+        :param command: Shell command to run (via ``bash -c``).
+        :param timeout: Seconds before the command is killed.
+        """
+        # The mount name is not a real path here; rewrite it rather than
+        # run a command against a directory that does not exist.
+        root = str(root_dir)
+        command = command.replace("/workspace/", f"{root.rstrip('/')}/")
+        try:
+            clamped = max(1, min(int(timeout), 120))
+        except (TypeError, ValueError):
+            clamped = 30
+        logging.getLogger(__name__).warning("run_command tool: %s", command)
+        try:
+            proc = subprocess.run(
+                command,
+                check=False,
+                shell=True,
+                executable="/bin/bash",
+                cwd=str(root_dir),
+                capture_output=True,
+                text=True,
+                timeout=clamped,
+            )
+        except subprocess.TimeoutExpired:
+            return (
+                f"Command timed out after {clamped}s and was killed: {command}"
+            )
+        except OSError as exc:
+            return f"Could not run command: {exc}"
+        combined = (proc.stdout or "") + (
+            f"\n[stderr]\n{proc.stderr}" if proc.stderr else ""
+        )
+        if len(combined) > _MAX_OUTPUT_CHARS:
+            combined = (
+                combined[:_MAX_OUTPUT_CHARS] + f"\n... output truncated "
+                f"({len(combined)} chars total)"
+            )
+        return f"[exit {proc.returncode}]\n{combined}".strip()
+
+    return run_command
+
+
+#: Stable toolset id for berg's STAGED tools (the run_command bridge and
+#: the plan_task delegate). Instruction parts and durable-execution
+#: records key off this string, so keep it constant. The file tools
+#: answer to the capability's own id (``workspace``, set on
+#: :class:`WorkspaceFileSystem`) — one id per surface, no sharing.
+STAGED_TOOLSET_ID = "workspace_staged"
 
 #: Usage guide injected into the agent's instructions once per run.
 #: Complements (not replaces) the system prompt's authoritative tool
@@ -68,17 +184,24 @@ Workspace tools (toolset `workspace`) - how to work the filesystem:
 
 - EXPLORE FIRST: call list_directory before reading anything. Never guess
   at paths; use the exact paths list_directory returns.
-- Directories are not files: read_file on a directory tells you so -
-  follow its guidance instead of retrying.
-- SEARCH before assuming: use grep to find definitions,
-  references, or error strings instead of reading trees by hand.
+- Directories are not files: read_file on a directory says so - follow
+  its guidance instead of retrying.
+- SEARCH before assuming: use grep to find definitions, references, or
+  error strings instead of reading trees by hand. grep is ripgrep: its
+  pattern is a REGEX unless you pass literal=True. For plain text (a
+  name, an error string) pass literal=True, and narrow with path= and
+  glob= instead of searching the whole tree.
 - RUN things with run_command (tests, builds, inspection). It has a
   timeout and truncated output; long jobs should be split or
   backgrounded by the caller. There is no other shell tool.
-- WRITE with intent: write_file creates or overwrites a whole file,
-  edit_file replaces one block inside an existing file. Both
-  need human approval in chat - the user sees an approve/reject
-  dialog, so say what you are about to do before calling.
+- WRITE with intent: write_file replaces a whole file; edit_file
+  replaces one exact block - old_text must appear verbatim, exactly
+  once, or the edit is refused with guidance. Both need human approval
+  in chat - the user sees an approve/reject dialog, so say what you are
+  about to do before calling.
+- read_file answers with line numbers and a content hash, and writes
+  return the new hash. Pass expected_hash to a write when you read the
+  file earlier and must not overwrite a change made since.
 - COMPLEX work (multistep plans, refactors, research) starts with
   plan_task, which writes the plan into this session's todo list (the
   plan panel the user can see and edit). Then delegate the plan: read
@@ -95,20 +218,100 @@ Workspace tools (toolset `workspace`) - how to work the filesystem:
 """
 
 
+def workspace_file_tools(read_only: bool = False) -> list[str]:
+    """The file tools berg offers, in the order the model should reach.
+
+    The harness registers ten; berg keeps the classic five — the surface
+    its agents always had — so a small local model is not handed more
+    tools to choose between. In read-only mode the harness's own
+    ``READ_ONLY_TOOL_NAMES`` intersects the selection, so neither the
+    tools nor the derived prompt inventory can offer a write the agent
+    does not have.
+
+    :param read_only: Whether the agent may not write at all.
+    :return: The tool names, in the order to register them.
+    """
+    from pydantic_ai_harness.filesystem import READ_ONLY_TOOL_NAMES
+
+    selected = [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "list_directory",
+        "grep"]
+    if read_only:
+        selected = [t for t in selected if t in READ_ONLY_TOOL_NAMES]
+    return selected
+
+
+class WorkspaceFileSystem(FileSystem):
+    """The harness's FileSystem as a CAPABILITY, with berg's gate on writes.
+
+    Registered through ``capabilities=``, never ``toolsets=``: the
+    harness's file tools emit capability events (``FileReadEvent``,
+    ``FileWrittenEvent``, ``DirectoryListedEvent`` ...), and pydantic-ai
+    accepts those only from tools a CAPABILITY contributes — a plain
+    toolset is refused at call time, which is how the first iteration of
+    this integration failed.
+
+    The approval wrapper rides the toolset the capability hands the
+    framework: writes pause for Sofia, reads and searches do not, and the
+    gate is the framework's own (``ApprovalRequiredToolset``), so those
+    calls land in the same ``DeferredToolRequests`` batch the chat
+    approval cards and the auto-approve opt-in already speak — one HITL
+    surface, not a second one.
+    """
+
+    def __init__(
+        self,
+        root_dir: str | Path | None = None,
+        *,
+        read_only: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        """Berg's file-tool capability: root, tools, id and instructions.
+
+        Defaults carry berg's whole workspace policy in one place — the
+        stable id, the usage instructions the model reads, and the tool
+        selection — so a caller says only WHERE the workspace is.
+
+        :param root_dir: Containment boundary for every file tool.
+        :param read_only: When True, the mutating tools are absent.
+        :param kwargs: Any other FileSystem argument (denied_patterns,
+            max_read_chars, ...), passed through untouched.
+        """
+        kwargs.setdefault("id", "workspace")
+        kwargs.setdefault("description", _WORKSPACE_INSTRUCTIONS)
+        kwargs.setdefault("tools", workspace_file_tools(read_only))
+        super().__init__(root_dir, read_only=read_only, **kwargs)
+
+    def get_toolset(self) -> Any:
+        """The capability's toolset, writes gated unless read-only.
+
+        :return: The file toolset, wrapped in the approval gate when the
+            agent may write.
+        """
+        toolset = super().get_toolset()
+        if self.read_only:
+            # Nothing to gate: the mutating tools are not registered.
+            return toolset
+        return toolset.approval_required(approval_required_func=_needs_approval)
+
+
 class WorkspaceToolset(WrapperToolset[None]):
-    """File/shell workspace tools as one named, dynamic toolset.
+    """Berg's staged workspace tools as one named toolset.
 
-    Builds an inner :class:`FunctionToolset` from
-    :func:`~berg_agents.agents.factory.create_tools` (the same specs
-    the harness loop and ``/api/tool/execute`` run) plus the staged
-    ``plan_task`` delegate, then adds identity, instructions, dynamic
-    membership, and an audited call path on top.
+    The FILE tools are the harness's, registered as the
+    :class:`WorkspaceFileSystem` capability beside this toolset (they
+    emit capability events, which only a capability may contribute).
+    What remains here is what berg still owns: the ``run_command``
+    bridge — the one shell function until the Shell capability lands —
+    and the staged ``plan_task`` delegate, plus the stable toolset id,
+    the usage instructions, and the audited call path over both.
 
-    :param root_dir: Workspace root all file tools are bound to.
-    :param read_only: When True, only low-risk tools (list, read,
-        search) are registered - the model cannot change files even
-        if it tries. Mutating tools are withheld, not merely
-        instructed away.
+    :param root_dir: Workspace root the bridge and delegate act in.
+    :param read_only: When True, the staged tools are withheld with the
+        mutating file tools — a read-only agent gets neither.
     :param allow_shell: When False, the ``run_command`` tool is withheld
         (safe default for untrusted deployments).
     """
@@ -121,15 +324,13 @@ class WorkspaceToolset(WrapperToolset[None]):
         allow_shell: bool = True,
         plan_tools: dict[str, Any] | None = None,
     ) -> None:
-        """Initialize the workspace toolset.
+        """Initialize the staged-tools toolset.
 
-        :param root_dir: Workspace root all file tools are bound to.
-        :param read_only: When True, only low-risk tools (list, read,
-            search) are registered - the model cannot change files even
-            if it tries. Mutating tools are withheld, not merely
-            instructed away.
-        :param allow_shell: When False, the ``run_command`` tool is withheld
-            (safe default for untrusted deployments).
+        :param root_dir: Workspace root the bridge and delegate act in.
+        :param read_only: When True, the staged tools are withheld with
+            the mutating file tools — a read-only agent gets neither.
+        :param allow_shell: When False, the ``run_command`` tool is
+            withheld (safe default for untrusted deployments).
         :param plan_tools: The session-bound plan-store tools, keyed by
             the names the delegates call (``create_todo``,
             ``add_subtask``, ``list_subtasks``).
@@ -140,42 +341,41 @@ class WorkspaceToolset(WrapperToolset[None]):
             write a plan would otherwise hand back prose that the
             implementer has to guess at, which is the seam this replaced.
         """
-        from berg_agents.tools.specs import create_tools
-        from pydantic_ai.toolsets import FunctionToolset
-
-        inner: FunctionToolset[None] = FunctionToolset()
-        # The planner subagent's read-only tool set: it may ground a plan
-        # in the repo it plans for, but the plan itself is written by the
-        # plan_task delegate alone. Store write tools are withheld here
-        # on purpose — a planner with store tools created its own todo,
-        # and the delegate then created a second from its text output.
-        read_tools: list[Any] = []
-        for spec in create_tools(root_dir):
-            if spec.execute is None:
-                logger.warning(
-                    "ToolSpec '%s' has no execute callable; skipping", spec.name
-                )
-                continue
-            risk = spec.risk_class or "medium"
-            if read_only and risk != "low":
-                continue
-            if not allow_shell and spec.name == "run_command":
-                continue
-            if risk == "low":
-                read_tools.append(spec.execute)
-            inner.add_function(
-                spec.execute,
-                name=spec.name,
-                description=spec.description or spec.name,
-                requires_approval=risk != "low",
+        extra: FunctionToolset[None] = FunctionToolset()
+        if allow_shell and not read_only:
+            extra.add_function(
+                _run_command_tool(root_dir),
+                name="run_command",
+                description=(
+                    "Run a shell command in the workspace root (tests, "
+                    "builds, linters, inspection). Bounded timeout, "
+                    "truncated output."
+                ),
+                requires_approval=True,
             )
+        # The planner subagent's read-only tools: it may ground a plan in
+        # the repo it plans for, but the plan itself is written by the
+        # plan_task delegate alone. Store write tools are withheld on
+        # purpose — a planner with store tools created its own todo, and
+        # the delegate then created a second from its text output.
+        # Transitional: the planner still runs berg's own read closures
+        # until the specialists move onto the FileSystem capability (the
+        # next step of this refactor); then this reads the capability's
+        # toolset like everything else.
+        from berg_agents.tools.specs import create_tools
+
+        read_tools: list[Any] = [
+            spec.execute
+            for spec in create_tools(root_dir)
+            if spec.execute is not None and (spec.risk_class or "") == "low"
+        ]
         missing = _missing_plan_tools(plan_tools)
         if not read_only and not missing and plan_tools is not None:
             # Staged delegation over ONE plan store: plan_task writes the
             # plan into the session's todo list, and the delegate reads it
             # back by id. The user sees and edits that same list, so the
             # views never diverge.
-            inner.add_function(
+            extra.add_function(
                 _make_plan_task(plan_tools, read_tools),
                 name="plan_task",
                 description=(
@@ -195,40 +395,23 @@ class WorkspaceToolset(WrapperToolset[None]):
                 "implementer roles.",
                 ", ".join(missing),
             )
-        super().__init__(wrapped=inner)
+        super().__init__(wrapped=extra)
         self._root_dir = str(root_dir)
-
-    @property
-    def id(self) -> str | None:
-        """Stable toolset id (``"workspace"``).
-
-        :return: Toolset id.
-        """
-        return WORKSPACE_TOOLSET_ID
-
-    # Overrides the framework toolset extension point
-    # (WrapperToolset/AbstractToolset.get_instructions), so it stays an
-    # instance method even though it ignores ``self``; ``@override``
-    # declares that contract instead of a static-method rewrite.
-    @override
-    async def get_instructions(self, ctx: Any) -> str:
-        """Workspace usage guide, injected once per run.
-
-        :param ctx: Context from the agent.
-        :return: Usage instructions for the workspace toolset.
-        """
-        _ = ctx
-        return _WORKSPACE_INSTRUCTIONS
 
     async def call_tool(
         self, name: str, tool_args: dict[str, Any], ctx: Any, tool: Any
     ) -> Any:
-        """Audit-log every invocation, then delegate to the toolset.
+        """Audit-log every staged-tool invocation, then run it.
 
-        The single switch for all workspace tool execution: approval
-        gating, retries, and result handling stay in the framework
-        (via each tool's registration metadata); this layer owns
-        observability.
+        The single audit switch for the tools berg still owns here
+        (``run_command`` bridge, ``plan_task``); the file tools are
+        audited by the harness's own events on the capability side.
+
+        :param name: The tool to run.
+        :param tool_args: Its arguments.
+        :param ctx: Context from the agent.
+        :param tool: The tool as the framework resolved it.
+        :return: The tool's result.
         """
         logger.info("workspace tool call: %s(%s)", name, tool_args)
         try:
@@ -241,8 +424,35 @@ class WorkspaceToolset(WrapperToolset[None]):
         )
         return result
 
+    def inventory_specs(self) -> list[ToolSpec]:
+        """The staged tools as specs for the prompt inventory.
 
-#: Plan-store tools the staged delegates need, by name. Both delegates go
+        DERIVED from the toolset the agent is built with (see
+        :func:`~berg_agents.tools.tool_spec.specs_from_toolset`), so the
+        prompt cannot name a parameter these tools reject. The file
+        tools contribute their own specs from the capability side.
+
+        :return: The specs.
+        """
+        from berg_agents.tools.tool_spec import specs_from_toolset
+
+        return specs_from_toolset(self.wrapped)
+
+    @property
+    def id(self) -> str | None:
+        """Stable toolset id for berg's staged tools (``"workspace_staged"``).
+
+        The workspace's FILE tools answer to the capability's id
+        (``"workspace"``, set on :class:`WorkspaceFileSystem`); this one
+        identifies the bridge and the delegate.
+
+        :return: Toolset id.
+        """
+        return STAGED_TOOLSET_ID
+
+    #: Plan-store tools the staged delegates need, by name. Both delegates go
+
+
 #: through the same store, so this is the minimum a working plan pipeline
 #: requires; the todo plugin grants all four to the planner and implementer.
 _REQUIRED_PLAN_TOOLS = ("create_todo", "add_subtask", "list_subtasks")
