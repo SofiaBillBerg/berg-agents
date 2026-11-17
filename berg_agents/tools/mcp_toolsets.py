@@ -47,7 +47,7 @@ import logging
 import os
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Self
 
 from pydantic_ai.toolsets.wrapper import WrapperToolset
 
@@ -107,7 +107,42 @@ class _ResilientToolset(WrapperToolset[None]):
     "no tools from this server" and calling degrades to a plain
     message, so one sick server cannot fail the chat turn. Approval
     handling, naming, retries, and lifecycle stay delegated.
+
+    The session entry is degraded too, and that half matters most: a
+    toolset that cannot connect raises inside ``__aenter__`` — at RUN
+    START, before the first token. Without the guard below one dead
+    server takes every turn down (found 2026-11-17: one npx-fetched
+    server failing to initialize turned every chat send into "Failed to
+    initialize server session"), which is exactly what this wrapper
+    exists to prevent.
     """
+
+    async def __aenter__(self) -> Self:
+        """Open the wrapped session; a server that will not connect degrades.
+
+        :return: This toolset, entered or not.
+        """
+        try:
+            await super().__aenter__()
+        except Exception as exc:
+            logger.warning("MCP server connect failed, hiding server: %s", exc)
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> bool:
+        """Close the wrapped session; a close that fails changes nothing.
+
+        :param exc_info: The exception triple leaving the run, if any.
+        :return: False always — this wrapper suppresses nothing.
+        """
+        try:
+            return await super().__aexit__(*exc_info)
+        except Exception as exc:
+            # The framework pairs a degraded entry with an exit anyway,
+            # so the inner toolset reports its own entry-count mismatch.
+            # Harmless, once per dead server per run — and never worth
+            # failing a run that is already leaving.
+            logger.debug("MCP server close failed: %s", exc)
+            return False
 
     async def get_tools(self, ctx: Any) -> dict[str, Any]:
         try:

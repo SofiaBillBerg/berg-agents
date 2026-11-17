@@ -4,7 +4,6 @@
 # Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
-#
 # it under the terms of the GNU Affero General Public License as
 # published by the Free Software Foundation, either version 3 of the
 # License, or (at your option) any later version.
@@ -17,114 +16,31 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
-"""Agent factory for berg_agents.
+"""Import-order anchor for the agents package.
 
-Framework-free factory that wires the core loop, backend, and file tools.
-Uses ``core.tool_spec.make_tool_spec``, ``core.loop.BergLoop``,
-``backends.BackendAdapter``, and ``tools._io`` helpers.
+This module once built the framework-free ``BergLoop`` and re-exported the
+workspace ToolSpecs. Both are gone: every agent is now a pydantic-ai agent
+whose tools come from the harness capabilities (see
+``tools/workspace_toolset.py``), and no caller ever built a loop through
+here. What remains is what made this module load-bearing: it is the FIRST
+import in ``berg_agents.agents.__init__`` so core.interface is pre-loaded
+via ``core.__init__``, and it re-exports the default system prompt.
 
-Exposes clean names: ``build_agent`` / ``build_loop`` / ``create_tools``.
+Exposes one clean name: ``DEFAULT_SYSTEM_PROMPT``.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from pathlib import Path
-from typing import Any
-
 from berg_agents.config.settings import DEFAULT_SYSTEM_PROMPT
-from berg_agents.core.checkpoint import Checkpointer
-from berg_agents.core.loop import BergLoop
 
-# Re-exported so `from berg_agents.agents.factory import create_tools` -- the
-# import every existing caller uses -- keeps working. The definitions moved to
-# berg_agents/tools/specs.py so agents/implementation.py can read the tool
-# inventory without importing this module and closing an import cycle.
-# ToolSpec / RiskClass / make_tool_spec are already imported above; the
-# workspace tool specs themselves live in tools.specs.
-from berg_agents.tools.specs import (  # ruff: ignore[unused-import]
-    _normalize_target,
-    _resolve_root,
-    create_tools,
-)
-from berg_agents.tools.tool_spec import ToolRegistry, ToolSpec
+# Deliberate pre-load, and the reason this module is imported FIRST in
+# berg_agents.agents.__init__: importing berg_agents.core executes its
+# package __init__, which reaches core.harness.orchestrator — and that
+# module imports from berg_agents.agents.guardian at module level.
+# Reaching it from inside guardian's own import is a cycle (guardian is
+# only partially initialized at that point); reaching it HERE first loads
+# guardian fresh and the cycle never closes. Keep this import ahead of any
+# use of the re-export below.
+import berg_agents.core  # ruff: ignore[unused-import] - imported for its load-order effect
 
-__all__ = ["DEFAULT_SYSTEM_PROMPT", "build_agent", "build_loop", "create_tools"]
-
-
-def build_loop(
-    adapter: Any,
-    tools: Sequence[ToolSpec] | None = None,
-    *,
-    root_dir: str | Path = ".",
-    interrupt_on: Mapping[str, bool] | None = None,
-    max_steps: int = 25,
-    checkpointer: Checkpointer | None = None,
-) -> BergLoop:
-    """Build a BergLoop wired for this project.
-
-    :param adapter: Object exposing ``chat(messages, *, tools, temperature)``.
-    :param tools: Optional ToolSpecs. Defaults to ``create_tools(root_dir)``.
-    :param root_dir: Working directory mounted at /workspace/.
-    :param interrupt_on: Optional {tool_name: bool} HITL map.
-    :param max_steps: Hard step limit.
-    :param checkpointer: Optional checkpointer.
-    :return: Configured BergLoop.
-    """
-    from berg_agents.core.hitl import default_interrupt_on
-
-    registry = ToolRegistry()
-    for spec in tools if tools is not None else create_tools(root_dir=root_dir):
-        registry.register(spec)
-
-    effective_interrupt: dict[str, bool] = (
-        dict(interrupt_on)
-        if interrupt_on is not None
-        else default_interrupt_on(dict(registry._tools.items()))
-    )
-
-    return BergLoop(
-        adapter=adapter,
-        tool_registry=registry,
-        interrupt_on=effective_interrupt,
-        max_steps=max_steps,
-        checkpointer=checkpointer,
-    )
-
-
-def build_agent(
-    adapter: Any,
-    tools: Sequence[ToolSpec] | None = None,
-    *,
-    root_dir: str | Path = ".",
-    system_prompt: str | None = None,
-    interrupt_on: Mapping[str, bool] | None = None,
-    max_steps: int = 25,
-    checkpointer: Checkpointer | None = None,
-) -> BergLoop:
-    """Build an agent loop with a system prompt.
-
-    Thin wrapper over ``build_loop`` that stashes ``system_prompt`` on the
-    returned loop for callers to prepend to messages before ``run``.
-
-    :param adapter: LLM adapter (e.g. BackendAdapter).
-    :param tools: Optional ToolSpecs.
-    :param root_dir: Working directory.
-    :param system_prompt: Base system prompt.
-    :param interrupt_on: Optional HITL policy.
-    :param max_steps: Hard step limit.
-    :param checkpointer: Optional checkpointer.
-    :return: Configured BergLoop with ``system_prompt`` attribute.
-    """
-    loop = build_loop(
-        adapter=adapter,
-        tools=tools,
-        root_dir=root_dir,
-        interrupt_on=interrupt_on,
-        max_steps=max_steps,
-        checkpointer=checkpointer,
-    )
-    loop.system_prompt = (
-        system_prompt if system_prompt is not None else DEFAULT_SYSTEM_PROMPT
-    )  # type: ignore[attr-defined]
-    return loop
+__all__ = ["DEFAULT_SYSTEM_PROMPT"]

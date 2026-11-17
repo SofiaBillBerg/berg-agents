@@ -37,12 +37,7 @@ from berg_agents.agents.curator import (
 
 # Order: factory first (pre-loads core.interface via core.__init__),
 # then guardian, implementation, planner, curator.
-from berg_agents.agents.factory import (
-    DEFAULT_SYSTEM_PROMPT,
-    build_agent,
-    build_loop,
-    create_tools,
-)
+from berg_agents.agents.factory import DEFAULT_SYSTEM_PROMPT
 from berg_agents.agents.guardian import (
     GuardianDecision,
     GuardianDeps,
@@ -90,14 +85,11 @@ __all__ = [
     "PlannerDeps",
     "Subtask",
     "assess_risk",
-    "build_agent",
     "build_guardian_agent",
     "build_implementation_agent",
-    "build_loop",
     "build_plan",
     "build_planner_agent",
     "build_update_plan",
-    "create_tools",
     "curate_task",
     "curation_confidence",
     "decide_hitl",

@@ -50,6 +50,7 @@ override the extension points you need, delegate the rest):
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 import re
@@ -95,7 +96,7 @@ def _needs_approval(ctx: Any, tool_def: Any, tool_args: Any) -> bool:
     return tool_def.name in _APPROVAL_TOOLS
 
 
-def _run_command_tool(root_dir: str | Path) -> Any:
+def run_command_tool(root_dir: str | Path) -> Any:
     """Berg's one shell function, bound to *root_dir*.
 
     The bridge: the harness's Shell capability is the eventual home for
@@ -344,7 +345,7 @@ class WorkspaceToolset(WrapperToolset[None]):
         extra: FunctionToolset[None] = FunctionToolset()
         if allow_shell and not read_only:
             extra.add_function(
-                _run_command_tool(root_dir),
+                run_command_tool(root_dir),
                 name="run_command",
                 description=(
                     "Run a shell command in the workspace root (tests, "
@@ -484,6 +485,35 @@ async def _call_plan_tool(
     return result
 
 
+def _run_planner_sync(root_dir: str | Path, description: str) -> str:
+    """Run the planner subagent OUTSIDE the caller's run, in its own loop.
+
+    A nested ``agent.run()`` inside a tool hangs when the child carries
+    capability-emitting tools: the child's events try to reach a run the
+    parent is still blocked on (found by isolating the plan_task hang —
+    the same code nested inline never returned; the same code here does,
+    in about a minute). Running it on a bare executor thread gives the
+    planner a run context of its own, which is the only thing its
+    capability events need.
+
+    :param root_dir: The workspace the planner reads.
+    :param description: What to plan.
+    :return: The planner's raw output, stripped.
+    """
+    from berg_agents.agents.planner import PlannerDeps, build_planner_agent
+
+    async def _go() -> str:
+        planner = build_planner_agent(root_dir=root_dir)
+        result = await planner.run(
+            description,
+            deps=PlannerDeps(),
+            model_settings={"max_tokens": _MAX_PLAN_OUTPUT_TOKENS},
+        )
+        return str(result.output).strip()
+
+    return asyncio.run(_go())
+
+
 def _make_plan_task(plan_tools: dict[str, Any], root_dir: str | Path) -> Any:
     """Build the ``plan_task`` delegate (the delegate writes the plan).
 
@@ -504,32 +534,25 @@ def _make_plan_task(plan_tools: dict[str, Any], root_dir: str | Path) -> Any:
         :return: The plan's todo id and its steps, or an explicit failure
             message when the planner produced no usable plan.
         """
-        from berg_agents.agents.planner import (
-            PLANNER_PLAN_INSTRUCTIONS,
-            PlannerDeps,
-            build_planner_agent,
-        )
-
         # The planner subagent is read-only by construction (its
         # WorkspaceFileSystem is read_only), and it reads the SAME
         # workspace this toolset serves. This delegate is the single
         # writer of the plan into the session's todo list — a planner
         # with store tools created its own todo, and the delegate then
         # created a second from its text output, so one plan arrived as
-        # two diverging todos.
-        agent = build_planner_agent(
-            root_dir=root_dir, instructions=PLANNER_PLAN_INSTRUCTIONS
-        )
+        # two diverging todos. It runs on its own thread (see
+        # _run_planner_sync), not nested in this run.
         # A plan is a short list, never an essay. Without a cap a looping
         # planner produced 65 MB of output, which then exceeded the
         # model's 50 MB request limit when the tool result was echoed
         # back - one bad planning run became a dead session.
-        result = await agent.run(
-            description,
-            deps=PlannerDeps(),
-            model_settings={"max_tokens": _MAX_PLAN_OUTPUT_TOKENS},
+        # On an executor thread, not awaited inline: the nested run's
+        # capability events need a run context of their own (see
+        # _run_planner_sync).
+        loop = asyncio.get_running_loop()
+        plan = await loop.run_in_executor(
+            None, _run_planner_sync, root_dir, description
         )
-        plan = str(result.output).strip()
         # Only enumerated lines become steps. If the planner wrote prose
         # and no list - including a refusal such as "I can't" - there is
         # no plan to store. Say so instead of creating an empty todo the

@@ -38,7 +38,7 @@ from pathlib import Path
 import threading
 from typing import Any, Literal
 
-from berg_agents.agents.deps import AgentDeps
+from berg_agents.agents.deps import AgentDeps, FileChange
 from berg_agents.capabilities.registry import ToolCatalog
 from berg_agents.capabilities.turn_shape import build_turn_shape_capability
 from berg_agents.config.settings import TOOL_SELECTION_BLOCK, get_settings
@@ -56,6 +56,7 @@ from berg_agents.tools.workspace_toolset import (
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.capabilities import LocalWorkspace, ReinjectSystemPrompt
+from pydantic_ai_harness.filesystem import FileEditedEvent, FileWrittenEvent
 
 # Restored module constants (see the comment above each): the
 # implementer's step templates, its run-span name, and its explicit
@@ -530,6 +531,33 @@ def build_implementation_agent(
         # is a pure function of task type and description.
         _ = ctx
         return str(estimate_confidence(task_type, description))
+
+    # Ground truth for "did the work happen", from the harness's own
+    # events rather than from per-tool bookkeeping: every file this run
+    # really wrote lands in deps.changes, whatever tool wrote it. The
+    # model's own summary is narration and may claim a write that never
+    # occurred; callers report from deps.changes, never from the prose.
+    @agent.on_event(FileWrittenEvent)
+    def _note_write(
+        ctx: RunContext[AgentDeps], event: FileWrittenEvent
+    ) -> None:
+        """Record one file the run wrote.
+
+        :param ctx: The run context carrying the deps.
+        :param event: The harness's write event (path relative to the
+            workspace root).
+        """
+        ctx.deps.changes.append(FileChange(action="write", path=event.path))
+
+    @agent.on_event(FileEditedEvent)
+    def _note_edit(ctx: RunContext[AgentDeps], event: FileEditedEvent) -> None:
+        """Record one file the run edited.
+
+        :param ctx: The run context carrying the deps.
+        :param event: The harness's edit event (path relative to the
+            workspace root).
+        """
+        ctx.deps.changes.append(FileChange(action="edit", path=event.path))
 
     return agent
 
