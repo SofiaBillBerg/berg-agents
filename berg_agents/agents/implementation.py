@@ -34,24 +34,28 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from pathlib import Path
 import threading
 from typing import Any, Literal
 
-from berg_agents.agents.deps import AgentDeps, FileChange
+from berg_agents.agents.deps import AgentDeps
 from berg_agents.capabilities.registry import ToolCatalog
 from berg_agents.capabilities.turn_shape import build_turn_shape_capability
-from berg_agents.config.settings import TOOL_SELECTION_BLOCK
+from berg_agents.config.settings import TOOL_SELECTION_BLOCK, get_settings
 from berg_agents.providers.models import (
     resolve_model_instance,
     resolve_model_request_settings,
     resolve_model_string,
 )
 from berg_agents.providers.tiers import model_for_complexity
-from berg_agents.tools._io import _atomic_write, _normalize_target
-from berg_agents.tools.tool_spec import fill_tool_inventory
+from berg_agents.tools.tool_spec import fill_tool_inventory, specs_from_toolset
+from berg_agents.tools.workspace_toolset import (
+    WorkspaceFileSystem,
+    WorkspaceToolset,
+)
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext, Tool
-from pydantic_ai.capabilities import ReinjectSystemPrompt
+from pydantic_ai.capabilities import LocalWorkspace, ReinjectSystemPrompt
 
 # Restored module constants (see the comment above each): the
 # implementer's step templates, its run-span name, and its explicit
@@ -309,59 +313,6 @@ def estimate_confidence(task_type: str, description: str) -> float:
     return 0.1
 
 
-def _record_change(
-    ctx: RunContext[AgentDeps], action: str, target: Any, root: Any
-) -> None:
-    """Note that this run really wrote *target*, for honest reporting.
-
-    The record is written only AFTER the file operation succeeded, so it
-    cannot claim a change that did not happen. Paths are stored relative
-    to the workspace root when possible, because an absolute host path is
-    noise in a chat transcript.
-
-    :param ctx: Run context carrying the run's deps.
-    :param action: Mutating tool that made the change.
-    :param target: Resolved absolute path that was written.
-    :param root: Workspace root the tools are bound to.
-    """
-    try:
-        display = str(target.relative_to(_resolve_path(root)))
-    except (ValueError, OSError):
-        # Outside the workspace, or unresolvable: keep the absolute path
-        # rather than inventing a relative one that would be wrong.
-        display = str(target)
-    ctx.deps.changes.append(FileChange(action=action, path=display))
-
-
-def _resolve_path(path: Any) -> Any:
-    """Resolve a workspace root the same way the file tools do.
-
-    :param path: Workspace root (str or Path).
-    :return: Resolved ``Path``.
-    """
-    from pathlib import Path
-
-    return Path(path or ".").expanduser().resolve()
-
-
-def summarize_changes(changes: list[FileChange]) -> str:
-    """Render what a run actually changed, for the caller to report.
-
-    This is the honest counterpart to the model's own summary: it answers
-    "what touched the disk" from the run's own record, so a caller never
-    has to trust prose that may describe work that never happened.
-
-    :param changes: Recorded file changes from the run's deps.
-    :return: One line per change, or a plain statement that nothing was
-        written.
-    """
-    if not changes:
-        return "No files were changed."
-    lines = [f"- {change.action}: {change.path}" for change in changes]
-    noun = "file" if len(changes) == 1 else "files"
-    return f"Changed {len(changes)} {noun}:\n" + "\n".join(lines)
-
-
 def build_implementation_agent(
     *,
     complexity: str = "standard",
@@ -370,6 +321,7 @@ def build_implementation_agent(
     instructions: str | None = None,
     extra_instructions: str | None = None,
     read_only: bool = False,
+    root_dir: str | Path | None = None,
     plugin_tools: list[Tool[AgentDeps]] | None = None,
 ) -> Agent[AgentDeps, str]:
     """Build the implementation Pydantic AI agent.
@@ -448,10 +400,25 @@ def build_implementation_agent(
     # The type parameters are repeated on the constructor: without them a
     # checker infers the deps slot as `object` and the annotation above is
     # reported as a mismatch.
-    # Imported here, not at module scope: agents.factory imports the
-    # orchestrator, which imports this module, so a top-level import is a cycle.
-    # The same function-local pattern chat_agent.py already uses.
-    from berg_agents.tools.specs import create_tools
+    # The workspace root the file tools act on: the caller's when given,
+    # the configured root otherwise (bergagents.jsonc /
+    # BERG_AGENT_ROOT_DIR) — never a hardcoded path.
+    root = str(root_dir) if root_dir else get_settings().root_dir
+    # The file tools are the harness's, as a capability (they emit
+    # capability events, which only a capability may contribute), with
+    # berg's approval gate over the writes. Read-only mode — planning
+    # and chat-mode delegations — registers no mutating tools at all:
+    # instructions alone never stop a tool call, missing tools do.
+    # ``_writes_gated()`` is the kill-switch for callers whose boundary
+    # already gates; with it off the writes are absent too, which is what
+    # the old conditional registration did.
+    files = WorkspaceFileSystem(
+        root, read_only=read_only or not _writes_gated()
+    )
+    # berg's one shell function, alongside the file tools the way the
+    # chat agent carries it. The implementer had a shell in every mode,
+    # read-only included, so the bridge is registered unconditionally.
+    bridge = WorkspaceToolset(root, allow_shell=True)
 
     agent: Agent[AgentDeps, str] = Agent[AgentDeps, str](
         model,
@@ -467,7 +434,15 @@ def build_implementation_agent(
             # One user turn per request: the plan handed to this agent is
             # a user message, and a strict template (Mistral/Devstral)
             # rejects two user turns in a row. Harmless elsewhere.
-            *([cap] if (cap := build_turn_shape_capability()) else [])],
+            *([cap] if (cap := build_turn_shape_capability()) else []),
+            # The workspace the file tools act on, and the tools
+            # themselves (a capability, because they emit capability
+            # events).
+            LocalWorkspace(root),
+            files],
+        # berg's staged/bridge tools (run_command), same toolset object
+        # the chat agent uses.
+        toolsets=[bridge],
         # Plugin tools for this role (e.g. the plan store the planner
         # wrote into). Empty by default, so the agent still runs with no
         # plugins — the same rule the chat agent follows.
@@ -491,11 +466,12 @@ def build_implementation_agent(
                 else default_instructions
             ),
             # THIS agent's real specs, so the implementer cannot be told a
-            # parameter name the tool rejects - the failure that made its calls
-            # fail validation and its turn stall.
-            # The inventory needs only names and parameters, which do not
-            # depend on the workspace root, so the default root is enough.
-            create_tools(),
+            # parameter name the tool rejects - the failure that made its
+            # calls fail validation and its turn stall. Derived from the
+            # toolsets the agent is actually built with.
+            [
+                *specs_from_toolset(files.get_toolset()),
+                *bridge.inventory_specs()],
         ),
     )
 
@@ -554,298 +530,6 @@ def build_implementation_agent(
         # is a pure function of task type and description.
         _ = ctx
         return str(estimate_confidence(task_type, description))
-
-    @agent.tool
-    def read_file(ctx: RunContext[AgentDeps], file_path: str) -> str:
-        """Read a file from the workspace.
-
-        Returns a helpful message instead of raising when the
-        path is a directory or does not exist, so the model
-        can recover (e.g. by calling ``list_directory``).
-
-        Args:
-            ctx: Run context carrying implementation deps.
-            file_path: Path to the file, relative to workspace root
-                or prefixed with /workspace.
-
-        Returns:
-            File contents as a string, or a guidance message.
-        """
-        root = ctx.deps.workspace_root or "."
-        target = _normalize_target(file_path, root)
-        if target.is_dir():
-            return (
-                f"{file_path} is a directory, not a file. "
-                f"Call list_directory with file_path={file_path!r} "
-                f"to see its contents."
-            )
-        if not target.exists():
-            return (
-                f"File not found: {file_path}. "
-                f"Call list_directory on the parent directory to see "
-                f"what exists."
-            )
-        try:
-            return target.read_text(encoding="utf-8")
-        except OSError as exc:
-            return f"Could not read {file_path}: {exc}"
-        except UnicodeDecodeError:
-            return f"Could not read {file_path}: not a UTF-8 text file."
-
-    @agent.tool
-    def list_directory(ctx: RunContext[AgentDeps], file_path: str = ".") -> str:
-        """List files and subdirectories in a workspace directory.
-
-        Use this to explore the project layout before reading
-        files - never guess at paths. Directories end with "/".
-
-        Args:
-            ctx: Run context carrying implementation deps.
-            file_path: Directory to list, relative to workspace
-                root or prefixed with /workspace (default: root).
-
-        Returns:
-            Sorted directory listing, directories first.
-        """
-        root = ctx.deps.workspace_root or "."
-        target = _normalize_target(file_path, root)
-        if not target.exists():
-            return (
-                f"Directory not found: {file_path}. "
-                f"Call list_directory with file_path='.' to start "
-                f"from the workspace root."
-            )
-        if not target.is_dir():
-            return (
-                f"{file_path} is a file, not a directory. "
-                f"Call read_file to see its contents."
-            )
-        try:
-            entries = sorted(
-                target.iterdir(), key=lambda p: (p.is_file(), p.name.lower())
-            )
-        except OSError as exc:
-            return f"Could not list {file_path}: {exc}"
-        lines = [f"{p.name}/" if p.is_dir() else p.name for p in entries[:200]]
-        extra = (
-            f"\n... and {len(entries) - 200} more (listing truncated)"
-            if len(entries) > 200
-            else ""
-        )
-        return "\n".join(lines) + extra if lines else "(empty directory)"
-
-    @agent.tool
-    def run_command(
-        ctx: RunContext[AgentDeps], command: str, timeout: int = 30
-    ) -> str:
-        """Run a shell command in the workspace root.
-
-        Use this to run tests, builds, linters, or inspect the
-        system. There is no other shell/terminal tool.
-
-        :param ctx: Run context carrying implementation deps.
-        :param command: Shell command to run (via ``bash -c``).
-        :param timeout: Seconds before the command is killed
-                (clamped to 120).
-
-        :retun:  Exit code plus combined output (truncated at 8000 chars).
-        """
-        import logging
-        import subprocess
-
-        root = ctx.deps.workspace_root or "."
-        root_path = _normalize_target(".", root)
-        try:
-            clamped = max(1, min(int(timeout), 120))
-        except (TypeError, ValueError):
-            clamped = 30
-        logging.getLogger(__name__).warning("bash tool: %s", command)
-        try:
-            proc = subprocess.run(
-                command,
-                check=False,
-                shell=True,
-                executable="/bin/bash",
-                cwd=root_path,
-                capture_output=True,
-                text=True,
-                timeout=clamped,
-            )
-        except subprocess.TimeoutExpired:
-            return (
-                f"Command timed out after {clamped}s and was killed: {command}"
-            )
-        except OSError as exc:
-            return f"Could not run command: {exc}"
-        combined = (proc.stdout or "") + (
-            f"\n[stderr]\n{proc.stderr}" if proc.stderr else ""
-        )
-        if len(combined) > 8000:
-            combined = (
-                combined[:8000] + f"\n... output truncated "
-                f"({len(combined)} chars total)"
-            )
-        return f"[exit {proc.returncode}]\n{combined}".strip()
-
-    @agent.tool
-    def grep(
-        ctx: RunContext[AgentDeps], pattern: str, directory: str = "."
-    ) -> str:
-        """Search file contents under a workspace directory.
-
-        Recursive literal-match grep over text files (skips
-        binaries, hidden/vendor dirs, files over 1MB; capped at
-        50 hits). Use this instead of guessing file paths.
-
-        :param ctx: Run context carrying implementation deps.
-        :param pattern: Literal text to search for (not a regex).
-        :param directory: Where to search (default: workspace root).
-
-        :return: ``path:line: text`` hits, or a no-match message.
-        """
-        root = ctx.deps.workspace_root or "."
-        base = _normalize_target(directory, root)
-        if not base.exists():
-            return (
-                f"Directory not found: {directory}. "
-                f"Call list_directory with file_path='.' to start "
-                f"from the workspace root."
-            )
-        if not base.is_dir():
-            return (
-                f"{directory} is a file, not a directory. "
-                f"Call read_file to see its contents."
-            )
-        skip_dirs = {
-            ".git",
-            "node_modules",
-            "__pycache__",
-            ".venv",
-            ".next",
-            "dist",
-            ".turbo"}
-        root_path = _normalize_target(".", root)
-        hits: list[str] = []
-        scanned = 0
-        for path in sorted(base.rglob("*")):
-            if len(hits) >= 50:
-                break
-            if any(part in skip_dirs for part in path.parts):
-                continue
-            if not path.is_file():
-                continue
-            try:
-                if path.stat().st_size > 1_000_000:
-                    continue
-            except OSError:
-                continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError, ValueError):
-                continue
-            scanned += 1
-            if scanned > 2000:
-                break
-            for i, line in enumerate(text.splitlines(), start=1):
-                if pattern in line:
-                    try:
-                        rel = path.relative_to(root_path)
-                    except ValueError:
-                        rel = path
-                    hits.append(f"{rel}:{i}: {line.strip()[:200]}")
-                    if len(hits) >= 50:
-                        break
-        if not hits:
-            return f"No matches for {pattern!r} under {directory}."
-        extra = (
-            "\n... and more (results truncated at 50)"
-            if len(hits) >= 50
-            else ""
-        )
-        return "\n".join(hits) + extra
-
-    # Mutating tools are withheld in read-only (chat) mode so
-    # the model cannot change files without going through the
-    # harness HITL gate - instructions alone never stop a
-    # tool call, missing tools do.
-    if not read_only and _writes_gated():
-
-        @agent.tool(requires_approval=True)
-        def write_file(
-            ctx: RunContext[AgentDeps], file_path: str, content: str
-        ) -> str:
-            """Create or overwrite a file in the workspace.
-
-            :param ctx: Run context carrying implementation deps.
-            :param file_path: Path to the file, relative to workspace root
-                or prefixed with /workspace.
-            :param content: File contents to write.
-
-            :return: Confirmation message with the written path.
-            """
-            root = ctx.deps.workspace_root or "."
-            target = _normalize_target(file_path, root)
-            _atomic_write(target, content)
-            _record_change(ctx, "write", target, root)
-            return f"Wrote {target}"
-
-        @agent.tool(requires_approval=True)
-        def edit_file(
-            ctx: RunContext[AgentDeps],
-            file_path: str,
-            old_text: str,
-            new_text: str,
-        ) -> str:
-            """Replace one block of text inside an existing file.
-
-            Surgical alternative to rewriting the whole file: only
-            the first occurrence of ``old_text`` is replaced, where
-            write_file replaces the whole file.
-
-            :param ctx: Run context carrying implementation deps.
-            :param file_path: Path to the file, relative to workspace
-                root or prefixed with /workspace.
-            :param old_text: Exact text block to replace (verbatim).
-            :param new_text: Replacement text.
-
-            :return: Confirmation message, or guidance when the file
-                is missing or the block is not found verbatim.
-            """
-            root = ctx.deps.workspace_root or "."
-            target = _normalize_target(file_path, root)
-            if target.is_dir():
-                return (
-                    f"{file_path} is a directory, not a file. "
-                    f"Call list_directory with file_path={file_path!r} "
-                    f"to see its contents."
-                )
-            if not target.exists():
-                return (
-                    f"File not found: {file_path}. "
-                    f"Call list_directory on the parent directory to see "
-                    f"what exists."
-                )
-            try:
-                text = target.read_text(encoding="utf-8")
-            except OSError as exc:
-                return f"Could not read {file_path}: {exc}"
-            except UnicodeDecodeError:
-                return f"Could not read {file_path}: not a UTF-8 text file."
-            if old_text not in text:
-                return (
-                    f"Block not found verbatim in {file_path}. "
-                    f"Call read_file first and copy the exact text, "
-                    f"whitespace included."
-                )
-            remaining = text.count(old_text) - 1
-            _atomic_write(target, text.replace(old_text, new_text, 1))
-            _record_change(ctx, "edit", target, root)
-            note = (
-                f" ({remaining} identical block(s) left untouched)"
-                if remaining
-                else ""
-            )
-            return f"Edited {target}{note}"
 
     return agent
 

@@ -358,17 +358,9 @@ class WorkspaceToolset(WrapperToolset[None]):
         # plan_task delegate alone. Store write tools are withheld on
         # purpose — a planner with store tools created its own todo, and
         # the delegate then created a second from its text output.
-        # Transitional: the planner still runs berg's own read closures
-        # until the specialists move onto the FileSystem capability (the
-        # next step of this refactor); then this reads the capability's
-        # toolset like everything else.
-        from berg_agents.tools.specs import create_tools
-
-        read_tools: list[Any] = [
-            spec.execute
-            for spec in create_tools(root_dir)
-            if spec.execute is not None and (spec.risk_class or "") == "low"
-        ]
+        # The planner subagent now reads through the harness's file
+        # tools like everything else (read_only at its own capability),
+        # so nothing but the workspace root is handed over.
         missing = _missing_plan_tools(plan_tools)
         if not read_only and not missing and plan_tools is not None:
             # Staged delegation over ONE plan store: plan_task writes the
@@ -376,7 +368,7 @@ class WorkspaceToolset(WrapperToolset[None]):
             # back by id. The user sees and edits that same list, so the
             # views never diverge.
             extra.add_function(
-                _make_plan_task(plan_tools, read_tools),
+                _make_plan_task(plan_tools, root_dir),
                 name="plan_task",
                 description=(
                     "Decompose a task into an ordered step plan and write "
@@ -492,8 +484,14 @@ async def _call_plan_tool(
     return result
 
 
-def _make_plan_task(plan_tools: dict[str, Any], read_tools: list[Any]) -> Any:
-    """Build the ``plan_task`` delegate (the delegate writes the plan)."""
+def _make_plan_task(plan_tools: dict[str, Any], root_dir: str | Path) -> Any:
+    """Build the ``plan_task`` delegate (the delegate writes the plan).
+
+    :param plan_tools: The session-bound plan-store tools the delegate
+        writes the plan through.
+    :param root_dir: The workspace the planner subagent reads.
+    :return: The ``plan_task`` tool function.
+    """
 
     async def _plan_task(description: str) -> str:
         """Decompose a task into an ordered step plan, stored as a todo.
@@ -512,14 +510,15 @@ def _make_plan_task(plan_tools: dict[str, Any], read_tools: list[Any]) -> Any:
             build_planner_agent,
         )
 
-        # The planner subagent is read-only: it gets the workspace's read
-        # tools so it is not blind to the repo, and never the plan-store
-        # tools. This delegate is the single writer of the plan into the
-        # session's todo list — a planner with store tools created its
-        # own todo, and the delegate then created a second from its text
-        # output, so one plan arrived as two diverging todos.
+        # The planner subagent is read-only by construction (its
+        # WorkspaceFileSystem is read_only), and it reads the SAME
+        # workspace this toolset serves. This delegate is the single
+        # writer of the plan into the session's todo list — a planner
+        # with store tools created its own todo, and the delegate then
+        # created a second from its text output, so one plan arrived as
+        # two diverging todos.
         agent = build_planner_agent(
-            plugin_tools=read_tools, instructions=PLANNER_PLAN_INSTRUCTIONS
+            root_dir=root_dir, instructions=PLANNER_PLAN_INSTRUCTIONS
         )
         # A plan is a short list, never an essay. Without a cap a looping
         # planner produced 65 MB of output, which then exceeded the

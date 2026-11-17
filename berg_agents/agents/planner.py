@@ -37,9 +37,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 import logging
+from pathlib import Path
 from typing import Any, ClassVar
 
 from berg_agents.capabilities.turn_shape import build_turn_shape_capability
+from berg_agents.config.settings import get_settings
 from berg_agents.core.interface import (
     AbstractAgent,
     AgentResult,
@@ -51,7 +53,10 @@ from berg_agents.providers.models import (
     resolve_model_request_settings,
 )
 from berg_agents.providers.tiers import model_for_complexity
+from berg_agents.tools.tool_spec import fill_tool_inventory, specs_from_toolset
+from berg_agents.tools.workspace_toolset import WorkspaceFileSystem
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.capabilities import LocalWorkspace
 
 logger = logging.getLogger(__name__)
 
@@ -407,7 +412,7 @@ def build_planner_agent(
     model_id: str | None = None,
     cfg: dict[str, Any] | None = None,
     *,
-    plugin_tools: list[Any] | None = None,
+    root_dir: str | Path | None = None,
     instructions: str | None = None,
 ) -> Agent[PlannerDeps, str]:
     """Build the planner Pydantic AI agent.
@@ -418,12 +423,11 @@ def build_planner_agent(
 
     :param model_id: Model id override; the complexity default when None.
     :param cfg: Plain configuration override.
-    :param plugin_tools: Tools the planner may use. The ``plan_task``
-        delegate passes the workspace's read-only tools so the planner
-        can ground its plan in the repo; plan-store write tools are
-        withheld on purpose — the delegate that runs the planner is the
-        single writer of the plan into the session's todo list, and a
-        planner with write tools made a second, diverging plan.
+    :param root_dir: The workspace the planner reads. None resolves the
+        configured root (``settings.root_dir`` — bergagents.jsonc /
+        ``BERG_AGENT_ROOT_DIR``), never a hardcoded path. The planner
+        reads only: the workspace capability is built read_only, so
+        write tools are absent rather than instructed away.
     :param instructions: Instruction override for this agent; the
         harness planner's default instructions when None.
     :return: Configured planner agent.
@@ -435,6 +439,13 @@ def build_planner_agent(
     # Per-model request options as extra_body (a strict chat template
     # override, for example). Empty when the model declares none.
     extra_body = resolve_model_request_settings(model_id, cfg)
+    # The planner reads the repo through the harness's file tools, and
+    # nothing else: read_only at the capability, so the mutating tools
+    # are absent rather than merely discouraged. The store's write
+    # tools stay with the plan_task delegate, which is the single
+    # writer of the plan into the session's todo list.
+    root = str(root_dir) if root_dir else get_settings().root_dir
+    files = WorkspaceFileSystem(root, read_only=True)
     # Specialized on the constructor for the same reason as the
     # implementation agent: an unparameterized call infers `object` for
     # the deps slot and contradicts the declared return type.
@@ -442,11 +453,13 @@ def build_planner_agent(
         resolve_model_instance(model_id, cfg),
         name=PLANNER_NAME,
         deps_type=PlannerDeps,
-        instructions=instructions or _PLANNER_INSTRUCTIONS,
-        # Empty by default, so the module-level instance below still
-        # builds without a plugin system; role callers pass the bound
-        # plan tools in.
-        tools=list(plugin_tools or []),
+        # The tool inventory is derived from the very capability this
+        # agent is built with, so the prompt cannot name a parameter
+        # the tools reject.
+        instructions=fill_tool_inventory(
+            instructions or _PLANNER_INSTRUCTIONS,
+            specs_from_toolset(files.get_toolset()),
+        ),
         # Per-model request options (a strict chat template override,
         # for example) ride in extra_body; None when none are declared.
         model_settings=({"extra_body": extra_body} if extra_body else None),
@@ -455,8 +468,12 @@ def build_planner_agent(
         # plan text plus any enqueued context produce exactly that
         # shape. Harmless on permissive backends.
         capabilities=[
-            *([cap] if (cap := build_turn_shape_capability()) else [])
-        ],
+            *([cap] if (cap := build_turn_shape_capability()) else []),
+            # The workspace the file tools act on, and the tools
+            # themselves (a capability, because they emit capability
+            # events).
+            LocalWorkspace(root),
+            files],
     )
     return agent
 
