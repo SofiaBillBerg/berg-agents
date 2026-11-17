@@ -441,6 +441,46 @@ async def _run_file_tool(tool: str, args: dict[str, Any], root_dir: str) -> str:
     )
 
 
+def _run_command(args: dict[str, Any], root_dir: str) -> ToolExecuteResponse:
+    """Run the one shell tool through berg's shared bridge function.
+
+    The same function the agents' ``WorkspaceToolset`` serves — one shell
+    implementation, not a route copy. The Shell capability (whose
+    ``run_command`` needs a run context) replaces this bridge on both
+    sides when it lands.
+
+    :param args: The caller's arguments (``command``, optional timeout).
+    :param root_dir: The resolved workspace root the command runs in.
+    :return: The tool's output, or an error response.
+    """
+    from berg_agents.tools.workspace_toolset import run_command_tool
+
+    command = str(args.get("command", ""))
+    if not command:
+        return ToolExecuteResponse(
+            tool="run_command",
+            output="Missing 'command': e.g. "
+            '/run_command {"command": "pytest -q"}.',
+            status="error",
+        )
+    try:
+        timeout = int(args.get("timeout", 30))
+    except (TypeError, ValueError):
+        timeout = 30
+    bridge = run_command_tool(root_dir)
+    try:
+        return ToolExecuteResponse(
+            tool="run_command", output=bridge(command, timeout)
+        )
+    except Exception as exc:
+        logger.warning("run_command failed: %s", exc)
+        return ToolExecuteResponse(
+            tool="run_command",
+            output=f"run_command failed: {exc}",
+            status="error",
+        )
+
+
 def register_tool_routes(
     router: APIRouter, *, harness: Harness, sessions: SessionManager
 ) -> None:
@@ -542,8 +582,6 @@ def register_tool_routes(
         :return: Tool name, string output, and status.
         :raises HTTPException: 404 for unknown tool names.
         """
-        from berg_agents.agents.factory import create_tools
-
         name = (request.tool or "").strip()
         args = request.args
         if isinstance(args, str):
@@ -570,41 +608,17 @@ def register_tool_routes(
                     tool=name, output=f"{name} failed: {exc}", status="error"
                 )
 
-        # run_command is the one tool with no harness home at the route
-        # level yet (Shell's run_command needs a run context), so it reuses
-        # the single existing closure in create_tools rather than a second
-        # body. The Shell capability replaces this bridge in the next pass.
-        specs = {
-            spec.name: spec
-            for spec in create_tools(root_dir=sessions._harness_root_dir())
-        }
-        spec = specs.get(name)
-        if spec is None or spec.execute is None:
+        if name == "run_command":
+            # The ONE shell function berg keeps, shared with the agents'
+            # WorkspaceToolset (see _run_command) — not a second body.
+            return _run_command(args, sessions._harness_root_dir())
+
+            # The specs dict this route used to build is gone with specs.py:
+            # the seam serves the harness toolset plus the one bridge above,
+            # so an unknown name is exactly that.
             raise HTTPException(
                 status_code=404,
                 detail=f"Unknown tool '{name}'. "
                 f"Available: {', '.join(sorted({*_SEAM_FILE_TOOLS, 'run_command'}))}"
                 ", run_task.",
-            )
-        try:
-            result = spec.execute(**args)
-            if asyncio.iscoroutine(result):
-                result = await result
-            output = result if isinstance(result, str) else str(result)
-            return ToolExecuteResponse(tool=name, output=output)
-        except TypeError as exc:
-            # Wrong kwargs (e.g. missing content for write_file, or the
-            # old_text/new_text pair for edit_file).
-            return ToolExecuteResponse(
-                tool=name,
-                output=f"Bad arguments for {name}: {exc}. "
-                f'Send {{"file_path": ..., "content": ...}} (write_file) '
-                f'or {{"file_path": ..., "old_text": ..., "new_text": ...}} '
-                f"(edit_file).",
-                status="error",
-            )
-        except Exception as exc:  # Defensive: never leak tracebacks.
-            logger.warning("Tool %s failed: %s", name, exc, exc_info=True)
-            return ToolExecuteResponse(
-                tool=name, output=f"{name} failed: {exc}", status="error"
             )

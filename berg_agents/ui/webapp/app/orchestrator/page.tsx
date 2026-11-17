@@ -50,6 +50,7 @@ import { useOrchestratorChat } from "@/harness/useOrchestratorChat";
 import { toChatMessage } from "@/harness/messageParts";
 import { useSpecialistStates } from "@/harness/useSpecialistStates";
 import { API_BASE } from "@/envConfig";
+import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip.tsx";
 
 /** One routing tier and the models it offers, the best first. */
 interface Tier {
@@ -99,16 +100,13 @@ function toolsOf(
  * @param state - Its latest state, if it has been read.
  * @returns The label to show.
  */
-function liveStateLabel(
-    runId: string,
-    state: string | undefined,
-): string {
-    if (!runId) return "starting…";
-    if (!state) return "starting…";
-    if (state === "waiting") return "waiting on you";
-    if (state === "working" || state === "pending") return "working…";
-    if (state === "done") return "done";
-    return state;
+function liveStateLabel(runId: string, state: string | undefined): string {
+  if (!runId) return "starting…";
+  if (!state) return "starting…";
+  if (state === "waiting") return "waiting on you";
+  if (state === "working" || state === "pending") return "working…";
+  if (state === "done") return "done";
+  return state;
 }
 
 /**
@@ -138,61 +136,61 @@ function OrchestratorConversation() {
     model,
     setModel} = useOrchestratorChat(resumeRunId);
   const [input, setInput] = useState("");
-    // The specialists this conversation has started, and what each is doing
-    // right now. Watched by the page rather than by the orchestrator's goodwill:
-    // a specialist used to be invisible until the model chose to look, so the
-    // user sat with a finished (or parked, or stuck) specialist and no way to
-    // tell which.
-    const startedSpecialists = useMemo(() => {
-        const rows: { agent: string; model: string; runId: string }[] = [];
-        for (const message of messages) {
-            for (const part of message.parts ?? []) {
-                // Any state, not only `output-available`: a gated tool call passes
-                // through input-streaming → approval-requested → approval-responded →
-                // output-available, and a strip that waits for the LAST one renders
-                // nothing at all while the specialist is genuinely running (found in
-                // Sofia's own transcript, where the part sat at approval-responded and
-                // the session link never appeared). The agent name is known from the
-                // call's input the moment it is parsed, so the chip can show then; the
-                // link needs the run id, which only the output carries.
-                if (part.type !== "tool-start_specialist") {
-                    continue;
-                }
-                // The tool's output arrives either as the object the tool
-                // returned or as its JSON text, depending on the transport.
-                let output: Record<string, unknown> = {};
-                if (typeof part.output === "string") {
-                    try {
-                        output = JSON.parse(part.output) as Record<string, unknown>;
-                    } catch {
-                        // Unparseable output still leaves the agent name, which
-                        // the tool call's input carries.
-                    }
-                } else if (typeof part.output === "object") {
-                    output = part.output as Record<string, unknown>;
-                }
-                const input = (part.input ?? {}) as {agent?: string};
-                const agent =
-                    String(input.agent ?? "") || String(output.agentName ?? "");
-                // Without an agent there is nothing to name yet — the call has not
-                // been fully described by the model.
-                if (!agent) continue;
-                rows.push({
-                    agent,
-                    model: String(output.model ?? ""),
-                    runId: String(output.runId ?? "")});
-            }
+  // The specialists this conversation has started, and what each is doing
+  // right now. Watched by the page rather than by the orchestrator's goodwill:
+  // a specialist used to be invisible until the model chose to look, so the
+  // user sat with a finished (or parked, or stuck) specialist and no way to
+  // tell which.
+  const startedSpecialists = useMemo(() => {
+    const rows: { agent: string; model: string; runId: string }[] = [];
+    for (const message of messages) {
+      for (const part of message.parts ?? []) {
+        // Any state, not only `output-available`: a gated tool call passes
+        // through input-streaming → approval-requested → approval-responded →
+        // output-available, and a strip that waits for the LAST one renders
+        // nothing at all while the specialist is genuinely running (found in
+        // Sofia's own transcript, where the part sat at approval-responded and
+        // the session link never appeared). The agent name is known from the
+        // call's input the moment it is parsed, so the chip can show then; the
+        // link needs the run id, which only the output carries.
+        if (part.type !== "tool-start_specialist") {
+          continue;
         }
-        return rows;
-    }, [messages]);
-    const specialistRunIds = useMemo(
-        () =>
-            startedSpecialists
-                .map((row) => row.runId)
-                .filter((id): id is string => Boolean(id)),
-        [startedSpecialists],
-    );
-    const specialistStates = useSpecialistStates(specialistRunIds);
+        // The tool's output arrives either as the object the tool
+        // returned or as its JSON text, depending on the transport.
+        let output: Record<string, unknown> = {};
+        if (typeof part.output === "string") {
+          try {
+            output = JSON.parse(part.output) as Record<string, unknown>;
+          } catch {
+            // Unparseable output still leaves the agent name, which
+            // the tool call's input carries.
+          }
+        } else if (typeof part.output === "object") {
+          output = part.output as Record<string, unknown>;
+        }
+        const input = (part.input ?? {}) as { agent?: string };
+        const agent =
+          String(input.agent ?? "") || String(output.agentName ?? "");
+        // Without an agent there is nothing to name yet — the call has not
+        // been fully described by the model.
+        if (!agent) continue;
+        rows.push({
+          agent,
+          model: String(output.model ?? ""),
+          runId: String(output.runId ?? "")});
+      }
+    }
+    return rows;
+  }, [messages]);
+  const specialistRunIds = useMemo(
+    () =>
+      startedSpecialists
+        .map((row) => row.runId)
+        .filter((id): id is string => Boolean(id)),
+    [startedSpecialists],
+  );
+  const specialistStates = useSpecialistStates(specialistRunIds);
   // The routing tiers, so the orchestrator's brain is a choice rather than
   // an environment variable.
   const [tiers, setTiers] = useState<Tier[]>([]);
@@ -381,12 +379,31 @@ function OrchestratorConversation() {
         <div className="mx-auto flex h-full w-full max-w-[95vw] flex-col gap-4 p-6">
           <header className="flex items-baseline justify-between gap-4">
             <div>
-              <h1 className="text-lg font-semibold">Orchestrator</h1>
-              <p className="text-sm opacity-70">
-                Plan together. It delegates to specialists that run as their own
-                tasks.
-              </p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold">Orchestrator</h1>
+
+                <TooltipTrigger>
+                  <button
+                    aria-label="About Orchestrator"
+                    className="cursor-help text-xs opacity-60 hover:opacity-100 focus:outline-none"
+                    type="button"
+                  >
+                    ⓘ
+                  </button>
+
+                  <Tooltip placement="right">
+                    The orchestrator is the component that coordinates the
+                    execution of the workflow. It delegates tasks to the
+                    appropriate agents. Follow the specialists the subsessions
+                    or stay here, either way the orchestrator keeps track of the
+                    progress.
+                  </Tooltip>
+                </TooltipTrigger>
+              </div>
+
+              <p className="text-sm opacity-70">Plan together.</p>
             </div>
+
             <div className="flex items-center gap-3">
               {/* The run id is shown, not hidden: it is what identifies this
                             orchestration on a reload or a reconnect. */}
@@ -402,8 +419,8 @@ function OrchestratorConversation() {
               {resumeRunId ? (
                 <button
                   className="rounded border border-current/30 px-2 py-0.5 text-xs"
-                  type="button"
                   title="Leave this restored run and start a fresh conversation"
+                  type="button"
                   onClick={() => {
                     window.location.assign("/orchestrator");
                   }}
@@ -838,9 +855,7 @@ export default function OrchestratorPage() {
   }, []);
   if (!mounted) {
     return (
-      <div className="p-6 text-sm opacity-60">
-        Loading the orchestrator…
-      </div>
+      <div className="p-6 text-sm opacity-60">Loading the orchestrator…</div>
     );
   }
   return <OrchestratorConversation />;
