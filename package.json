@@ -1,0 +1,62 @@
+{
+  "name": "Berg-Agents-metaproject",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint": " eslint",
+    "typecheck": "tsc --noEmit --skipLibCheck --project berg_agents/ui/webapp",
+    "prepare": "husky",
+    "no-hooks": "cross-env HUSKY=0 git"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "bun  --cwd  berg_agents/ui/webapp eslint --fix --max-warnings 0  ",
+      "bun  --cwd  berg_plugins/shared-todo eslint --fix --max-warnings 0  ",
+      "prettier --check . --write"
+    ],
+    "*.{js,jsx,mjs}": [
+      "bun  --cwd  berg_agents/ui/webapp eslint --fix  ",
+      "bun  --cwd  berg_plugins/shared-todo eslint --fix  ",
+      "prettier --check . --write"
+    ],
+    "*.{css,scss}": [
+      "prettier --check . --write"
+    ],
+    "*.{json,yaml,yml}": [
+      "prettier --check . --write"
+    ],
+    "*.md": [
+      "prettier --check . --write",
+      "panache lint . --fix  --config .panache.toml"
+    ],
+    "*.{qmd,rmd}": [
+      "panache lint . --fix  --config .panache.toml"
+    ],
+    "*.{png,jpg,jpeg,gif,svg}": [
+      "imagemin-lint-staged"
+    ],
+    "*.py": [
+      "make -C berg_plugins/shared-todo uv-format-shared-todo-plugin",
+      "make -C . uv-format",
+      "make -C plugin_system uv-format-plugin-system"
+    ]
+  },
+  "dependencies": {
+    "@typescript-eslint/parser": "^8.73.0",
+    "typescript-eslint": "^8.73.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "eslint": "^9.39.5",
+    "git-format-staged": "^4.0.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.1",
+    "lint-staged.sh": "^0.6.9",
+    "prettier": "^3.10.1",
+    "pretty-quick": "^4.2.2"
+  },
+  "packageManager": "bun@1.4.4",
+  "ignoreScripts": [],
+  "trustedDependencies": []
+}

@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react";
+import { useEffect, useState } from "react";
 
 /**
  * The live state of a set of specialists, polled.
@@ -18,49 +18,47 @@ import {useEffect, useState} from "react";
  * @param runIds - The runs to watch. An empty list polls nothing.
  * @returns Each run's latest state, keyed by run id; absent until first read.
  */
-export function useSpecialistStates(
-    runIds: string[],
-): Record<string, string> {
-    const [states, setStates] = useState<Record<string, string>>({});
+export function useSpecialistStates(runIds: string[]): Record<string, string> {
+  const [states, setStates] = useState<Record<string, string>>({});
 
-    // A stable key: the caller's array is rebuilt each render, and polling
-    // should not restart because of it.
-    const key = runIds.join(",");
-    useEffect(() => {
-        const ids = key ? key.split(",") : [];
-        if (ids.length === 0) return;
-        let alive = true;
+  // A stable key: the caller's array is rebuilt each render, and polling
+  // should not restart because of it.
+  const key = runIds.join(",");
+  useEffect(() => {
+    const ids = key ? key.split(",") : [];
+    if (ids.length === 0) return;
+    let alive = true;
 
-        const poll = async (): Promise<void> => {
-            const entries = await Promise.all(
-                ids.map(async (id) => {
-                    try {
-                        const response = await fetch(
-                            `/api/workflow/chat/${encodeURIComponent(id)}/state`,
-                        );
-                        if (!response.ok) return [id, "unknown"] as const;
-                        const data = (await response.json()) as {
-                            state?: string;
-                        };
-                        return [id, String(data.state ?? "unknown")] as const;
-                    } catch {
-                        // A failed read leaves the previous state standing: the
-                        // strip degrades to the last known truth rather than
-                        // blinking to "unknown" on a dropped request.
-                        return [id, "unknown"] as const;
-                    }
-                }),
+    const poll = async (): Promise<void> => {
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const response = await fetch(
+              `/api/workflow/chat/${encodeURIComponent(id)}/state`,
             );
-            if (alive) setStates(Object.fromEntries(entries));
-        };
+            if (!response.ok) return [id, "unknown"] as const;
+            const data = (await response.json()) as {
+              state?: string;
+            };
+            return [id, String(data.state ?? "unknown")] as const;
+          } catch {
+            // A failed read leaves the previous state standing: the
+            // strip degrades to the last known truth rather than
+            // blinking to "unknown" on a dropped request.
+            return [id, "unknown"] as const;
+          }
+        }),
+      );
+      if (alive) setStates(Object.fromEntries(entries));
+    };
 
-        void poll();
-        const timer = window.setInterval(() => void poll(), 3000);
-        return () => {
-            alive = false;
-            window.clearInterval(timer);
-        };
-    }, [key]);
+    void poll();
+    const timer = window.setInterval(() => void poll(), 3000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [key]);
 
-    return states;
+  return states;
 }

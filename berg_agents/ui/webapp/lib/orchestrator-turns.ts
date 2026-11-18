@@ -1,4 +1,4 @@
-import {Client} from "pg";
+import { Client } from "pg";
 
 /**
  * The orchestrator's own conversation store.
@@ -47,15 +47,15 @@ const DELETED_TABLE = `${BERG_SCHEMA}.orchestrator_turns_deleted`;
  * @param client - An open connection to the world's database.
  */
 async function ensureTable(client: Client): Promise<void> {
-    await client.query(`CREATE SCHEMA IF NOT EXISTS ${BERG_SCHEMA}`);
-    await client.query(`
+  await client.query(`CREATE SCHEMA IF NOT EXISTS ${BERG_SCHEMA}`);
+  await client.query(`
         CREATE TABLE IF NOT EXISTS ${TURNS_TABLE} (
             run_id      text PRIMARY KEY,
             messages    jsonb NOT NULL,
             created_at  timestamptz NOT NULL DEFAULT now()
         )
     `);
-    await client.query(`
+  await client.query(`
         CREATE TABLE IF NOT EXISTS ${DELETED_TABLE} (
             run_id      text PRIMARY KEY,
             deleted_at  timestamptz NOT NULL DEFAULT now()
@@ -69,12 +69,12 @@ async function ensureTable(client: Client): Promise<void> {
  * @returns A connected client, or null when no workflow world is configured.
  */
 async function connect(): Promise<Client | null> {
-    const url = process.env.WORKFLOW_POSTGRES_URL;
-    if (!url) return null;
-    const client = new Client({connectionString: url});
-    await client.connect();
-    await ensureTable(client);
-    return client;
+  const url = process.env.WORKFLOW_POSTGRES_URL;
+  if (!url) return null;
+  const client = new Client({ connectionString: url });
+  await client.connect();
+  await ensureTable(client);
+  return client;
 }
 
 /**
@@ -85,53 +85,53 @@ async function connect(): Promise<Client | null> {
  *   was sent: everything the user and the orchestrator had said so far.
  */
 export async function saveTurn(
-    runId: string,
-    messages: unknown,
+  runId: string,
+  messages: unknown,
 ): Promise<void> {
-    const client = await connect();
-    if (!client) return;
-    try {
-        // ON CONFLICT, not INSERT OR REPLACE: a run id identifies one turn, so
-        // a second write for the same id is a correction of that same turn
-        // rather than a second row pretending a second turn happened.
-        await client.query(
-            `INSERT INTO ${TURNS_TABLE} (run_id, messages)
+  const client = await connect();
+  if (!client) return;
+  try {
+    // ON CONFLICT, not INSERT OR REPLACE: a run id identifies one turn, so
+    // a second write for the same id is a correction of that same turn
+    // rather than a second row pretending a second turn happened.
+    await client.query(
+      `INSERT INTO ${TURNS_TABLE} (run_id, messages)
              VALUES ($1, $2)
              ON CONFLICT (run_id) DO UPDATE SET messages = EXCLUDED.messages`,
-            [runId, JSON.stringify(messages)],
-        );
-    } finally {
-        await client.end().catch(() => undefined);
-    }
+      [runId, JSON.stringify(messages)],
+    );
+  } finally {
+    await client.end().catch(() => undefined);
+  }
 }
 
 /** One past turn, as the list shows it. */
 export interface StoredTurn {
-    /** The run id — the handle for restoring or deleting it. */
-    runId: string;
-    /** What the run is doing now, from the workflow world's own record. */
-    status: string;
-    /** When the turn was sent. */
-    createdAt: string | null;
-    /**
-     * Whether berg holds the conversation for this run.
-     *
-     * False for turns started before the store existed: the world still has the
-     * agent's log (so the run can be replayed from its stream) but there is no
-     * conversation of Sofia's to restore or delete. The flag is what lets the
-     * page offer restore-without-conversation and drop the delete button,
-     * rather than offering a delete that would remove nothing of hers.
-     */
-    hasConversation: boolean;
-    /**
-     * The turn's opening message — what this run was ABOUT.
-     *
-     * A run id says nothing to a person: the panel listed fifty opaque ids and
-     * the only way to find a session was to restore each one. This is the first
-     * user message of the stored conversation, truncated for the list; null
-     * where there is no conversation (a log-only run).
-     */
-    preview: string | null;
+  /** The run id — the handle for restoring or deleting it. */
+  runId: string;
+  /** What the run is doing now, from the workflow world's own record. */
+  status: string;
+  /** When the turn was sent. */
+  createdAt: string | null;
+  /**
+   * Whether berg holds the conversation for this run.
+   *
+   * False for turns started before the store existed: the world still has the
+   * agent's log (so the run can be replayed from its stream) but there is no
+   * conversation of Sofia's to restore or delete. The flag is what lets the
+   * page offer restore-without-conversation and drop the delete button,
+   * rather than offering a delete that would remove nothing of hers.
+   */
+  hasConversation: boolean;
+  /**
+   * The turn's opening message — what this run was ABOUT.
+   *
+   * A run id says nothing to a person: the panel listed fifty opaque ids and
+   * the only way to find a session was to restore each one. This is the first
+   * user message of the stored conversation, truncated for the list; null
+   * where there is no conversation (a log-only run).
+   */
+  preview: string | null;
 }
 
 /**
@@ -156,17 +156,17 @@ export interface StoredTurn {
  * @returns The stored turns, newest first.
  */
 export async function listTurns(): Promise<StoredTurn[]> {
-    const client = await connect();
-    if (!client) return [];
-    try {
-        // Each branch selects only columns its own table has: berg's table is
-        // (run_id, messages, created_at) and carries no `status`, so the first
-        // branch LEFT JOINs the world's run for it. Selecting `status` from
-        // berg's table — which is what this query did first — is a parse error
-        // ("column \"status\" does not exist"), and it took the whole panel down
-        // rather than one row.
-        const result = await client.query(
-            `SELECT t.run_id, r.status, t.created_at, TRUE AS has_conversation,
+  const client = await connect();
+  if (!client) return [];
+  try {
+    // Each branch selects only columns its own table has: berg's table is
+    // (run_id, messages, created_at) and carries no `status`, so the first
+    // branch LEFT JOINs the world's run for it. Selecting `status` from
+    // berg's table — which is what this query did first — is a parse error
+    // ("column \"status\" does not exist"), and it took the whole panel down
+    // rather than one row.
+    const result = await client.query(
+      `SELECT t.run_id, r.status, t.created_at, TRUE AS has_conversation,
                     (SELECT e.m->'parts'->0->>'text'
                        FROM jsonb_array_elements(t.messages) AS e(m)
                       WHERE e.m->>'role' = 'user'
@@ -186,16 +186,16 @@ export async function listTurns(): Promise<StoredTurn[]> {
                 )
               ORDER BY created_at DESC
               LIMIT 50`,
-        );
-        return result.rows.map((row) => ({
-            runId: String(row.run_id),
-            status: String(row.status ?? "unknown"),
-            createdAt: row.created_at ? String(row.created_at) : null,
-            hasConversation: Boolean(row.has_conversation),
-            preview: row.preview ? String(row.preview) : null}));
-    } finally {
-        await client.end().catch(() => undefined);
-    }
+    );
+    return result.rows.map((row) => ({
+      runId: String(row.run_id),
+      status: String(row.status ?? "unknown"),
+      createdAt: row.created_at ? String(row.created_at) : null,
+      hasConversation: Boolean(row.has_conversation),
+      preview: row.preview ? String(row.preview) : null}));
+  } finally {
+    await client.end().catch(() => undefined);
+  }
 }
 
 /**
@@ -204,22 +204,20 @@ export async function listTurns(): Promise<StoredTurn[]> {
  * @param runId - The run to restore.
  * @returns The stored messages, or null when berg has no record of that turn.
  */
-export async function loadTurn(
-    runId: string,
-): Promise<unknown[] | null> {
-    const client = await connect();
-    if (!client) return null;
-    try {
-        const result = await client.query(
-            `SELECT messages FROM ${TURNS_TABLE} WHERE run_id = $1`,
-            [runId],
-        );
-        if (result.rowCount === 0) return null;
-        const stored = result.rows[0]?.messages;
-        return Array.isArray(stored) ? stored : null;
-    } finally {
-        await client.end().catch(() => undefined);
-    }
+export async function loadTurn(runId: string): Promise<unknown[] | null> {
+  const client = await connect();
+  if (!client) return null;
+  try {
+    const result = await client.query(
+      `SELECT messages FROM ${TURNS_TABLE} WHERE run_id = $1`,
+      [runId],
+    );
+    if (result.rowCount === 0) return null;
+    const stored = result.rows[0]?.messages;
+    return Array.isArray(stored) ? stored : null;
+  } finally {
+    await client.end().catch(() => undefined);
+  }
 }
 
 /**
@@ -241,21 +239,18 @@ export async function loadTurn(
  * @returns True once the run is out of the list.
  */
 export async function deleteTurn(runId: string): Promise<boolean> {
-    const client = await connect();
-    if (!client) return false;
-    try {
-        await client.query(
-            `DELETE FROM ${TURNS_TABLE} WHERE run_id = $1`,
-            [runId],
-        );
-        await client.query(
-            `INSERT INTO ${DELETED_TABLE} (run_id)
+  const client = await connect();
+  if (!client) return false;
+  try {
+    await client.query(`DELETE FROM ${TURNS_TABLE} WHERE run_id = $1`, [runId]);
+    await client.query(
+      `INSERT INTO ${DELETED_TABLE} (run_id)
              VALUES ($1)
              ON CONFLICT (run_id) DO NOTHING`,
-            [runId],
-        );
-        return true;
-    } finally {
-        await client.end().catch(() => undefined);
-    }
+      [runId],
+    );
+    return true;
+  } finally {
+    await client.end().catch(() => undefined);
+  }
 }

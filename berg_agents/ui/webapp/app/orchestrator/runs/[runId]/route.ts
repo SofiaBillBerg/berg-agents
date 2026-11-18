@@ -1,4 +1,4 @@
-import {deleteTurn, loadTurn, saveTurn} from "@/lib/orchestrator-turns";
+import { deleteTurn, loadTurn, saveTurn } from "@/lib/orchestrator-turns";
 
 /**
  * One past orchestration: read its conversation back, record what it ended with,
@@ -15,18 +15,18 @@ import {deleteTurn, loadTurn, saveTurn} from "@/lib/orchestrator-turns";
  *   no record of that run.
  */
 export async function GET(
-    request: Request,
-    {params}: {params: Promise<{runId: string}>},
+  request: Request,
+  { params }: { params: Promise<{ runId: string }> },
 ): Promise<Response> {
-    const {runId} = await params;
-    const messages = await loadTurn(runId);
-    if (messages === null) {
-        // Not recorded, rather than unknown: the run may exist in the workflow
-        // world (it is the agent's log) while berg has no conversation for it —
-        // which is the case for every turn sent before this store existed.
-        return Response.json({detail: "no stored conversation"}, {status: 404});
-    }
-    return Response.json({runId, messages});
+  const { runId } = await params;
+  const messages = await loadTurn(runId);
+  if (messages === null) {
+    // Not recorded, rather than unknown: the run may exist in the workflow
+    // world (it is the agent's log) while berg has no conversation for it —
+    // which is the case for every turn sent before this store existed.
+    return Response.json({ detail: "no stored conversation" }, { status: 404 });
+  }
+  return Response.json({ runId, messages });
 }
 
 /**
@@ -44,13 +44,13 @@ export async function GET(
  * @returns 204 once recorded.
  */
 export async function POST(
-    request: Request,
-    {params}: {params: Promise<{runId: string}>},
+  request: Request,
+  { params }: { params: Promise<{ runId: string }> },
 ): Promise<Response> {
-    const {runId} = await params;
-    const body = (await request.json()) as {messages?: unknown};
-    await saveTurn(runId, body.messages ?? []);
-    return new Response(null, {status: 204});
+  const { runId } = await params;
+  const body = (await request.json()) as { messages?: unknown };
+  await saveTurn(runId, body.messages ?? []);
+  return new Response(null, { status: 204 });
 }
 
 /**
@@ -68,13 +68,13 @@ export async function POST(
  * @returns 204 once the run is out of the list.
  */
 export async function DELETE(
-    request: Request,
-    {params}: {params: Promise<{runId: string}>},
+  request: Request,
+  { params }: { params: Promise<{ runId: string }> },
 ): Promise<Response> {
-    const {runId} = await params;
-    const deleted = await deleteTurn(runId);
-    if (!deleted) {
-        return Response.json({detail: "nothing to delete"}, {status: 404});
-    }
-    return new Response(null, {status: 204});
+  const { runId } = await params;
+  const deleted = await deleteTurn(runId);
+  if (!deleted) {
+    return Response.json({ detail: "nothing to delete" }, { status: 404 });
+  }
+  return new Response(null, { status: 204 });
 }

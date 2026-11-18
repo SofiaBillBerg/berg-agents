@@ -1,4 +1,4 @@
-import {callBackend} from "./specialists";
+import { callBackend } from "./specialists";
 
 /**
  * MCP for the orchestrator: looking things up without delegating.
@@ -28,11 +28,11 @@ import {callBackend} from "./specialists";
 
 /** One MCP tool, as berg's allowlisted list reports it. */
 export interface McpToolSpec {
-    server: string;
-    tool: string;
-    description: string;
-    /** Its argument schema, in berg's JSON-Schema dialect. */
-    parameters: Record<string, unknown>;
+  server: string;
+  tool: string;
+  description: string;
+  /** Its argument schema, in berg's JSON-Schema dialect. */
+  parameters: Record<string, unknown>;
 }
 
 /**
@@ -41,20 +41,20 @@ export interface McpToolSpec {
  * @returns The allowed tools, with what each does and what arguments it takes.
  */
 export async function listMcpTools(): Promise<McpToolSpec[]> {
-    "use step";
-    const result = (await callBackend("/api/mcp/tools")) as {
-        tools?: unknown;
-    };
-    const rows = Array.isArray(result.tools) ? result.tools : [];
-    return rows.map((row) => {
-        const entry = (row ?? {}) as Record<string, unknown>;
-        return {
-            server: String(entry.server ?? ""),
-            tool: String(entry.tool ?? ""),
-            description: String(entry.description ?? ""),
-            parameters:
-                (entry.parameters as Record<string, unknown> | undefined) ?? {}};
-    });
+  "use step";
+  const result = (await callBackend("/api/mcp/tools")) as {
+    tools?: unknown;
+  };
+  const rows = Array.isArray(result.tools) ? result.tools : [];
+  return rows.map((row) => {
+    const entry = (row ?? {}) as Record<string, unknown>;
+    return {
+      server: String(entry.server ?? ""),
+      tool: String(entry.tool ?? ""),
+      description: String(entry.description ?? ""),
+      parameters:
+        (entry.parameters as Record<string, unknown> | undefined) ?? {}};
+  });
 }
 
 /**
@@ -66,16 +66,16 @@ export async function listMcpTools(): Promise<McpToolSpec[]> {
  * @returns The tool's output, and what ran.
  */
 export async function useMcpTool(
-    server: string,
-    tool: string,
-    args: Record<string, unknown> = {},
+  server: string,
+  tool: string,
+  args: Record<string, unknown> = {},
 ): Promise<string> {
-    "use step";
-    const result = (await callBackend(
-        `/api/mcp/${encodeURIComponent(server)}/tools/${encodeURIComponent(tool)}`,
-        {
-            method: "POST",
-            body: JSON.stringify({args})},
-    )) as {output?: unknown};
-    return String(result.output ?? "");
+  "use step";
+  const result = (await callBackend(
+    `/api/mcp/${encodeURIComponent(server)}/tools/${encodeURIComponent(tool)}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ args })},
+  )) as { output?: unknown };
+  return String(result.output ?? "");
 }

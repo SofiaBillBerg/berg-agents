@@ -38,21 +38,21 @@
  * its own ollama rather than at a hosted gateway — which is the point.
  */
 
-import {createOpenAICompatible} from "@ai-sdk/openai-compatible";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import {
-    WORKFLOW_DESERIALIZE,
-    WORKFLOW_SERIALIZE} from "@ai-sdk/provider-utils";
+  WORKFLOW_DESERIALIZE,
+  WORKFLOW_SERIALIZE} from "@ai-sdk/provider-utils";
 
 /** What a model needs to carry across a step: strings, and nothing else. */
 interface LocalModelState {
-    /** The model name at the endpoint, e.g. `bonsai-2:9b`. */
-    modelId: string;
-    /** The OpenAI-compatible base URL, e.g. `http://127.0.0.1:11434/v1`. */
-    baseURL: string;
-    /** The key the endpoint expects; ollama accepts any non-empty value. */
-    apiKey: string;
-    /** The provider name, which shows up in error messages and telemetry. */
-    provider: string;
+  /** The model name at the endpoint, e.g. `bonsai-2:9b`. */
+  modelId: string;
+  /** The OpenAI-compatible base URL, e.g. `http://127.0.0.1:11434/v1`. */
+  baseURL: string;
+  /** The key the endpoint expects; ollama accepts any non-empty value. */
+  apiKey: string;
+  /** The provider name, which shows up in error messages and telemetry. */
+  provider: string;
 }
 
 /**
@@ -63,101 +63,105 @@ interface LocalModelState {
  * this class adds serialization, it does not reimplement a provider.
  */
 export class LocalModel {
-    /** Required by the AI SDK's model contract. */
-    readonly specificationVersion = "v4" as const;
-    /** Which provider this model claims, for errors and telemetry. */
-    readonly provider: string;
-    /** The model name at the endpoint. */
-    readonly modelId: string;
+  /** Required by the AI SDK's model contract. */
+  readonly specificationVersion = "v4" as const;
+  /** Which provider this model claims, for errors and telemetry. */
+  readonly provider: string;
+  /** The model name at the endpoint. */
+  readonly modelId: string;
 
-    /** The endpoint this model talks to. */
-    private readonly baseURL: string;
-    /** The key the endpoint expects. */
-    private readonly apiKey: string;
+  /** The endpoint this model talks to. */
+  private readonly baseURL: string;
+  /** The key the endpoint expects. */
+  private readonly apiKey: string;
 
-    /**
-     * @param state - The strings that identify the endpoint and model.
-     */
-    constructor(state: LocalModelState) {
-        this.provider = state.provider;
-        this.modelId = state.modelId;
-        this.baseURL = state.baseURL;
-        this.apiKey = state.apiKey;
-    }
+  /**
+   * @param state - The strings that identify the endpoint and model.
+   */
+  constructor(state: LocalModelState) {
+    this.provider = state.provider;
+    this.modelId = state.modelId;
+    this.baseURL = state.baseURL;
+    this.apiKey = state.apiKey;
+  }
 
-    /**
-     * Reduce the model to what can cross a step boundary.
-     *
-     * Only strings, deliberately: this is the hook whose absence caused the
-     * `this.config.url is not a function` failure, so the state must stay
-     * plain data rather than a provider config.
-     *
-     * @param model - The model being serialized.
-     * @returns Its endpoint and name, as plain JSON.
-     */
-    static [WORKFLOW_SERIALIZE](model: LocalModel): LocalModelState {
-        return {
-            modelId: model.modelId,
-            baseURL: model.baseURL,
-            apiKey: model.apiKey,
-            provider: model.provider};
-    }
+  /**
+   * Reduce the model to what can cross a step boundary.
+   *
+   * Only strings, deliberately: this is the hook whose absence caused the
+   * `this.config.url is not a function` failure, so the state must stay
+   * plain data rather than a provider config.
+   *
+   * @param model - The model being serialized.
+   * @returns Its endpoint and name, as plain JSON.
+   */
+  static [WORKFLOW_SERIALIZE](model: LocalModel): LocalModelState {
+    return {
+      modelId: model.modelId,
+      baseURL: model.baseURL,
+      apiKey: model.apiKey,
+      provider: model.provider};
+  }
 
-    /**
-     * Rebuild a working model from serialized state.
-     *
-     * @param state - What {@link WORKFLOW_SERIALIZE} produced.
-     * @returns A model that can actually make the call.
-     */
-    static [WORKFLOW_DESERIALIZE](state: LocalModelState): LocalModel {
-        return new LocalModel(state);
-    }
+  /**
+   * Rebuild a working model from serialized state.
+   *
+   * @param state - What {@link WORKFLOW_SERIALIZE} produced.
+   * @returns A model that can actually make the call.
+   */
+  static [WORKFLOW_DESERIALIZE](state: LocalModelState): LocalModel {
+    return new LocalModel(state);
+  }
 
-    /**
-     * The provider, rebuilt on demand.
-     *
-     * Built per call rather than cached because a deserialized instance has no
-     * usable config of its own — reconstructing is what makes the model work on
-     * the far side of the step boundary.
-     *
-     * @returns An `openai-compatible` provider bound to this endpoint.
-     */
-    private providerInstance() {
-        return createOpenAICompatible({
-            name: this.provider,
-            baseURL: this.baseURL,
-            apiKey: this.apiKey});
-    }
+  /**
+   * The provider, rebuilt on demand.
+   *
+   * Built per call rather than cached because a deserialized instance has no
+   * usable config of its own — reconstructing is what makes the model work on
+   * the far side of the step boundary.
+   *
+   * @returns An `openai-compatible` provider bound to this endpoint.
+   */
+  private providerInstance() {
+    return createOpenAICompatible({
+      name: this.provider,
+      baseURL: this.baseURL,
+      apiKey: this.apiKey});
+  }
 
-    /** The underlying provider model, rebuilt from strings. */
-    private inner() {
-        return this.providerInstance()(this.modelId);
-    }
+  /** The underlying provider model, rebuilt from strings. */
+  private inner() {
+    return this.providerInstance()(this.modelId);
+  }
 
-    /** Which URLs the endpoint can fetch itself, delegated to the provider. */
-    get supportedUrls() {
-        return this.inner().supportedUrls;
-    }
+  /** Which URLs the endpoint can fetch itself, delegated to the provider. */
+  get supportedUrls() {
+    return this.inner().supportedUrls;
+  }
 
-    /**
-     * Non-streaming generation, delegated.
-     *
-     * @param options - The AI SDK's call options.
-     * @returns The provider's generation result.
-     */
-    async doGenerate(options: Parameters<ReturnType<LocalModel["inner"]>["doGenerate"]>[0]) {
-        return this.inner().doGenerate(options);
-    }
+  /**
+   * Non-streaming generation, delegated.
+   *
+   * @param options - The AI SDK's call options.
+   * @returns The provider's generation result.
+   */
+  async doGenerate(
+    options: Parameters<ReturnType<LocalModel["inner"]>["doGenerate"]>[0],
+  ) {
+    return this.inner().doGenerate(options);
+  }
 
-    /**
-     * Streaming generation, delegated.
-     *
-     * @param options - The AI SDK's call options.
-     * @returns The provider's stream result.
-     */
-    async doStream(options: Parameters<ReturnType<LocalModel["inner"]>["doStream"]>[0]) {
-        return this.inner().doStream(options);
-    }
+  /**
+   * Streaming generation, delegated.
+   *
+   * @param options - The AI SDK's call options.
+   * @returns The provider's stream result.
+   */
+  async doStream(
+    options: Parameters<ReturnType<LocalModel["inner"]>["doStream"]>[0],
+  ) {
+    return this.inner().doStream(options);
+  }
 }
 
 /**
@@ -167,21 +171,21 @@ export class LocalModel {
  * @returns A model that can cross a workflow step boundary intact.
  */
 export function localModel(
-    options: {
-        modelId?: string;
-        baseURL?: string;
-        apiKey?: string;
-        provider?: string;
-    } = {},
+  options: {
+    modelId?: string;
+    baseURL?: string;
+    apiKey?: string;
+    provider?: string;
+  } = {},
 ): LocalModel {
-    return new LocalModel({
-        modelId: options.modelId || process.env.ORCHESTRATOR_MODEL || "bonsai-2:9b",
-        baseURL:
-            options.baseURL ||
-            process.env.ORCHESTRATOR_BASE_URL ||
-            // berg talks to ollama on its own port; the OpenAI-compatible
-            // surface lives under /v1.
-            `http://127.0.0.1:${process.env.BERG_AGENT_OLLAMA_PORT || "11434"}/v1`,
-        apiKey: options.apiKey || process.env.ORCHESTRATOR_API_KEY || "ollama",
-        provider: options.provider || "berg-local"});
+  return new LocalModel({
+    modelId: options.modelId || process.env.ORCHESTRATOR_MODEL || "bonsai-2:9b",
+    baseURL:
+      options.baseURL ||
+      process.env.ORCHESTRATOR_BASE_URL ||
+      // berg talks to ollama on its own port; the OpenAI-compatible
+      // surface lives under /v1.
+      `http://127.0.0.1:${process.env.BERG_AGENT_OLLAMA_PORT || "11434"}/v1`,
+    apiKey: options.apiKey || process.env.ORCHESTRATOR_API_KEY || "ollama",
+    provider: options.provider || "berg-local"});
 }

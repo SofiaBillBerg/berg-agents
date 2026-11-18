@@ -1,5 +1,6 @@
 Berg Agents
 ================
+
 Sofia Billger Bergström
 
 <!-- README.md is generated from index.qmd. Please edit that file -->
@@ -25,7 +26,7 @@ title="Berg Agents overview" alt="Berg-Agents Overview" />
 
 ## Quick Start
 
-``` bash
+```bash
 # Install dependencies (uv is recommended)
 uv venv .venv
 source .venv/bin/activate
@@ -76,17 +77,17 @@ The config directory resolves via `BERG_AGENTS_CONFIG_DIR` →
 
 ## Configuration
 
-``` bash
+```bash
 {config}/bergagents.jsonc   # providers, harness, model_routing, hitl_rules, plugins, agents
 .env                        # secrets referenced as `${env:VAR_NAME}`
 ```
 
-| Layer | Source |
-|----|----|
-| Config file | `{config}/bergagents.jsonc` — `providers` block plus `harness` / `model_routing` / `hitl_rules` / `plugins` / `agents` |
-| Secrets | `.env` file, referenced with `${env:VAR_NAME}` |
-| Overrides | `BERG_AGENT_*` environment variables |
-| External tools | `{config}/mcp.json` for MCP server configuration |
+| Layer          | Source                                                                                                                 |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Config file    | `{config}/bergagents.jsonc` — `providers` block plus `harness` / `model_routing` / `hitl_rules` / `plugins` / `agents` |
+| Secrets        | `.env` file, referenced with `${env:VAR_NAME}`                                                                         |
+| Overrides      | `BERG_AGENT_*` environment variables                                                                                   |
+| External tools | `{config}/mcp.json` for MCP server configuration                                                                       |
 
 See [CONFIGURATION](docs/CONFIGURATION.qmd) for the full reference.
 
@@ -98,21 +99,21 @@ title="Berg Agents Config Modules" alt="Berg-Agents Config" />
 
 ## Documentation
 
-| Page | Description |
-|----|----|
-| [QUICKSTART](docs/QUICKSTART.qmd) | Installation and first run |
-| [USAGE](docs/USAGE.qmd) | TUI, Python API, and web workflows |
-| [API](docs/API.qmd) | Module map for the codebase |
-| [TOOLS](docs/TOOLS.qmd) | Tool catalog with signatures and risk classes |
-| [CONFIGURATION](docs/CONFIGURATION.qmd) | Provider-centric config, `.env`, and env vars |
-| [MEMORY](docs/MEMORY.qmd) | Memory, compaction, and persistence |
-| [PLUGIN-UI](docs/plugins/PLUGIN-UI.qmd) | Runtime plugin UI bridge |
-| [SHARED-TODO](docs/plugins/SHARED-TODO.qmd) | Plugin pilot walkthrough |
-| [MANIFEST](docs/plugins/MANIFEST.qmd) | Plugin manifest reference |
-| [CHEATSHEET](docs/CHEATSHEET.qmd) | Commands, endpoints, and env keys |
-| [CONTRIBUTING](docs/CONTRIBUTING.qmd) | Guidelines for contributing |
-| [FAQ](docs/FAQ.qmd) | Common questions and troubleshooting |
-| [CHANGELOG](docs/CHANGELOG.qmd) | Versioned change tracking |
+| Page                                        | Description                                   |
+| ------------------------------------------- | --------------------------------------------- |
+| [QUICKSTART](docs/QUICKSTART.qmd)           | Installation and first run                    |
+| [USAGE](docs/USAGE.qmd)                     | TUI, Python API, and web workflows            |
+| [API](docs/API.qmd)                         | Module map for the codebase                   |
+| [TOOLS](docs/TOOLS.qmd)                     | Tool catalog with signatures and risk classes |
+| [CONFIGURATION](docs/CONFIGURATION.qmd)     | Provider-centric config, `.env`, and env vars |
+| [MEMORY](docs/MEMORY.qmd)                   | Memory, compaction, and persistence           |
+| [PLUGIN-UI](docs/plugins/PLUGIN-UI.qmd)     | Runtime plugin UI bridge                      |
+| [SHARED-TODO](docs/plugins/SHARED-TODO.qmd) | Plugin pilot walkthrough                      |
+| [MANIFEST](docs/plugins/MANIFEST.qmd)       | Plugin manifest reference                     |
+| [CHEATSHEET](docs/CHEATSHEET.qmd)           | Commands, endpoints, and env keys             |
+| [CONTRIBUTING](docs/CONTRIBUTING.qmd)       | Guidelines for contributing                   |
+| [FAQ](docs/FAQ.qmd)                         | Common questions and troubleshooting          |
+| [CHANGELOG](docs/CHANGELOG.qmd)             | Versioned change tracking                     |
 
 ## Getting Help
 

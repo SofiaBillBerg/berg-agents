@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# update — Accept/reject individual refs (server-side).
+# When: On the server, once per ref being updated.
+# Args: $1 = ref · $2 = old object · $3 = new object.
+# Exit: Non-zero rejects that ref.
+
+exit 0

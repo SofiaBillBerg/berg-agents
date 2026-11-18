@@ -1,4 +1,4 @@
-import {listTurns} from "@/lib/orchestrator-turns";
+import { listTurns } from "@/lib/orchestrator-turns";
 
 /**
  * Past orchestrator runs, newest first.
@@ -15,6 +15,6 @@ import {listTurns} from "@/lib/orchestrator-turns";
  * why no orchestrator run ever appeared in the History tab.
  */
 export async function GET(): Promise<Response> {
-    const runs = await listTurns();
-    return Response.json({runs});
+  const runs = await listTurns();
+  return Response.json({ runs });
 }

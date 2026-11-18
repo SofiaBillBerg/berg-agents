@@ -119,6 +119,7 @@ export async function loadPluginSurface(
     return null;
   }
   try {
+    /* eslint-disable-next-line @next/next/no-assign-module-variable */
     const module = (await importPluginBundle(ui.entry_url)) as Record<
       string,
       unknown

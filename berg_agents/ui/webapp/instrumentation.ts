@@ -32,11 +32,11 @@
  * @see https://nextjs.org/docs/app/guides/instrumentation
  */
 export async function register(): Promise<void> {
-    if (process.env.NEXT_RUNTIME !== "edge") {
-        const {getWorld} = await import("workflow/runtime");
-        const world = await getWorld();
-        // Optional on worlds that have no worker (the Vercel world does
-        // nothing here), so it is safe to call unconditionally.
-        await world.start?.();
-    }
+  if (process.env.NEXT_RUNTIME !== "edge") {
+    const { getWorld } = await import("workflow/runtime");
+    const world = await getWorld();
+    // Optional on worlds that have no worker (the Vercel world does
+    // nothing here), so it is safe to call unconditionally.
+    await world.start?.();
+  }
 }

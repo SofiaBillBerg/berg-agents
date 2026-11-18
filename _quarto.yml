@@ -25,7 +25,7 @@ website:
   llms-txt: true
   page-navigation: true
   search:
-    keyboard-shortcut: [ "?", "H" ]
+    keyboard-shortcut: ["?", "H"]
     copy-button: true
     type: textbox
   favicon: docs/styles/logo/favicon.png

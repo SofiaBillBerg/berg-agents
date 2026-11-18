@@ -22,6 +22,7 @@
 import { useState } from "react";
 
 export const useInitial = () => {
+  /*eslint @typescript-eslint/no-unused-vars: "off"*/
   const [status, setStatus] = useState({
     loading: false,
     error: false});

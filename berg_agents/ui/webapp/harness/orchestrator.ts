@@ -49,7 +49,7 @@ import {
   listWorkspaceFiles,
   readWorkspaceFile,
   searchWorkspaceCode} from "./workspace-tools";
-import {listMcpTools, useMcpTool} from "./mcp-tools";
+import { listMcpTools, useMcpTool } from "./mcp-tools";
 
 /**
  * The orchestrator's instructions.
@@ -112,7 +112,7 @@ export const orchestratorTools = {
       "not specialist work.",
     inputSchema: z.object({
       file_path: z.string().describe("Path relative to the workspace root.")}),
-    execute: async ({file_path}) => readWorkspaceFile(file_path)}),
+    execute: async ({ file_path }) => readWorkspaceFile(file_path)}),
 
   list_directory: tool({
     description:
@@ -123,7 +123,7 @@ export const orchestratorTools = {
         .string()
         .optional()
         .describe("Path relative to the workspace root; the root when absent.")}),
-    execute: async ({directory}) => listWorkspaceFiles(directory)}),
+    execute: async ({ directory }) => listWorkspaceFiles(directory)}),
 
   grep: tool({
     description:
@@ -135,7 +135,7 @@ export const orchestratorTools = {
         .string()
         .optional()
         .describe("Where to look; the whole workspace when absent.")}),
-    execute: async ({pattern, directory}) =>
+    execute: async ({ pattern, directory }) =>
       searchWorkspaceCode(pattern, directory)}),
 
   // Looking things up beyond the workspace: documentation, the code graph, her
@@ -150,7 +150,7 @@ export const orchestratorTools = {
       "carries that tool's argument schema, so you can call it correctly " +
       "without guessing argument names. Call it before using a tool here.",
     inputSchema: z.object({}),
-    execute: async () => ({tools: await listMcpTools()})}),
+    execute: async () => ({ tools: await listMcpTools() })}),
 
   use_mcp_tool: tool({
     description:
@@ -164,7 +164,7 @@ export const orchestratorTools = {
         .record(z.string(), z.unknown())
         .optional()
         .describe("The tool's arguments.")}),
-    execute: async ({server, tool, args}) =>
+    execute: async ({ server, tool, args }) =>
       useMcpTool(server, tool, (args ?? {}) as Record<string, unknown>)}),
 
   list_specialists: tool({
@@ -275,7 +275,9 @@ export const orchestratorTools = {
  *   selection happens on the Python side; this is the orchestrator's own brain.
  * @returns A `WorkflowAgent` to run inside a workflow.
  */
-export function buildOrchestrator(model: string | object): WorkflowAgent<any> {
+export function buildOrchestrator(
+  model: string | object,
+): WorkflowAgent<typeof orchestratorTools> {
   // Signed approvals, and only when a secret is actually configured: the SDK
   // signs the approval id, tool call and validated input so that a modified
   // client history cannot forge an approval that releases a real write on the

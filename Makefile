@@ -132,17 +132,17 @@ uv-format: ## Use uv to format the Berg-Agents package code
 	@echo "Formatting the Berg-Agents package code with uv"
 	@.venv/bin/uv check --fix
 
-uv-lock: uv-install ## Use uv to lock the dependencies and generate a requirements.txt file for the Berg-Agents package
-	@echo "Locking the dependencies with uv and generating requirements.txt for Berg-Agents package"
-	@.venv/bin/uv lock
-	@.venv/bin/uv export --format requirements.txt --output-file requirements.txt -q
-
 uv-install: ## Install uv dependencies for the Berg-Agents package
 	@echo "Installing Berg-Agents package and uv dependencies"
 	@.venv/bin/uv pip install -e .
 
 
-uv-build: uv-install ## Use uv to build the Berg-Agents package
+uv-lock: uv-install ## Use uv to lock the dependencies and generate a requirements.txt file for the Berg-Agents package
+	@echo "Locking the dependencies with uv and generating requirements.txt for Berg-Agents package"
+	@.venv/bin/uv lock
+	@.venv/bin/uv export --format requirements.txt --output-file requirements.txt -q
+
+uv-build: uv-lock ## Use uv to build the Berg-Agents package
 	@echo "Build the Berg-Agents package with uv"
 	@.venv/bin/uv build
 

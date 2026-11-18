@@ -34,45 +34,45 @@
  * clear the cache and the next reader re-fetches.
  */
 
-import type {AgentInfo} from "@/harness";
+import type { AgentInfo } from "@/harness";
 
-import {API_BASE} from "@/envConfig";
+import { API_BASE } from "@/envConfig";
 
 /** One capability descriptor from /api/plugins. */
 export interface PluginCapabilityInfo {
-    type: string;
-    id?: string;
-    name?: string;
-    server_type?: string;
-    enabled?: boolean;
-    sensitive?: boolean;
+  type: string;
+  id?: string;
+  name?: string;
+  server_type?: string;
+  enabled?: boolean;
+  sensitive?: boolean;
 }
 
 /** The `ui:` block a plugin manifest declares. */
 export interface PluginUiDeclaration {
-    entry?: string;
-    entry_url?: string;
-    entry_built?: boolean;
-    placement?: string;
-    label?: string;
-    width?: number;
+  entry?: string;
+  entry_url?: string;
+  entry_built?: boolean;
+  placement?: string;
+  label?: string;
+  width?: number;
 }
 
 /** One plugin as /api/plugins reports it. */
 export interface PluginInfo {
-    id: string;
-    name: string;
-    version: string;
-    state: string;
-    description: string;
-    tools: string[];
-    capabilities: PluginCapabilityInfo[];
-    ui?: PluginUiDeclaration | null;
+  id: string;
+  name: string;
+  version: string;
+  state: string;
+  description: string;
+  tools: string[];
+  capabilities: PluginCapabilityInfo[];
+  ui?: PluginUiDeclaration | null;
 }
 
 /** What the plugins endpoint answers. */
 interface PluginsResponse {
-    plugins?: PluginInfo[];
+  plugins?: PluginInfo[];
 }
 
 /**
@@ -84,7 +84,7 @@ const cache = new Map<string, unknown>();
 
 /** Forget every cached catalog (after a plugin enable/disable). */
 export function invalidateCatalog(): void {
-    cache.clear();
+  cache.clear();
 }
 
 /**
@@ -94,17 +94,17 @@ export function invalidateCatalog(): void {
  * @returns The payload, or null when the request failed.
  */
 async function readCatalog(path: string): Promise<unknown | null> {
-    if (cache.has(path)) return cache.get(path) ?? null;
-    try {
-        const resp = await fetch(`${API_BASE}${path}`);
-        if (!resp.ok) return null;
-        const data = await resp.json();
-        cache.set(path, data);
-        return data;
-    } catch {
-        // Backend unreachable: the caller keeps what it has.
-        return null;
-    }
+  if (cache.has(path)) return cache.get(path) ?? null;
+  try {
+    const resp = await fetch(`${API_BASE}${path}`);
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    cache.set(path, data);
+    return data;
+  } catch {
+    // Backend unreachable: the caller keeps what it has.
+    return null;
+  }
 }
 
 /**
@@ -113,8 +113,8 @@ async function readCatalog(path: string): Promise<unknown | null> {
  * @returns The plugins, or [] when unavailable.
  */
 export async function fetchPlugins(): Promise<PluginInfo[]> {
-    const data = (await readCatalog("/api/plugins")) as PluginsResponse | null;
-    return data && Array.isArray(data.plugins) ? data.plugins : [];
+  const data = (await readCatalog("/api/plugins")) as PluginsResponse | null;
+  return data && Array.isArray(data.plugins) ? data.plugins : [];
 }
 
 /**
@@ -123,8 +123,8 @@ export async function fetchPlugins(): Promise<PluginInfo[]> {
  * @returns The agents, or [] when unavailable.
  */
 export async function fetchAgents(): Promise<AgentInfo[]> {
-    const data = await readCatalog("/api/agents");
-    return Array.isArray(data) ? (data as AgentInfo[]) : [];
+  const data = await readCatalog("/api/agents");
+  return Array.isArray(data) ? (data as AgentInfo[]) : [];
 }
 
 /**
@@ -133,5 +133,5 @@ export async function fetchAgents(): Promise<AgentInfo[]> {
  * @returns The stats payload, or null when unavailable.
  */
 export async function fetchRouterStats(): Promise<unknown | null> {
-    return readCatalog("/api/router-stats");
+  return readCatalog("/api/router-stats");
 }

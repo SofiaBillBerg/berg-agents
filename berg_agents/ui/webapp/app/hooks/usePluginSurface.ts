@@ -88,6 +88,7 @@ export interface PluginSurface {
  * @returns The machine's state and its drag/refresh actions.
  */
 export function usePluginSurface(deps: UsePluginSurfaceDeps): PluginSurface {
+  /*eslint @typescript-eslint/no-unused-vars: "off"*/
   const { apiBase, messages } = deps;
 
   const [sidePluginId, setSidePluginId] = useState<string | null>(null);

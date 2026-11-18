@@ -1,3 +1,16 @@
 # Ignore artifacts:
-build
-coverage
+**/build
+**/coverage
+**/dist
+**/.next/**
+**/node_modules/**
+**/.swc/**
+**/.venv
+**/.rvenv*
+**/_extensions
+**/_site
+**/apidocs
+**/*cache*
+**/.*
+**/transcripts
+**/berg_agent_outputs

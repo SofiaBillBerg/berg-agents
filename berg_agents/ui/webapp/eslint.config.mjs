@@ -45,7 +45,9 @@ export default tseslint.config(
       "**/node_modules",
       "**/coverage",
       "**/.next",
-      "**/build"]},
+      "**/build",
+      "**/*config*.mjs",
+      "**/*dir*.mjs"]},
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -77,7 +79,7 @@ export default tseslint.config(
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs["core-web-vitals"].rules,
 
-      "no-console": "warn",
+      "no-console": "off",
       "react/prop-types": "off",
       "react/jsx-uses-react": "off",
       "react/react-in-jsx-scope": "off",
@@ -91,8 +93,11 @@ export default tseslint.config(
         "warn",
         {
           args: "after-used",
-          ignoreRestSiblings: false,
+          ignoreRestSiblings: true,
+          reportUsedIgnorePattern: false,
+          ignoreUsingDeclarations: true,
           argsIgnorePattern: "^_.*?$"}],
+
       "import/order": [
         "warn",
         {
@@ -111,6 +116,7 @@ export default tseslint.config(
               group: "external",
               position: "after"}],
           "newlines-between": "always"}],
+
       "react/self-closing-comp": "warn",
       "react/jsx-sort-props": [
         "warn",

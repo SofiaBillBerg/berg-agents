@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -19,10 +19,9 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-
 /** @type {import('postcss-load-config').Config} */
 const config = {
-    plugins: {
-        "@tailwindcss/postcss": {}}};
+  plugins: {
+    "@tailwindcss/postcss": {}}};
 
 export default config;

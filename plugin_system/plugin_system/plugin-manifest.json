@@ -4,22 +4,14 @@
   "title": "Berg Agents Plugin Manifest",
   "description": "Schema for Berg Agents plugin manifest",
   "type": "object",
-  "required": [
-    "id",
-    "version",
-    "name",
-    "description",
-    "entry_point"
-  ],
+  "required": ["id", "version", "name", "description", "entry_point"],
   "properties": {
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*$",
       "minLength": 3,
       "maxLength": 64,
-      "examples": [
-        "berg-plugin-github"
-      ]
+      "examples": ["berg-plugin-github"]
     },
     "version": {
       "type": "string",
@@ -102,10 +94,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": [
-          "id",
-          "version"
-        ],
+        "required": ["id", "version"],
         "properties": {
           "id": {
             "type": "string"
@@ -126,17 +115,10 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": [
-          "type"
-        ],
+        "required": ["type"],
         "properties": {
           "type": {
-            "enum": [
-              "tool",
-              "agent",
-              "provider",
-              "backend"
-            ]
+            "enum": ["tool", "agent", "provider", "backend"]
           },
           "id": {
             "type": "string"
@@ -148,11 +130,7 @@
             "type": "string"
           },
           "risk_level": {
-            "enum": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "enum": ["low", "medium", "high"]
           },
           "deferred": {
             "type": "boolean"

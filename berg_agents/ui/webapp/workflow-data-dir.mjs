@@ -20,7 +20,7 @@
  *   2) the checkout's `.berg-agents`.
  */
 
-import {fileURLToPath} from "node:url";
+import { fileURLToPath } from "node:url";
 
 /**
  * Berg's workflow data directory, wherever the config dir resolves.
@@ -72,7 +72,10 @@ if (!process.env.WORKFLOW_TARGET_WORLD) {
  * service's migrations a berg outage. The connection string is overridable so
  * an existing deployment can point elsewhere.
  */
-if (!process.env.WORKFLOW_TARGET_WORLD || process.env.WORKFLOW_TARGET_WORLD === "local") {
+if (
+  !process.env.WORKFLOW_TARGET_WORLD ||
+  process.env.WORKFLOW_TARGET_WORLD === "local"
+) {
   process.env.WORKFLOW_TARGET_WORLD = "@workflow/world-postgres";
   process.env.WORKFLOW_POSTGRES_URL =
     process.env.WORKFLOW_POSTGRES_URL ||

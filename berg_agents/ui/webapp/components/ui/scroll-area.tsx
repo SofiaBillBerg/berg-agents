@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { cn } from "cn"
+import * as React from "react";
+import { cn } from "cn";
 
 function ScrollArea({
   className,
@@ -11,16 +11,16 @@ function ScrollArea({
   // Use native scrollbar-width and scrollbar-color to customize the scrollbar.
   return (
     <div
-      data-slot="scroll-area"
       className={cn(
         "relative [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] overflow-auto outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1",
-        className
+        className,
       )}
+      data-slot="scroll-area"
       {...props}
     >
       {children}
     </div>
-  )
+  );
 }
 
-export { ScrollArea }
+export { ScrollArea };

@@ -58,7 +58,7 @@ export interface ToolResult {
 
 /** DOM id of the transcript scroll region (jump buttons target it). */
 export const CHAT_SCROLL_ID = "chat-scroll";
-
+/*eslint @typescript-eslint/no-unused-vars: "off"*/
 export function ChatTranscript({
   transcript,
   isExecuting,

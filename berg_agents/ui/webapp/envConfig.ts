@@ -1,6 +1,6 @@
 /*
  * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
-* The system follows a harness-based execution model with multiple specialized agents working together.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -18,7 +18,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
-
 
 /**
  * Client-side environment configuration and API utilities for Next.js.
@@ -44,9 +43,10 @@ export const BuildAgentProxy = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 // so set NEXT_PUBLIC_API_BASE_URL=http://localhost:<backend-port> when
 // running the frontend standalone, e.g.
 // NEXT_PUBLIC_API_BASE_URL=http://localhost:8001 bun run next dev
-export const API_BASE = (
-    process.env.NEXT_PUBLIC_API_BASE_URL || ""
-).replace(/\/+$/, "");
+export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(
+  /\/+$/,
+  "",
+);
 
 /**
  * Helper to perform fetch requests against the Berg Agents API.
@@ -57,8 +57,8 @@ export const API_BASE = (
  * @returns Fetch Promise with response
  */
 export async function apiFetch(path: string, options: RequestInit = {}) {
-    const url = `${API_BASE}${path}`;
-    return fetch(url, options);
+  const url = `${API_BASE}${path}`;
+  return fetch(url, options);
 }
 
 export default BuildAgentProxy;

@@ -19,23 +19,22 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-
 /*-- scss:rules --*/
 
 /* CSS for DT tables: wrap text and show line breaks */
 .dt-wrap {
-    line-height: 1.4;
-    min-width: 40vw;
-    max-width: 80vw;
-    white-space: pre-line !important;
-    word-break: auto-phrase;
-    overflow-y: auto;
-    font-size: 1.1em;
-    background: #f8f9fa;
-    border-radius: 6px;
-    padding: 0.5em;
+  line-height: 1.4;
+  min-width: 40vw;
+  max-width: 80vw;
+  white-space: pre-line !important;
+  word-break: auto-phrase;
+  overflow-y: auto;
+  font-size: 1.1em;
+  background: #f8f9fa;
+  border-radius: 6px;
+  padding: 0.5em;
 }
 
 .dt-wrap div {
-    font-weight: normal !important;
+  font-weight: normal !important;
 }

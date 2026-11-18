@@ -47,6 +47,7 @@ Webapp - in `styles.css` replace the current `var(--color-*)` block with:
 CLI/server:
 
 ```python
+
 ```
 
 ## Syncing to docs

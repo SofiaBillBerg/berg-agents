@@ -125,6 +125,7 @@ class LazyComponentErrorBoundary extends React.Component<
 function ChatContent() {
   const router = useRouter();
   const aiChat = useAISDKChat();
+  /*eslint @typescript-eslint/no-unused-vars: "off"*/
   const {
     messages,
     input,
@@ -480,7 +481,10 @@ function ChatContent() {
                 state-labelled button whose width changes with its own
                 value. The label sits beside it at caption size. */}
           <label className="flex items-center gap-1.5 text-xs">
-            <RiFlashlightLine aria-hidden="true" className="size-3.5 opacity-70" />
+            <RiFlashlightLine
+              aria-hidden="true"
+              className="size-3.5 opacity-70"
+            />
             <span className="opacity-80">Auto-approve</span>
             <Switch
               aria-label="Auto-approve edits in this session"

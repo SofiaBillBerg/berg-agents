@@ -1,5 +1,3 @@
 {
-  "plugins": [
-    "mermaid-formatter/prettier-plugin"
-  ]
+  "plugins": ["mermaid-formatter/prettier-plugin"]
 }

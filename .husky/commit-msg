@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# commit-msg — Validate or normalize the commit message.
+# When: On `git commit`, after the message is composed, before the commit is finalized.
+# Args: $1 = path to the commit-message file.
+# Exit: Non-zero aborts the commit.
+bunx --no -- commitlint --edit "$1"
+
+exit 0

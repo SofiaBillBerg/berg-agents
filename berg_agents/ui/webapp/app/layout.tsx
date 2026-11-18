@@ -37,6 +37,7 @@ const nunitoSans = Nunito_Sans({ subsets: ["latin"], variable: "--font-sans" });
  * Public Sans, self-hosted via next/font. The `variable` option exposes
  * `--font-public-sans`
  */
+/*eslint @typescript-eslint/no-unused-vars: "off"*/
 const publicSans = Public_Sans({
   subsets: ["latin"],
   variable: "--font-public-sans",

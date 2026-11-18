@@ -28,18 +28,18 @@ uv-format-plugin-system: ## Use uv to format the plugin-system package code
 	@echo "Formatting the plugin code with uv"
 	@uv check --fix
 
+uv-install-plugin-system: ## Install uv dependencies for the plugin-system package
+	@echo "Installing the project package and uv dependencies"
+	@uv pip install -e .
+
 uv-lock-plugin-system: uv-install-plugin-system ## Use uv to lock the dependencies and generate a requirements.txt file
 	@echo "Locking the dependencies with uv and generating requirements.txt"
 	@uv lock
 	@uv export --format requirements.txt --output-file requirements.txt -q
 
 
-uv-install-plugin-system: ## Install uv dependencies for the plugin-system package
-	@echo "Installing the project package and uv dependencies"
-	@uv pip install -e .
 
-
-uv-build-plugin-system: uv-install-plugin-system ## Use uv to build the plugin-system package
+uv-build-plugin-system: uv-lock-plugin-system ## Use uv to build the plugin-system package
 	@echo "Build the package with uv"
 	@uv build
 

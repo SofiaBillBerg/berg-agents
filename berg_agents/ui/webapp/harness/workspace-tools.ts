@@ -1,4 +1,4 @@
-import {callBackend} from "./specialists";
+import { callBackend } from "./specialists";
 
 /**
  * The orchestrator's own tools: looking at the project itself.
@@ -25,8 +25,8 @@ import {callBackend} from "./specialists";
 
 /** One tool result, as berg's `/api/tool/execute` answers it. */
 interface ToolResult {
-    output: string;
-    status: string;
+  output: string;
+  status: string;
 }
 
 /**
@@ -37,15 +37,15 @@ interface ToolResult {
  * @returns The tool's output and status.
  */
 async function runWorkspaceTool(
-    tool: string,
-    args: Record<string, unknown>,
+  tool: string,
+  args: Record<string, unknown>,
 ): Promise<ToolResult> {
-    const result = (await callBackend("/api/tool/execute", {
-        method: "POST",
-        body: JSON.stringify({tool, args})})) as Partial<ToolResult>;
-    return {
-        output: String(result.output ?? ""),
-        status: String(result.status ?? "ok")};
+  const result = (await callBackend("/api/tool/execute", {
+    method: "POST",
+    body: JSON.stringify({ tool, args })})) as Partial<ToolResult>;
+  return {
+    output: String(result.output ?? ""),
+    status: String(result.status ?? "ok")};
 }
 
 /**
@@ -54,11 +54,9 @@ async function runWorkspaceTool(
  * @param filePath - Path relative to the workspace root.
  * @returns The file's contents, or berg's error message.
  */
-export async function readWorkspaceFile(
-    filePath: string,
-): Promise<ToolResult> {
-    "use step";
-    return runWorkspaceTool("read_file", {file_path: filePath});
+export async function readWorkspaceFile(filePath: string): Promise<ToolResult> {
+  "use step";
+  return runWorkspaceTool("read_file", { file_path: filePath });
 }
 
 /**
@@ -68,10 +66,10 @@ export async function readWorkspaceFile(
  * @returns The directory's entries, or berg's error message.
  */
 export async function listWorkspaceFiles(
-    directory?: string,
+  directory?: string,
 ): Promise<ToolResult> {
-    "use step";
-    return runWorkspaceTool("list_directory", {file_path: directory ?? "."});
+  "use step";
+  return runWorkspaceTool("list_directory", { file_path: directory ?? "." });
 }
 
 /**
@@ -82,11 +80,11 @@ export async function listWorkspaceFiles(
  * @returns The matching lines, or berg's error message.
  */
 export async function searchWorkspaceCode(
-    pattern: string,
-    directory?: string,
+  pattern: string,
+  directory?: string,
 ): Promise<ToolResult> {
-    "use step";
-    return runWorkspaceTool("grep", {
-        pattern,
-        ...(directory ? {directory} : {})});
+  "use step";
+  return runWorkspaceTool("grep", {
+    pattern,
+    ...(directory ? { directory } : {})});
 }

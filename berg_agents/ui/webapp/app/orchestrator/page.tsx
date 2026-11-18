@@ -88,6 +88,7 @@ interface Tier {
  * @param parts - The message's parts, as the AI SDK holds them.
  * @returns The concatenated text parts.
  */
+/*eslint @typescript-eslint/no-unused-vars: "off"*/
 function textOf(parts: Array<{ type?: string; text?: string }>): string {
   return parts
     .filter((part) => part?.type === "text" && typeof part.text === "string")
@@ -489,139 +490,141 @@ function OrchestratorConversation() {
               </CollapsibleTrigger>
               <CollapsibleContent className="border-t border-border">
                 <div className="px-3 py-1.5">
-                <InputGroup className="w-full">
-                  <InputGroupAddon>
-                    <RiSearchLine />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    aria-label="Search past runs"
-                    placeholder="Search runs"
-                    value={runQuery}
-                    onChange={(event) => setRunQuery(event.target.value)}
-                  />
-                  {runQuery ? (
-                    <InputGroupAddon align="inline-end">
-                      <InputGroupButton
-                        aria-label="Clear search"
-                        onPress={() => setRunQuery("")}
-                      >
-                        <RiCloseLine />
-                      </InputGroupButton>
+                  <InputGroup className="w-full">
+                    <InputGroupAddon>
+                      <RiSearchLine />
                     </InputGroupAddon>
-                  ) : null}
-                </InputGroup>
-              {/* Capped and scrolling on its own: fifty runs would otherwise
+                    <InputGroupInput
+                      aria-label="Search past runs"
+                      placeholder="Search runs"
+                      value={runQuery}
+                      onChange={(event) => setRunQuery(event.target.value)}
+                    />
+                    {runQuery ? (
+                      <InputGroupAddon align="inline-end">
+                        <InputGroupButton
+                          aria-label="Clear search"
+                          onPress={() => setRunQuery("")}
+                        >
+                          <RiCloseLine />
+                        </InputGroupButton>
+                      </InputGroupAddon>
+                    ) : null}
+                  </InputGroup>
+                  {/* Capped and scrolling on its own: fifty runs would otherwise
                     push the whole page past its scroll container. The outer
                     page scrolls for the conversation, not for this list. */}
-              <ScrollArea className="max-h-72">
-                <ul className="flex flex-col">
-                  {visibleRuns.map((run) => (
-                    <li
-                      key={run.runId}
-                      className="flex items-center gap-2 px-3 py-1 text-xs"
-                    >
-                      {/* What the run was ABOUT — the opening message, or an
+                  <ScrollArea className="max-h-72">
+                    <ul className="flex flex-col">
+                      {visibleRuns.map((run) => (
+                        <li
+                          key={run.runId}
+                          className="flex items-center gap-2 px-3 py-1 text-xs"
+                        >
+                          {/* What the run was ABOUT — the opening message, or an
                             honest label for the runs that predate the store. */}
-{/* What the run was ABOUT — the opening message, or an
+                          {/* What the run was ABOUT — the opening message, or an
                             honest label for the runs that predate the store. */}
-                      <span className="min-w-0 flex-1 truncate">
-                        {run.preview ?? (
-                          <span
-                            className="opacity-60"
-                            title="This run has the agent's log in the workflow world, but no stored conversation — there is nothing to restore."
-                          >
-                            agent log only
+                          <span className="min-w-0 flex-1 truncate">
+                            {run.preview ?? (
+                              <span
+                                className="opacity-60"
+                                title="This run has the agent's log in the workflow world, but no stored conversation — there is nothing to restore."
+                              >
+                                agent log only
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
-                      <Badge
-                        variant={
-                          run.status === "completed" ? "secondary" : "outline"
-                        }
-                      >
-                        {run.status}
-                      </Badge>
-                      <time className="opacity-60 tabular-nums">
-                        {run.createdAt
-                          ? new Date(run.createdAt).toLocaleString()
-                          : ""}
-                      </time>
-                      {/* Restore, not just view: the page navigates with this
+                          <Badge
+                            variant={
+                              run.status === "completed"
+                                ? "secondary"
+                                : "outline"
+                            }
+                          >
+                            {run.status}
+                          </Badge>
+                          <time className="opacity-60 tabular-nums">
+                            {run.createdAt
+                              ? new Date(run.createdAt).toLocaleString()
+                              : ""}
+                          </time>
+                          {/* Restore, not just view: the page navigates with this
                             run's id, and on mount the hook adopts the stored
                             conversation — so the next message continues this
                             turn. Offered only where a conversation exists: a
                             log-only run has nothing to restore, and clicking
                             Restore there produced a 404 read and a hydration
                             crash. */}
-                      {run.hasConversation ? (
-                        <TooltipTrigger>
-                          <Button
-                            aria-label="Restore this run"
-                            size="xs"
-                            variant="ghost"
-                            onPress={() => {
-                              window.location.assign(
-                                `/orchestrator?run=${run.runId}`,
-                              );
-                            }}
-                          >
-                            <RiRestartLine data-icon="inline-start" />
-                          </Button>
-                          <Tooltip placement="top">
-                            Restore this conversation
-                          </Tooltip>
-                        </TooltipTrigger>
-                      ) : null}
-                      {/* Delete, in two steps on purpose: the first click
+                          {run.hasConversation ? (
+                            <TooltipTrigger>
+                              <Button
+                                aria-label="Restore this run"
+                                size="xs"
+                                variant="ghost"
+                                onPress={() => {
+                                  window.location.assign(
+                                    `/orchestrator?run=${run.runId}`,
+                                  );
+                                }}
+                              >
+                                <RiRestartLine data-icon="inline-start" />
+                              </Button>
+                              <Tooltip placement="top">
+                                Restore this conversation
+                              </Tooltip>
+                            </TooltipTrigger>
+                          ) : null}
+                          {/* Delete, in two steps on purpose: the first click
                             asks, the second does it. Removing a conversation is
                             Sofia's decision, and a single mis-click is not
                             one. */}
-                      {confirmDelete === run.runId ? (
-                        <Button
-                          aria-label="Delete for real"
-                          size="xs"
-                          variant="destructive"
-                          onPress={() => {
-                            void (async () => {
-                              await fetch(
-                                `/orchestrator/runs/${encodeURIComponent(run.runId)}`,
-                                { method: "DELETE" },
-                              );
-                              setConfirmDelete(null);
-                              setPastRuns((runs) =>
-                                runs.filter((r) => r.runId !== run.runId),
-                              );
-                            })();
-                          }}
-                        >
-                          <RiCheckLine data-icon="inline-start" />
-                        </Button>
-                      ) : (
-                        <TooltipTrigger>
-                          <Button
-                            aria-label="Delete this run"
-                            size="xs"
-                            variant="ghost"
-                            onPress={() => setConfirmDelete(run.runId)}
-                          >
-                            <RiDeleteBinLine data-icon="inline-start" />
-                          </Button>
-                          <Tooltip placement="top">
-                            {run.hasConversation
-                              ? "Delete this conversation (asks twice)"
-                              : "Delete this log entry (asks twice)"}
-                          </Tooltip>
-                        </TooltipTrigger>
-                      )}
-                    </li>
-                  ))}
-                  {visibleRuns.length === 0 ? (
-                    <li className="px-3 py-2 text-xs opacity-60">
-                      No run matches that search.
-                    </li>
-                  ) : null}
-                </ul>
-              </ScrollArea>
+                          {confirmDelete === run.runId ? (
+                            <Button
+                              aria-label="Delete for real"
+                              size="xs"
+                              variant="destructive"
+                              onPress={() => {
+                                void (async () => {
+                                  await fetch(
+                                    `/orchestrator/runs/${encodeURIComponent(run.runId)}`,
+                                    { method: "DELETE" },
+                                  );
+                                  setConfirmDelete(null);
+                                  setPastRuns((runs) =>
+                                    runs.filter((r) => r.runId !== run.runId),
+                                  );
+                                })();
+                              }}
+                            >
+                              <RiCheckLine data-icon="inline-start" />
+                            </Button>
+                          ) : (
+                            <TooltipTrigger>
+                              <Button
+                                aria-label="Delete this run"
+                                size="xs"
+                                variant="ghost"
+                                onPress={() => setConfirmDelete(run.runId)}
+                              >
+                                <RiDeleteBinLine data-icon="inline-start" />
+                              </Button>
+                              <Tooltip placement="top">
+                                {run.hasConversation
+                                  ? "Delete this conversation (asks twice)"
+                                  : "Delete this log entry (asks twice)"}
+                              </Tooltip>
+                            </TooltipTrigger>
+                          )}
+                        </li>
+                      ))}
+                      {visibleRuns.length === 0 ? (
+                        <li className="px-3 py-2 text-xs opacity-60">
+                          No run matches that search.
+                        </li>
+                      ) : null}
+                    </ul>
+                  </ScrollArea>
                 </div>
               </CollapsibleContent>
             </Collapsible>
@@ -633,41 +636,41 @@ function OrchestratorConversation() {
                         plugin that declared + shipped a surface, plus the
                         catalog — reused rather than reimplemented. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {pluginSurfaces.map((surface) => {
-            const decl = surface.ui as { label?: unknown } | null;
-            const label =
-              typeof decl?.label === "string" ? decl.label : "Plugin";
-            const isOpen = sidePluginId === surface.pluginId;
-            return (
-              <Button
-                key={surface.pluginId}
-                aria-label={isOpen ? `Hide ${label}` : `Show ${label}`}
-                size="xs"
-                variant="secondary"
-                onPress={() => {
-                  setSidePluginId((prev) =>
-                    prev === surface.pluginId ? null : surface.pluginId,
-                  );
-                }}
-              >
-                {label}
-              </Button>
-            );
-          })}
-          <Button
-            aria-label={showCatalog ? "Hide plugins" : "Show plugins"}
-            size="xs"
-            variant="secondary"
-            onPress={() => {
-              setShowCatalog((prev) => !prev);
-              // The catalog owns the right-hand side on its own.
-              setSidePluginId(null);
-            }}
-          >
-            <RiPlugLine data-icon="inline-start" />
-            Plugins
-          </Button>
-<span className="flex-1" />
+            {pluginSurfaces.map((surface) => {
+              const decl = surface.ui as { label?: unknown } | null;
+              const label =
+                typeof decl?.label === "string" ? decl.label : "Plugin";
+              const isOpen = sidePluginId === surface.pluginId;
+              return (
+                <Button
+                  key={surface.pluginId}
+                  aria-label={isOpen ? `Hide ${label}` : `Show ${label}`}
+                  size="xs"
+                  variant="secondary"
+                  onPress={() => {
+                    setSidePluginId((prev) =>
+                      prev === surface.pluginId ? null : surface.pluginId,
+                    );
+                  }}
+                >
+                  {label}
+                </Button>
+              );
+            })}
+            <Button
+              aria-label={showCatalog ? "Hide plugins" : "Show plugins"}
+              size="xs"
+              variant="secondary"
+              onPress={() => {
+                setShowCatalog((prev) => !prev);
+                // The catalog owns the right-hand side on its own.
+                setSidePluginId(null);
+              }}
+            >
+              <RiPlugLine data-icon="inline-start" />
+              Plugins
+            </Button>
+            <span className="flex-1" />
             {/* Two model choices in one labeled row: the orchestrator's
                     own brain, and the brain every specialist this
                     conversation starts runs on. They used to be native
@@ -692,8 +695,8 @@ function OrchestratorConversation() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem id="__default">
-                    default (
-                    {tiers.flatMap((t) => t.models)[0] ?? "configured"})
+                    default ({tiers.flatMap((t) => t.models)[0] ?? "configured"}
+                    )
                   </SelectItem>
                   {/* Flat, in tier order, deduplicated: a model that sits
                           in two tiers is the same model, and a collection
