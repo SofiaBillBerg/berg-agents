@@ -35,14 +35,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  RiArrowRightSLine,
+  RiCheckLine,
+  RiCloseLine,
+  RiDeleteBinLine,
+  RiPlugLine,
+  RiRestartLine,
+  RiSearchLine} from "@remixicon/react";
 
-import AgentSelector from "../components/AgentSelector.tsx";
 import ThemeToggle from "../components/ThemeToggle.tsx";
 import { ChatTranscript } from "../components/ChatTranscript.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 import { PluginCatalog } from "../components/PluginCatalog.tsx";
 import { PluginUISurface } from "../plugins/PluginUISurface.tsx";
-import { ProviderSelector } from "../components/ProviderSelector.tsx";
 import { usePluginSurface } from "../hooks/usePluginSurface";
 
 import { buildExportMarkdown } from "@/utils/utils";
@@ -51,6 +57,24 @@ import { toChatMessage } from "@/harness/messageParts";
 import { useSpecialistStates } from "@/harness/useSpecialistStates";
 import { API_BASE } from "@/envConfig";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue} from "@/components/ui/select.tsx";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger} from "@/components/ui/collapsible.tsx";
+import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput} from "@/components/ui/input-group.tsx";
 
 /** One routing tier and the models it offers, the best first. */
 interface Tier {
@@ -205,8 +229,23 @@ function OrchestratorConversation() {
       status: string;
       createdAt: string | null;
       hasConversation: boolean;
+      preview: string | null;
     }[]
   >([]);
+  // The runs panel's search text: fifty runs are only findable if they can be
+  // filtered by what they were about, not by their id.
+  const [runQuery, setRunQuery] = useState<string>("");
+  // The runs the search leaves, newest first as the route ordered them.
+  const visibleRuns = useMemo(() => {
+    const query = runQuery.trim().toLowerCase();
+    if (!query) return pastRuns;
+    return pastRuns.filter(
+      (run) =>
+        (run.preview ?? "").toLowerCase().includes(query) ||
+        run.runId.toLowerCase().includes(query) ||
+        run.status.toLowerCase().includes(query),
+    );
+  }, [pastRuns, runQuery]);
   // The run awaiting a second click to be deleted. Null means no delete is
   // pending, so no row shows its "for real" button.
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -222,6 +261,7 @@ function OrchestratorConversation() {
             status: string;
             createdAt: string | null;
             hasConversation: boolean;
+            preview: string | null;
           }[];
         };
         if (alive) setPastRuns(data.runs ?? []);
@@ -325,7 +365,6 @@ function OrchestratorConversation() {
     pluginSurfaces,
     activeSurface,
     pluginRefreshKey,
-    pluginCount,
     setPluginCount} = usePluginSurface({ apiBase: API_BASE, messages: chatMessages });
 
   /**
@@ -431,192 +470,274 @@ function OrchestratorConversation() {
             </div>
           </header>
 
-          {/* The record of what has been orchestrated before, because a
-                        reload used to leave no trace of it. Read from the
-                        workflow world's own tables, so what is listed is what
-                        actually ran. Restoring a chosen run into the
-                        conversation is the next step and deliberately not
-                        pretended here. */}
+          {/* Past runs — context, not content. It used to be fifty opaque run ids
+                    with full-size buttons, which pushed the transcript off a
+                    laptop screen (the only thing this page is for). Now: what
+                    the run was ABOUT, a search field, and icon-sized actions.
+                    Collapsed by default: fifty runs of history are context, not
+                    content — the conversation is. Expanded on demand. */}
           {pastRuns.length > 0 ? (
-            <details className="rounded border border-current/20 px-3 py-2 text-xs">
-              <summary className="cursor-pointer opacity-80">
-                Past orchestration runs ({pastRuns.length})
-              </summary>
-              {/* Capped and scrolling on its own: 29 runs would otherwise push the
-                            whole page past its scroll container and freeze the
-                            layout. The outer page scrolls for the conversation,
-                            not for this list. */}
-              <ul className="mt-2 flex max-h-64 flex-col gap-1 overflow-y-auto">
-                {pastRuns.map((run) => (
-                  <li
-                    key={run.runId}
-                    className="flex items-baseline justify-between gap-3"
-                  >
-                    <code className="opacity-70">{run.runId}</code>
-                    <span className="opacity-60">{run.status}</span>
-                    <span className="opacity-60">
-                      {run.createdAt
-                        ? new Date(run.createdAt).toLocaleString()
-                        : ""}
-                    </span>
-                    {/* Restore, not just view: the page navigates with this
-                                            run's id, and on mount the hook
-                                            adopts the stored conversation — so the
-                                            next message continues this turn rather
-                                            than starting a new one beside it.
-                                            Offered only where a conversation
-                                            exists: a run from before the store
-                                            has the agent's log and nothing of
-                                            Sofia's to restore, and clicking
-                                            Restore there produced a 404 read and
-                                            a hydration crash. */}
-                    {run.hasConversation ? (
-                      <button
-                        className="rounded border border-current/30 px-2 py-0.5 text-xs"
-                        type="button"
-                        onClick={() => {
-                          window.location.assign(
-                            `/orchestrator?run=${run.runId}`,
-                          );
-                        }}
+            <Collapsible className="rounded border border-border">
+              <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-3 py-1.5">
+                <RiArrowRightSLine
+                  aria-hidden="true"
+                  className="size-3.5 opacity-70 transition-transform [[aria-expanded=true]_&]:rotate-90"
+                />
+                <span className="text-xs font-medium opacity-80">
+                  Past runs ({pastRuns.length})
+                </span>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="border-t border-border">
+                <div className="px-3 py-1.5">
+                <InputGroup className="w-full">
+                  <InputGroupAddon>
+                    <RiSearchLine />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    aria-label="Search past runs"
+                    placeholder="Search runs"
+                    value={runQuery}
+                    onChange={(event) => setRunQuery(event.target.value)}
+                  />
+                  {runQuery ? (
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupButton
+                        aria-label="Clear search"
+                        onPress={() => setRunQuery("")}
                       >
-                        Restore
-                      </button>
-                    ) : (
-                      <span
-                        className="text-xs opacity-50"
-                        title="This run has the agent's log in the workflow world, but no stored conversation — there is nothing to restore."
-                      >
-                        log only
+                        <RiCloseLine />
+                      </InputGroupButton>
+                    </InputGroupAddon>
+                  ) : null}
+                </InputGroup>
+              {/* Capped and scrolling on its own: fifty runs would otherwise
+                    push the whole page past its scroll container. The outer
+                    page scrolls for the conversation, not for this list. */}
+              <ScrollArea className="max-h-72">
+                <ul className="flex flex-col">
+                  {visibleRuns.map((run) => (
+                    <li
+                      key={run.runId}
+                      className="flex items-center gap-2 px-3 py-1 text-xs"
+                    >
+                      {/* What the run was ABOUT — the opening message, or an
+                            honest label for the runs that predate the store. */}
+{/* What the run was ABOUT — the opening message, or an
+                            honest label for the runs that predate the store. */}
+                      <span className="min-w-0 flex-1 truncate">
+                        {run.preview ?? (
+                          <span
+                            className="opacity-60"
+                            title="This run has the agent's log in the workflow world, but no stored conversation — there is nothing to restore."
+                          >
+                            agent log only
+                          </span>
+                        )}
                       </span>
-                    )}
-                    {/* Delete, in two steps on purpose: the
-                                            first click asks, the second does it.
-                                            Removing a conversation is Sofia's
-                                            decision, and a single mis-click is
-                                            not one. */}
-                    {confirmDelete === run.runId ? (
-                      <button
-                        className="rounded border border-danger px-2 py-0.5 text-xs text-danger"
-                        type="button"
-                        onClick={() => {
-                          void (async () => {
-                            await fetch(
-                              `/orchestrator/runs/${encodeURIComponent(run.runId)}`,
-                              { method: "DELETE" },
-                            );
-                            setConfirmDelete(null);
-                            setPastRuns((runs) =>
-                              runs.filter((r) => r.runId !== run.runId),
-                            );
-                          })();
-                        }}
+                      <Badge
+                        variant={
+                          run.status === "completed" ? "secondary" : "outline"
+                        }
                       >
-                        Delete for real
-                      </button>
-                    ) : (
-                      <button
-                        className="rounded border border-current/30 px-2 py-0.5 text-xs"
-                        type="button"
-                        onClick={() => setConfirmDelete(run.runId)}
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </details>
+                        {run.status}
+                      </Badge>
+                      <time className="opacity-60 tabular-nums">
+                        {run.createdAt
+                          ? new Date(run.createdAt).toLocaleString()
+                          : ""}
+                      </time>
+                      {/* Restore, not just view: the page navigates with this
+                            run's id, and on mount the hook adopts the stored
+                            conversation — so the next message continues this
+                            turn. Offered only where a conversation exists: a
+                            log-only run has nothing to restore, and clicking
+                            Restore there produced a 404 read and a hydration
+                            crash. */}
+                      {run.hasConversation ? (
+                        <TooltipTrigger>
+                          <Button
+                            aria-label="Restore this run"
+                            size="xs"
+                            variant="ghost"
+                            onPress={() => {
+                              window.location.assign(
+                                `/orchestrator?run=${run.runId}`,
+                              );
+                            }}
+                          >
+                            <RiRestartLine data-icon="inline-start" />
+                          </Button>
+                          <Tooltip placement="top">
+                            Restore this conversation
+                          </Tooltip>
+                        </TooltipTrigger>
+                      ) : null}
+                      {/* Delete, in two steps on purpose: the first click
+                            asks, the second does it. Removing a conversation is
+                            Sofia's decision, and a single mis-click is not
+                            one. */}
+                      {confirmDelete === run.runId ? (
+                        <Button
+                          aria-label="Delete for real"
+                          size="xs"
+                          variant="destructive"
+                          onPress={() => {
+                            void (async () => {
+                              await fetch(
+                                `/orchestrator/runs/${encodeURIComponent(run.runId)}`,
+                                { method: "DELETE" },
+                              );
+                              setConfirmDelete(null);
+                              setPastRuns((runs) =>
+                                runs.filter((r) => r.runId !== run.runId),
+                              );
+                            })();
+                          }}
+                        >
+                          <RiCheckLine data-icon="inline-start" />
+                        </Button>
+                      ) : (
+                        <TooltipTrigger>
+                          <Button
+                            aria-label="Delete this run"
+                            size="xs"
+                            variant="ghost"
+                            onPress={() => setConfirmDelete(run.runId)}
+                          >
+                            <RiDeleteBinLine data-icon="inline-start" />
+                          </Button>
+                          <Tooltip placement="top">
+                            {run.hasConversation
+                              ? "Delete this conversation (asks twice)"
+                              : "Delete this log entry (asks twice)"}
+                          </Tooltip>
+                        </TooltipTrigger>
+                      )}
+                    </li>
+                  ))}
+                  {visibleRuns.length === 0 ? (
+                    <li className="px-3 py-2 text-xs opacity-60">
+                      No run matches that search.
+                    </li>
+                  ) : null}
+                </ul>
+              </ScrollArea>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           ) : null}
 
           {/* The same controls the chat page offers, because the
                         orchestrator is where planning happens: which model,
-                        which agent, whose todos, which plugins. Reused rather
-                        than reimplemented — these are the real components. */}
-          <div className="flex flex-wrap items-center gap-2">
-            {pluginSurfaces.map((surface) => {
-              const isOpen = sidePluginId === surface.pluginId;
-              const label =
-                (surface.ui?.label as string | undefined) ?? surface.pluginId;
-              return (
-                <button
-                  key={surface.pluginId}
-                  className="rounded border border-current/30 px-2 py-1 text-xs"
-                  type="button"
-                  onClick={() => {
-                    setShowCatalog(false);
-                    setSidePluginId(isOpen ? null : surface.pluginId);
-                  }}
-                >
-                  {label}
-                  {isOpen && pluginCount > 0 ? ` (${pluginCount})` : ""}
-                </button>
-              );
-            })}
-            <button
-              aria-label={showCatalog ? "Hide plugins" : "Show plugins"}
-              className="rounded border border-current/30 px-2 py-1 text-xs"
-              type="button"
-              onClick={() => {
-                setShowCatalog((prev) => !prev);
-                setSidePluginId(null);
-              }}
-            >
-              🔌 Plugins
-            </button>
-            <span className="flex-1" />
-            <AgentSelector />
-            <ProviderSelector />
-            {/* Which brain the *specialists* run on — a separate
-                            choice from the orchestrator's own model, and saved
-                            through berg's delegate endpoint rather than kept in
-                            this page. Labeled, because three model selects in one
-                            row otherwise read as "which model is this one?" */}
-            <span className="text-xs opacity-70">Specialists</span>
-            <select
-              aria-label="Specialists run on"
-              className="rounded border border-current/20 bg-transparent px-2 py-1 text-sm"
-              title="Which model every specialist this conversation starts runs on. Unset means your configured tier default."
-              value={delegateModel}
-              onChange={(event) => {
-                void onDelegateModelChange(event.target.value);
-              }}
-            >
-              <option value="">specialists: default (tier)</option>
-              {tiers.map((tier) => (
-                <optgroup key={tier.name} label={tier.name}>
-                  {tier.models.map((name) => (
-                    <option key={name} value={name}>
+                        which agent, whose todos, which plugins. One button per
+                        plugin that declared + shipped a surface, plus the
+                        catalog — reused rather than reimplemented. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {pluginSurfaces.map((surface) => {
+            const decl = surface.ui as { label?: unknown } | null;
+            const label =
+              typeof decl?.label === "string" ? decl.label : "Plugin";
+            const isOpen = sidePluginId === surface.pluginId;
+            return (
+              <Button
+                key={surface.pluginId}
+                aria-label={isOpen ? `Hide ${label}` : `Show ${label}`}
+                size="xs"
+                variant="secondary"
+                onPress={() => {
+                  setSidePluginId((prev) =>
+                    prev === surface.pluginId ? null : surface.pluginId,
+                  );
+                }}
+              >
+                {label}
+              </Button>
+            );
+          })}
+          <Button
+            aria-label={showCatalog ? "Hide plugins" : "Show plugins"}
+            size="xs"
+            variant="secondary"
+            onPress={() => {
+              setShowCatalog((prev) => !prev);
+              // The catalog owns the right-hand side on its own.
+              setSidePluginId(null);
+            }}
+          >
+            <RiPlugLine data-icon="inline-start" />
+            Plugins
+          </Button>
+<span className="flex-1" />
+            {/* Two model choices in one labeled row: the orchestrator's
+                    own brain, and the brain every specialist this
+                    conversation starts runs on. They used to be native
+                    <select>s with tiny caption labels, flanked by the
+                    chat page's agent/provider selectors — which write
+                    the chat surface's settings and do nothing on this
+                    route, so they belong to the page that reads them.
+                    Grouped by tier so the ordering berg configures stays
+                    visible, not a flat list of names. */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="text-xs opacity-70">Orchestrator runs on</span>
+              <Select
+                aria-label="Orchestrator runs on"
+                className="min-w-56"
+                selectedKey={model || "__default"}
+                onSelectionChange={(key) =>
+                  setModel(key === "__default" ? "" : String(key))
+                }
+              >
+                <SelectTrigger size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem id="__default">
+                    default (
+                    {tiers.flatMap((t) => t.models)[0] ?? "configured"})
+                  </SelectItem>
+                  {/* Flat, in tier order, deduplicated: a model that sits
+                          in two tiers is the same model, and a collection
+                          may not list one twice. */}
+                  {Array.from(
+                    new Set(tiers.flatMap((tier) => tier.models)),
+                  ).map((name) => (
+                    <SelectItem key={name} id={name}>
                       {name}
-                    </option>
+                    </SelectItem>
                   ))}
-                </optgroup>
-              ))}
-            </select>
-            {/* Which brain the orchestrator itself runs on. Grouped
-                            by tier so the ordering berg configures is visible,
-                            not just a flat list of names. Labeled for the same
-                            reason as the specialists' select. */}
-            <span className="text-xs opacity-70">Orchestrator</span>
-            <select
-              aria-label="Orchestrator model"
-              className="rounded border border-current/20 bg-transparent px-2 py-1 text-sm"
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-            >
-              <option value="">
-                default ({tiers.flatMap((t) => t.models)[0] ?? "configured"})
-              </option>
-              {tiers.map((tier) => (
-                <optgroup key={tier.name} label={tier.name}>
-                  {tier.models.map((name) => (
-                    <option key={name} value={name}>
+                </SelectContent>
+              </Select>
+              <span className="text-xs opacity-70">Specialists run on</span>
+              <Select
+                aria-label="Specialists run on"
+                className="min-w-56"
+                selectedKey={delegateModel || "__default"}
+                onSelectionChange={(key) => {
+                  void onDelegateModelChange(
+                    key === "__default" ? "" : String(key),
+                  );
+                }}
+              >
+                <SelectTrigger size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem id="__default">
+                    specialists: default (tier)
+                  </SelectItem>
+                  {/* Flat, in tier order, deduplicated: a model that sits
+                          in two tiers is the same model, and a collection
+                          may not list one twice. */}
+                  {Array.from(
+                    new Set(tiers.flatMap((tier) => tier.models)),
+                  ).map((name) => (
+                    <SelectItem key={name} id={name}>
                       {name}
-                    </option>
+                    </SelectItem>
                   ))}
-                </optgroup>
-              ))}
-            </select>
+                </SelectContent>
+              </Select>
+            </div>
             {/* The same toggle the chat page carries: the theme is a
                             property of the app, not of one route, and the
                             orchestrator page used to be the only one without it

@@ -123,6 +123,15 @@ export interface StoredTurn {
      * rather than offering a delete that would remove nothing of hers.
      */
     hasConversation: boolean;
+    /**
+     * The turn's opening message — what this run was ABOUT.
+     *
+     * A run id says nothing to a person: the panel listed fifty opaque ids and
+     * the only way to find a session was to restore each one. This is the first
+     * user message of the stored conversation, truncated for the list; null
+     * where there is no conversation (a log-only run).
+     */
+    preview: string | null;
 }
 
 /**
@@ -157,11 +166,16 @@ export async function listTurns(): Promise<StoredTurn[]> {
         // ("column \"status\" does not exist"), and it took the whole panel down
         // rather than one row.
         const result = await client.query(
-            `SELECT t.run_id, r.status, t.created_at, TRUE AS has_conversation
+            `SELECT t.run_id, r.status, t.created_at, TRUE AS has_conversation,
+                    (SELECT e.m->'parts'->0->>'text'
+                       FROM jsonb_array_elements(t.messages) AS e(m)
+                      WHERE e.m->>'role' = 'user'
+                        AND jsonb_typeof(e.m->'parts'->0) = 'object'
+                      LIMIT 1) AS preview
                FROM ${TURNS_TABLE} t
                LEFT JOIN workflow.workflow_runs r ON r.id = t.run_id
               UNION ALL
-             SELECT r.id, r.status, r.created_at, FALSE
+             SELECT r.id, r.status, r.created_at, FALSE, NULL::text
                FROM workflow.workflow_runs r
               WHERE r.name LIKE '%orchestrator-turn%'
                 AND NOT EXISTS (
@@ -177,7 +191,8 @@ export async function listTurns(): Promise<StoredTurn[]> {
             runId: String(row.run_id),
             status: String(row.status ?? "unknown"),
             createdAt: row.created_at ? String(row.created_at) : null,
-            hasConversation: Boolean(row.has_conversation)}));
+            hasConversation: Boolean(row.has_conversation),
+            preview: row.preview ? String(row.preview) : null}));
     } finally {
         await client.end().catch(() => undefined);
     }

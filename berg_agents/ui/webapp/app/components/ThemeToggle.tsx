@@ -20,6 +20,9 @@
  */
 
 import { useEffect, useState } from "react";
+import { RiMoonLine, RiSunLine } from "@remixicon/react";
+
+import { Switch } from "@/components/ui/switch.tsx";
 
 /**
  * ThemeToggle component.
@@ -79,29 +82,32 @@ function ThemeToggle() {
     applyTheme(next);
   };
 
+  // Themed Switch, not a bespoke pill: this used to be a hand-styled
+  // gradient button with its own CSS variables — one more surface the
+  // theme tokens did not reach. Sun and moon flank a small switch, so the
+  // control is a third the width and the same component as every other
+  // boolean in the app.
   return (
-    <button
-      aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      className={`theme-toggle flex items-center justify-center gap-1 px-3 py-1.5 rounded-full border-2 border-(--berg-border) text-(--berg-text) cursor-pointer transition-all duration-300 shadow-sm text-sm font-medium min-w-15 hover:scale-105 hover:shadow-md ${
-        isDark
-          ? "bg-linear-to-br from-[#2d323b] to-[#1a1d23]"
-          : "bg-linear-to-br from-[#f8edf8] to-[#e8e0f0]"
-      }`}
-      title={isDark ? "Switch to light theme" : "Switch to dark theme"}
-      onClick={toggle}
+    <div
+      className="group inline-flex items-center gap-1"
+      data-state={isDark ? "checked" : "unchecked"}
+      title="Toggle between dark and light theme"
     >
-      {isDark ? (
-        <>
-          <span className="text-base">🌙</span>
-          <span className="text-[11px]">Dark</span>
-        </>
-      ) : (
-        <>
-          <span className="text-base">☀️</span>
-          <span className="text-[11px]">Light</span>
-        </>
-      )}
-    </button>
+      <RiSunLine
+        aria-hidden="true"
+        className="size-3.5 opacity-70 transition-opacity group-data-[state=checked]:opacity-40"
+      />
+      <Switch
+        aria-label="Toggle between dark and light theme"
+        isSelected={isDark}
+        size="sm"
+        onChange={toggle}
+      />
+      <RiMoonLine
+        aria-hidden="true"
+        className="size-3.5 opacity-70 transition-opacity group-data-[state=unchecked]:opacity-40"
+      />
+    </div>
   );
 }
 

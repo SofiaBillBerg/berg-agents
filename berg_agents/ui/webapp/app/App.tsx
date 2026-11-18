@@ -31,6 +31,12 @@ import type { Command } from "./components/SlashCommandAutocomplete";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Card, Toast, toast } from "@heroui/react";
+import {
+  RiAddLine,
+  RiArrowDownLine,
+  RiArrowUpLine,
+  RiFlashlightLine,
+  RiHistoryLine} from "@remixicon/react";
 import { useRouter } from "next/navigation";
 
 import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
@@ -56,6 +62,9 @@ import { useBackendCatalog } from "./hooks/useBackendCatalog";
 import { usePluginSurface } from "./hooks/usePluginSurface";
 import { useSlashCommands } from "./hooks/useSlashCommands";
 
+import { Switch } from "@/components/ui/switch.tsx";
+import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip.tsx";
+import { Button as ToolbarButton } from "@/components/ui/button.tsx";
 import { buildExportMarkdown } from "@/utils/utils";
 import { API_BASE } from "@/envConfig";
 import { useAISDKChat } from "@/harness";
@@ -380,38 +389,49 @@ function ChatContent() {
             sessionId={aiChat.sessionId ?? null}
             streaming={aiChat.isStreaming ?? false}
           />
-          <Button
+          <ToolbarButton
             aria-label="Open sessions (server-side history)"
-            size="sm"
+            size="xs"
             variant="secondary"
             onPress={() => router.push("/history")}
           >
-            🕘 Sessions
-          </Button>
-          <Button
+            <RiHistoryLine data-icon="inline-start" />
+            Sessions
+          </ToolbarButton>
+          <ToolbarButton
             aria-label="Start a new chat (current chat is saved as a session)"
-            size="sm"
+            size="xs"
             variant="secondary"
             onPress={startNewChat}
           >
-            ＋ New chat
-          </Button>
-          <Button
-            aria-label="Jump to the top of the conversation"
-            size="sm"
-            variant="secondary"
-            onPress={() => scrollChatTo("top")}
-          >
-            ↑ Top
-          </Button>
-          <Button
-            aria-label="Jump to the bottom of the conversation"
-            size="sm"
-            variant="secondary"
-            onPress={() => scrollChatTo("bottom")}
-          >
-            ↓ Bottom
-          </Button>
+            <RiAddLine data-icon="inline-start" />
+            New chat
+          </ToolbarButton>
+          {/* Top and Bottom are navigation for a long transcript — the two
+                least-used controls in the row, so they cost the least space:
+                icons with tooltips, no labels. */}
+          <TooltipTrigger>
+            <ToolbarButton
+              aria-label="Jump to the top of the conversation"
+              size="xs"
+              variant="ghost"
+              onPress={() => scrollChatTo("top")}
+            >
+              <RiArrowUpLine data-icon="inline-start" />
+            </ToolbarButton>
+            <Tooltip placement="bottom">Jump to the top</Tooltip>
+          </TooltipTrigger>
+          <TooltipTrigger>
+            <ToolbarButton
+              aria-label="Jump to the bottom of the conversation"
+              size="xs"
+              variant="ghost"
+              onPress={() => scrollChatTo("bottom")}
+            >
+              <RiArrowDownLine data-icon="inline-start" />
+            </ToolbarButton>
+            <Tooltip placement="bottom">Jump to the bottom</Tooltip>
+          </TooltipTrigger>
           {/*
             One button per plugin that declared + shipped a surface.
             Labels and widths come from the plugin's own manifest, so
@@ -423,7 +443,7 @@ function ChatContent() {
               typeof decl?.label === "string" ? decl.label : "Plugin";
             const isOpen = sidePluginId === surface.pluginId;
             return (
-              <Button
+              <ToolbarButton
                 key={surface.pluginId}
                 aria-label={isOpen ? `Hide ${label}` : `Show ${label}`}
                 size="sm"
@@ -439,10 +459,10 @@ function ChatContent() {
               >
                 {label}
                 {isOpen && pluginCount > 0 ? ` (${pluginCount})` : ""}
-              </Button>
+              </ToolbarButton>
             );
           })}
-          <Button
+          <ToolbarButton
             aria-label={showCatalog ? "Hide plugins" : "Show plugins"}
             size="sm"
             variant="secondary"
@@ -453,21 +473,26 @@ function ChatContent() {
             }}
           >
             🔌 Plugins
-          </Button>
+          </ToolbarButton>
           <span className="flex-1" />
           <ThemeToggle />
-          <Button
-            aria-label="Auto-approve edits in this session"
-            size="sm"
-            variant={autoApproveEdits ? "primary" : "secondary"}
-            onPress={toggleAutoApproveEdits}
-          >
-            {autoApproveEdits ? "⚡ Auto-approve ON" : "⚡ Auto-approve OFF"}
-          </Button>
+          {/* Auto-approve is a boolean, so it is a Switch — not a
+                state-labelled button whose width changes with its own
+                value. The label sits beside it at caption size. */}
+          <label className="flex items-center gap-1.5 text-xs">
+            <RiFlashlightLine aria-hidden="true" className="size-3.5 opacity-70" />
+            <span className="opacity-80">Auto-approve</span>
+            <Switch
+              aria-label="Auto-approve edits in this session"
+              isSelected={autoApproveEdits}
+              size="sm"
+              onChange={toggleAutoApproveEdits}
+            />
+          </label>
           <AgentSelector />
           <ProviderSelector />
           <span title="Download this conversation as a Markdown file">
-            <Button
+            <ToolbarButton
               aria-label="Export conversation as markdown"
               className="border border-primary text-primary hover:bg-primary/10"
               size="sm"
@@ -502,7 +527,7 @@ function ChatContent() {
               }}
             >
               ⬇ Export
-            </Button>
+            </ToolbarButton>
           </span>
         </div>
 
