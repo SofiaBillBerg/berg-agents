@@ -31,6 +31,7 @@
 
 "use client";
 
+import type { ComponentType } from "react";
 import type { PluginSurfaceProps } from "./registry.tsx";
 
 import { useEffect, useState } from "react";
@@ -45,35 +46,55 @@ export interface PluginUISurfaceProps extends PluginSurfaceProps {
   ui?: Record<string, unknown> | null;
 }
 
+/** What one (pluginId, ui) target resolved to. */
+interface LoadedSurface {
+  /** Which plugin this answer belongs to. */
+  pluginId: string;
+  /** Which `ui:` block this answer belongs to. */
+  ui?: Record<string, unknown> | null;
+  /** The mounted surface, or null when the load found none. */
+  component: ComponentType<PluginSurfaceProps> | null;
+  /** Why the surface could not be mounted, when it could not. */
+  error: string | null;
+}
+
 /** PluginUISurface - one plugin's own UI, loaded and mounted by the host. */
 export function PluginUISurface({
   pluginId,
   ui,
   ...rest
 }: PluginUISurfaceProps) {
-  const [component, setComponent] =
-    useState<PluginSurfaceProps extends never ? never : unknown>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [surface, setSurface] = useState<LoadedSurface | null>(null);
+  // Loading is derived, not stored: until the answer for the CURRENT
+  // (pluginId, ui) lands, that target is still loading. That shows the
+  // spinner on first paint and again on a plugin switch - what the old
+  // setLoading(true)/setError(null) reset in the effect did - without
+  // calling setState inside the effect body, which
+  // react-hooks/set-state-in-effect forbids.
+  const stale =
+    surface === null || surface.pluginId !== pluginId || surface.ui !== ui;
+  const loading = stale;
+  const error = stale ? null : (surface?.error ?? null);
+  const component = stale ? null : (surface?.component ?? null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
     void loadPluginSurface(pluginId, ui).then((loaded) => {
       if (cancelled) return;
       if (loaded) {
-        setComponent(() => loaded.component);
+        setSurface({ pluginId, ui, component: loaded.component, error: null });
       } else {
         const declared = (ui as { entry?: unknown } | null)?.entry;
         const built = (ui as { entry_built?: unknown } | null)?.entry_built;
-        setError(
-          built === false && typeof declared === "string"
-            ? `${pluginId} declares "${declared}", which has not been built. Run the plugin's build:ui script.`
-            : `${pluginId} has no loadable UI surface in this build.`,
-        );
+        setSurface({
+          pluginId,
+          ui,
+          component: null,
+          error:
+            built === false && typeof declared === "string"
+              ? `${pluginId} declares "${declared}", which has not been built. Run the plugin's build:ui script.`
+              : `${pluginId} has no loadable UI surface in this build.`});
       }
-      setLoading(false);
     });
     return () => {
       cancelled = true;
@@ -104,7 +125,7 @@ export function PluginUISurface({
     );
   }
 
-  const Surface = component as React.ComponentType<PluginSurfaceProps>;
+  const Surface = component as ComponentType<PluginSurfaceProps>;
   return <Surface {...rest} />;
 }
 

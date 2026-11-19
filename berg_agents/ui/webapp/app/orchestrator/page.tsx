@@ -34,7 +34,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   RiArrowRightSLine,
   RiCheckLine,
@@ -462,6 +462,11 @@ function OrchestratorConversation() {
                   title="Leave this restored run and start a fresh conversation"
                   type="button"
                   onClick={() => {
+                    // A full load on purpose: resumeRunId is read once
+                    // at mount (see above), and a router.push would keep
+                    // this restored conversation mounted instead of
+                    // starting a fresh one.
+                    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                     window.location.assign("/orchestrator");
                   }}
                 >
@@ -563,6 +568,11 @@ function OrchestratorConversation() {
                                 size="xs"
                                 variant="ghost"
                                 onPress={() => {
+                                  // A full load on purpose: the page
+                                  // adopts `?run=` on mount (see
+                                  // resumeRunId above), which a client
+                                  // navigation would not re-run.
+                                  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
                                   window.location.assign(
                                     `/orchestrator?run=${run.runId}`,
                                   );
@@ -975,6 +985,7 @@ function OrchestratorConversation() {
 export default function OrchestratorPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Wait for hydration.
     setMounted(true);
   }, []);
   if (!mounted) {

@@ -152,6 +152,7 @@ export function usePluginSurface(deps: UsePluginSurfaceDeps): PluginSurface {
   useEffect(() => {
     if (pluginActivity > seenPluginActivity.current) {
       seenPluginActivity.current = pluginActivity;
+
       setPluginRefreshKey((k) => k + 1);
     }
   }, [pluginActivity]);
