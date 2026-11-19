@@ -263,6 +263,45 @@ def _decode_payload(raw: Any) -> Any:
         return None
 
 
+def _turn_run_chain(run_id: str) -> list[str]:
+    """Every run of the turn this run belongs to, oldest pass first.
+
+    A deferred write ENDS the pass, and the decision arrives as a new
+    run: one turn is a chain of runs sharing the turn's token. Reading
+    only the addressed run's frames is why a session lost its whole
+    history at every gate — the continuation frames only its own pass,
+    so the transcript blanked until the next pass arrived.
+
+    :param run_id: Any run belonging to the turn.
+    :return: The turn's run ids, oldest first, addressed run included.
+    """
+    turn = _turn_token(run_id)
+    if not turn:
+        return [run_id]
+    from berg_agents.workflow.registry import _workflow_data_dir
+
+    runs_dir = _workflow_data_dir() / Path("runs")
+    chain: list[tuple[str, str]] = []
+    for record_path in runs_dir.glob("*.json"):
+        rid = record_path.stem
+        # The same ONE reader _turn_token uses: the stored payload's shape
+        # (a list wrapper around the turn's data) is decoded in one place,
+        # so both the token and the chain agree on what a turn is.
+        if _turn_token(rid) != turn:
+            continue
+        record = _run_record(rid) or {}
+        # ISO-8601 UTC sorts as text; the id breaks a same-millisecond tie.
+        chain.append((str(record.get("createdAt") or ""), rid))
+    chain.sort()
+    ids = [rid for _, rid in chain]
+    # The addressed run is always in its own turn's chain; append it if
+    # its record could not be read, so the caller still gets the run it
+    # asked for rather than an empty stream.
+    if run_id not in ids:
+        ids.append(run_id)
+    return ids
+
+
 def _parked_pass(run_id: str) -> dict[str, Any] | None:
     """What the run parked on, and the context to resume it with.
 
@@ -516,9 +555,21 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         async def _frames() -> Any:
             from vercel import workflow
 
-            run = workflow.Run(run_id)
-            async for frame in run.readable(type=Frame):
-                yield frame.data
+            # The whole turn, oldest pass first: a gate resumes as a new
+            # run whose own frames are only its pass, so reading one run
+            # made a session forget everything the turn had already done.
+            # The turn's token is the thread that ties the passes
+            # together, and it is what makes one conversation of many
+            # runs.
+            for run_of_pass in _turn_run_chain(run_id):
+                try:
+                    run = workflow.Run(run_of_pass)
+                    async for frame in run.readable(type=Frame):
+                        yield frame.data
+                except Exception:
+                    # An unreadable record must not blank the session:
+                    # the next pass's frames still reach the reader.
+                    continue
             # The protocol closes a turn with a finish frame; the turn's own
             # encoder already emitted it, so the reader only needs to stop.
             yield "data: [DONE]\n\n"

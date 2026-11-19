@@ -459,6 +459,75 @@ function SubagentRow({
 }
 
 /**
+ * One turn's tool calls, grouped under a single summary row — the Chain
+ * of Thought pattern (ui.shadcn.com/docs/ai-elements/aria/chain-of-thought):
+ * the summary says what happened ("4 tool calls", any failures counted),
+ * and the per-call rows sit inside it, so a working turn reads as one
+ * line until the reader opens it. It opens while the turn streamss and
+ * closes when it ends, unless the reader chooses otherwise. A single
+ * call skips the summary: one step is already one row.
+ *
+ * @param props - The calls, the streaming flag, the delegated-approval
+ *   handler, and the plugin tool set
+ * @returns The grouped rows
+ */
+function ToolTraceGroup({
+  calls,
+  isAnimating,
+  onResolveDelegatedApproval,
+  pluginTools}: {
+  calls: NonNullable<ChatMessage["toolCalls"]>;
+  /** Whether the turn is still streaming. */
+  isAnimating?: boolean;
+  onResolveDelegatedApproval?: (callId: string, approved: boolean) => void;
+  /** Tool names that belong to a plugin surface. */
+  pluginTools: ReadonlySet<string>;
+}) {
+  const [open, setOpen] = useState<boolean | undefined>(undefined);
+  const running = Boolean(isAnimating);
+  const failed = calls.filter((c) => (c.state ?? "").includes("error")).length;
+  if (calls.length <= 1) {
+    return (
+      <ToolTrace
+        calls={calls}
+        isAnimating={isAnimating}
+        pluginTools={pluginTools}
+        onResolveDelegatedApproval={onResolveDelegatedApproval}
+      />
+    );
+  }
+  const count = `${calls.length} tool call${calls.length === 1 ? "" : "s"}`;
+  const line = (
+    <TraceLine status={running ? "running" : failed > 0 ? "error" : undefined}>
+      <TraceIcon>
+        {running ? (
+          <RiLoaderLine className="animate-spin" />
+        ) : failed > 0 ? (
+          <RiErrorWarningLine />
+        ) : (
+          <RiToolsLine />
+        )}
+      </TraceIcon>
+      <TraceTitle>{running ? `Working — ${count}` : count}</TraceTitle>
+      {failed > 0 && <TraceDescription>{failed} failed</TraceDescription>}
+    </TraceLine>
+  );
+  return (
+    <TraceCollapsible isExpanded={open ?? running} onExpandedChange={setOpen}>
+      <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
+      <TraceCollapsibleContent>
+        <ToolTrace
+          calls={calls}
+          isAnimating={isAnimating}
+          pluginTools={pluginTools}
+          onResolveDelegatedApproval={onResolveDelegatedApproval}
+        />
+      </TraceCollapsibleContent>
+    </TraceCollapsible>
+  );
+}
+
+/**
  * One turn's tool calls as a list of Trace rows. Calls the backend split
  * across several protocol messages arrive already merged by the caller,
  * so this is the whole list — no group header to duplicate the per-row
@@ -714,7 +783,7 @@ export function MessageList({
                 isAnimating={role === "assistant" && isAnimating}
               />
               {toolCalls && toolCalls.length > 0 && (
-                <ToolTrace
+                <ToolTraceGroup
                   calls={toolCalls}
                   isAnimating={isAnimating}
                   pluginTools={pluginTools}
