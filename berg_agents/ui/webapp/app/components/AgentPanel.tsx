@@ -20,6 +20,8 @@
 
 import { Avatar, Card, Chip } from "@heroui/react";
 
+import { Badge } from "@/components/ui/badge.tsx";
+
 export interface AgentInfo {
   name: string;
   description?: string;
@@ -109,78 +111,61 @@ export function AgentPanel({
     );
   }
 
+  // Full view: a LIST, not a grid of cards. Five rows do not need a
+  // card each — that was five boxes around a name and some text, which
+  // made the page about its own chrome. The row keeps everything the
+  // cards had (initials, name, description, complexity, capabilities,
+  // active state) at a fraction of the height, and selects the same way.
+  const row = (agent: AgentInfo) => {
+    const isActive = activeAgent === agent.name;
+    const content = (
+      <>
+        <Avatar
+          className="size-6 text-[10px]"
+          color={isActive ? "success" : "accent"}
+        >
+          {agent.name?.substring(0, 2).toUpperCase() || "??"}
+        </Avatar>
+        <span className="font-medium">{agent.name}</span>
+        {isActive && <Badge variant="secondary">Active</Badge>}
+        <span className="min-w-0 flex-1 truncate opacity-70">
+          {agent.description}
+        </span>
+        {agent.preferred_complexity && (
+          <Badge variant="outline">{agent.preferred_complexity}</Badge>
+        )}
+        {agent.capabilities?.map((cap) => (
+          <Badge key={cap} variant="outline">
+            {cap}
+          </Badge>
+        ))}
+      </>
+    );
+    if (!onSelect) {
+      return (
+        <div key={agent.name} className="flex items-center gap-2 px-1 py-1">
+          {content}
+        </div>
+      );
+    }
+    return (
+      <button
+        key={agent.name}
+        aria-pressed={isActive}
+        className={`flex w-full items-center gap-2 rounded px-1 py-1 text-left text-xs transition hover:bg-muted ${
+          isActive ? "bg-muted" : ""
+        }`}
+        type="button"
+        onClick={() => onSelect(agent.name)}
+      >
+        {content}
+      </button>
+    );
+  };
+
   return (
     <section aria-label="Registered agents" className="agent-panel">
-      <Card>
-        <Card.Header>
-          <Card.Title>Registered Agents</Card.Title>
-          <Card.Description>
-            {agents.length} available
-            {activeAgent ? ` · ${activeAgent} active` : ""}
-          </Card.Description>
-        </Card.Header>
-        {/* Responsive grid: one column on phones, two on tablets,
-            three on wide screens - never a single centered column. */}
-        <Card.Content className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {agents.map((agent) => {
-            const isActive = activeAgent === agent.name;
-            const card = (
-              <Card variant={isActive ? "secondary" : "transparent"}>
-                <Card.Header className="flex items-start gap-3">
-                  <Avatar
-                    className="mt-0.5"
-                    color={isActive ? "success" : "accent"}
-                    size="md"
-                  >
-                    {agent.name?.substring(0, 2).toUpperCase() || "??"}
-                  </Avatar>
-                  <div className="flex-1">
-                    <Card.Title>{agent.name}</Card.Title>
-                    {agent.description && (
-                      <Card.Description>{agent.description}</Card.Description>
-                    )}
-                  </div>
-                  {isActive && (
-                    <Chip color="success" size="sm" variant="soft">
-                      Active
-                    </Chip>
-                  )}
-                </Card.Header>
-                <Card.Content className="flex flex-wrap items-center gap-1.5">
-                  {agent.preferred_complexity && (
-                    <Chip size="sm" variant="secondary">
-                      {agent.preferred_complexity}
-                    </Chip>
-                  )}
-                  {agent.capabilities?.map((cap) => (
-                    <Chip key={cap} size="sm" variant="soft">
-                      {cap}
-                    </Chip>
-                  ))}
-                </Card.Content>
-              </Card>
-            );
-            // Read-only when no handler; otherwise the whole card is the
-            // select button (selected = ring + the Active chip above).
-            if (!onSelect) {
-              return <div key={agent.name}>{card}</div>;
-            }
-            return (
-              <button
-                key={agent.name}
-                aria-pressed={isActive}
-                className={`block w-full rounded-lg text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
-                  isActive ? "ring-2 ring-success" : "hover:opacity-95"
-                }`}
-                type="button"
-                onClick={() => onSelect(agent.name)}
-              >
-                {card}
-              </button>
-            );
-          })}
-        </Card.Content>
-      </Card>
+      <div className="flex flex-col">{agents.map(row)}</div>
     </section>
   );
 }

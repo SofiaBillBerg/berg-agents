@@ -95,9 +95,12 @@ export default defineConfig(
       //   ecmaVersion: 12,
       sourceType: "module",
       globals: {
-        ...Object.fromEntries(
-          Object.entries(globals.browser).map(([key]) => [key, "off"]),
-        ),
+        // Browser globals as READ-ONLY (the standard value), not "off":
+        // "off" made every reference to window/document/React an
+        // undefined-global error in a Next.js app that runs in the
+        // browser. Node globals stay alongside for the route/harness
+        // files that legitimately use process/require-shaped APIs.
+        ...globals.browser,
         ...globals.node},
       parserOptions: {
         projectService: true,

@@ -31,10 +31,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Chip } from "@heroui/react";
+import {
+  RiCheckLine,
+  RiDeleteBinLine,
+  RiEditLine,
+  RiRestartLine} from "@remixicon/react";
 
 import { Navbar } from "../components/Navbar.tsx";
 
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip.tsx";
 import { API_BASE } from "@/envConfig";
 import { storeSessionId } from "@/harness/sessionIdentity";
 
@@ -181,21 +189,19 @@ export default function HistoryPage() {
           {serverSessions === null && !error && (
             <p className="mb-3 text-xs text-muted-foreground">Loading…</p>
           )}
-          {serverSessions !== null && serverSessions.length === 0 && (
-            <Card className="mb-3" variant="default">
-              <Card.Content>
-                <p className="text-sm text-muted-foreground">
-                  No server sessions yet — chat once and it appears here in
-                  every browser.
-                </p>
-              </Card.Content>
-            </Card>
-          )}
-          <div className="mb-4 flex flex-col gap-2">
-            {(serverSessions ?? []).map((s) => (
-              <Card key={s.id} variant="default">
-                <Card.Content className="flex items-center gap-2 p-2">
-                  <div className="min-w-0 flex-1">
+          <ScrollArea className="max-h-[70vh]">
+            <ul className="flex flex-col">
+              {(serverSessions ?? []).map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center gap-2 px-1 py-1 text-xs"
+                >
+                  {/* Title first, and the whole row is the thing: this used
+                        to be a Card per session — a box around two lines of
+                        text and four buttons, which pushed a page of history
+                        into a wall of chrome. The subtitle and counts stay,
+                        in the row, at caption weight. */}
+                  <span className="min-w-0 flex-1 truncate">
                     {renamingId === s.id ? (
                       <input
                         aria-label="Session title"
@@ -208,59 +214,77 @@ export default function HistoryPage() {
                         }}
                       />
                     ) : (
-                      <p className="truncate text-sm font-medium">{s.title}</p>
+                      <span className="font-medium">{s.title}</span>
                     )}
-                    <p className="truncate text-[11px] text-muted-foreground">
-                      {s.subtitle || s.workspace} ·{" "}
-                      {new Date(s.updated_at).toLocaleString()} ·{" "}
-                      {s.message_count} msgs
-                    </p>
-                  </div>
-                  <Chip size="sm" variant="soft">
-                    {s.workspace}
-                  </Chip>
+                    <span className="ml-2 opacity-60">
+                      {s.subtitle || s.workspace}
+                    </span>
+                  </span>
+                  <Badge variant="outline">{s.workspace}</Badge>
+                  <time className="opacity-60 tabular-nums">
+                    {new Date(s.updated_at).toLocaleString()} ·{" "}
+                    {s.message_count} msgs
+                  </time>
                   {renamingId === s.id ? (
-                    <Button
-                      aria-label="Save title"
-                      size="sm"
-                      variant="primary"
-                      onPress={() => void renameServer(s.id)}
-                    >
-                      Save
-                    </Button>
+                    <TooltipTrigger>
+                      <Button
+                        aria-label="Save title"
+                        size="xs"
+                        variant="ghost"
+                        onPress={() => void renameServer(s.id)}
+                      >
+                        <RiCheckLine data-icon="inline-start" />
+                      </Button>
+                      <Tooltip placement="top">Save title</Tooltip>
+                    </TooltipTrigger>
                   ) : (
-                    <Button
-                      aria-label={`Rename ${s.title}`}
-                      size="sm"
-                      variant="secondary"
-                      onPress={() => {
-                        setRenamingId(s.id);
-                        setDraftTitle(s.title);
-                      }}
-                    >
-                      ✏️
-                    </Button>
+                    <TooltipTrigger>
+                      <Button
+                        aria-label={`Rename ${s.title}`}
+                        size="xs"
+                        variant="ghost"
+                        onPress={() => {
+                          setRenamingId(s.id);
+                          setDraftTitle(s.title);
+                        }}
+                      >
+                        <RiEditLine data-icon="inline-start" />
+                      </Button>
+                      <Tooltip placement="top">Rename</Tooltip>
+                    </TooltipTrigger>
                   )}
-                  <Button
-                    aria-label={`Restore ${s.title}`}
-                    size="sm"
-                    variant="primary"
-                    onPress={() => void restoreServer(s)}
-                  >
-                    Restore
-                  </Button>
-                  <Button
-                    aria-label={`Delete ${s.title}`}
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => void removeServer(s.id)}
-                  >
-                    🗑
-                  </Button>
-                </Card.Content>
-              </Card>
-            ))}
-          </div>
+                  <TooltipTrigger>
+                    <Button
+                      aria-label={`Restore ${s.title}`}
+                      size="xs"
+                      variant="ghost"
+                      onPress={() => void restoreServer(s)}
+                    >
+                      <RiRestartLine data-icon="inline-start" />
+                    </Button>
+                    <Tooltip placement="top">Restore this conversation</Tooltip>
+                  </TooltipTrigger>
+                  <TooltipTrigger>
+                    <Button
+                      aria-label={`Delete ${s.title}`}
+                      size="xs"
+                      variant="ghost"
+                      onPress={() => void removeServer(s.id)}
+                    >
+                      <RiDeleteBinLine data-icon="inline-start" />
+                    </Button>
+                    <Tooltip placement="top">Delete this conversation</Tooltip>
+                  </TooltipTrigger>
+                </li>
+              ))}
+              {serverSessions !== null && serverSessions.length === 0 && (
+                <li className="px-1 py-2 text-xs opacity-60">
+                  No server sessions yet — chat once and it appears here in
+                  every browser.
+                </li>
+              )}
+            </ul>
+          </ScrollArea>
         </div>
       </div>
     </>

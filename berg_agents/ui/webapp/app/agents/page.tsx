@@ -165,13 +165,20 @@ export default function AgentsPage() {
           container that fills the space below the navbar. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-6xl p-4">
-          <h1 className="text-2xl font-bold mb-4">Registered Agents</h1>
+          <h1 className="text-2xl font-bold mb-2">Agents</h1>
+          {/* What this page is for, said plainly: five initials and some
+                task-type chips told a reader nothing about what an agent
+                IS. An agent is a specialist brain the chat can hand a
+                task to — the orchestrator delegates to them, and choosing
+                one here routes the next chat turn to it. */}
           <p className="text-sm text-muted-foreground mb-4">
-            {agents.length} agent(s) available - each handles different task
-            types via the BergAgents harness pipeline.{" "}
+            An agent is a specialist brain in berg's harness. When you chat, the
+            general agent does the work itself; choosing one here hands the next
+            turn to that specialist instead — the orchestrator delegates to the
+            same ones when a task needs their skills.{" "}
             {activeAgent
               ? `Active: ${activeAgent} (next chat turn routes to it).`
-              : "Click an agent to select it."}
+              : "None active — the general agent answers. Click one to select it."}
           </p>
           <AgentPanel
             activeAgent={activeAgent}
