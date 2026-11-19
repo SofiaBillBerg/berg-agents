@@ -1,14 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-
-import {
-  Button,
-  Card,
-  Chip,
-  Fieldset,
-  FieldsetLegend} from "@heroui/react";
+import { Button, Card, Chip, Fieldset, FieldsetLegend } from "@heroui/react";
 import { Streamdown } from "streamdown";
+
 import { apiFetch, sessionId } from "./runtime";
 
 /**
@@ -148,6 +143,7 @@ export function TodoSurface({
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     void fetchTodos();
   }, [fetchTodos, refreshKey]);
@@ -409,16 +405,16 @@ export function TodoSurface({
                   <input
                     aria-label="Todo title"
                     className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-                    onChange={(e) => setTodoTitleDraft(e.target.value)}
                     value={todoTitleDraft}
+                    onChange={(e) => setTodoTitleDraft(e.target.value)}
                   />
                   <textarea
                     aria-label="Todo description"
                     className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-                    onChange={(e) => setTodoDescDraft(e.target.value)}
                     placeholder="Description"
                     rows={view === "canvas" ? 3 : 2}
                     value={todoDescDraft}
+                    onChange={(e) => setTodoDescDraft(e.target.value)}
                   />
                   <div className="flex gap-1">
                     <Button
@@ -472,10 +468,7 @@ export function TodoSurface({
                 {(todo.subtasks ?? []).map((sub) => {
                   const rowBusy = busyId === `${todo.id}:sub${sub.index}`;
                   return (
-                    <div
-                      key={sub.index}
-                      className="flex flex-col gap-1 py-0.5"
-                    >
+                    <div key={sub.index} className="flex flex-col gap-1 py-0.5">
                       <div className="flex items-center gap-1.5">
                         <button
                           aria-label={`Subtask ${sub.text}`}
@@ -486,10 +479,10 @@ export function TodoSurface({
                               : "cursor-pointer hover:bg-surface-soft"
                           }`}
                           disabled={rowBusy}
+                          type="button"
                           onClick={() =>
                             void setSubtask(todo, sub.index, !sub.done)
                           }
-                          type="button"
                         >
                           <span aria-hidden>{sub.done ? "☑" : "☐"}</span>
                           <span
@@ -532,24 +525,20 @@ export function TodoSurface({
                           <input
                             aria-label="Subtask text"
                             className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs"
-                            onChange={(e) =>
-                              setSubRenameText(e.target.value)
-                            }
+                            value={subRenameText}
+                            onChange={(e) => setSubRenameText(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 void renameSubtask(todo, sub.index);
                               }
                               if (e.key === "Escape") setRenamingSub(null);
                             }}
-                            value={subRenameText}
                           />
                           <Button
                             aria-label="Save subtask text"
                             size="sm"
                             variant="primary"
-                            onPress={() =>
-                              void renameSubtask(todo, sub.index)
-                            }
+                            onPress={() => void renameSubtask(todo, sub.index)}
                           >
                             Save
                           </Button>
@@ -561,9 +550,11 @@ export function TodoSurface({
                 <div className="mt-1 flex gap-1">
                   <input
                     aria-label={`New subtask for ${todo.title}`}
-                    name={`new-subtask-${todo.id}`}
-                    id={`new-subtask-${todo.id}`}
                     className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs"
+                    id={`new-subtask-${todo.id}`}
+                    name={`new-subtask-${todo.id}`}
+                    placeholder="New subtask… (Enter to add)"
+                    value={subDrafts[todo.id] ?? ""}
                     onChange={(e) =>
                       setSubDrafts((prev) => ({
                         ...prev,
@@ -572,8 +563,6 @@ export function TodoSurface({
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void addSubtask(todo);
                     }}
-                    placeholder="New subtask… (Enter to add)"
-                    value={subDrafts[todo.id] ?? ""}
                   />
                   <Button
                     aria-label={`Add subtask to ${todo.title}`}
@@ -608,25 +597,25 @@ export function TodoSurface({
         <div className="mt-1 flex flex-col gap-1 border-t border-border pt-2">
           <input
             aria-label="New todo title"
-            name="new-todo-title"
-            id="new-todo-title"
             className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+            id="new-todo-title"
+            name="new-todo-title"
+            placeholder="New todo… (Enter to add)"
+            value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") void createTodo();
             }}
-            placeholder="New todo… (Enter to add)"
-            value={title}
           />
           <textarea
             aria-label="New todo description"
-            name="new-todo-description"
-            id="new-todo-description"
             className="rounded-md border border-border bg-background px-2 py-1 text-sm"
-            onChange={(e) => setDescription(e.target.value)}
+            id="new-todo-description"
+            name="new-todo-description"
             placeholder="Description (optional)"
             rows={view === "canvas" ? 3 : 1}
             value={description}
+            onChange={(e) => setDescription(e.target.value)}
           />
           <Button
             isDisabled={!title.trim() || creating}

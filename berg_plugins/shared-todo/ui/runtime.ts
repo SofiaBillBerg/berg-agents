@@ -61,6 +61,10 @@ export function sessionId(): string {
  * @param init - Standard fetch options.
  * @returns The fetch response.
  */
-export function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+export function apiFetch(
+  path: string,
+  // eslint-disable-next-line no-undef -- RequestInit is a standard type in lib.dom.d.ts
+  init: RequestInit = {},
+): Promise<Response> {
   return fetch(`${apiBase()}${path}`, init);
 }

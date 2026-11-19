@@ -91,6 +91,7 @@ export default function PluginDevPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Load the catalog on mount.
     void reloadPlugins();
   }, [reloadPlugins]);
 
@@ -102,6 +103,7 @@ export default function PluginDevPage() {
   // Default the tool runner to the plugin's first tool whenever the
   // selection changes, so the panel is immediately usable.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset the runner when selection changes.
     setTool(selected?.tools?.[0] ?? null);
     setArgsText("{}");
     setResult(null);

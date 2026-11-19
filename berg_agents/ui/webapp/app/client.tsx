@@ -38,10 +38,12 @@ import { installBergRuntime } from "./runtime/berg-runtime.ts";
  * server and on the very first client pass keeps server and client HTML
  * identical.
  */
+
 export function ClientOnly() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Wait for hydration.
     setMounted(true);
     // Plugin UI bundles resolve React/HeroUI against this runtime, so
     // it must exist before any plugin surface is imported.

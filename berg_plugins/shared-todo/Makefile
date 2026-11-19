@@ -34,15 +34,15 @@ uv-install-shared-todo-plugin: ## Install uv dependencies for the shared-todo pl
 	@echo "Installing the shared-todo plugin app and uv dependencies"
 	@uv pip install -e .
 
-
-uv-build-shared-todo-plugin: uv-install-shared-todo-plugin ## Use uv to build the shared-todo plugin app
-	@echo "Building the shared-todo plugin app with uv"
-	@.venv/bin/uv build
-
-uv-lock-shared-todo-plugin: ## Use uv to lock the dependencies and generate a requirements.txt file
+uv-lock-shared-todo-plugin: uv-install-shared-todo-plugin ## Use uv to lock the dependencies and generate a requirements.txt file
 	@echo "Locking the shared todo app's dependencies with uv and generating requirements.txt"
 	@.venv/bin/uv lock
 	@.venv/bin/uv export --format requirements.txt --output-file requirements.txt -q
+
+
+uv-build-shared-todo-plugin: uv-lock-shared-todo-plugin ## Use uv to build the shared-todo plugin app
+	@echo "Building the shared-todo plugin app with uv"
+	@.venv/bin/uv build
 
 
 .PHONY: help

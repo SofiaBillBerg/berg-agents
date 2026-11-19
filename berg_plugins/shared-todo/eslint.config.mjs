@@ -18,18 +18,23 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
-import importPlugin from "eslint-plugin-import-x";
 import js from "@eslint/js";
+import { defineConfig, globalIgnores } from "eslint/config";
+import jestPlugin from "eslint-plugin-jest";
 import tseslint from "typescript-eslint";
+import importPlugin from "eslint-plugin-import-x";
 import unusedImports from "eslint-plugin-unused-imports";
 import globals from "globals";
-import tsParser from "@typescript-eslint/parser";
 import nextPlugin from "@next/eslint-plugin-next";
 import reactPlugin from "eslint-plugin-react";
 import hooksPlugin from "eslint-plugin-react-hooks";
 import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
+import reactHooks from "eslint-plugin-react-hooks";
+import prettier from "eslint-config-prettier/flat";
+import eslintNextPlugin from "@next/eslint-plugin-next";
 
 export default tseslint.config(
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
   {
     ignores: [
       ".now/*",
@@ -45,22 +50,38 @@ export default tseslint.config(
       "**/node_modules",
       "**/coverage",
       "**/.next",
-      "**/build"]},
-
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
-  {
-    files: ["**/*.{js,ts,jsx,tsx}"],
+      "**/build",
+      "**/*config*.mjs",
+      "**/*dir*.mjs",
+      "**/*.config.js",
+      "**/.DS_Store",
+      "**/node_modules",
+      "**/coverage",
+      "**/.next",
+      "**/build",
+      "**/_site",
+      "**/apidocs",
+      "**/_extensions",
+      "**/.venv",
+      "**/*cache*",
+      "**/rvenv*",
+      ".*/",
+      ".next/**",
+      "out/**",
+      "build/**",
+      "next-env.d.ts"],
     plugins: {
       "unused-imports": unusedImports,
+      "@typescript-eslint": tseslint.plugin,
       "@next/next": nextPlugin,
       react: reactPlugin,
       "react-hooks": hooksPlugin,
       "jsx-a11y": jsxA11yPlugin,
-      import: importPlugin},
+      "eslint-next": eslintNextPlugin,
+      "import-x": importPlugin},
     languageOptions: {
-      parser: tsParser,
-      ecmaVersion: 12,
+      parser: tseslint.parser,
+      //   ecmaVersion: 12,
       sourceType: "module",
       globals: {
         ...Object.fromEntries(
@@ -73,10 +94,16 @@ export default tseslint.config(
     settings: {
       react: {
         version: "detect"}},
+    extends: [
+      tseslint.configs.recommended,
+      prettier,
+      js.configs.recommended,
+      reactHooks.configs.flat["recommended-latest"]],
     rules: {
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs["core-web-vitals"].rules,
-      "no-console": "warn",
+      "no-html-link-for-pages": "off",
+      "no-console": "off",
       "react/prop-types": "off",
       "react/jsx-uses-react": "off",
       "react/react-in-jsx-scope": "off",
@@ -85,14 +112,18 @@ export default tseslint.config(
       "jsx-a11y/interactive-supports-focus": "warn",
       "no-unused-vars": "off",
       "unused-imports/no-unused-vars": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
       "unused-imports/no-unused-imports": "warn",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         {
           args: "after-used",
-          ignoreRestSiblings: false,
+          ignoreRestSiblings: true,
+          reportUsedIgnorePattern: false,
+          ignoreUsingDeclarations: true,
           argsIgnorePattern: "^_.*?$"}],
-      "import/order": [
+
+      "import-x/order": [
         "warn",
         {
           groups: [
@@ -110,6 +141,7 @@ export default tseslint.config(
               group: "external",
               position: "after"}],
           "newlines-between": "always"}],
+
       "react/self-closing-comp": "warn",
       "react/jsx-sort-props": [
         "warn",
@@ -118,4 +150,8 @@ export default tseslint.config(
           shorthandFirst: true,
           noSortAlphabetically: false,
           reservedFirst: true}]}},
+  {
+    files: ["**/*.{js,jsx,ts,tsx}"],
+    languageOptions: {
+      globals: globals.browser}},
 );

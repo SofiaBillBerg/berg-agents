@@ -42,6 +42,8 @@
 
 import type { ComponentType } from "react";
 
+import React from "react";
+
 /** Props the host passes to any plugin surface. */
 export interface PluginSurfaceProps {
   /** Side-panel (docked) or canvas (wide) presentation. */

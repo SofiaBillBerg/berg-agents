@@ -2,7 +2,7 @@
 
 This file lives inside the plugin package (`berg_plugins/shared-todo/ui/`) so
 the plugin owns its own interface --- the host only provides the mount point and
-the API surface. The host's job is to discover *that* this plugin has a surface
+the API surface. The host's job is to discover _that_ this plugin has a surface
 (via the `ui:` block in `plugin.yaml`), then render it --- it never knows what
 "todos" are.
 
