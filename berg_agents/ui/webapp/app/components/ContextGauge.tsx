@@ -19,7 +19,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import useSWR from "swr";
 
 import { API_BASE } from "@/envConfig";
 
@@ -32,6 +32,22 @@ interface UsageReading {
 
 /** How often to refresh while a turn is running, in ms. */
 const POLL_MS = 4000;
+
+/**
+ * Read the latest context-window reading for a session.
+ *
+ * @param url - The fully-built request URL (the SWR key doubles as the
+ *   request, so the session in the key is the session in the request).
+ * @returns The current reading, or null when none is known yet.
+ * @throws When the request fails — SWR then keeps the last good reading,
+ *   which is what the gauge wants: a dropped poll must not blank it.
+ */
+async function fetchUsage(url: string): Promise<UsageReading | null> {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = (await resp.json()) as { usage?: UsageReading | null };
+  return data?.usage ?? null;
+}
 
 /**
  * Live context-window gauge.
@@ -50,46 +66,18 @@ export default function ContextGauge({
   sessionId: string | null;
   streaming: boolean;
 }) {
-  const [usage, setUsage] = useState<UsageReading | null>(null);
-
-  // The read touches no state; the caller applies its result in a
-  // promise callback (react-hooks/set-state-in-effect forbids the
-  // setState-calling loader the effect used to invoke directly).
-  // `undefined` is "the request did not answer" - distinct from a `null`
-  // reading - so a failed poll keeps the last reading.
-  const readUsage = useCallback(async (): Promise<
-    UsageReading | null | undefined
-  > => {
-    const resp = await fetch(
-      `${API_BASE}/api/context/usage` +
-        (sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""),
-    );
-    if (!resp.ok) return undefined;
-    const data = await resp.json();
-    return data?.usage ?? null;
-  }, [sessionId]);
-
-  const refresh = useCallback(() => {
-    void readUsage()
-      .then((reading) => {
-        if (reading !== undefined) setUsage(reading);
-      })
-      .catch(() => {
-        // Backend unreachable - keep the last reading.
-      });
-  }, [readUsage]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  // Poll while a turn runs (the reading changes every request), then a
-  // few more times so the final number settles.
-  useEffect(() => {
-    if (!streaming) return;
-    const timer = window.setInterval(() => void refresh(), POLL_MS);
-    return () => window.clearInterval(timer);
-  }, [streaming, refresh]);
+  // One key per session: switching session moves to its own cache entry,
+  // so the gauge never shows session A's reading under session B.
+  const usageKey =
+    `${API_BASE}/api/context/usage` +
+    (sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "");
+  const { data: usage } = useSWR<UsageReading | null>(usageKey, fetchUsage, {
+    // Poll only while a turn runs (the reading changes every request),
+    // then a few more times so the final number settles. 0 stops it.
+    refreshInterval: streaming ? POLL_MS : 0,
+    // A transient error must not blank the gauge: keep the last reading
+    // and retry when the window refocuses or the interval comes round.
+    keepPreviousData: true});
 
   if (!usage || usage.window_tokens <= 0) return null;
 

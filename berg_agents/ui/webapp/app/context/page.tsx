@@ -30,14 +30,18 @@
 
 import type { PluginInfo } from "@/lib/backendCatalog";
 
-import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { Card, Chip, Spinner } from "@heroui/react";
 
 import { RouterStatsPanel } from "../components/RouterStatsPanel.tsx";
 import { SharedContextEditor } from "../components/SharedContextEditor.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 
-import { fetchPlugins, fetchRouterStats } from "@/lib/backendCatalog";
+import {
+  CATALOG_KEYS,
+  CATALOG_SWR_OPTIONS,
+  fetchPlugins,
+  fetchRouterStats} from "@/lib/backendCatalog";
 import { API_BASE } from "@/envConfig";
 
 interface MemoryEntry {
@@ -102,39 +106,46 @@ function indexPlugins(plugins: PluginInfo[]): {
 }
 
 /**
+ * Read /api/context — memory files, skills, MCP servers and the active
+ * model. Only this page consumes it, so the fetcher lives here rather
+ * than in the shared catalog module.
+ *
+ * @returns The context catalog.
+ * @throws When the request fails.
+ */
+async function fetchContext(): Promise<ContextData> {
+  const resp = await fetch(`${API_BASE}/api/context`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return (await resp.json()) as ContextData;
+}
+
+/**
  * ContextPage - client component showing the shared context catalog:
  * memory files, skills, MCP servers, and compact router stats.
+ *
+ * Three independent SWR readers rather than one Promise.all: the plugin
+ * and stats reads are best-effort (their own comment says the catalog
+ * must still render when the plugin system is down), and bundling them
+ * into a single all-or-nothing await made one outage fail the page.
+ * Each key now fails, or succeeds, on its own.
  */
 export default function ContextPage() {
-  const [data, setData] = useState<ContextData | null>(null);
-  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
-  const [stats, setStats] = useState<unknown>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, isLoading } = useSWR<ContextData>(
+    `${API_BASE}/api/context`,
+    fetchContext,
+  );
+  const { data: plugins = [] } = useSWR<PluginInfo[]>(
+    CATALOG_KEYS.plugins,
+    fetchPlugins,
+    CATALOG_SWR_OPTIONS,
+  );
+  const { data: stats } = useSWR<unknown>(
+    CATALOG_KEYS.routerStats,
+    fetchRouterStats,
+    CATALOG_SWR_OPTIONS,
+  );
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        // NOTE: /api/plugins is best-effort — the config-driven
-        // catalog below still renders when the plugin system is down.
-        const [ctxRes, stats, plugins] = await Promise.all([
-          fetch(`${API_BASE}/api/context`),
-          fetchRouterStats(),
-          fetchPlugins()]);
-        if (!ctxRes.ok) throw new Error(`HTTP ${ctxRes.status}`);
-        setData(await ctxRes.json());
-        if (stats) setStats(stats);
-        if (plugins.length > 0) setPlugins(plugins);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Network error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    void fetchAll();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <>
         <Navbar />
@@ -164,7 +175,7 @@ export default function ContextPage() {
               </Card.Header>
               <Card.Content>
                 <p className="text-sm">
-                  Failed to load context: {error ?? "empty response"}
+                  Failed to load context: {error?.message ?? "empty response"}
                 </p>
               </Card.Content>
             </Card>

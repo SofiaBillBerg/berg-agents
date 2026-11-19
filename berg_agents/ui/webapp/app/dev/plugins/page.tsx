@@ -41,24 +41,39 @@
 
 import type { PluginInfo } from "@/lib/backendCatalog";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Card, Chip, Spinner } from "@heroui/react";
+import useSWR from "swr";
 
 import { installBergRuntime } from "../../runtime/berg-runtime.ts";
 import { PluginUISurface } from "../../plugins/PluginUISurface.tsx";
 import { Navbar } from "../../components/Navbar.tsx";
 
 import { API_BASE } from "@/envConfig";
-import { fetchPlugins, invalidateCatalog } from "@/lib/backendCatalog";
+import {
+  CATALOG_KEYS,
+  CATALOG_SWR_OPTIONS,
+  fetchPlugins} from "@/lib/backendCatalog";
 
 /**
  * Plugin dev page — mount any plugin's surface and call its tools
  * directly, without a live agent run.
  */
 export default function PluginDevPage() {
-  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // The catalog is the shared entry: a plugin toggled here revalidates
+  // it, and every other reader of the plugins list (chat's surface
+  // discovery, the catalog panel) sees the same answer. The throwing
+  // fetcher means a failed read leaves the previous list in place and
+  // reports itself in `error`, instead of blanking this page.
+  const {
+    data: plugins = [],
+    error,
+    isLoading: loading,
+    mutate: mutatePlugins} = useSWR<PluginInfo[]>(
+    CATALOG_KEYS.plugins,
+    fetchPlugins,
+    CATALOG_SWR_OPTIONS,
+  );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<"panel" | "canvas">("canvas");
@@ -71,6 +86,9 @@ export default function PluginDevPage() {
   const [result, setResult] = useState<string | null>(null);
   const [toolError, setToolError] = useState<string | null>(null);
   const [toggling, setToggling] = useState(false);
+  // A failed TOGGLE is not a failed read: the read's failure lives in
+  // SWR's `error`, this one is only about the last button press.
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   // Plugin UI bundles resolve against window.BergRuntime; install it on
   // this route too (client.tsx only covers the `/` route). Idempotent.
@@ -78,37 +96,24 @@ export default function PluginDevPage() {
     installBergRuntime();
   }, []);
 
-  const reloadPlugins = useCallback(async () => {
-    try {
-      invalidateCatalog();
-      setPlugins(await fetchPlugins());
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Network error");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Load the catalog on mount.
-    void reloadPlugins();
-  }, [reloadPlugins]);
-
   // Auto-select the first plugin once the catalog arrives; explicit
   // selections (setSelectedId + reset) override afterward.
   const selected =
     plugins.find((p) => p.id === selectedId) ?? plugins[0] ?? null;
 
-  // Default the tool runner to the plugin's first tool whenever the
-  // selection changes, so the panel is immediately usable.
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset the runner when selection changes.
-    setTool(selected?.tools?.[0] ?? null);
+  // Reset the tool runner whenever the SELECTION changes. Done in render
+  // rather than an Effect keyed on `selected.tools`: the catalog
+  // re-polls, and each poll hands over a fresh array — an Effect that
+  // listed it would wipe the arguments the user is typing every few
+  // seconds. Keying the guard on the id resets on a real switch only.
+  const [runnerFor, setRunnerFor] = useState<string | null>(null);
+  if (selected && runnerFor !== selected.id) {
+    setRunnerFor(selected.id);
+    setTool(selected.tools?.[0] ?? null);
     setArgsText("{}");
     setResult(null);
     setToolError(null);
-  }, [selected?.id]);
+  }
 
   /** Select a plugin and clear any prior tool-run output. */
   const selectPlugin = (id: string) => {
@@ -120,17 +125,18 @@ export default function PluginDevPage() {
   const togglePlugin = async (plugin: PluginInfo) => {
     const enabled = plugin.state === "enabled";
     setToggling(true);
+    setToggleError(null);
     try {
       const resp = await fetch(
         `${API_BASE}/api/plugins/${encodeURIComponent(plugin.id)}/${enabled ? "disable" : "enable"}`,
         { method: "POST" },
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      // The toggle changed what the catalog reports: reload through the
-      // loader, which invalidates the shared cache first.
-      await reloadPlugins();
+      // The toggle changed what the catalog reports: re-read the shared
+      // key so this page and every other reader update together.
+      await mutatePlugins();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Toggle failed");
+      setToggleError(e instanceof Error ? e.message : "Toggle failed");
     } finally {
       setToggling(false);
     }
@@ -197,7 +203,11 @@ export default function PluginDevPage() {
             </Card>
           )}
 
-          {error && <p className="mb-3 text-xs text-red-500">{error}</p>}
+          {(error || toggleError) && (
+            <p className="mb-3 text-xs text-red-500">
+              {error ? error.message : toggleError}
+            </p>
+          )}
 
           {!loading && plugins.length === 0 && !error && (
             <Card variant="default">

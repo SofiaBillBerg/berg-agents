@@ -18,23 +18,33 @@
  */
 
 /*
- * The backend catalog client - one reader per catalog, for the whole app.
+ * The backend catalog client - one fetcher per catalog, for the whole app.
  *
- * The app's chrome reads three catalogs from the server: plugins (five
- * places), agents (three), router stats (three). Each used to fetch the
- * endpoint itself, with its own failure handling and its own copy of the
- * response shape (the plugin descriptor alone was declared three times,
- * with three different field sets). There is now one function per
- * catalog, one type per catalog, and a small in-process cache: the
- * catalogs are static for the life of a server process, so five readers
- * cost one request, and every reader sees the same bytes.
+ * The app's chrome reads four catalogs from the server: plugins, agents,
+ * router stats and the tool list. Each used to fetch the endpoint itself,
+ * with its own failure handling and its own copy of the response shape
+ * (the plugin descriptor alone was declared three times, with three
+ * different field sets). There is now one fetcher per catalog and one
+ * type per catalog, keyed by CATALOG_KEYS so every reader shares SWR's
+ * cache: five readers of the plugins endpoint cost one request, and every
+ * reader sees the same bytes.
+ *
+ * The fetchers THROW on a failed request instead of answering `[]` or
+ * `null`. That distinction is the whole point: SWR keeps the last good
+ * `data` and records the failure in `error`, so one unreachable moment
+ * never erases what the chrome is already showing. Returning a falsy
+ * fallback made every caller's success path indistinguishable from its
+ * failure path, and they all applied the fallback as if it were real —
+ * clearing the plugin list whenever the backend was merely down.
  *
  * `invalidateCatalog()` is the one mutation hook: a plugin enabled or
  * disabled changes what the catalog reports, so the toggling surfaces
- * clear the cache and the next reader re-fetches.
+ * revalidate the keys and every reader refetches together.
  */
 
 import type { AgentInfo } from "@/harness";
+
+import { mutate } from "swr";
 
 import { API_BASE } from "@/envConfig";
 
@@ -76,62 +86,161 @@ interface PluginsResponse {
 }
 
 /**
- * The last successful answer per catalog. A failed request leaves the
- * cache alone (and returns []), so one unreachable moment never erases
- * what the chrome is already showing.
+ * The SWR key for every catalog, so a reader (`useSWR`) and a mutation
+ * (`mutate`) name the same entry. Derived from API_BASE rather than
+ * spelled out, because callers pass `apiBase` around and a mismatched
+ * key would silently split one catalog into two caches.
  */
-const cache = new Map<string, unknown>();
+export const CATALOG_KEYS = {
+  plugins: `${API_BASE}/api/plugins`,
+  agents: `${API_BASE}/api/agents`,
+  routerStats: `${API_BASE}/api/router-stats`,
+  tools: `${API_BASE}/api/tools`} as const;
 
-/** Forget every cached catalog (after a plugin enable/disable). */
+/**
+ * How often a catalog is re-read on its own, in ms.
+ *
+ * A catalog is not only changed through the UI: a plugin file is edited
+ * on disk, an agent's definition is saved, a new tool registers. Nothing
+ * posts an event when that happens, so without a poll the browser keeps
+ * serving the list it read at mount until someone reloads. Polling is
+ * what closes that gap — the endpoints are cheap, local reads.
+ */
+export const CATALOG_REFRESH_MS = 15_000;
+
+/**
+ * Shared SWR options for every catalog reader: re-poll on the interval,
+ * and keep the last good list visible while a re-poll fails (the fetchers
+ * throw, so SWR records the error without dropping `data`). Pass this as
+ * the third `useSWR` argument so the cadence lives in one place instead
+ * of being restated — and drift — at each call site.
+ */
+export const CATALOG_SWR_OPTIONS = {
+  refreshInterval: CATALOG_REFRESH_MS,
+  keepPreviousData: true} as const;
+
+/**
+ * Revalidate every catalog. Used after a mutation (a plugin toggled, an
+ * agent activated) that changes what one of them reports; SWR refetches
+ * each key in place, so mounted readers update without a remount.
+ */
 export function invalidateCatalog(): void {
-  cache.clear();
+  for (const key of Object.values(CATALOG_KEYS)) void mutate(key);
 }
 
 /**
- * Fetch a catalog once, then serve it from the cache.
- *
- * @param path - Endpoint path relative to the API base.
- * @returns The payload, or null when the request failed.
+ * SWR key for the backend's active-agent pointer. It sits beside the
+ * catalogs because the Agents page and the header AgentSelector both
+ * read and write it — one key, so they can never hold two answers.
  */
-async function readCatalog(path: string): Promise<unknown | null> {
-  if (cache.has(path)) return cache.get(path) ?? null;
+export const ACTIVE_AGENT_KEY = `${API_BASE}/api/agents/active`;
+
+/** What /api/agents/active answers. */
+export interface ActiveResponse {
+  agent: string | null;
+}
+
+/**
+ * Read the backend's active-agent pointer.
+ *
+ * @returns The active agent, or null when none is set.
+ * @throws When the request fails.
+ */
+export async function fetchActiveAgent(): Promise<ActiveResponse> {
+  const resp = await fetch(ACTIVE_AGENT_KEY);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = (await resp.json()) as { agent?: unknown };
+  // A missing or oddly-typed agent is "none active", not a failure.
+  return { agent: typeof data.agent === "string" ? data.agent : null };
+}
+
+/** localStorage key the header reads for offline display. */
+const SELECTED_AGENT_KEY = "berg-selected-agent";
+
+/**
+ * Mirror the active agent into localStorage for offline display in the
+ * header. An external-store write rather than component state, so it
+ * belongs in an Effect; a failed read leaves the stored value alone
+ * rather than clearing it, so the header still shows the last known
+ * agent while the backend is unreachable.
+ *
+ * @param agent - The active agent, or null to clear the selection.
+ */
+export function storeActiveAgent(agent: string | null): void {
   try {
-    const resp = await fetch(`${API_BASE}${path}`);
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    cache.set(path, data);
-    return data;
+    if (agent) localStorage.setItem(SELECTED_AGENT_KEY, agent);
+    else localStorage.removeItem(SELECTED_AGENT_KEY);
   } catch {
-    // Backend unreachable: the caller keeps what it has.
-    return null;
+    // Private-mode storage: selection stays in memory only.
   }
 }
 
 /**
  * Read the plugin catalog.
  *
- * @returns The plugins, or [] when unavailable.
+ * @returns The plugins the backend reports.
+ * @throws When the request fails or the payload is not a plugin list.
  */
 export async function fetchPlugins(): Promise<PluginInfo[]> {
-  const data = (await readCatalog("/api/plugins")) as PluginsResponse | null;
-  return data && Array.isArray(data.plugins) ? data.plugins : [];
+  const resp = await fetch(CATALOG_KEYS.plugins);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = (await resp.json()) as PluginsResponse;
+  if (!Array.isArray(data.plugins)) {
+    throw new Error("Malformed /api/plugins payload");
+  }
+  return data.plugins;
 }
 
 /**
  * Read the agent catalog.
  *
- * @returns The agents, or [] when unavailable.
+ * @returns The agents the backend reports.
+ * @throws When the request fails or the payload is not an agent list.
  */
 export async function fetchAgents(): Promise<AgentInfo[]> {
-  const data = await readCatalog("/api/agents");
-  return Array.isArray(data) ? (data as AgentInfo[]) : [];
+  const resp = await fetch(CATALOG_KEYS.agents);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  if (!Array.isArray(data)) throw new Error("Malformed /api/agents payload");
+  return data as AgentInfo[];
 }
 
 /**
  * Read the router stats.
  *
- * @returns The stats payload, or null when unavailable.
+ * @returns The stats payload (shape owned by the backend).
+ * @throws When the request fails.
  */
-export async function fetchRouterStats(): Promise<unknown | null> {
-  return readCatalog("/api/router-stats");
+export async function fetchRouterStats(): Promise<unknown> {
+  const resp = await fetch(CATALOG_KEYS.routerStats);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return await resp.json();
+}
+
+/** One entry in the tool catalog the slash palette and executor read. */
+export interface ToolInfo {
+  name: string;
+  description: string;
+  source: string;
+}
+
+/** What the tools endpoint answers. */
+interface ToolsResponse {
+  tools?: ToolInfo[];
+}
+
+/**
+ * Read the tool catalog (workspace file tools, run_task, the delegated
+ * plan/implement entries).
+ *
+ * @returns The tools the backend reports.
+ * @throws When the request fails or the payload is not a tool list.
+ */
+export async function fetchTools(): Promise<ToolInfo[]> {
+  const resp = await fetch(CATALOG_KEYS.tools);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = (await resp.json()) as ToolsResponse;
+  if (!Array.isArray(data.tools))
+    throw new Error("Malformed /api/tools payload");
+  return data.tools;
 }

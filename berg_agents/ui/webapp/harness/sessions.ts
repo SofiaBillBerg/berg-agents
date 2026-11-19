@@ -174,17 +174,24 @@ export function useServerSessions(deps: UseServerSessionsDeps): ServerSessions {
   );
 
   // Open a server-side session: load its transcript, adopt its id.
-  const openSession = async (id: string) => {
-    const data = await reloadSession(id);
-    adoptSession(id);
-    if (data.session && typeof data.session.title === "string") {
-      setSessionTitle(data.session.title);
-    }
-    storeSessionId(id);
-  };
+  // `useCallback` so the mount-restore effect below can list it as a
+  // dependency without re-running: every input it reads (`reloadSession`,
+  // `adoptSession`, the title setter) is itself stable, so the identity
+  // holds for the life of the hook and the restore still happens once.
+  const openSession = useCallback(
+    async (id: string) => {
+      const data = await reloadSession(id);
+      adoptSession(id);
+      if (data.session && typeof data.session.title === "string") {
+        setSessionTitle(data.session.title);
+      }
+      storeSessionId(id);
+    },
+    [reloadSession, adoptSession, setSessionTitle],
+  );
 
   // Start a new server-side session (numbered title from the backend).
-  const newServerChat = async () => {
+  const newServerChat = useCallback(async () => {
     const resp = await fetch(`${apiBase}/api/sessions`, { method: "POST" });
     if (!resp.ok) throw new Error(`New session: HTTP ${resp.status}`);
     const data = await resp.json();
@@ -194,7 +201,7 @@ export function useServerSessions(deps: UseServerSessionsDeps): ServerSessions {
     if (typeof data.id === "string") {
       storeSessionId(data.id);
     }
-  };
+  }, [apiBase, setUIMessages, adoptSession, setSessionTitle]);
 
   // Restore the persisted conversation once, after mount. Server
   // first (shared across browsers), localStorage as offline fallback.
@@ -263,7 +270,10 @@ export function useServerSessions(deps: UseServerSessionsDeps): ServerSessions {
       cancelled = true;
     };
     // Runs once on mount: a re-run would re-restore over a live chat.
-  }, []);
+    // Every dependency listed here is referentially stable (see the
+    // `useCallback` on `openSession`), so listing them satisfies the
+    // check without the effect ever firing twice.
+  }, [apiBase, adoptSession, openSession, restoreMessages]);
 
   return {
     sessionId,

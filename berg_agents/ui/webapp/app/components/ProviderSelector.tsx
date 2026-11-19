@@ -21,10 +21,39 @@
 
 import type { ActiveProviderState, ProviderItem } from "../actions/providers";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, ListBox, Select, Spinner } from "@heroui/react";
+import useSWR, { mutate } from "swr";
 
 import { getProviderData, switchProvider } from "../actions/providers";
+
+/** What the providers action layer answers on a read. */
+interface ProviderData {
+  providers: ProviderItem[];
+  active: ActiveProviderState | null;
+}
+
+/**
+ * SWR key for the provider list. Null when the caller already passed the
+ * data as props — then there is nothing to fetch and the fetch path
+ * simply does not exist, rather than racing the props for ownership.
+ */
+const PROVIDERS_KEY = "berg/providers";
+
+/**
+ * Read the provider list and active selection through the actions layer
+ * (secure, server-side API communication).
+ *
+ * @returns The providers and the active one, if any.
+ * @throws When the actions layer fails — SWR then keeps the last good
+ *   list, so a dropped read never empties the selector.
+ */
+async function fetchProviderData(): Promise<ProviderData> {
+  const data = await getProviderData();
+  return {
+    providers: data.providers ?? [],
+    active: data.active ?? null};
+}
 
 export interface ProviderSelectorProps {
   activeProvider?: ActiveProviderState | null;
@@ -47,66 +76,44 @@ export function ProviderSelector({
   activeProvider: initialActiveProvider,
   providers: initialProviders,
   onSwitch}: ProviderSelectorProps) {
-  const [providers, setProviders] = useState<ProviderItem[]>(
-    initialProviders || [],
+  // Props are the fast path: when the caller already passed the list AND
+  // the active pair, the SWR key is null and no request is made at all.
+  // Without props the shared cache is the source of truth — which also
+  // means another reader of PROVIDERS_KEY sees a switch made here.
+  const hasProps = Boolean(initialProviders?.length && initialActiveProvider);
+  const { data: fetched, error: fetchError } = useSWR<ProviderData>(
+    hasProps ? null : PROVIDERS_KEY,
+    fetchProviderData,
   );
-  const [activeProvider, setActiveProvider] =
-    useState<ActiveProviderState | null>(initialActiveProvider || null);
+
   const [isSwitching, setIsSwitching] = useState<boolean>(false);
+  // The list only ever comes from props or the read; the active pair
+  // additionally gets overwritten by a switch the user just made, which
+  // is local state because it happens before any server re-read.
+  const [switchedTo, setSwitchedTo] = useState<ActiveProviderState | null>(
+    null,
+  );
   const [notice, setNotice] = useState<{
     text: string;
     type: "success" | "error";
   } | null>(null);
 
-  // Sync with prop updates if provided (same pattern as other components)
-  const [prevInitialProviders, setPrevInitialProviders] =
-    useState(initialProviders);
-  if (prevInitialProviders !== initialProviders) {
-    setPrevInitialProviders(initialProviders);
-    if (initialProviders && initialProviders.length > 0) {
-      setProviders(initialProviders);
-    }
+  const providers =
+    initialProviders && initialProviders.length > 0
+      ? initialProviders
+      : (fetched?.providers ?? []);
+  const activeProvider =
+    switchedTo ?? initialActiveProvider ?? fetched?.active ?? null;
+
+  // A failed read surfaces as a notice (auto-dismissed like every other
+  // one) instead of as thrown state — the selector keeps the list it has.
+  const [shownFetchError, setShownFetchError] = useState<string | null>(null);
+  if (fetchError && shownFetchError !== fetchError.message) {
+    setShownFetchError(fetchError.message);
+    setNotice({
+      text: `Failed to load providers list from backend API: ${fetchError.message}`,
+      type: "error"});
   }
-
-  const [prevInitialActiveProvider, setPrevInitialActiveProvider] = useState(
-    initialActiveProvider,
-  );
-  if (prevInitialActiveProvider !== initialActiveProvider) {
-    setPrevInitialActiveProvider(initialActiveProvider);
-    if (initialActiveProvider) {
-      setActiveProvider(initialActiveProvider);
-    }
-  }
-
-  // Fetch providers and active status via actions layer if not provided via props
-  const fetchProviderData = useCallback(async () => {
-    try {
-      const data = await getProviderData();
-      setProviders(data.providers);
-      if (data.active) {
-        setActiveProvider(data.active);
-      }
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : "Network error";
-      setNotice({
-        text: `Failed to load providers list from backend API: ${detail}`,
-        type: "error"});
-    }
-  }, []);
-
-  useEffect(() => {
-    if (
-      !initialProviders ||
-      initialProviders.length === 0 ||
-      !initialActiveProvider
-    ) {
-      // Deferred to a microtask so the fetch's state updates land outside
-      // the effect body to avoid synchronous setState cascades.
-      queueMicrotask(() => {
-        void fetchProviderData();
-      });
-    }
-  }, [initialProviders, initialActiveProvider, fetchProviderData]);
 
   // Auto-dismiss status notice after 4 seconds
   useEffect(() => {
@@ -138,7 +145,16 @@ export function ProviderSelector({
 
       if (result.success) {
         const newState = result.active || { provider, model };
-        setActiveProvider(newState);
+        setSwitchedTo(newState);
+        // Confirm the new active pair into the shared cache so any other
+        // reader of PROVIDERS_KEY (and a remount) agrees, without
+        // re-fetching over the server's own answer.
+        void mutate(
+          PROVIDERS_KEY,
+          (prev: ProviderData | undefined) =>
+            prev ? { ...prev, active: newState } : prev,
+          { revalidate: false },
+        );
         setNotice({
           text: `Switched to ${provider} (${model})`,
           type: "success"});

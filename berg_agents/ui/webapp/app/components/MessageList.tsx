@@ -21,46 +21,46 @@
 
 import type { ChatMessage, MessageToolCall } from "@/harness";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button, Surface } from "@heroui/react";
+import useSWR from "swr";
 
 import { MarkdownRenderer } from "./MarkdownRenderer.tsx";
 import { ToolCard } from "./ToolCard.tsx";
 import DelegationTaskControls from "./DelegationTaskControls.tsx";
 
-import { fetchPlugins } from "@/lib/backendCatalog";
-
-/** Plugin tool names, supplied by the backend (see usePluginSurfaceTools). */
-const PLUGIN_SURFACE_TOOLS = new Set<string>();
+import {
+  CATALOG_KEYS,
+  CATALOG_SWR_OPTIONS,
+  fetchPlugins,
+  type PluginInfo} from "@/lib/backendCatalog";
 
 /**
- * Track which tool names belong to a plugin surface.
+ * The tool names that belong to a plugin surface, as a set derived from
+ * the plugin catalog. Built during render from the shared SWR entry so
+ * the transcript that reads it is never a render behind the catalog —
+ * this used to live in a module-level Set mutated by an Effect, which
+ * meant the Set changed AFTER the render that needed it.
  *
- * The backend is the only place that knows which plugins are
- * installed, so the host asks it rather than keeping its own list.
- * Until it answers the marker stays neutral — never wrong.
+ * @returns Every tool name any installed plugin advertises.
  */
-export function usePluginSurfaceTools(): void {
-  useEffect(() => {
-    let cancelled = false;
-    // The backend is the only place that knows which tools belong to a
-    // plugin surface, and it is asked through the shared catalog client
-    // (one request for every reader in the app).
-    void fetchPlugins().then((plugins) => {
-      if (cancelled) return;
-      PLUGIN_SURFACE_TOOLS.clear();
-      for (const p of plugins) {
-        if (p && Array.isArray(p.tools)) {
-          for (const t of p.tools) {
-            if (typeof t === "string") PLUGIN_SURFACE_TOOLS.add(t);
-          }
+function usePluginToolNames(): Set<string> {
+  const { data: plugins } = useSWR<PluginInfo[]>(
+    CATALOG_KEYS.plugins,
+    fetchPlugins,
+    CATALOG_SWR_OPTIONS,
+  );
+  return useMemo(() => {
+    const names = new Set<string>();
+    for (const p of plugins ?? []) {
+      if (p && Array.isArray(p.tools)) {
+        for (const t of p.tools) {
+          if (typeof t === "string") names.add(t);
         }
       }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    }
+    return names;
+  }, [plugins]);
 }
 
 /**
@@ -120,18 +120,21 @@ function ReasoningBlock({
 function ToolCallGroup({
   calls,
   isAnimating,
-  onResolveDelegatedApproval}: {
+  onResolveDelegatedApproval,
+  pluginTools}: {
   calls: NonNullable<ChatMessage["toolCalls"]>;
   /** Keep the group open while the turn is still streaming. */
   isAnimating?: boolean;
   onResolveDelegatedApproval?: (callId: string, approved: boolean) => void;
+  /** Tool names that belong to a plugin surface (drives the marker). */
+  pluginTools: ReadonlySet<string>;
 }) {
   const [open, setOpen] = useState(true);
   // NOTE: Plugin tool calls render under their own marker so todo
   // activity reads as plugin work, not generic tool output. The full
   // interactive surface lives in the side-panel/canvas (TodoPanel).
   const isTodoGroup =
-    calls.length > 0 && calls.every((c) => PLUGIN_SURFACE_TOOLS.has(c.tool));
+    calls.length > 0 && calls.every((c) => pluginTools.has(c.tool));
   return (
     <div className="mt-1.5 flex flex-col gap-1 rounded-md border border-border px-1.5 py-1">
       <button
@@ -179,6 +182,7 @@ function ToolCallGroup({
                 <SubagentWork
                   isAnimating={isAnimating}
                   parts={call.children}
+                  pluginTools={pluginTools}
                   onResolveDelegatedApproval={onResolveDelegatedApproval}
                 />
               )}
@@ -206,11 +210,14 @@ function ToolCallGroup({
 function SubagentWork({
   parts,
   isAnimating,
-  onResolveDelegatedApproval}: {
+  onResolveDelegatedApproval,
+  pluginTools}: {
   parts: NonNullable<MessageToolCall["children"]>;
   /** Whether the turn is still streaming (thinking shown open by default). */
   isAnimating?: boolean;
   onResolveDelegatedApproval?: (callId: string, approved: boolean) => void;
+  /** Tool names that belong to a plugin surface. */
+  pluginTools: ReadonlySet<string>;
 }) {
   return (
     <div
@@ -227,7 +234,11 @@ function SubagentWork({
         </div>
       )}
       {parts.toolCalls && parts.toolCalls.length > 0 && (
-        <ToolCallGroup calls={parts.toolCalls} isAnimating={isAnimating} />
+        <ToolCallGroup
+          calls={parts.toolCalls}
+          isAnimating={isAnimating}
+          pluginTools={pluginTools}
+        />
       )}
       {/* A delegated task's gated write, decided in place. It sits
                 with the work it belongs to rather than in the run's
@@ -282,7 +293,7 @@ export function MessageList({
   history = [],
   isAnimating,
   onResolveDelegatedApproval}: MessageListProps) {
-  usePluginSurfaceTools();
+  const pluginTools = usePluginToolNames();
 
   /**
    * Merge consecutive assistant messages into one display group so that
@@ -376,6 +387,7 @@ export function MessageList({
               <ToolCallGroup
                 calls={toolCalls}
                 isAnimating={isAnimating}
+                pluginTools={pluginTools}
                 onResolveDelegatedApproval={onResolveDelegatedApproval}
               />
             )}

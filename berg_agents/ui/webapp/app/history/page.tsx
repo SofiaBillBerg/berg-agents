@@ -31,6 +31,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import {
   RiCheckLine,
   RiDeleteBinLine,
@@ -57,59 +58,63 @@ interface ServerSession {
   outcome: string;
 }
 
+/** What /api/sessions answers. */
+interface SessionsResponse {
+  sessions?: ServerSession[];
+}
+
+/**
+ * Read the server session list for a search key.
+ *
+ * @param url - The fully-built request URL (the SWR key doubles as the
+ *   request, so the cache and the query can never drift apart).
+ * @returns The sessions the backend reports.
+ * @throws When the request fails or the payload has no session list.
+ */
+async function fetchSessions(url: string): Promise<SessionsResponse> {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = (await resp.json()) as SessionsResponse;
+  if (!Array.isArray(data.sessions)) {
+    throw new Error("Malformed /api/sessions payload");
+  }
+  return data;
+}
+
 /** HistoryPage - server-side sessions, searchable. */
 export default function HistoryPage() {
   const router = useRouter();
-  const [serverSessions, setServerSessions] = useState<ServerSession[] | null>(
-    null,
-  );
   const [restoredMessages, setRestoredMessages] = useState<unknown[] | null>(
     null,
   );
   const [query, setQuery] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  // The search box debounces into the SWR key rather than into a fetch of
+  // its own: one Effect owns the timer, and the request it eventually
+  // causes is SWR's. `cancelled` is unnecessary here because the timer is
+  // cleared on change and SWR ignores a response for a superseded key.
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
 
-  // Server search (debounced): titles, subtitles, transcripts.
   useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      try {
-        const resp = await fetch(
-          `${API_BASE}/api/sessions?q=${encodeURIComponent(query.trim())}`,
-        );
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        if (!cancelled && Array.isArray(data.sessions)) {
-          setServerSessions(data.sessions);
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setServerSessions(null);
-          setError(query.trim() ? String(e) : null);
-        }
-      }
-    }, 300);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
+    const timer = window.setTimeout(() => setDebouncedQuery(query), 300);
+    return () => window.clearTimeout(timer);
   }, [query]);
 
-  const refreshServer = async () => {
-    try {
-      const resp = await fetch(
-        `${API_BASE}/api/sessions?q=${encodeURIComponent(query.trim())}`,
-      );
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      if (Array.isArray(data.sessions)) setServerSessions(data.sessions);
-    } catch (e) {
-      setError(String(e));
-    }
-  };
+  // The key IS the request: same string, same cache entry, so a reader
+  // elsewhere in the app and this one share one list.
+  const sessionsKey = `${API_BASE}/api/sessions?q=${encodeURIComponent(
+    debouncedQuery.trim(),
+  )}`;
+  const {
+    data,
+    error,
+    mutate: mutateSessions} = useSWR<SessionsResponse>(sessionsKey, fetchSessions);
+  const serverSessions = data?.sessions ?? null;
+
+  // Refresh after a mutation (delete, rename) — a bound mutate, so it
+  // re-reads whichever query is current instead of rebuilding the URL.
+  const refreshServer = () => mutateSessions();
 
   const restoreServer = async (session: ServerSession) => {
     const resp = await fetch(
@@ -171,7 +176,9 @@ export default function HistoryPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
+          {error && (
+            <p className="mb-2 text-xs text-red-500">{error.message}</p>
+          )}
 
           <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
             Server sessions

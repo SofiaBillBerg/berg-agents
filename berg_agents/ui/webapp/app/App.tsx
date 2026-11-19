@@ -157,9 +157,8 @@ function ChatContent() {
     newServerChat,
     openSession} = aiChat;
   // The backend's three catalogs (tools, agents, router stats) - one
-  // reader each, in ./hooks/useBackendCatalog.
-  const { backendTools, agents, routerStats } = useBackendCatalog({
-    apiBase: API_BASE});
+  // SWR reader each, in ./hooks/useBackendCatalog.
+  const { backendTools, agents, routerStats } = useBackendCatalog();
 
   // Publish the active session to plugin surfaces (via window.BergRuntime).
   // A plugin whose storage is per session reads this to name the store it
@@ -214,7 +213,6 @@ function ChatContent() {
     sessionId,
     openSession,
     messages,
-    input,
     approvalBatch,
     respondToAllApprovals});
 
@@ -320,7 +318,10 @@ function ChatContent() {
 
     // No slash prefix - just send the message to the AI model.
     forwardToModel(input.trim());
-  }, [input, processSlashCommand, forwardToModel]);
+    // `setInput` and `addCmdCard` are read inside the slash branch above;
+    // both are stable (a state setter and a `useCallback` with no deps),
+    // so listing them costs nothing and keeps the closure honest.
+  }, [input, processSlashCommand, forwardToModel, setInput, addCmdCard]);
 
   // -------------------------------------------------------------------------
   // Keyboard handling (Enter → send, Shift+Enter → new line)

@@ -173,7 +173,7 @@ export function useSpecialistSession(runId: string): SpecialistSession {
         setError(`${path} failed: ${String(err)}`);
       }
     },
-    [runId],
+    [runId, router],
   );
 
   const answer = useCallback(

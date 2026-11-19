@@ -28,98 +28,78 @@
 
 import type { AgentInfo } from "@/harness/webhook";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Card, Spinner } from "@heroui/react";
+import useSWR from "swr";
 
 import { AgentPanel } from "../components/AgentPanel.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 
-import { API_BASE } from "@/envConfig";
-
-/** localStorage key for the selected (active) agent — behavior TBD. */
-const SELECTED_AGENT_KEY = "berg-selected-agent";
+import {
+  ACTIVE_AGENT_KEY,
+  CATALOG_KEYS,
+  CATALOG_SWR_OPTIONS,
+  fetchActiveAgent,
+  fetchAgents,
+  storeActiveAgent,
+  type ActiveResponse} from "@/lib/backendCatalog";
 
 /**
- * AgentsPage - client component that fetches and displays all registered
- * agents. Shows a spinner while loading and an empty state if no agents.
+ * AgentsPage - client component that displays all registered agents.
+ * Shows a spinner while loading and an empty state if no agents.
  */
 export default function AgentsPage() {
-  const [agents, setAgents] = useState<AgentInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // The backend (/api/agents/active) is the source of truth for the
   // active agent; localStorage is only a cache for offline display.
-  const [activeAgent, setActiveAgent] = useState<string | null>(null);
+  // Derived straight from the SWR cache so the panel and the header
+  // AgentSelector can never disagree — they read the same key.
+  const { data: activePayload, mutate: mutateActive } = useSWR<ActiveResponse>(
+    ACTIVE_AGENT_KEY,
+    fetchActiveAgent,
+  );
+  const activeAgent = activePayload?.agent ?? null;
 
-  // Sync from the backend on mount so the Agents page and the header
-  // AgentSelector agree (and survive reloads without drift).
+  const {
+    data: agents,
+    error,
+    isLoading} = useSWR<AgentInfo[]>(
+    CATALOG_KEYS.agents,
+    fetchAgents,
+    CATALOG_SWR_OPTIONS,
+  );
+
+  // Keep the offline cache in step with the server's answer, on arrival
+  // and after every revalidation, so a change made in another window
+  // converges here too. This writes localStorage rather than state, which
+  // is why it is an Effect and not a derivation.
   useEffect(() => {
-    let cancelled = false;
-    void fetch(`${API_BASE}/api/agents/active`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled) return;
-        const agent =
-          data && typeof data.agent === "string" ? data.agent : null;
-        setActiveAgent(agent);
-        try {
-          if (agent) localStorage.setItem(SELECTED_AGENT_KEY, agent);
-          else localStorage.removeItem(SELECTED_AGENT_KEY);
-        } catch {
-          // Private-mode storage: selection stays in memory only.
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (activePayload === undefined) return;
+    storeActiveAgent(activePayload.agent);
+  }, [activePayload]);
 
   // Click the active agent again to clear the selection. Backend is
-  // the source of truth; we update local state from its response so
-  // the UI never drifts from what the server actually stored.
+  // the source of truth; the cache is written optimistically and then
+  // confirmed by the PUT, so the UI never drifts from what the server
+  // actually stored.
   const selectAgent = (name: string) => {
     const next = activeAgent === name ? null : name;
-    setActiveAgent(next);
-    try {
-      if (next) localStorage.setItem(SELECTED_AGENT_KEY, next);
-      else localStorage.removeItem(SELECTED_AGENT_KEY);
-    } catch {
-      // Private-mode storage: selection stays in memory only.
-    }
-    void fetch(`${API_BASE}/api/agents/active`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agent: next })})
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && typeof data.agent === "string") {
-          setActiveAgent(data.agent);
-        } else if (data && data.agent === null) {
-          setActiveAgent(null);
-        }
-      })
-      .catch(() => undefined);
+    storeActiveAgent(next);
+    void mutateActive(
+      async () => {
+        const resp = await fetch(ACTIVE_AGENT_KEY, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agent: next })});
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return (await resp.json()) as ActiveResponse;
+      },
+      {
+        optimisticData: { agent: next },
+        revalidate: false},
+    ).catch(() => undefined);
   };
 
-  useEffect(() => {
-    const fetchAgents = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/agents`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        setAgents(data || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Network error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    void fetchAgents();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <>
         <Navbar />
@@ -148,7 +128,9 @@ export default function AgentsPage() {
                 <Card.Title className="text-danger">Error</Card.Title>
               </Card.Header>
               <Card.Content>
-                <p className="text-sm">Failed to load agents: {error}</p>
+                <p className="text-sm">
+                  Failed to load agents: {error.message}
+                </p>
               </Card.Content>
             </Card>
           </div>
@@ -182,7 +164,7 @@ export default function AgentsPage() {
           </p>
           <AgentPanel
             activeAgent={activeAgent}
-            agents={agents}
+            agents={agents ?? []}
             onSelect={selectAgent}
           />
         </div>

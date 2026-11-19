@@ -31,10 +31,20 @@
  */
 
 import type { ChatMessage } from "@/harness";
+import type { PluginInfo } from "@/lib/backendCatalog";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState} from "react";
+import useSWR from "swr";
 
-import { fetchPlugins } from "@/lib/backendCatalog";
+import {
+  CATALOG_KEYS,
+  CATALOG_SWR_OPTIONS,
+  fetchPlugins} from "@/lib/backendCatalog";
 
 /** What the hook needs from the layout component. */
 export interface UsePluginSurfaceDeps {
@@ -106,56 +116,56 @@ export function usePluginSurface(deps: UsePluginSurfaceDeps): PluginSurface {
   const [pluginRefreshKey, setPluginRefreshKey] = useState(0);
   /** Headline count reported by the open surface (badge). */
   const [pluginCount, setPluginCount] = useState(0);
-  /** Registry entries for plugins that shipped a surface. */
-  const [pluginSurfaces, setPluginSurfaces] = useState<PluginSurfaceEntry[]>(
-    [],
-  );
 
-  // Discover which plugins have a registered surface.
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const plugins = await fetchPlugins();
-      if (cancelled) return;
-      const found: PluginSurfaceEntry[] = [];
-      for (const p of plugins) {
-        if (!p || typeof p.id !== "string" || !p.ui) continue;
-        // NOTE: the manifest is the only filter — any plugin that
-        // declares a `ui:` block is offered. Whether its bundle loads
-        // is the bridge's problem, reported on the surface itself.
-        found.push({
-          pluginId: p.id,
-          ui: p.ui as Record<string, unknown> | null,
-          tools: Array.isArray(p.tools) ? (p.tools as string[]) : []});
-      }
-      setPluginSurfaces(found);
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Discover which plugins have a registered surface. Derived from the
+  // shared catalog entry rather than copied into state by an Effect, so
+  // a plugin installed or removed while the app is open arrives here
+  // too (the catalog re-polls — see CATALOG_SWR_OPTIONS).
+  const { data: plugins } = useSWR<PluginInfo[]>(
+    CATALOG_KEYS.plugins,
+    fetchPlugins,
+    CATALOG_SWR_OPTIONS,
+  );
+  const pluginSurfaces = useMemo<PluginSurfaceEntry[]>(() => {
+    const found: PluginSurfaceEntry[] = [];
+    for (const p of plugins ?? []) {
+      if (!p || typeof p.id !== "string" || !p.ui) continue;
+      // NOTE: the manifest is the only filter — any plugin that
+      // declares a `ui:` block is offered. Whether its bundle loads
+      // is the bridge's problem, reported on the surface itself.
+      found.push({
+        pluginId: p.id,
+        ui: p.ui as Record<string, unknown> | null,
+        tools: Array.isArray(p.tools) ? (p.tools as string[]) : []});
+    }
+    return found;
+  }, [plugins]);
 
   const activeSurface = pluginSurfaces.find((s) => s.pluginId === sidePluginId);
 
   // Completed tool calls anywhere in the transcript refresh the open
-  // surface, so agent edits appear without manual reloads.
-  const activeTools =
-    pluginSurfaces.find((s) => s.pluginId === sidePluginId)?.tools ?? [];
+  // surface, so agent edits appear without manual reloads. The observed
+  // value is "<plugin>:<count>" rather than the count alone: switching
+  // plugins recomputes the count against the NEW plugin's tools, which
+  // can land below the number the previous plugin had reached — a
+  // count-only comparison then never fired again and the surface went
+  // stale. Keying on the plugin as well resets the baseline on a
+  // switch, and a transcript that is replaced (new session, restore)
+  // changes the count and refreshes too.
+  const activeTools = activeSurface?.tools ?? [];
   const pluginActivity = messages.reduce(
     (n, m) =>
       n +
       (m.toolCalls?.filter((c) => activeTools.includes(c.tool)).length ?? 0),
     0,
   );
-  const seenPluginActivity = useRef(0);
+  const seenPluginActivity = useRef("");
   useEffect(() => {
-    if (pluginActivity > seenPluginActivity.current) {
-      seenPluginActivity.current = pluginActivity;
-
-      setPluginRefreshKey((k) => k + 1);
-    }
-  }, [pluginActivity]);
+    const observed = `${sidePluginId ?? ""}:${pluginActivity}`;
+    if (seenPluginActivity.current === observed) return;
+    seenPluginActivity.current = observed;
+    setPluginRefreshKey((k) => k + 1);
+  }, [sidePluginId, pluginActivity]);
 
   // -------------------------------------------------------------------------
   // Side-surface resize: pointer-capture divider between the transcript

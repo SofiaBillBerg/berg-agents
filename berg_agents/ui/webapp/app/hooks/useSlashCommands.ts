@@ -57,8 +57,6 @@ export interface UseSlashCommandsDeps {
   openSession: (id: string) => Promise<void>;
   /** The live transcript (some commands summarize it). */
   messages: readonly ChatMessage[];
-  /** The current text in the input box (/read_file reads it). */
-  input: string;
   /** The active approval batch, for the auto-approve opt-in. */
   approvalBatch: Array<{ id: string; decided?: boolean; toolName: string }>;
   /** Answer every pending approval (the auto-approve opt-in). */
@@ -109,7 +107,6 @@ export function useSlashCommands(deps: UseSlashCommandsDeps): SlashCommands {
     sessionId,
     openSession,
     messages,
-    input,
     approvalBatch,
     respondToAllApprovals} = deps;
 
@@ -165,42 +162,48 @@ export function useSlashCommands(deps: UseSlashCommandsDeps): SlashCommands {
   const dismissCmdCard = useCallback((id: number) => {
     setCmdCards((prev) => prev.filter((c) => c.id !== id));
   }, []);
-  const executeTool = async (
-    tool: string,
-    args: Record<string, unknown>,
-  ): Promise<ToolResult> => {
-    const resp = await fetch(`${apiBase}/api/tool/execute`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tool, args })});
+  // `useCallback` on `apiBase` alone: everything else it touches is a
+  // state setter, so its identity only moves when the API base does —
+  // which is what lets `processSlashCommand` list it as a dependency.
+  const executeTool = useCallback(
+    async (
+      tool: string,
+      args: Record<string, unknown>,
+    ): Promise<ToolResult> => {
+      const resp = await fetch(`${apiBase}/api/tool/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tool, args })});
 
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`Tool ${tool} failed: ${err}`);
-    }
+      if (!resp.ok) {
+        const err = await resp.text();
+        throw new Error(`Tool ${tool} failed: ${err}`);
+      }
 
-    // The exact shape of the response depends on your backend implementation.
-    // We expect an object like { output: <serialisable result> }.
-    const data = await resp.json();
+      // The exact shape of the response depends on your backend implementation.
+      // We expect an object like { output: <serialisable result> }.
+      const data = await resp.json();
 
-    // Build the result object that ChatTranscript will render.
-    const result: ToolResult = {
-      tool,
-      input: JSON.stringify(args),
-      output: data.output,
-      expanded: false,
-      onToggle: () => {
-        // Toggle the expanded state of the just-added result.
-        setToolResults((prev) => {
-          const newPrev = [...prev];
-          const last = newPrev[newPrev.length - 1];
-          return [
-            ...newPrev.slice(0, newPrev.length - 1),
-            { ...last, expanded: !last.expanded }];
-        });
-      }};
-    return result;
-  };
+      // Build the result object that ChatTranscript will render.
+      const result: ToolResult = {
+        tool,
+        input: JSON.stringify(args),
+        output: data.output,
+        expanded: false,
+        onToggle: () => {
+          // Toggle the expanded state of the just-added result.
+          setToolResults((prev) => {
+            const newPrev = [...prev];
+            const last = newPrev[newPrev.length - 1];
+            return [
+              ...newPrev.slice(0, newPrev.length - 1),
+              { ...last, expanded: !last.expanded }];
+          });
+        }};
+      return result;
+    },
+    [apiBase],
+  );
 
   // -------------------------------------------------------------------------
   // Slash-command handling - including backend-backed tool commands
@@ -433,7 +436,23 @@ export function useSlashCommands(deps: UseSlashCommandsDeps): SlashCommands {
         handled: true,
         card: `Unknown command: ${cmd}\nType /help for the available commands.`};
     },
-    [agents, backendTools, clearMessages, input, routerStats, messages],
+    // Every value this callback reads must be listed, or a command keeps
+    // using the one it closed over: `/compact` takes `sessionId`, so after
+    // a session switch an unlisted id would compact the WRONG session.
+    // `sendMessage` and `openSession` are plain async functions whose
+    // identity moves each render; listing them only makes this callback
+    // re-derive, which costs nothing — no effect depends on it.
+    [
+      agents,
+      apiBase,
+      backendTools,
+      clearMessages,
+      executeTool,
+      messages,
+      openSession,
+      routerStats,
+      sendMessage,
+      sessionId],
   );
 
   return {

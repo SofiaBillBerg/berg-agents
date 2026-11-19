@@ -27,72 +27,68 @@
  * shape; there is now one reader per catalog behind a single hook, and
  * a failure in one leaves the other two intact rather than taking the
  * chrome down with it.
+ *
+ * Each catalog is one `useSWR` call against the shared key in
+ * lib/backendCatalog, so this hook holds no fetch, no effect and no
+ * loading bookkeeping of its own: SWR owns the request, the cache, the
+ * deduplication across readers, and the error/empty distinction (a
+ * failed read keeps the last good list instead of blanking it). The hook
+ * only narrows SWR's `{ data, error }` to the three fields App draws.
  */
 
 import type { AgentInfo } from "@/harness";
+import type { ToolInfo } from "@/lib/backendCatalog";
 
-import { useEffect, useState } from "react";
+import useSWR from "swr";
 
-import { fetchAgents, fetchRouterStats } from "@/lib/backendCatalog";
-
-/** What the hook needs. */
-export interface UseBackendCatalogDeps {
-  /** Base URL of the Berg Agents API. */
-  apiBase: string;
-}
+import {
+  CATALOG_KEYS,
+  CATALOG_SWR_OPTIONS,
+  fetchAgents,
+  fetchRouterStats,
+  fetchTools} from "@/lib/backendCatalog";
 
 /** The three catalogs, each independently loadable. */
 export interface BackendCatalog {
   /** Workspace file tools, run_task, and the delegated plan/implement
         entries, each with a one-line description. */
-  backendTools: Array<{ name: string; description: string; source: string }>;
+  backendTools: ToolInfo[];
   /** The agent list for the selector. */
-  agents: Array<{
-    name: string;
-    description?: string;
-    preferred_complexity?: string;
-    capabilities?: string[];
-  }>;
+  agents: AgentInfo[];
   /** Router stats for the stats panel, or null before they arrive. */
   routerStats: unknown;
 }
 
 /**
- * Read the backend's three catalogs, once each, on mount.
+ * Read the backend's three catalogs, on mount and on the shared cadence.
  *
- * @param deps - The API base.
  * @returns The three catalogs (each empty or null until it loads).
  */
-export function useBackendCatalog(deps: UseBackendCatalogDeps): BackendCatalog {
-  const { apiBase } = deps;
+export function useBackendCatalog(): BackendCatalog {
+  // One SWR reader per catalog. `?? []` / `?? null` only cover the
+  // not-yet-loaded case; a failed read surfaces as `error` on that same
+  // key and leaves these at their last good value, which is what keeps a
+  // backend blip from blanking the chrome. CATALOG_SWR_OPTIONS adds the
+  // re-poll, so a tool or agent added on disk reaches the chrome without
+  // a reload.
+  const { data: tools } = useSWR<ToolInfo[]>(
+    CATALOG_KEYS.tools,
+    fetchTools,
+    CATALOG_SWR_OPTIONS,
+  );
+  const { data: agents } = useSWR<AgentInfo[]>(
+    CATALOG_KEYS.agents,
+    fetchAgents,
+    CATALOG_SWR_OPTIONS,
+  );
+  const { data: routerStats } = useSWR<unknown>(
+    CATALOG_KEYS.routerStats,
+    fetchRouterStats,
+    CATALOG_SWR_OPTIONS,
+  );
 
-  // Backend tool catalog (powers the slash palette + execution).
-  // Fetched once, before the palette below reads it: workspace file
-  // tools, run_task, and the delegated plan/implement entries, each
-  // with a one-line description.
-  const [backendTools, setBackendTools] = useState<
-    Array<{ name: string; description: string; source: string }>
-  >([]);
-  useEffect(() => {
-    fetch(`${apiBase}/api/tools`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && Array.isArray(data.tools)) setBackendTools(data.tools);
-      })
-      .catch(() => setBackendTools([]));
-  }, [apiBase]);
-
-  // Local agent list (fetched from /api/agents)
-  const [agents, setAgents] = useState<AgentInfo[]>([]);
-  useEffect(() => {
-    void fetchAgents().then(setAgents);
-  }, []);
-
-  // Fetch Router stats on mount
-  const [routerStats, setRouterStats] = useState<unknown>(null);
-  useEffect(() => {
-    void fetchRouterStats().then(setRouterStats);
-  }, []);
-
-  return { backendTools, agents, routerStats };
+  return {
+    backendTools: tools ?? [],
+    agents: agents ?? [],
+    routerStats: routerStats ?? null};
 }

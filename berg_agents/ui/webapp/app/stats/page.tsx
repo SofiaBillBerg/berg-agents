@@ -26,37 +26,35 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
 import { Card, Spinner } from "@heroui/react";
+import useSWR from "swr";
 
 import { RouterStatsPanel } from "../components/RouterStatsPanel.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 
-import { fetchRouterStats } from "@/lib/backendCatalog";
+import {
+  CATALOG_KEYS,
+  CATALOG_SWR_OPTIONS,
+  fetchRouterStats} from "@/lib/backendCatalog";
 
 /**
- * StatsPage - client component that fetches and displays router statistics.
- * Shows a spinner while loading and an empty state if no router stats exist.
+ * StatsPage - client component that displays router statistics.
+ * SWR owns the read: a spinner while the request is in flight, the
+ * error card when it fails (rather than a silent empty panel, which is
+ * what the old effect produced — its catch could never fire because the
+ * fetcher answered null on failure instead of throwing).
  */
 export default function StatsPage() {
-  const [stats, setStats] = useState<unknown>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: stats,
+    error,
+    isLoading} = useSWR<unknown>(
+    CATALOG_KEYS.routerStats,
+    fetchRouterStats,
+    CATALOG_SWR_OPTIONS,
+  );
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setStats(await fetchRouterStats());
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Network error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    void fetchStats();
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <>
         <Navbar />
@@ -85,7 +83,7 @@ export default function StatsPage() {
                 <Card.Title className="text-danger">Error</Card.Title>
               </Card.Header>
               <Card.Content>
-                <p className="text-sm">Failed to load stats: {error}</p>
+                <p className="text-sm">Failed to load stats: {error.message}</p>
               </Card.Content>
             </Card>
           </div>

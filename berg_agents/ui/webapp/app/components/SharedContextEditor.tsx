@@ -24,26 +24,46 @@
  * every turn (and can contribute to via its tools). This is the
  * collaboration surface for the context, with each section what/why
  * history shown beside it. CodeMirror gives real Markdown editing.
+ *
+ * Two things this used to get wrong, both fixed by keying on the server:
+ *
+ *   - The section picker hardcoded six section names, a second copy of a
+ *     list the backend already owns (it reports nine). The picker now
+ *     renders whatever /api/context/shared returns, so a section added on
+ *     the backend appears here without a code change.
+ *
+ *   - Switching sections fired a bare fetch with no cancellation, so two
+ *     in-flight reads resolved in arrival order and a fast click could
+ *     leave section A's text on screen while the button said B. SWR keys
+ *     the read by section, so a late answer lands in its own entry and
+ *     can never overwrite the one on screen.
  */
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { Button, Card, Chip } from "@heroui/react";
 import { Streamdown } from "streamdown";
+import useSWR, { mutate } from "swr";
 
 import { API_BASE } from "@/envConfig";
 
-/** Canonical context sections (mirror of SECTIONS on the backend). */
-const SECTIONS = [
-  "preferences",
-  "project",
-  "task-state",
-  "files",
-  "notes",
-  "learnings"] as const;
+/** SWR key for the shared-context catalog (scopes + section list). */
+const CATALOG_KEY = `${API_BASE}/api/context/shared`;
+
+/**
+ * SWR key for one section's body and history. Keyed by name so each
+ * section has its own cache entry — this is what makes a rapid switch
+ * between sections safe: answers cannot cross over.
+ *
+ * @param name - The section name.
+ * @returns The request URL, which doubles as the cache key.
+ */
+function sectionKey(name: string): string {
+  return `${CATALOG_KEY}/${name}`;
+}
 
 /** One journal record from the backend history. */
 interface HistoryEntry {
@@ -53,6 +73,54 @@ interface HistoryEntry {
   author: string;
   why: string;
   summary: string;
+}
+
+/** One entry in the backend's section list. */
+interface CatalogSection {
+  name: string;
+  has_content: boolean;
+}
+
+/** What GET /api/context/shared answers. */
+interface CatalogData {
+  scopes: Record<string, string>;
+  sections: CatalogSection[];
+}
+
+/** What GET /api/context/shared/<name> answers. */
+interface SectionData {
+  content: string;
+  history: HistoryEntry[];
+}
+
+/**
+ * Read the shared-context catalog: which scopes exist, and every section
+ * with its content flag. The section list drives the picker, so this is
+ * the single source of truth for what can be edited.
+ *
+ * @returns The catalog.
+ * @throws When the request fails.
+ */
+async function fetchCatalog(): Promise<CatalogData> {
+  const resp = await fetch(CATALOG_KEY);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = (await resp.json()) as Partial<CatalogData>;
+  return {
+    scopes: data.scopes ?? {},
+    sections: Array.isArray(data.sections) ? data.sections : []};
+}
+
+/**
+ * Read one section's body and what/why history.
+ *
+ * @param name - The section name.
+ * @throws When the request fails.
+ */
+async function fetchSection(name: string): Promise<SectionData> {
+  const resp = await fetch(sectionKey(name));
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = (await resp.json()) as Partial<SectionData>;
+  return { content: data.content ?? "", history: data.history ?? [] };
 }
 
 /** Follow the app's light/dark theme so CodeMirror matches. */
@@ -76,88 +144,81 @@ function useCodeMirrorTheme(): "light" | "dark" {
 /** SharedContextEditor - view/edit the user-owned Shared Context in-app. */
 export function SharedContextEditor() {
   const theme = useCodeMirrorTheme();
-  const [sections, setSections] = useState<
-    Array<{ name: string; has_content: boolean }>
-  >([]);
-  const [scopes, setScopes] = useState<Record<string, string>>({});
-  const [section, setSection] = useState<string>(SECTIONS[0]);
+
+  const {
+    data: catalog,
+    isLoading: catalogLoading,
+    error: catalogError} = useSWR<CatalogData>(CATALOG_KEY, fetchCatalog);
+
+  // Which section is open. Starts unset so the first one the backend
+  // reports becomes the selection — the list is the server's, not ours.
+  const [selected, setSelected] = useState<string | null>(null);
+  const sections = catalog?.sections ?? [];
+  const section = selected ?? sections[0]?.name ?? "";
+
+  // Revalidate on focus would rewrite the editor buffer mid-keystroke,
+  // so this read is deliberately pinned: the body changes on save (which
+  // mutates the key) or when the user picks another section.
+  const {
+    data: sectionData,
+    isLoading: sectionLoading,
+    error: sectionError} = useSWR<SectionData>(section ? sectionKey(section) : null, () =>
+    fetchSection(section),
+  );
+
+  // The editor buffer is local — the user is typing into it — and is only
+  // replaced when it belongs to a different section than the one showing.
+  // Guarded in render rather than an Effect so the editor never paints
+  // one section's text under another section's button.
   const [content, setContent] = useState("");
   const [saved, setSaved] = useState("");
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [bufferFor, setBufferFor] = useState<string | null>(null);
+  if (sectionData !== undefined && bufferFor !== section) {
+    setBufferFor(section);
+    setContent(sectionData.content);
+    setSaved(sectionData.content);
+    setHistory(sectionData.history);
+  }
+
   const [scope, setScope] = useState<"project" | "global">("project");
   const [why, setWhy] = useState("");
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [status, setStatus] = useState<string | null>(null);
-  // Starts true: the mount load below has no need to reset it, which is
-  // what react-hooks/set-state-in-effect wants (the effect shows
-  // "Loading…" on the very first paint now, instead of one commit later).
-  const [loading, setLoading] = useState(true);
-
-  // The readers touch no state; their callers apply the result in
-  // promise callbacks. That keeps the mounting effects free of setState
-  // (react-hooks/set-state-in-effect) while the interactive paths stay
-  // exactly as they were.
-  const readCatalog = useCallback(async () => {
-    const resp = await fetch(`${API_BASE}/api/context/shared`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    return await resp.json();
-  }, []);
-
-  const loadCatalog = useCallback(() => {
-    void readCatalog()
-      .then((data) => {
-        setScopes(data.scopes || {});
-        setSections(data.sections || []);
-      })
-      .catch((e) => {
-        setStatus(`Catalog: ${e instanceof Error ? e.message : e}`);
-      });
-  }, [readCatalog]);
-
-  const loadSection = useCallback((name: string) => {
-    void fetch(`${API_BASE}/api/context/shared/${name}`)
-      .then((resp) => {
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        return resp.json();
-      })
-      .then((data) => {
-        setContent(data.content || "");
-        setSaved(data.content || "");
-        setHistory(data.history || []);
-      })
-      .catch((e) => {
-        setStatus(`${name}: ${e instanceof Error ? e.message : e}`);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    void loadCatalog();
-  }, [loadCatalog]);
-
-  useEffect(() => {
-    void loadSection(section);
-  }, [section, loadSection]);
 
   const dirty = content !== saved;
 
-  /** Save (write) or append the editor buffer to a scope, with a why. */
+  /**
+   * Save (write) or append the editor buffer to a scope, with a why.
+   *
+   * The PUT's own response is the editor's new truth, so the buffer is
+   * adopted from it directly; the catalog and history are then
+   * revalidated in the background to refresh the content dots and the
+   * what/why log without blanking the editor.
+   *
+   * @param mode - "write" replaces the section, "append" adds a line.
+   */
   const save = async (mode: "write" | "append") => {
     setStatus(null);
     try {
-      const resp = await fetch(`${API_BASE}/api/context/shared/${section}`, {
+      const resp = await fetch(sectionKey(section), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, mode, scope, why })});
-      const data = await resp.json().catch(() => ({}));
+      const data = (await resp.json().catch(() => ({}))) as {
+        detail?: string;
+        content?: string;
+        changed?: boolean;
+      };
       if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
-      setSaved(data.content || content);
+      // Adopt the canonical text the server stored (for an append that
+      // is the buffer plus the new line, which the buffer alone is not).
+      const canonical = data.content || content;
+      setSaved(canonical);
+      setContent(canonical);
       setStatus(data.changed ? "Saved" : "No change");
       setWhy("");
-      // The re-read after a save shows "Loading…" while it runs (the
-      // loader no longer pre-sets it, so the event handler does).
-      setLoading(true);
-      void loadCatalog();
-      void loadSection(section);
+      void mutate(sectionKey(section));
+      void mutate(CATALOG_KEY);
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Save failed");
     }
@@ -173,29 +234,29 @@ export function SharedContextEditor() {
         </Card.Description>
       </Card.Header>
       <Card.Content className="flex flex-col gap-3">
-        {/* Section picker; a dot marks sections that already have content. */}
+        {/* Section picker; a dot marks sections that already have content.
+            The list comes from the backend, so a section added there
+            shows up here with no edit to this file. */}
         <div className="flex flex-wrap gap-2">
-          {SECTIONS.map((name) => {
-            const has = sections.find((s) => s.name === name)?.has_content;
-            return (
-              <Button
-                key={name}
-                size="sm"
-                variant={section === name ? "primary" : "secondary"}
-                onPress={() => {
-                  // Show "Loading…" while the new section arrives: the
-                  // mount effect no longer resets loading itself
-                  // (react-hooks/set-state-in-effect), so the switch
-                  // marks it here, in the event handler.
-                  setLoading(true);
-                  setSection(name);
-                }}
-              >
-                {name}
-                {has ? " •" : ""}
-              </Button>
-            );
-          })}
+          {catalogLoading && (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          )}
+          {catalogError && (
+            <p className="text-sm text-muted-foreground">
+              Sections unavailable: {catalogError.message}
+            </p>
+          )}
+          {sections.map((s) => (
+            <Button
+              key={s.name}
+              size="sm"
+              variant={section === s.name ? "primary" : "secondary"}
+              onPress={() => setSelected(s.name)}
+            >
+              {s.name}
+              {s.has_content ? " •" : ""}
+            </Button>
+          ))}
         </div>
 
         {/* Scope, `why` (the `what`/`why` discipline), and the save controls. */}
@@ -237,6 +298,11 @@ export function SharedContextEditor() {
         </div>
 
         {status && <p className="text-xs text-muted-foreground">{status}</p>}
+        {sectionError && (
+          <p className="text-xs text-muted-foreground">
+            {section}: {sectionError.message}
+          </p>
+        )}
 
         {/* The editor (left) and a live Streamdown preview (right) so the
             user sees rendered markdown as they type — no new route, just
@@ -247,7 +313,7 @@ export function SharedContextEditor() {
               Edit
             </div>
             <div className="min-h-0 flex-1">
-              {loading ? (
+              {sectionLoading ? (
                 <p className="text-sm text-muted-foreground p-3">Loading…</p>
               ) : (
                 <CodeMirror
@@ -289,7 +355,8 @@ export function SharedContextEditor() {
         )}
 
         <p className="text-[11px] text-muted-foreground">
-          project: {scopes.project ?? "…"} · global: {scopes.global ?? "…"}
+          project: {catalog?.scopes.project ?? "…"} · global:{" "}
+          {catalog?.scopes.global ?? "…"}
         </p>
       </Card.Content>
     </Card>

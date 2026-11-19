@@ -411,7 +411,7 @@ export function useAISDKChat(): UseAISDKChatReturn {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, sessionTitle, isStreaming]);
+  }, [sessionId, sessionTitle, isStreaming, setSessionTitle]);
 
   // Follow and account for this session's runs from any tab, and check
   // how a run this client SENT ended - both in ./runWatch. stopFollowing
@@ -530,7 +530,11 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // request above is the server's, and a rejection there has nothing
     // further to do.
     void stop();
-  }, [stop]);
+    // `sessionIdRef` is a ref (stable identity, and read through `.current`
+    // precisely so a Stop addresses the CURRENT session), the setters are
+    // state setters, and `stopFollowing` only flips a ref — listing them
+    // satisfies the dependency check without changing when this runs.
+  }, [stop, sessionIdRef, setPendingSteering, setUIMessages, stopFollowing]);
 
   return {
     messages,

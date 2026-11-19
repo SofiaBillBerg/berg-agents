@@ -35,6 +35,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import useSWR, { mutate } from "swr";
 import {
   RiArrowRightSLine,
   RiCheckLine,
@@ -80,6 +81,61 @@ import {
 interface Tier {
   name: string;
   models: string[];
+}
+
+/** What GET /api/orchestrator/runs answers. */
+interface RunsResponse {
+  runs?: {
+    runId: string;
+    status: string;
+    createdAt: string | null;
+    hasConversation: boolean;
+    preview: string | null;
+  }[];
+}
+
+/** SWR keys for the orchestrator page's three reads, so a reader and a
+    mutation always name the same cache entry. */
+const RUNS_KEY = "/api/orchestrator/runs";
+const TIERS_KEY = `${API_BASE}/api/tiers`;
+const DELEGATE_KEY = `${API_BASE}/api/providers/delegate`;
+
+/**
+ * Read the list of past orchestration runs.
+ *
+ * @returns The runs, newest first as the route ordered them.
+ * @throws When the request fails — SWR then leaves the panel on its
+ *   last good list rather than blanking it.
+ */
+async function fetchRuns(): Promise<RunsResponse> {
+  const resp = await fetch(RUNS_KEY);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = (await resp.json()) as RunsResponse;
+  return { runs: Array.isArray(data.runs) ? data.runs : [] };
+}
+
+/**
+ * Read the routing tiers.
+ *
+ * @returns The tiers, or none when the endpoint reports none.
+ * @throws When the request fails.
+ */
+async function fetchTiers(): Promise<{ tiers?: Tier[] }> {
+  const resp = await fetch(TIERS_KEY);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return (await resp.json()) as { tiers?: Tier[] };
+}
+
+/**
+ * Read which model delegated specialists run on.
+ *
+ * @returns The chosen model id, or absent for the backend's default.
+ * @throws When the request fails.
+ */
+async function fetchDelegateModel(): Promise<{ model?: string }> {
+  const resp = await fetch(DELEGATE_KEY);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return (await resp.json()) as { model?: string };
 }
 
 /**
@@ -217,22 +273,28 @@ function OrchestratorConversation() {
   );
   const specialistStates = useSpecialistStates(specialistRunIds);
   // The routing tiers, so the orchestrator's brain is a choice rather than
-  // an environment variable.
-  const [tiers, setTiers] = useState<Tier[]>([]);
+  // an environment variable. Configuration rather than conversation state,
+  // so it is a shared read: an edit on the backend shows up on the next
+  // revalidation without a reload.
+  const { data: tiersPayload } = useSWR<{ tiers?: Tier[] }>(
+    TIERS_KEY,
+    fetchTiers,
+  );
+  const tiers = tiersPayload?.tiers ?? [];
   // Past orchestration runs. They live in the workflow world's database, not
   // in Python's sessions, so the History tab can never show them — this is
   // their surface. A reload used to lose the run entirely.
   // The stored turns, in the shape berg's store returns (see
   // lib/orchestrator-turns.ts — camelCase, as the rest of this app).
-  const [pastRuns, setPastRuns] = useState<
-    {
-      runId: string;
-      status: string;
-      createdAt: string | null;
-      hasConversation: boolean;
-      preview: string | null;
-    }[]
-  >([]);
+  // One shared read; the delete below writes the same entry, so the panel
+  // and any other reader of RUNS_KEY agree without a second fetch.
+  const {
+    data: runsPayload,
+    error: runsError,
+    mutate: mutateRuns} = useSWR<RunsResponse>(RUNS_KEY, fetchRuns);
+  // Memoized so the array identity is stable across renders: `?? []` on
+  // every render would hand `visibleRuns` a new dependency each time.
+  const pastRuns = useMemo(() => runsPayload?.runs ?? [], [runsPayload]);
   // The runs panel's search text: fifty runs are only findable if they can be
   // filtered by what they were about, not by their id.
   const [runQuery, setRunQuery] = useState<string>("");
@@ -250,31 +312,9 @@ function OrchestratorConversation() {
   // The run awaiting a second click to be deleted. Null means no delete is
   // pending, so no row shows its "for real" button.
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const response = await fetch(`/api/orchestrator/runs`);
-        if (!response.ok) return;
-        const data = (await response.json()) as {
-          runs?: {
-            runId: string;
-            status: string;
-            createdAt: string | null;
-            hasConversation: boolean;
-            preview: string | null;
-          }[];
-        };
-        if (alive) setPastRuns(data.runs ?? []);
-      } catch {
-        // No list leaves the panel empty; the live conversation is
-        // unaffected either way.
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // A failed run-list read is surfaced in the panel rather than thrown:
+  // the live conversation is unaffected either way, and an empty list
+  // that silently means "could not reach the server" is a lie.
 
   // The same side-surface machinery the chat page uses — one hook, so todos
   // and plugin surfaces behave identically here. It wants berg's ChatMessage
@@ -285,49 +325,22 @@ function OrchestratorConversation() {
     () => messages.map((message) => toChatMessage(message)),
     [messages],
   );
-  // Loaded once, from berg's own endpoint: a tier list is configuration, and
-  // editing it should be visible without a rebuild.
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/tiers`);
-        if (!response.ok) return;
-        const data = (await response.json()) as { tiers?: Tier[] };
-        if (alive) setTiers(data.tiers ?? []);
-      } catch {
-        // No tiers leave the selector on its default, which is the
-        // behavior before tiers were visible at all.
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   // Which model the specialists this page delegates to run on. Loaded from
   // berg's own endpoint and saved back through it, so the choice is the
   // session's (one place) rather than a second copy living in this page.
   // Empty means "not chosen": the backend falls back to its tier default,
   // which is the behavior before this control existed.
-  const [delegateModel, setDelegateModel] = useState<string>("");
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/providers/delegate`);
-        if (!response.ok) return;
-        const data = (await response.json()) as { model?: string };
-        if (alive) setDelegateModel(data.model ?? "");
-      } catch {
-        // Leaving it empty is the default; a failed read must not
-        // pretend a choice was made.
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // `chosenOverride` is the value the user just picked: it wins over the
+  // read because a POST that has not answered yet must still show the
+  // choice, and a failed write is deliberately not rolled back — the next
+  // save attempt is the user's to make.
+  const { data: delegatePayload } = useSWR<{ model?: string }>(
+    DELEGATE_KEY,
+    fetchDelegateModel,
+  );
+  const [chosenOverride, setChosenOverride] = useState<string | null>(null);
+  const delegateModel = chosenOverride ?? delegatePayload?.model ?? "";
 
   /**
    * Choose which brain the delegated specialists run on.
@@ -340,12 +353,18 @@ function OrchestratorConversation() {
    * @param value - The chosen model id, or "" for the backend's default.
    */
   async function onDelegateModelChange(value: string): Promise<void> {
-    setDelegateModel(value);
+    setChosenOverride(value);
     try {
-      await fetch(`${API_BASE}/api/providers/delegate`, {
+      const resp = await fetch(DELEGATE_KEY, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: value })});
+      if (resp.ok) {
+        // Confirm the stored choice into the shared entry so a remount
+        // (or another reader) starts from what the server accepted,
+        // without re-fetching over it.
+        void mutate(DELEGATE_KEY, { model: value }, { revalidate: false });
+      }
     } catch {
       // The selection stays as chosen locally; the next save attempt is
       // the user's, so a failed write must not silently persist.
@@ -482,6 +501,11 @@ function OrchestratorConversation() {
                     the run was ABOUT, a search field, and icon-sized actions.
                     Collapsed by default: fifty runs of history are context, not
                     content — the conversation is. Expanded on demand. */}
+          {runsError ? (
+            <p className="px-3 text-xs text-red-500">
+              Past runs unavailable: {runsError.message}
+            </p>
+          ) : null}
           {pastRuns.length > 0 ? (
             <Collapsible className="rounded border border-border">
               <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-3 py-1.5">
@@ -596,14 +620,38 @@ function OrchestratorConversation() {
                               variant="destructive"
                               onPress={() => {
                                 void (async () => {
-                                  await fetch(
-                                    `/orchestrator/runs/${encodeURIComponent(run.runId)}`,
-                                    { method: "DELETE" },
-                                  );
                                   setConfirmDelete(null);
-                                  setPastRuns((runs) =>
-                                    runs.filter((r) => r.runId !== run.runId),
-                                  );
+                                  // Optimistic: drop the row at once, then
+                                  // confirm against the server. A failed
+                                  // delete rolls the row back rather than
+                                  // leaving a row the panel insists is gone.
+                                  await mutateRuns(
+                                    async (
+                                      current: RunsResponse | undefined,
+                                    ) => {
+                                      const resp = await fetch(
+                                        `/orchestrator/runs/${encodeURIComponent(run.runId)}`,
+                                        { method: "DELETE" },
+                                      );
+                                      if (!resp.ok) {
+                                        throw new Error(`HTTP ${resp.status}`);
+                                      }
+                                      return {
+                                        runs: (current?.runs ?? []).filter(
+                                          (r) => r.runId !== run.runId,
+                                        )};
+                                    },
+                                    {
+                                      optimisticData: {
+                                        runs: pastRuns.filter(
+                                          (r) => r.runId !== run.runId,
+                                        )},
+                                      rollbackOnError: true,
+                                      revalidate: false},
+                                  ).catch(() => {
+                                    // The row comes back on its own from the
+                                    // next revalidation; nothing to restore.
+                                  });
                                 })();
                               }}
                             >

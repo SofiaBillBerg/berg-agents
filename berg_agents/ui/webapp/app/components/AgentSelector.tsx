@@ -1,6 +1,5 @@
 /*
- * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
- * The system follows a harness-based execution model with multiple specialized agents working together.
+ * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
  *
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
@@ -20,61 +19,79 @@
 
 /* AgentSelector - pick the active agent for the chat session.
  *
- * Mirrors ProviderSelector: fetches the agent list + the active selection,
+ * Mirrors ProviderSelector: reads the agent list + the active selection,
  * and PUTs the choice to /api/agents/active so the next chat turn routes
  * to that agent (the chat agent adopts its persona). The selection is
  * also persisted on the backend session, so the Agents page and the
  * header agree.
+ *
+ * Both reads are the same SWR keys the Agents page uses, so the header
+ * and that page share one cache rather than each fetching their own copy
+ * and occasionally disagreeing about which agent is active.
  */
 
 "use client";
 
-import { useEffect, useState } from "react";
+import type { AgentInfo } from "@/harness";
 
-import { API_BASE } from "@/envConfig";
+import { useEffect } from "react";
+import useSWR from "swr";
 
-interface AgentItem {
-  name: string;
-  description?: string;
-}
+import {
+  ACTIVE_AGENT_KEY,
+  CATALOG_KEYS,
+  CATALOG_SWR_OPTIONS,
+  fetchActiveAgent,
+  fetchAgents,
+  storeActiveAgent} from "@/lib/backendCatalog";
 
 /** AgentSelector - header control for the active agent. */
 export default function AgentSelector() {
-  const [agents, setAgents] = useState<AgentItem[]>([]);
-  const [active, setActive] = useState<string | null>(null);
+  // One reader per catalog — the shared keys, so a change made on the
+  // Agents page shows up here without a reload.
+  const { data: agents = [] } = useSWR<AgentInfo[]>(
+    CATALOG_KEYS.agents,
+    fetchAgents,
+    CATALOG_SWR_OPTIONS,
+  );
+  const { data: activePayload, mutate: mutateActive } = useSWR(
+    ACTIVE_AGENT_KEY,
+    fetchActiveAgent,
+  );
+  const active = activePayload?.agent ?? null;
 
-  // The fetch runs as a local routine of the mount effect (the shape
-  // harness/sessions.ts uses): the two setState calls land in its async
-  // continuation, never in the effect body itself, which is what
-  // react-hooks/set-state-in-effect asks for.
+  // Mirror the server's answer into localStorage for offline display.
+  // Writing an external store rather than state, so an Effect is the
+  // right home for it.
   useEffect(() => {
-    void (async () => {
-      try {
-        const [listRes, activeRes] = await Promise.all([
-          fetch(`${API_BASE}/api/agents`),
-          fetch(`${API_BASE}/api/agents/active`)]);
-        if (listRes.ok) {
-          const data = await listRes.json();
-          setAgents(Array.isArray(data) ? data : data.agents || []);
-        }
-        if (activeRes.ok) {
-          const data = await activeRes.json();
-          setActive(typeof data?.agent === "string" ? data.agent : null);
-        }
-      } catch {
-        // Backend unreachable - keep the current selection in memory.
-      }
-    })();
-  }, []);
+    if (activePayload === undefined) return;
+    storeActiveAgent(activePayload.agent);
+  }, [activePayload]);
 
-  /** Set the active agent on the backend (and locally). */
+  /**
+   * Set the active agent on the backend (and locally).
+   *
+   * @param name - The chosen agent, or "" to fall back to the default.
+   */
   const onChange = (name: string) => {
     const next = name === "" ? null : name;
-    setActive(next);
-    void fetch(`${API_BASE}/api/agents/active`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agent: next })}).catch(() => undefined);
+    storeActiveAgent(next);
+    // Optimistic: show the choice at once, then confirm it against the
+    // server. `revalidate: false` keeps the PUT's own answer as the
+    // final word instead of immediately re-fetching over it.
+    void mutateActive(
+      async () => {
+        const resp = await fetch(ACTIVE_AGENT_KEY, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agent: next })});
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return (await resp.json()) as { agent: string | null };
+      },
+      {
+        optimisticData: { agent: next },
+        revalidate: false},
+    ).catch(() => undefined);
   };
 
   return (
