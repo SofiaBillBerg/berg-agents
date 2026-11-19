@@ -51,6 +51,7 @@ import { Navbar } from "../components/Navbar.tsx";
 import { PluginCatalog } from "../components/PluginCatalog.tsx";
 import { PluginUISurface } from "../plugins/PluginUISurface.tsx";
 import { usePluginSurface } from "../hooks/usePluginSurface";
+import { useBackendCatalog } from "../hooks/useBackendCatalog";
 
 import { buildExportMarkdown } from "@/utils/utils";
 import { useOrchestratorChat } from "@/harness/useOrchestratorChat";
@@ -99,6 +100,7 @@ interface RunsResponse {
 const RUNS_KEY = "/api/orchestrator/runs";
 const TIERS_KEY = `${API_BASE}/api/tiers`;
 const DELEGATE_KEY = `${API_BASE}/api/providers/delegate`;
+const SPECIALISTS_KEY = `${API_BASE}/api/providers/specialists`;
 
 /**
  * Read the list of past orchestration runs.
@@ -136,6 +138,21 @@ async function fetchDelegateModel(): Promise<{ model?: string }> {
   const resp = await fetch(DELEGATE_KEY);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return (await resp.json()) as { model?: string };
+}
+
+/**
+ * Read the per-specialist model overrides.
+ *
+ * @returns The overrides keyed by agent name, absent agents having no
+ *   choice of their own (the delegation default still applies).
+ * @throws When the request fails.
+ */
+async function fetchSpecialistModels(): Promise<{
+  models?: Record<string, string>;
+}> {
+  const resp = await fetch(SPECIALISTS_KEY);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return (await resp.json()) as { models?: Record<string, string> };
 }
 
 /**
@@ -341,6 +358,18 @@ function OrchestratorConversation() {
   );
   const [chosenOverride, setChosenOverride] = useState<string | null>(null);
   const delegateModel = chosenOverride ?? delegatePayload?.model ?? "";
+  // Which specialist runs on which model. `chosenSpecialists` holds the
+  // user's edits until a POST answers, exactly like the delegate pair
+  // above; a failed write stays visible so the next attempt is theirs.
+  const { data: specialistsPayload } = useSWR<{
+    models?: Record<string, string>;
+  }>(SPECIALISTS_KEY, fetchSpecialistModels);
+  const [chosenSpecialists, setChosenSpecialists] = useState<Record<
+    string,
+    string
+  > | null>(null);
+  const specialistModels =
+    chosenSpecialists ?? specialistsPayload?.models ?? {};
 
   /**
    * Choose which brain the delegated specialists run on.
@@ -370,6 +399,47 @@ function OrchestratorConversation() {
       // the user's, so a failed write must not silently persist.
     }
   }
+
+  /**
+   * Choose which model one specialist runs on.
+   *
+   * The whole map is written on every change — the endpoint replaces
+   * wholesale — so the local edit applies to the map in state, and the
+   * server holds a set that can never be half-updated.
+   *
+   * @param agent - The specialist whose model changes.
+   * @param value - The chosen model id, or "" to hand it back to the
+   *   delegation default.
+   */
+  async function onSpecialistModelChange(
+    agent: string,
+    value: string,
+  ): Promise<void> {
+    const next = { ...specialistModels, [agent]: value };
+    setChosenSpecialists(next);
+    try {
+      const resp = await fetch(SPECIALISTS_KEY, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ models: next })});
+      if (resp.ok) {
+        // Confirm the stored set into the shared entry, so a remount
+        // (or another reader) starts from what the server accepted.
+        void mutate(SPECIALISTS_KEY, { models: next }, { revalidate: false });
+      }
+    } catch {
+      // As with the delegate model: the choice stays visible, and the
+      // next save attempt is the user's.
+    }
+  }
+
+  // The registered specialists, for the pickers' rows, and the flat
+  // model list in tier order — the same collection the orchestrator's
+  // own selector reads.
+  const { agents } = useBackendCatalog();
+  const specialistOptions = Array.from(
+    new Set(tiers.flatMap((tier) => tier.models)),
+  );
 
   const {
     sidePluginId,
@@ -729,13 +799,13 @@ function OrchestratorConversation() {
               Plugins
             </Button>
             <span className="flex-1" />
-            {/* Two model choices in one labeled row: the orchestrator's
-                    own brain, and the brain every specialist this
-                    conversation starts runs on. They used to be native
-                    <select>s with tiny caption labels, flanked by the
-                    chat page's agent/provider selectors — which write
-                    the chat surface's settings and do nothing on this
-                    route, so they belong to the page that reads them.
+            {/* Model choices in one labeled row: the orchestrator's own
+                    brain, and the specialists' brains. One global select
+                    could not express "planner cheap, implementer strong",
+                    so each specialist gets a selector of its own — the
+                    old single value stays as the "all specialists" row,
+                    which is the fallback any specialist without a choice
+                    of its own still resolves through.
                     Grouped by tier so the ordering berg configures stays
                     visible, not a flat list of names. */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -759,45 +829,101 @@ function OrchestratorConversation() {
                   {/* Flat, in tier order, deduplicated: a model that sits
                           in two tiers is the same model, and a collection
                           may not list one twice. */}
-                  {Array.from(
-                    new Set(tiers.flatMap((tier) => tier.models)),
-                  ).map((name) => (
+                  {specialistOptions.map((name) => (
                     <SelectItem key={name} id={name}>
                       {name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <span className="text-xs opacity-70">Specialists run on</span>
-              <Select
-                aria-label="Specialists run on"
-                className="min-w-56"
-                selectedKey={delegateModel || "__default"}
-                onSelectionChange={(key) => {
-                  void onDelegateModelChange(
-                    key === "__default" ? "" : String(key),
-                  );
-                }}
-              >
-                <SelectTrigger size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem id="__default">
-                    specialists: default (tier)
-                  </SelectItem>
-                  {/* Flat, in tier order, deduplicated: a model that sits
-                          in two tiers is the same model, and a collection
-                          may not list one twice. */}
-                  {Array.from(
-                    new Set(tiers.flatMap((tier) => tier.models)),
-                  ).map((name) => (
-                    <SelectItem key={name} id={name}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Collapsible>
+                <CollapsibleTrigger className="flex items-center gap-1 text-xs opacity-70 hover:opacity-100">
+                  Specialists run on
+                  <RiArrowRightSLine className="transition-transform group-aria-expanded:rotate-90" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2">
+                  <div className="flex max-h-72 w-72 flex-col gap-2 overflow-y-auto rounded-md border border-border bg-surface/60 p-2">
+                    {/* The global fallback: what a specialist with no
+                        choice of its own runs on. */}
+                    <div className="flex items-center gap-2">
+                      <span className="w-28 shrink-0 text-xs opacity-70">
+                        all specialists
+                      </span>
+                      <Select
+                        aria-label="All specialists run on"
+                        className="min-w-0 flex-1"
+                        selectedKey={delegateModel || "__default"}
+                        onSelectionChange={(key) => {
+                          void onDelegateModelChange(
+                            key === "__default" ? "" : String(key),
+                          );
+                        }}
+                      >
+                        <SelectTrigger size="sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem id="__default">
+                            specialists: default (tier)
+                          </SelectItem>
+                          {specialistOptions.map((name) => (
+                            <SelectItem key={name} id={name}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* One row per specialist berg registers, each with
+                        its own model choice. An override wins over the
+                        global row; "default (tier)" hands it back. */}
+                    {agents.map((agent) => {
+                      const chosen = specialistModels[agent.name] ?? "";
+                      return (
+                        <div
+                          key={agent.name}
+                          className="flex items-center gap-2"
+                          title={agent.description}
+                        >
+                          <span className="w-28 shrink-0 truncate text-xs">
+                            {agent.name}
+                          </span>
+                          <Select
+                            aria-label={`${agent.name} runs on`}
+                            className="min-w-0 flex-1"
+                            selectedKey={chosen || "__default"}
+                            onSelectionChange={(key) => {
+                              void onSpecialistModelChange(
+                                agent.name,
+                                key === "__default" ? "" : String(key),
+                              );
+                            }}
+                          >
+                            <SelectTrigger size="sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem id="__default">
+                                default (tier)
+                              </SelectItem>
+                              {specialistOptions.map((name) => (
+                                <SelectItem key={name} id={name}>
+                                  {name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })}
+                    {agents.length === 0 && (
+                      <span className="text-xs opacity-70">
+                        No specialists registered.
+                      </span>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
             {/* The same toggle the chat page carries: the theme is a
                             property of the app, not of one route, and the

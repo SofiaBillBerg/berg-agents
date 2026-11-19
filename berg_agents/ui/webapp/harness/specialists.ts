@@ -79,9 +79,16 @@ export interface SpecialistReport {
  * same-origin, so a relative `/api/...` resolves for the client. `workflow`'s
  * `fetch` runs inside a step and requires an absolute URL, so the origin has to
  * be named here instead.
+ *
+ * `BERG_BACKEND_URL` is read before the host/port pair because it is the one
+ * variable the Makefile already exports for the UI's proxy — asking for the
+ * backend's address two different ways is how the step side ended up with a
+ * hardcoded `:8001` default while every configured run was on another port.
  */
 function backendOrigin(): string {
   if (API_BASE) return API_BASE;
+  const url = process.env.BERG_BACKEND_URL;
+  if (url) return url.replace(/\/+$/, "");
   const host = process.env.BERG_BACKEND_HOST || "127.0.0.1";
   const port = process.env.BERG_BACKEND_PORT || "8001";
   return `http://${host}:${port}`;
