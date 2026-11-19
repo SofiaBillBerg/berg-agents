@@ -440,16 +440,6 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         from berg_agents.workflow.gated_turn import gated_turn as turn_workflow
 
         sessions = request.app.state.sessions
-        # Order matters: an explicit model from the caller wins, then the model
-        # chosen for delegated work, then the chat session's model. The middle
-        # rung is what lets a specialist run on a chosen model without the
-        # orchestrator having to know about the choice.
-        model_id = (
-            request.query_params.get("model")
-            or getattr(sessions, "delegate_model", "")
-            or sessions.active_model
-            or ""
-        )
         # The session's own root dir, exactly as the chat path reads it.
         root_dir = str(sessions._harness_root_dir())
         # An explicit ``agent`` names the specialist this run is for; without
@@ -475,6 +465,19 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
             active_agent, active_agent_description = _resolve_active_agent(
                 request.app.state.harness, sessions
             )
+        # Order matters: an explicit model from the caller wins, then this
+        # specialist's own choice, then the model chosen for delegated work,
+        # then the chat session's model. The second rung is what lets each
+        # specialist be pinned to its own brain without the orchestrator
+        # knowing about the choice; the middle rung still covers the ones
+        # with no choice of their own.
+        model_id = (
+            request.query_params.get("model")
+            or getattr(sessions, "specialist_models", {}).get(active_agent, "")
+            or getattr(sessions, "delegate_model", "")
+            or sessions.active_model
+            or ""
+        )
         token = str(body.get("token") or "").strip() or _new_token()
         point_queue_at_berg(port)
         run = await workflow.start(

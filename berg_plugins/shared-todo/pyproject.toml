@@ -8,7 +8,8 @@ authors = [{ name = "Berg Agents Team", email = "team@berg-agents.dev" }]
 readme = "README.md"
 requires-python = ">=3.12"
 
-dependencies = []
+dependencies = [
+    "pydantic-ai>=2.71.0"]
 
 #  berg-agents==0.1.0 (from file:///home/sofiabillberg/code-projects/berg-agents)
 
@@ -29,7 +30,7 @@ plugin-deps = [
     "berg-agents",
     "dotenv>=0.9.9",
     "httpx>=0.27.0",
-    "pydantic-settings>=2.15.0",
+    "pydantic-settings>=2.15.0"]
     # "berg-agents"]
 
 [build-system]

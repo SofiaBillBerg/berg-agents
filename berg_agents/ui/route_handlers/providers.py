@@ -31,6 +31,7 @@ from berg_agents.ui.schemas import (
     ModelTier,
     ProviderInfo,
     ProviderListResponse,
+    SpecialistModels,
     TierListResponse,
 )
 from berg_agents.ui.sessions import SessionManager
@@ -155,3 +156,37 @@ def register_provider_routes(
         """
         sessions.delegate_model = selection.model.strip()
         return DelegateModel(model=sessions.delegate_model)
+
+    @router.get("/api/providers/specialists")
+    async def get_specialist_models() -> SpecialistModels:
+        """Read the per-specialist model overrides.
+
+        Absent agents have no choice of their own: the delegation default
+        still applies, exactly as before this existed.
+
+        :return: The overrides, keyed by agent name.
+        """
+        return SpecialistModels(
+            models=getattr(sessions, "specialist_models", {}) or {}
+        )
+
+    @router.post("/api/providers/specialists")
+    async def set_specialist_models(
+        selection: SpecialistModels,
+    ) -> SpecialistModels:
+        """Choose which model each specialist runs on.
+
+        The map replaces wholesale — there is no per-agent endpoint to
+        drift from the collection — and every value is stripped, so a
+        blank entry clears that specialist back to the default rather
+        than pinning it to the empty string.
+
+        :param selection: The full override map, keyed by agent name.
+        :return: The overrides now in force.
+        """
+        sessions.specialist_models = {
+            agent.strip(): model.strip()
+            for agent, model in (selection.models or {}).items()
+            if agent.strip() and model.strip()
+        }
+        return SpecialistModels(models=sessions.specialist_models)

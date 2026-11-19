@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ProviderInfo(BaseModel):
@@ -67,6 +67,18 @@ class DelegateModel(BaseModel):
     """The model delegated sub-agents run on."""
 
     model: str
+
+
+class SpecialistModels(BaseModel):
+    """Per-specialist model overrides, keyed by agent name.
+
+    A specialist absent from the map has no choice of its own: the
+    delegation default still applies. The map replaces wholesale on
+    save, so the caller always sends the whole set — there is no
+    per-agent endpoint to drift from the collection.
+    """
+
+    models: dict[str, str] = Field(default_factory=dict)
 
 
 class ToolExecuteRequest(BaseModel):

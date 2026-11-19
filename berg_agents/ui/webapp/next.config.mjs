@@ -48,10 +48,7 @@ const withBundleAnalyzer =
 const nextConfig = {
   // A Next server, not a static export. The orchestrator is a
   // `WorkflowAgent`, and the Workflow runtime starts and resumes runs from
-  // server routes — which a static export cannot host. The comment this
-  // replaces said the opposite ("static export only in production, FastAPI
-  // mounts dist/"), which was true while the UI had no server behavior of its
-  // own; it does now.
+  // server routes — which a static export cannot host.
   //
   // ONE FRONT DOOR. The UI is served by Next now, but berg's API, sessions,
   // specialists and workflow routes all live in the Python backend. Rather than
@@ -79,8 +76,7 @@ const nextConfig = {
         // plugin's manifest gives an `entry_url` such as
         // `/berg-plugins/shared-todo/ui/dist/todo-surface.js`, and the browser
         // loads it directly — so without this rewrite the Plugins page renders
-        // its chrome but the bundle 404s and the panel is empty (found
-        // 2026-11-12 from a screenshot: 404 here, 200 on the backend).
+        // its chrome but the bundle 404s and the panel is empty
         //
         // Not under /api/*, so it needs its own rule; and not a Next route, so
         // there is no precedence concern as there is with /api/orchestrator.

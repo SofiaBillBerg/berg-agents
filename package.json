@@ -41,9 +41,6 @@
       "imagemin-lint-staged"
     ],
     "*.py": [
-      "make -C berg_plugins/shared-todo uv-format-shared-todo-plugin",
-      "make -C . uv-format",
-      "make -C plugin_system uv-format-plugin-system",
       "panache lint . --fix  --config .panache.toml"
     ]
   },

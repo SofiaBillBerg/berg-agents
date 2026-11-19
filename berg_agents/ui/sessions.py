@@ -47,6 +47,7 @@ class SessionManager:
         active_model: str = "",
         active_agent: str | None = None,
         delegate_model: str = "",
+        specialist_models: dict[str, str] | None = None,
         root_dir: str = ".",
     ) -> None:
         """Initialize session state.
@@ -57,6 +58,9 @@ class SessionManager:
         :param delegate_model: Model delegated sub-agents run on. Empty means
             the tier default from configuration, which is what a delegated run
             resolved to before the choice existed.
+        :param specialist_models: Per-specialist model overrides, keyed by
+            agent name. An agent absent from the map falls back to
+            ``delegate_model``, then the session's model.
         :param root_dir: Workspace root directory for file tools.
         """
         self.active_provider = active_provider
@@ -67,6 +71,10 @@ class SessionManager:
         # the specialist's model an invisible side effect of editing the chat
         # selector, which is not a choice anyone can see.
         self.delegate_model = delegate_model
+        # One choice per specialist, so a user can pin the planner to a
+        # cheap model and the implementer to a strong one in the same
+        # conversation — the single delegate value could not express that.
+        self.specialist_models: dict[str, str] = dict(specialist_models or {})
         self._root_dir = root_dir
 
     def _harness_root_dir(self) -> str:
