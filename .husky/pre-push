@@ -3,6 +3,8 @@
 # When: On `git push`, before any objects are transferred.
 # Args: $1 = remote name · $2 = remote URL. Refs to push arrive on stdin.
 # Exit: Non-zero aborts the push.
+bunx lint-staged
 make -C . run-all-build
+git update-index --again
 
 exit 0

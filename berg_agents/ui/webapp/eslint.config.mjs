@@ -42,7 +42,8 @@ export default defineConfig(
     "next-env.d.ts",
     "**/.swc/**",
     "public/*",
-    "**/*.db*"]),
+    "**/*.db*",
+    "**/dist"]),
   {
     ignores: [
       ".now/*",
@@ -122,9 +123,10 @@ export default defineConfig(
       "@typescript-eslint/no-floating-promises": "error",
       "no-console": "off",
       "react/prop-types": "off",
-      "react/jsx-uses-react": "off",
+      "react/jsx-uses-react": "warn",
+      "eslint-next/no-typos": "warn",
       "react/react-in-jsx-scope": "off",
-      "react-hooks/exhaustive-deps": "off",
+      "react-hooks/exhaustive-deps": "warn",
       "jsx-a11y/click-events-have-key-events": "warn",
       "jsx-a11y/interactive-supports-focus": "warn",
       "no-unused-vars": "off",

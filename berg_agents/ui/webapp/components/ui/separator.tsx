@@ -2,6 +2,7 @@
 
 import { cn } from "cn";
 import { Separator as SeparatorPrimitive } from "react-aria-components";
+import React from "react";
 
 function Separator({
   className,

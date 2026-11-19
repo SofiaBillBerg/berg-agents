@@ -12,18 +12,21 @@
     "*.{ts,tsx}": [
       "bun  --cwd  berg_agents/ui/webapp eslint --fix --max-warnings 0  ",
       "bun  --cwd  berg_plugins/shared-todo eslint --fix --max-warnings 0  ",
-      "prettier --check . --write"
+      "prettier --check . --write",
+      "bun run typecheck"
     ],
     "*.{js,jsx,mjs}": [
       "bun  --cwd  berg_agents/ui/webapp eslint --fix  ",
       "bun  --cwd  berg_plugins/shared-todo eslint --fix  ",
-      "prettier --check . --write"
+      "prettier --check . --write",
+      "bun run typecheck"
     ],
     "*.{css,scss}": [
       "prettier --check . --write"
     ],
     "*.{json,yaml,yml}": [
-      "prettier --check . --write"
+      "prettier --check . --write",
+      "panache lint . --fix  --config .panache.toml"
     ],
     "*.md": [
       "prettier --check . --write",
@@ -38,7 +41,8 @@
     "*.py": [
       "make -C berg_plugins/shared-todo uv-format-shared-todo-plugin",
       "make -C . uv-format",
-      "make -C plugin_system uv-format-plugin-system"
+      "make -C plugin_system uv-format-plugin-system",
+      "panache lint . --fix  --config .panache.toml"
     ]
   },
   "dependencies": {
