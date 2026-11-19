@@ -35,7 +35,10 @@ export type {
 // Main chat hook - wraps AI SDK v7's useChat.
 export { useAISDKChat } from "./useAISDKChat";
 export type { ChatMessage, UseAISDKChatReturn } from "./useAISDKChat";
-export type { MessageToolCall } from "./messageParts";
+export type {
+  MessageToolCall,
+  DelegatedTaskInCard,
+  MessageParts} from "./messageParts";
 
 // The ask_user vocabulary and the message-parts walker live in their own
 // modules; components keep importing them from the harness barrel.

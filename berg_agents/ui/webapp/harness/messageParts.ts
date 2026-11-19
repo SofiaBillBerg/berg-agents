@@ -35,7 +35,6 @@
 
 import type { TextUIPart, UIMessage } from "ai";
 
-import { ASK_USER_TOOL_NAME } from "./askUser";
 import { SUBAGENT_MARKER_TYPE } from "./history";
 
 /** Max output chars kept per tool call for display/export. */
@@ -71,7 +70,7 @@ export interface ChatMessage {
 
 /** What one pass over a message's parts yields. */
 export interface MessageParts {
-  /** Visible transcript: text parts plus a marker per in-flight call. */
+  /** Visible transcript: the prose text; tool calls are their own rows. */
   text: string;
   /** Reasoning trace, or undefined when the model produced none. */
   reasoning?: string;
@@ -212,28 +211,6 @@ export function partToolName(p: Record<string, unknown>): string {
 }
 
 /**
- * Render a tool call's arguments as `key=value` pairs for a one-line
- * marker. Objects only: a raw string input has no pairs to show.
- *
- * @param input - The tool part's `input` field.
- * @returns `(k=v, ...)`, or an empty string when there is nothing to show.
- */
-function toolArgsSnippet(input: unknown): string {
-  if (input == null || typeof input !== "object") return "";
-  try {
-    const entries = Object.entries(input as Record<string, unknown>).map(
-      ([k, v]) => {
-        const s = typeof v === "string" ? v : JSON.stringify(v);
-        return `${k}=${s}`;
-      },
-    );
-    return entries.length > 0 ? `(${entries.join(", ")})` : "";
-  } catch {
-    return "";
-  }
-}
-
-/**
  * Walk one message's parts once, filling text, reasoning and tool calls.
  *
  * Part kinds, in the order the protocol emits them:
@@ -364,22 +341,10 @@ export function readMessageParts(msg: UIMessage): MessageParts {
           : {}),
         ...(delegated && delegated.open ? { delegatedTask: delegated } : {})});
 
-      // A call still in flight or awaiting a decision: the card
-      // downstream has no output to show, so the transcript keeps
-      // a one-line marker for it.
-      if (output === undefined) {
-        const approval = (p as { approval?: unknown }).approval as
-          { id?: unknown } | undefined;
-        const marker =
-          name === ASK_USER_TOOL_NAME
-            ? "❓ question pending"
-            : (p as { state?: unknown }).state === "approval-requested"
-              ? typeof approval?.id === "string"
-                ? "⏳ needs approval"
-                : "⏳ approval expired"
-              : "🔧";
-        textChunks.push(`${marker} ${name}${toolArgsSnippet(p.input)}`);
-      }
+      // No text marker for in-flight or waiting calls: every tool part
+      // becomes a Trace row below ("Running …", "Waiting for approval:
+      // …"), so a marker line in the text duplicated the same call.
+      // Text stays prose; steps stay rows — one representation each.
     }
   }
 
