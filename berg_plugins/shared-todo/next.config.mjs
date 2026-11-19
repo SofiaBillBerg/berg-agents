@@ -26,6 +26,8 @@ const nextConfig = {
     // Keeps Next from walking up to a parent package.json for root.
     root: import.meta.dirname,
     resolveAlias: {}},
+  experimental: {
+    typedEnv: true},
   allowedDevOrigins: ["localhost", "127.0.0.1"],
   compiler: {
     styledJsx: true,

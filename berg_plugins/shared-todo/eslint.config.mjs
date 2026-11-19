@@ -20,7 +20,6 @@
  */
 import js from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
-import jestPlugin from "eslint-plugin-jest";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import-x";
 import unusedImports from "eslint-plugin-unused-imports";
@@ -29,11 +28,8 @@ import nextPlugin from "@next/eslint-plugin-next";
 import reactPlugin from "eslint-plugin-react";
 import hooksPlugin from "eslint-plugin-react-hooks";
 import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
-import reactHooks from "eslint-plugin-react-hooks";
-import prettier from "eslint-config-prettier/flat";
-import eslintNextPlugin from "@next/eslint-plugin-next";
 
-export default tseslint.config(
+export default defineConfig(
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
   {
     ignores: [
@@ -77,7 +73,6 @@ export default tseslint.config(
       react: reactPlugin,
       "react-hooks": hooksPlugin,
       "jsx-a11y": jsxA11yPlugin,
-      "eslint-next": eslintNextPlugin,
       "import-x": importPlugin},
     languageOptions: {
       parser: tseslint.parser,
@@ -89,19 +84,14 @@ export default tseslint.config(
         ),
         ...globals.node},
       parserOptions: {
+        tsconfigRootDir: import.meta.dirname,
         ecmaFeatures: {
           jsx: true}}},
     settings: {
       react: {
         version: "detect"}},
-    extends: [
-      tseslint.configs.recommended,
-      prettier,
-      js.configs.recommended,
-      reactHooks.configs.flat["recommended-latest"]],
+    extends: [tseslint.configs.recommended, js.configs.recommended],
     rules: {
-      ...nextPlugin.configs.recommended.rules,
-      ...nextPlugin.configs["core-web-vitals"].rules,
       "no-html-link-for-pages": "off",
       "no-console": "off",
       "react/prop-types": "off",

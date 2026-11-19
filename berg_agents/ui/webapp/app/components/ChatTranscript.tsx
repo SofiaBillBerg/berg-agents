@@ -23,12 +23,15 @@ import type { ChatMessage } from "@/harness";
 
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, Card, Spinner, Surface } from "@heroui/react";
+import { math } from "@streamdown/math";
 
 import { ToolCard } from "./ToolCard";
 import { MessageList } from "./MessageList.tsx";
 // Import KaTeX styles for math rendering
-import "katex/dist/katex.min.css";
-
+// ignore: this import is necessary for KaTeX to work properly, even if it seems unused
+const katexImportPath = math.getStyles?.();
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
+import("katex/dist/katex.min.css");
 export interface ChatTranscriptProps {
   transcript: ChatMessage[];
   isExecuting: boolean;

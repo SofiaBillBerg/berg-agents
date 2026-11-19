@@ -143,7 +143,6 @@ export function TodoSurface({
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     void fetchTodos();
   }, [fetchTodos, refreshKey]);

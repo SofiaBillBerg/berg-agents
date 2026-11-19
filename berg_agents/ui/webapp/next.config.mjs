@@ -31,6 +31,7 @@
 // first — ES module imports are hoisted — and the plugin's default would win,
 // which is exactly the bug this fixes. The dynamic import makes the order
 // explicit rather than relying on hoisting rules.
+import { resolve } from "node:path";
 await import("./workflow-data-dir.mjs");
 
 const { withWorkflow } = await import("workflow/next");
@@ -45,7 +46,7 @@ const withBundleAnalyzer =
     : (config) => config;
 
 const nextConfig = {
-  // A real Next server, not a static export. The orchestrator is a
+  // A Next server, not a static export. The orchestrator is a
   // `WorkflowAgent`, and the Workflow runtime starts and resumes runs from
   // server routes — which a static export cannot host. The comment this
   // replaces said the opposite ("static export only in production, FastAPI
@@ -86,12 +87,15 @@ const nextConfig = {
         source: "/berg-plugins/:path*",
         destination: `${backend}/berg-plugins/:path*`}];
   },
-
+  experimental: {
+    typedEnv: true},
   distDir: "./dist",
   reactStrictMode: false,
   turbopack: {
     // Project root - prevents Next.js from using /home/nvidia as root
-    root: import.meta.dirname,
+    root: resolve(import.meta.dirname, "../../.."),
+
+    //    root: import.meta.dirname,
     resolveAlias: {}},
   allowedDevOrigins: ["localhost", "127.0.0.1", "192.168.0.59"],
   compiler: {
