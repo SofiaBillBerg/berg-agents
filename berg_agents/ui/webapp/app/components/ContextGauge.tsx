@@ -79,7 +79,25 @@ export default function ContextGauge({
     // and retry when the window refocuses or the interval comes round.
     keepPreviousData: true});
 
-  if (!usage || usage.window_tokens <= 0) return null;
+  // No reading yet - a session that has not run a turn has no context
+  // usage to report. A missing bar read as a broken header, so the row
+  // stays visible as a dimmed placeholder that says so.
+  if (!usage || usage.window_tokens <= 0) {
+    return (
+      <span
+        aria-label="No context window reading yet"
+        className="flex items-center gap-1.5 text-xs text-muted-foreground/60"
+        title="No context reading for this session yet — it appears once a turn has run."
+      >
+        <span
+          aria-hidden
+          className="relative h-1.5 w-12 overflow-hidden rounded-full"
+          style={{ background: "var(--muted)" }}
+        />
+        <span className="tabular-nums">–%</span>
+      </span>
+    );
+  }
 
   const pct = Math.min(100, Math.max(0, Math.round(usage.fraction * 100)));
   const tone =
