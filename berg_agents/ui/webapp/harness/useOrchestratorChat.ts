@@ -126,9 +126,14 @@ export function useOrchestratorChat(
   const [model, setModel] = useState<string>("");
   // The chosen model, readable by a callback created in an earlier render:
   // a transport callback captures one render's closures, so the ref is what
-  // keeps the latest choice reachable.
+  // keeps the latest choice reachable. Written after commit rather than
+  // during render (react-hooks/refs forbids the latter): the only reader
+  // is the send body below, which runs after mount, so the timing is the
+  // same as the per-render write it replaces.
   const modelRef = useRef<string>("");
-  modelRef.current = model;
+  useEffect(() => {
+    modelRef.current = model;
+  }, [model]);
 
   const {
     messages,
@@ -139,6 +144,12 @@ export function useOrchestratorChat(
     stop,
     addToolApprovalResponse,
     resumeStream} = useChat({
+    // The transport's callbacks can only be attached at construction
+    // (the SDK's fields are protected), and they read the model through
+    // the ref above because they fire on network events - a send, a
+    // reconnect, a minted run id - never during render, so the rule's
+    // "access refs outside of render" concern does not apply.
+    // eslint-disable-next-line react-hooks/refs
     transport: new DefaultChatTransport({
       // Same origin: this is a Next route in this app, so it needs no
       // API_BASE. Under the `/api/*` proxy this path is explicitly NOT

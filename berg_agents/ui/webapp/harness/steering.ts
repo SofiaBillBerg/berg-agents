@@ -63,12 +63,13 @@ export function usePendingSteering(
   deps: UsePendingSteeringDeps,
 ): PendingSteering {
   const { sessionId, isStreaming, apiBase } = deps;
-  const [pendingSteering, setPendingSteering] = useState<string[]>([]);
+  const [sampled, setSampled] = useState<string[]>([]);
+  // No session, no inbox to sample: the strip is empty by derivation
+  // rather than by the setState reset this effect used to perform (which
+  // react-hooks/set-state-in-effect flags).
+  const pendingSteering = sessionId ? sampled : [];
   useEffect(() => {
-    if (!sessionId) {
-      setPendingSteering([]);
-      return;
-    }
+    if (!sessionId) return;
     let cancelled = false;
     const poll = async () => {
       try {
@@ -87,7 +88,7 @@ export function usePendingSteering(
           data.live === true && Array.isArray(data.steering)
             ? data.steering.filter((t): t is string => typeof t === "string")
             : [];
-        if (!cancelled) setPendingSteering(queued);
+        if (!cancelled) setSampled(queued);
       } catch {
         // Backend unreachable - keep showing what we know.
       }
@@ -106,5 +107,5 @@ export function usePendingSteering(
     };
   }, [sessionId, isStreaming, apiBase]);
 
-  return { pendingSteering, setPendingSteering };
+  return { pendingSteering, setPendingSteering: setSampled };
 }

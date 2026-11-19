@@ -35,6 +35,7 @@
  */
 
 import type { UIMessage } from "ai";
+import type { MutableRefObject } from "react";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -61,7 +62,7 @@ export interface ServerSessions {
   /** Set the title (the chat hook re-reads it after a settled turn). */
   setSessionTitle: (title: string | null) => void;
   /** Read the current id without re-subscribing (Stop, transport). */
-  sessionIdRef: React.MutableRefObject<string | null>;
+  sessionIdRef: MutableRefObject<string | null>;
   /** Set the id and its ref together - never one without the other. */
   adoptSession: (id: string | null) => void;
   /** Put server messages into the live chat (dedupes ids). */

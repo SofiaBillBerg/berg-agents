@@ -165,6 +165,10 @@ export const orchestratorTools = {
         .optional()
         .describe("The tool's arguments.")}),
     execute: async ({ server, tool, args }) =>
+      // Not a hook despite the name: `useMcpTool` is an async workflow
+      // step in ./mcp-tools ("use an MCP tool"), so the rule does not
+      // apply inside this AI-SDK tool's execute.
+      // eslint-disable-next-line react-hooks/rules-of-hooks
       useMcpTool(server, tool, (args ?? {}) as Record<string, unknown>)}),
 
   list_specialists: tool({

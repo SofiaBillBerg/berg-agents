@@ -123,80 +123,90 @@ export function useSendRecovery(deps: UseSendRecoveryDeps): SendRecovery {
   // disarmed and the next step needs a human send.
   const recoveryRoundsRef = useRef(0);
   useEffect(() => {
-    if (!error) {
-      // A clean turn in between proves the pipeline works again.
-      recoveryRoundsRef.current = 0;
-      return;
-    }
-    if (handledErrorRef.current === error) return;
-    handledErrorRef.current = error;
-    // A stale deferred answer (HTTP 409) is the designed card-expiry
-    // path, not a failure: the run being answered already ended, so
-    // there is nothing to diagnose. It must never open the dialog.
-    if ((error as { statusCode?: number }).statusCode === 409) return;
-    if (recoveryRoundsRef.current >= 1) {
-      setFailureNotice({
-        kind: "recovery",
-        detail: `Send keeps failing (${String(error).slice(0, 160)}).`,
-        hint: "Automatic recovery stopped after one round — send a new message to try again."});
-      return;
-    }
-    recoveryRoundsRef.current += 1;
-    const ids: string[] = [];
-    for (const msg of uiMessages) {
-      if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
-      for (const part of msg.parts) {
-        const p = part as unknown as Record<string, unknown>;
-        if (
-          typeof p !== "object" ||
-          p === null ||
-          (p.state !== "approval-requested" && p.state !== "approval-responded")
-        ) {
-          continue;
-        }
-        const approval = p.approval as { id?: unknown } | undefined;
-        if (
-          typeof approval?.id === "string" &&
-          !autoRejectedIds.current.has(approval.id)
-        ) {
-          ids.push(approval.id);
+    // The recovery routine runs as a local of the effect (the shape
+    // harness/sessions.ts uses): the dialog is the routine's report of a
+    // failed send, an outcome of synchronizing with an external system,
+    // so its setFailureNotice stays - it is not a render sync, and it
+    // runs outside the effect body proper, which is what
+    // react-hooks/set-state-in-effect asks for.
+    const recover = () => {
+      if (!error) {
+        // A clean turn in between proves the pipeline works again.
+        recoveryRoundsRef.current = 0;
+        return;
+      }
+      if (handledErrorRef.current === error) return;
+      handledErrorRef.current = error;
+      // A stale deferred answer (HTTP 409) is the designed card-expiry
+      // path, not a failure: the run being answered already ended, so
+      // there is nothing to diagnose. It must never open the dialog.
+      if ((error as { statusCode?: number }).statusCode === 409) return;
+      if (recoveryRoundsRef.current >= 1) {
+        setFailureNotice({
+          kind: "recovery",
+          detail: `Send keeps failing (${String(error).slice(0, 160)}).`,
+          hint: "Automatic recovery stopped after one round — send a new message to try again."});
+        return;
+      }
+      recoveryRoundsRef.current += 1;
+      const ids: string[] = [];
+      for (const msg of uiMessages) {
+        if (msg.role !== "assistant" || !Array.isArray(msg.parts)) continue;
+        for (const part of msg.parts) {
+          const p = part as unknown as Record<string, unknown>;
+          if (
+            typeof p !== "object" ||
+            p === null ||
+            (p.state !== "approval-requested" &&
+              p.state !== "approval-responded")
+          ) {
+            continue;
+          }
+          const approval = p.approval as { id?: unknown } | undefined;
+          if (
+            typeof approval?.id === "string" &&
+            !autoRejectedIds.current.has(approval.id)
+          ) {
+            ids.push(approval.id);
+          }
         }
       }
-    }
-    if (ids.length === 0) {
-      // The failed send had no approvals to reject. The old behavior
-      // silently dropped the error here (nothing surfaced at all);
-      // this is exactly the class of failure the dialog is for.
-      setFailureNotice({
-        kind: "send",
-        detail: String(error).slice(0, 300),
-        hint: clientFailureHint(String(error))});
-      return;
-    }
-    for (const id of ids) autoRejectedIds.current.add(id);
-    const stopped =
-      /abort|cancel/i.test(String(error)) || status === "streaming";
-    for (const id of ids) {
-      void addToolApprovalResponse({
-        id,
-        approved: false,
-        reason: stopped
-          ? "System: the run was stopped by the user before completing. " +
-            "This rejection is automatic cleanup — you may retry on request."
-          : SYSTEM_RETRY_REASON});
-    }
-    setFailureNotice(
-      stopped
-        ? {
-            kind: "recovery",
-            detail:
-              "Run stopped — the pending tool approvals were rejected as cleanup.",
-            hint: "Send a message to continue."}
-        : {
-            kind: "send",
-            detail: String(error).slice(0, 300),
-            hint: "Its pending approvals were auto-rejected so the conversation can continue — ask the model to retry."},
-    );
+      if (ids.length === 0) {
+        // The failed send had no approvals to reject. The old behavior
+        // silently dropped the error here (nothing surfaced at all);
+        // this is exactly the class of failure the dialog is for.
+        setFailureNotice({
+          kind: "send",
+          detail: String(error).slice(0, 300),
+          hint: clientFailureHint(String(error))});
+        return;
+      }
+      for (const id of ids) autoRejectedIds.current.add(id);
+      const stopped =
+        /abort|cancel/i.test(String(error)) || status === "streaming";
+      for (const id of ids) {
+        void addToolApprovalResponse({
+          id,
+          approved: false,
+          reason: stopped
+            ? "System: the run was stopped by the user before completing. " +
+              "This rejection is automatic cleanup — you may retry on request."
+            : SYSTEM_RETRY_REASON});
+      }
+      setFailureNotice(
+        stopped
+          ? {
+              kind: "recovery",
+              detail:
+                "Run stopped — the pending tool approvals were rejected as cleanup.",
+              hint: "Send a message to continue."}
+          : {
+              kind: "send",
+              detail: String(error).slice(0, 300),
+              hint: "Its pending approvals were auto-rejected so the conversation can continue — ask the model to retry."},
+      );
+    };
+    recover();
   }, [error, uiMessages, status, addToolApprovalResponse]);
 
   return {

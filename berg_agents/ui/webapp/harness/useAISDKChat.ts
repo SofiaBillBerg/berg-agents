@@ -190,6 +190,12 @@ export function useAISDKChat(): UseAISDKChatReturn {
     // status. The SDK's built-in `resume` recovers only after a network
     // disconnect and would otherwise resume on every mount.
     resume: false,
+    // The transport's callbacks can only be attached at construction
+    // (the SDK's fields are protected), and they read the session
+    // through the refs above because they fire on network events - a
+    // send, a reconnect, a minted id - never during render, so the
+    // rule's "access refs outside of render" concern does not apply.
+    // eslint-disable-next-line react-hooks/refs
     transport: new DefaultChatTransport({
       api: `${API_BASE}/api/chat/stream`,
       // Strip stale approval answers before every send. Anything
@@ -294,8 +300,15 @@ export function useAISDKChat(): UseAISDKChatReturn {
     newServerChat} = useServerSessions({
     apiBase: API_BASE,
     setUIMessages});
-  adoptSessionRef.current = adoptSession;
-  sessionIdHolderRef.current = sessionIdRef;
+  // The transport's callbacks reach the session handle through these
+  // refs. Written after commit rather than during render (which
+  // react-hooks/refs forbids): both values are stable for the hook's
+  // lifetime, and every reader - the send body, the reconnect URL, the
+  // minted-id adoption - runs after mount, so the timing is unchanged.
+  useEffect(() => {
+    adoptSessionRef.current = adoptSession;
+    sessionIdHolderRef.current = sessionIdRef;
+  }, [adoptSession, sessionIdRef]);
 
   const isStreaming = status === "streaming" || status === "submitted";
 
@@ -513,7 +526,10 @@ export function useAISDKChat(): UseAISDKChatReturn {
         // Backend unreachable: the local stop still applies.
       });
     }
-    stop();
+    // Fire-and-forget: stopping the stream is the local half; the
+    // request above is the server's, and a rejection there has nothing
+    // further to do.
+    void stop();
   }, [stop]);
 
   return {

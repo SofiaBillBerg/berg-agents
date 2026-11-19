@@ -1,5 +1,6 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { toChatMessage } from "@/harness/messageParts";
@@ -55,6 +56,7 @@ export interface SpecialistSession {
  * @returns The session: transcript, state, gates, and the actions on it.
  */
 export function useSpecialistSession(runId: string): SpecialistSession {
+  const router = useRouter();
   const [state, setState] = useState<SpecialistSessionState>("pending");
   const [pending, setPending] = useState<PendingCall[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -157,9 +159,10 @@ export function useSpecialistSession(runId: string): SpecialistSession {
           try {
             const resumed = JSON.parse(raw) as { run_id?: string };
             if (resumed.run_id && resumed.run_id !== runId) {
-              window.location.assign(
-                `/specialist/${encodeURIComponent(resumed.run_id)}`,
-              );
+              // Client navigation to the continuing run: the effects
+              // above are keyed on the run id, so the new session is
+              // adopted and polled without a full reload.
+              router.push(`/specialist/${encodeURIComponent(resumed.run_id)}`);
             }
           } catch {
             // No JSON body: the session stays where it is and the
