@@ -163,16 +163,6 @@ button:disabled {
   box-shadow: none;
 }
 
-/* =================== Transcript bubbles (living rules) ===================
-   Bubbles render as HeroUI Surfaces with .message-role-* accents
-   (see MessageList.tsx). Light mode gives agent turns a white card
-   for contrast on the pale-pink ground; dark mode keeps surfaces. */
-
-:root:not(.dark) .message-list-item.message-role-agent {
-  border-color: var(--berg-border);
-  background: #fff;
-}
-
 /* Dark input fields shift blue-purple (hue 293), away from the
    rose-red family that read as brown. Pairs with the HeroUI
    --field-background token. */
@@ -239,26 +229,6 @@ button:disabled {
   background: var(--berg-surface-tint);
 }
 
-/* =================== Reasoning block (inside message bubble) =================== */
-
-.reasoning-block {
-  margin-bottom: var(--berg-sp-2);
-  padding: 0 var(--berg-sp-2);
-  border-left: 2px solid var(--berg-brand-purple);
-  border-radius: 0 var(--berg-radius) var(--berg-radius) 0;
-
-  font-size: var(--berg-fs-sm);
-
-  background: rgb(125 2 156 / 5%);
-}
-
-.reasoning-block summary {
-  cursor: pointer;
-  padding: var(--berg-sp-2) 0;
-  font-weight: var(--berg-fw-medium);
-  color: var(--berg-brand-purple);
-}
-
 /* =================== Thinking bubble (loading) =================== */
 
 .thinking-bubble {
@@ -284,39 +254,6 @@ button:disabled {
   font-size: var(--berg-fs-sm);
 
   background: var(--berg-surface);
-}
-
-/* =================== Message list =================== */
-
-.message-list-content {
-  font-size: var(--berg-fs-sm);
-  color: var(--berg-muted);
-}
-
-/* Role-specific transcript styling */
-.message-list-item.message-role-user {
-  border-left: 3px solid var(--berg-brand-blue);
-}
-
-.message-list-item.message-role-user .text-xs.font-semibold {
-  color: var(--berg-brand-blue);
-}
-
-.message-list-item.message-role-agent {
-  border-left: 3px solid var(--berg-brand-purple);
-}
-
-.message-list-item.message-role-agent .text-xs.font-semibold {
-  color: var(--berg-brand-purple);
-}
-
-.message-list-item.message-role-system {
-  border-left: 3px solid var(--berg-muted);
-  background: rgb(120 120 120 / 6%);
-}
-
-.message-list-item.message-role-system .text-xs.font-semibold {
-  color: var(--berg-muted);
 }
 
 /* === Harness Panels === */
