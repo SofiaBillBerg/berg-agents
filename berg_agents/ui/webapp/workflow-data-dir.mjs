@@ -62,12 +62,11 @@ if (!process.env.WORKFLOW_TARGET_WORLD) {
  * batching and no retention. `WORKFLOW_STREAM_FLUSH_INTERVAL_MS` did not help
  * (tested: 854 files for one turn, WORSE than the 162 without it).
  *
- * So berg runs a real database-backed world instead, and PostgreSQL is the
+ * So berg runs a database-backed world instead, and PostgreSQL is the
  * target: it is one durable store, queryable, and swept by ordinary SQL rather
  * than by pruning a directory tree.
  *
- * The database is BERG'S OWN, created by berg's tooling on its own port — not
- * hindsight's, not the system postgres, and not shared with anything else.
+ * The database is BERG'S, created by berg's tooling on its own port.
  * Coupling berg's durability to another service's database would make that
  * service's migrations a berg outage. The connection string is overridable so
  * an existing deployment can point elsewhere.

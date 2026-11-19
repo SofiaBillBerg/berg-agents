@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.1.0",
+  "packageManager": "bun@1.4.5",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -36,6 +37,7 @@
     "@next/env": "^16.4.6",
     "@openrouter/ai-sdk-provider": "^3.1.0",
     "@remixicon/react": "^4.9.0",
+    "@shadcn/react": "^0.3.1",
     "@streamdown/code": "^2.0.1",
     "@streamdown/math": "^1.0.4",
     "@streamdown/mermaid": "^1.0.4",
