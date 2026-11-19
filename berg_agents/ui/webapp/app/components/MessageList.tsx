@@ -26,7 +26,7 @@ import type {
   MessageToolCall} from "@/harness";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
 import {
   RiCheckLine,
@@ -343,6 +343,96 @@ function ToolLine({
 }
 
 /**
+ * The run id a start_specialist call's output carries, if any.
+ *
+ * The specialist is a run of its own, so its id is what every address
+ * — the state poll, the session page, the approval route — is keyed on.
+ *
+ * @param output - The call's raw output.
+ * @returns The run id, or undefined when the output carries none.
+ */
+function specialistRunId(output: string | undefined): string | undefined {
+  if (!output) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(output);
+    if (parsed && typeof parsed === "object") {
+      const candidate =
+        (parsed as { runId?: unknown }).runId ??
+        (parsed as { run_id?: unknown }).run_id ??
+        (parsed as { id?: unknown }).id;
+      if (typeof candidate === "string" && candidate.trim() !== "") {
+        return candidate;
+      }
+    }
+  } catch {
+    // A prose output carries no run id.
+  }
+  return undefined;
+}
+
+/**
+ * One pending call a waiting specialist needs answered, as its row
+ * shows it. Same shape the specialist session page answers from — one
+ * definition, so the two surfaces cannot drift.
+ */
+type PendingCall = {
+  tool_call_id: string;
+  tool_name: string;
+  args: unknown;
+};
+
+/**
+ * A running specialist's live state, polled while it works or waits.
+ *
+ * The Subagent pattern's "Running" section: while the subagent runs, the
+ * row reads "Running the … agent" and its content shows what it is
+ * doing. berg's specialist reports through the state route — what it is
+ * doing (working/pending) and, when it parked on a gate, the call it is
+ * waiting on — so that is what the row shows, in the main conversation.
+ *
+ * @param runId - The specialist's run id, when the call launched one.
+ * @returns The live state and the calls it is waiting on.
+ */
+function useSpecialistRunPreview(
+  runId: string | undefined,
+): { state: string; pending: PendingCall[] } | null {
+  const [preview, setPreview] = useState<{
+    state: string;
+    pending: PendingCall[];
+  } | null>(null);
+  useEffect(() => {
+    if (!runId) return;
+    let alive = true;
+    const poll = async (): Promise<void> => {
+      try {
+        const response = await fetch(
+          `/api/workflow/chat/${encodeURIComponent(runId)}/state`,
+        );
+        if (!response.ok || !alive) return;
+        const data = (await response.json()) as {
+          state?: string;
+          pending?: PendingCall[];
+        };
+        if (!alive) return;
+        setPreview({
+          state: String(data.state ?? ""),
+          pending: Array.isArray(data.pending) ? data.pending : []});
+      } catch {
+        // A failed poll keeps the last reading: a transient failure
+        // must not blank the row's live state.
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 3000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [runId]);
+  return preview;
+}
+
+/**
  * The door to a specialist's own session, for a launch whose work did
  * not stream back into this call: the tool's output carries the run id
  * the session page is keyed on. Without one (an expired or failed
@@ -407,8 +497,21 @@ function SubagentRow({
   pluginTools: ReadonlySet<string>;
 }) {
   const [open, setOpen] = useState<boolean | undefined>(undefined);
-  const status = callStatus(call.state ?? "", isAnimating);
-  const running = status === "running";
+  // The specialist's own run: its live state is what turns this row into
+  // the Subagent pattern's running row — the row tracks the run, not
+  // just the tool call that started it.
+  const runId = specialistRunId(call.output);
+  const preview = useSpecialistRunPreview(runId);
+  const liveRunning =
+    preview?.state === "working" || preview?.state === "pending";
+  const liveWaiting = (preview?.pending.length ?? 0) > 0;
+  const status =
+    callStatus(call.state ?? "", isAnimating) ??
+    (liveWaiting
+      ? ("pending" as const)
+      : liveRunning
+        ? ("running" as const)
+        : undefined);
   const agent = agentLabel(call.tool, call.input, call.delegatedTask);
   // The task the specialist was given, one line, as the row's
   // description; the full body opens with the run's detail.
@@ -416,11 +519,13 @@ function SubagentRow({
   const title =
     status === "error"
       ? `Failed to run the ${agent} agent`
-      : running
-        ? `Running the ${agent} agent`
-        : status === "pending"
-          ? `Waiting for the ${agent} agent`
-          : `Ran the ${agent} agent`;
+      : liveWaiting
+        ? `Waiting — the ${agent} agent needs a decision`
+        : status === "running"
+          ? `Running the ${agent} agent`
+          : status === "pending"
+            ? `Waiting for the ${agent} agent`
+            : `Ran the ${agent} agent`;
   const line = (
     <TraceLine status={status}>
       <TraceIcon>
@@ -435,7 +540,10 @@ function SubagentRow({
     </TraceLine>
   );
   return (
-    <TraceCollapsible isExpanded={open ?? running} onExpandedChange={setOpen}>
+    <TraceCollapsible
+      isExpanded={open ?? status === "running"}
+      onExpandedChange={setOpen}
+    >
       <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
       <TraceCollapsibleContent className="flex flex-col gap-2">
         {call.children ? (
@@ -445,6 +553,36 @@ function SubagentRow({
             pluginTools={pluginTools}
             onResolveDelegatedApproval={onResolveDelegatedApproval}
           />
+        ) : liveWaiting && preview ? (
+          /* The specialist parked on a gate and its work did not stream
+             back into this call: the main view shows what it is waiting
+             on, so the conversation carries the decision rather than
+             hiding it in the specialist's own session. Answering stays
+             there — the gate is the specialist's, and the run id is what
+             addresses it. */
+          <div className="flex flex-col gap-1.5">
+            {preview.pending.map((gate) => (
+              <div
+                key={gate.tool_call_id}
+                className="flex flex-wrap items-center gap-2 rounded-md border border-warning p-2 text-xs"
+              >
+                <span className="font-medium">
+                  wants to run {gate.tool_name}
+                </span>
+                <code className="text-muted-foreground">
+                  {JSON.stringify(gate.args).slice(0, 160)}
+                </code>
+              </div>
+            ))}
+            {runId && (
+              <Link
+                className="text-xs text-accent hover:underline"
+                href={`/specialist/${encodeURIComponent(runId)}`}
+              >
+                Answer it in the specialist&rsquo;s session →
+              </Link>
+            )}
+          </div>
         ) : (
           /* No streamed work under this call: the specialist runs as
              its own durable session, so the row offers the door to it

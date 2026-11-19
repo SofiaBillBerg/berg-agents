@@ -29,6 +29,7 @@ import { ToolCard } from "./ToolCard";
 import { MessageList } from "./MessageList.tsx";
 // Import KaTeX styles for math rendering
 // ignore: this import is necessary for KaTeX to work properly, even if it seems unused
+
 const katexImportPath = math.getStyles?.();
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 import("katex/dist/katex.min.css");
