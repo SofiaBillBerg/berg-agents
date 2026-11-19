@@ -52,19 +52,32 @@ export default function ContextGauge({
 }) {
   const [usage, setUsage] = useState<UsageReading | null>(null);
 
-  const refresh = useCallback(async () => {
-    try {
-      const resp = await fetch(
-        `${API_BASE}/api/context/usage` +
-          (sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""),
-      );
-      if (!resp.ok) return;
-      const data = await resp.json();
-      setUsage(data?.usage ?? null);
-    } catch {
-      // Backend unreachable - keep the last reading.
-    }
+  // The read touches no state; the caller applies its result in a
+  // promise callback (react-hooks/set-state-in-effect forbids the
+  // setState-calling loader the effect used to invoke directly).
+  // `undefined` is "the request did not answer" - distinct from a `null`
+  // reading - so a failed poll keeps the last reading.
+  const readUsage = useCallback(async (): Promise<
+    UsageReading | null | undefined
+  > => {
+    const resp = await fetch(
+      `${API_BASE}/api/context/usage` +
+        (sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""),
+    );
+    if (!resp.ok) return undefined;
+    const data = await resp.json();
+    return data?.usage ?? null;
   }, [sessionId]);
+
+  const refresh = useCallback(() => {
+    void readUsage()
+      .then((reading) => {
+        if (reading !== undefined) setUsage(reading);
+      })
+      .catch(() => {
+        // Backend unreachable - keep the last reading.
+      });
+  }, [readUsage]);
 
   useEffect(() => {
     void refresh();

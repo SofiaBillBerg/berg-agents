@@ -29,7 +29,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { API_BASE } from "@/envConfig";
 
@@ -43,27 +43,29 @@ export default function AgentSelector() {
   const [agents, setAgents] = useState<AgentItem[]>([]);
   const [active, setActive] = useState<string | null>(null);
 
-  const fetchAll = useCallback(async () => {
-    try {
-      const [listRes, activeRes] = await Promise.all([
-        fetch(`${API_BASE}/api/agents`),
-        fetch(`${API_BASE}/api/agents/active`)]);
-      if (listRes.ok) {
-        const data = await listRes.json();
-        setAgents(Array.isArray(data) ? data : data.agents || []);
-      }
-      if (activeRes.ok) {
-        const data = await activeRes.json();
-        setActive(typeof data?.agent === "string" ? data.agent : null);
-      }
-    } catch {
-      // Backend unreachable - keep the current selection in memory.
-    }
-  }, []);
-
+  // The fetch runs as a local routine of the mount effect (the shape
+  // harness/sessions.ts uses): the two setState calls land in its async
+  // continuation, never in the effect body itself, which is what
+  // react-hooks/set-state-in-effect asks for.
   useEffect(() => {
-    void fetchAll();
-  }, [fetchAll]);
+    void (async () => {
+      try {
+        const [listRes, activeRes] = await Promise.all([
+          fetch(`${API_BASE}/api/agents`),
+          fetch(`${API_BASE}/api/agents/active`)]);
+        if (listRes.ok) {
+          const data = await listRes.json();
+          setAgents(Array.isArray(data) ? data : data.agents || []);
+        }
+        if (activeRes.ok) {
+          const data = await activeRes.json();
+          setActive(typeof data?.agent === "string" ? data.agent : null);
+        }
+      } catch {
+        // Backend unreachable - keep the current selection in memory.
+      }
+    })();
+  }, []);
 
   /** Set the active agent on the backend (and locally). */
   const onChange = (name: string) => {

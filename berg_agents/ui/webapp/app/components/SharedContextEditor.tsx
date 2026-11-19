@@ -87,34 +87,47 @@ export function SharedContextEditor() {
   const [why, setWhy] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [status, setStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Starts true: the mount load below has no need to reset it, which is
+  // what react-hooks/set-state-in-effect wants (the effect shows
+  // "Loading…" on the very first paint now, instead of one commit later).
+  const [loading, setLoading] = useState(true);
 
-  const loadCatalog = useCallback(async () => {
-    try {
-      const resp = await fetch(`${API_BASE}/api/context/shared`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      setScopes(data.scopes || {});
-      setSections(data.sections || []);
-    } catch (e) {
-      setStatus(`Catalog: ${e instanceof Error ? e.message : e}`);
-    }
+  // The readers touch no state; their callers apply the result in
+  // promise callbacks. That keeps the mounting effects free of setState
+  // (react-hooks/set-state-in-effect) while the interactive paths stay
+  // exactly as they were.
+  const readCatalog = useCallback(async () => {
+    const resp = await fetch(`${API_BASE}/api/context/shared`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
   }, []);
 
-  const loadSection = useCallback(async (name: string) => {
-    setLoading(true);
-    try {
-      const resp = await fetch(`${API_BASE}/api/context/shared/${name}`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      setContent(data.content || "");
-      setSaved(data.content || "");
-      setHistory(data.history || []);
-    } catch (e) {
-      setStatus(`${name}: ${e instanceof Error ? e.message : e}`);
-    } finally {
-      setLoading(false);
-    }
+  const loadCatalog = useCallback(() => {
+    void readCatalog()
+      .then((data) => {
+        setScopes(data.scopes || {});
+        setSections(data.sections || []);
+      })
+      .catch((e) => {
+        setStatus(`Catalog: ${e instanceof Error ? e.message : e}`);
+      });
+  }, [readCatalog]);
+
+  const loadSection = useCallback((name: string) => {
+    void fetch(`${API_BASE}/api/context/shared/${name}`)
+      .then((resp) => {
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        return resp.json();
+      })
+      .then((data) => {
+        setContent(data.content || "");
+        setSaved(data.content || "");
+        setHistory(data.history || []);
+      })
+      .catch((e) => {
+        setStatus(`${name}: ${e instanceof Error ? e.message : e}`);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -140,6 +153,9 @@ export function SharedContextEditor() {
       setSaved(data.content || content);
       setStatus(data.changed ? "Saved" : "No change");
       setWhy("");
+      // The re-read after a save shows "Loading…" while it runs (the
+      // loader no longer pre-sets it, so the event handler does).
+      setLoading(true);
       void loadCatalog();
       void loadSection(section);
     } catch (e) {
@@ -166,7 +182,14 @@ export function SharedContextEditor() {
                 key={name}
                 size="sm"
                 variant={section === name ? "primary" : "secondary"}
-                onPress={() => setSection(name)}
+                onPress={() => {
+                  // Show "Loading…" while the new section arrives: the
+                  // mount effect no longer resets loading itself
+                  // (react-hooks/set-state-in-effect), so the switch
+                  // marks it here, in the event handler.
+                  setLoading(true);
+                  setSection(name);
+                }}
               >
                 {name}
                 {has ? " •" : ""}

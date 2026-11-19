@@ -72,29 +72,45 @@ export function PluginCatalog({
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
 
-  const reloadPlugins = useCallback(async () => {
-    // One spinner rule for both entry points (mount and ↻), so a refresh shows
-    // the same state a mount does.
-    setLoading(true);
-    try {
-      invalidateCatalog();
-      setPlugins(await fetchPlugins());
-      setError(null);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
+  // The read touches no state: `invalidateCatalog` still runs here, so
+  // every entry point is a real refresh rather than a re-read of the
+  // cached list.
+  const readPlugins = useCallback(async (): Promise<PluginInfo[]> => {
+    invalidateCatalog();
+    return await fetchPlugins();
   }, []);
 
-  // Both the mount and the ↻ button go through `reloadPlugins`, which is what
-  // actually applies the result and clears `loading`. They used to call
-  // `fetchPlugins()` directly and discard the promise, so `loading` never
-  // became false and the panel sat on "Loading…" forever — a bug that looked
-  // like a broken backend because the request itself succeeded (2026-11-12).
+  const applyPlugins = useCallback((loaded: PluginInfo[]) => {
+    setPlugins(loaded);
+    setError(null);
+  }, []);
+
+  const reloadPlugins = useCallback(() => {
+    // One spinner rule for both entry points (mount and ↻), so a refresh shows
+    // the same state a mount does. Returns the read so the toggle path can
+    // await the refresh before clearing its own spinner.
+    setLoading(true);
+    return readPlugins()
+      .then(applyPlugins)
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, [readPlugins, applyPlugins]);
+
+  // The mount reads through the same reader and applies through the same
+  // handlers as `reloadPlugins` - what actually applies the result and
+  // clears `loading`. It used to call `fetchPlugins()` directly and discard
+  // the promise, so `loading` never became false and the panel sat on
+  // "Loading…" forever — a bug that looked like a broken backend because
+  // the request itself succeeded (2026-11-12). The state updates run in
+  // promise callbacks rather than the effect body, which is what
+  // react-hooks/set-state-in-effect asks for; `loading` already starts
+  // true, so the mount needs no reset.
   useEffect(() => {
-    void reloadPlugins();
-  }, [reloadPlugins]);
+    void readPlugins()
+      .then(applyPlugins)
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, [readPlugins, applyPlugins]);
 
   // Enable/disable one plugin: the next chat turn picks up the change
   // (tools withheld, MCP toolsets and skills excluded server-side).
