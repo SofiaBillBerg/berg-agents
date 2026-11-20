@@ -307,6 +307,43 @@ def _specialist_sessions() -> list[dict[str, Any]]:
     return sessions[:50]
 
 
+async def _read_pass_frames(run_of_pass: str, live: bool) -> Any:
+    """One pass's frames, without the tail that never ends.
+
+    A run that ended on a gate, or was cancelled, never wrote the frame
+    that closes its stream — so the SDK's ``readable`` for it tails
+    forever, and replaying a turn stopped at that pass and never
+    delivered the response. A pass that is not live has no more frames
+    coming, so its journal is DRAINED: frames until the reader goes quiet,
+    then done. A live pass is tailed, because its frames are still
+    arriving and the reader wants them as they land.
+
+    :param run_of_pass: The run whose frames are read.
+    :param live: Whether the run is still working.
+    :return: An async iterator of the run's SSE frame data.
+    """
+    import asyncio
+
+    from berg_agents.workflow.registry import Frame
+    from vercel import workflow
+
+    run = workflow.Run(run_of_pass)
+    frames = run.readable(type=Frame)
+    if live:
+        async for frame in frames:
+            yield frame.data
+        return
+    iterator = frames.__aiter__()
+    while True:
+        try:
+            # Two seconds of silence is the journal's end: a parked run
+            # emits nothing new, ever.
+            frame = await asyncio.wait_for(iterator.__anext__(), timeout=2.0)
+        except (StopAsyncIteration, asyncio.TimeoutError):
+            return
+        yield frame.data
+
+
 def _turn_run_chain(run_id: str) -> list[str]:
     """Every run of the turn this run belongs to, oldest pass first.
 
@@ -595,7 +632,6 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         """
         return JSONResponse({"specialists": _specialist_sessions()})
 
-
     @router.get("/api/workflow/chat/{run_id}/stream")
     async def workflow_chat_stream(run_id: str, request: Request) -> Any:
         """Serve a durable turn's frames in the SSE protocol the UI renders.
@@ -622,8 +658,6 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
             start_index = 0
 
         async def _frames() -> Any:
-            from vercel import workflow
-
             # The whole turn, oldest pass first: a gate resumes as a new
             # run whose own frames are only its pass, so reading one run
             # made a session forget everything the turn had already done.
@@ -632,16 +666,13 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
             # runs.
             index = 0
             for run_of_pass in _turn_run_chain(run_id):
-                try:
-                    run = workflow.Run(run_of_pass)
-                    async for frame in run.readable(type=Frame):
-                        if index >= start_index:
-                            yield frame.data
-                        index += 1
-                except Exception:
-                    # An unreadable record must not blank the session:
-                    # the next pass's frames still reach the reader.
-                    continue
+                live = str(
+                    (_run_record(run_of_pass) or {}).get("status") or ""
+                ).lower() in {"working", "running"}
+                async for frame_data in _read_pass_frames(run_of_pass, live):
+                    if index >= start_index:
+                        yield frame_data
+                    index += 1
             # The protocol closes a turn with a finish frame; the turn's own
             # encoder already emitted it, so the reader only needs to stop.
             yield "data: [DONE]\n\n"
