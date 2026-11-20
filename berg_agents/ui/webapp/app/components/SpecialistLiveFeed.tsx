@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { MessageList } from "./MessageList.tsx";
 
+import { API_BASE } from "@/envConfig";
 import { toChatMessage } from "@/harness/messageParts";
 
 /** One SSE frame's payload, as berg's encoder writes it. */
@@ -140,9 +141,16 @@ export default function SpecialistLiveFeed({ runId }: { runId: string }) {
 
     const open = async (): Promise<void> => {
       try {
-        const response = await fetch(
-          `/api/workflow/chat/${encodeURIComponent(runId)}/stream`,
-        );
+        // Straight at the backend when the env names one: the /api/*
+        // rewrite proxies non-streaming calls fine but never delivers an
+        // SSE body to a fetch reader (verified: curl through the proxy
+        // gets the whole journal, `fetch` hangs with zero chunks), and
+        // envConfig's API_BASE is the same origin the chat page streams
+        // from. Relative stays the fallback for the single-origin build.
+        const streamUrl = API_BASE
+          ? `${API_BASE}/api/workflow/chat/${encodeURIComponent(runId)}/stream`
+          : `/api/workflow/chat/${encodeURIComponent(runId)}/stream`;
+        const response = await fetch(streamUrl);
         if (!response.ok || !response.body) return;
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
