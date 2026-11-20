@@ -27,10 +27,8 @@
  * @ai-sdk/react to consume it.
  */
 
-import type { Command } from "./components/SlashCommandAutocomplete";
-
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Card, Toast, toast } from "@heroui/react";
+import { Toast, toast } from "@heroui/react";
 import {
   RiAddLine,
   RiArrowDownLine,
@@ -39,13 +37,15 @@ import {
   RiHistoryLine} from "@remixicon/react";
 import { useRouter } from "next/navigation";
 
-import { SlashCommandAutocomplete } from "./components/SlashCommandAutocomplete";
+import {
+  type SlashCommandItem,
+  SlashCommandPalette} from "./components/SlashCommandAutocomplete";
+import { AskUserQuestionnaire } from "./components/AskUserQuestionnaire";
+import DelegationQuestionCard from "./components/DelegationQuestionCard";
 import InputBar from "./components/InputBar.tsx";
 import SteeringStrip from "./components/SteeringStrip.tsx";
 import ContextGauge from "./components/ContextGauge.tsx";
 import ApprovalItem from "./components/ApprovalItem";
-import QuestionItem from "./components/QuestionItem";
-import DelegationQuestionCard from "./components/DelegationQuestionCard";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import ProviderSelector from "./components/ProviderSelector.tsx";
 import AgentPanel from "./components/AgentPanel.tsx";
@@ -62,12 +62,19 @@ import { useBackendCatalog } from "./hooks/useBackendCatalog";
 import { usePluginSurface } from "./hooks/usePluginSurface";
 import { useSlashCommands } from "./hooks/useSlashCommands";
 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle} from "@/components/ui/card.tsx";
+import { Button, Button as ToolbarButton } from "@/components/ui/button.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip.tsx";
-import { Button as ToolbarButton } from "@/components/ui/button.tsx";
 import { buildExportMarkdown } from "@/utils/utils";
 import { API_BASE } from "@/envConfig";
 import { useAISDKChat } from "@/harness";
+
 // Import KaTeX styles for math rendering
 import "katex/dist/katex.min.css";
 
@@ -98,20 +105,20 @@ class LazyComponentErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <Card className="m-4 border-danger" variant="default">
-          <Card.Header>
-            <Card.Title className="text-danger">
+        <Card className="m-4 border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">
               Failed to load {this.props.componentName}
-            </Card.Title>
-          </Card.Header>
-          <Card.Content>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
             <p className="text-sm">
               The {this.props.componentName} component encountered an error.
             </p>
-            <pre className="text-xs mt-2 bg-surface-tint p-2 rounded">
+            <pre className="text-xs mt-2 bg-muted p-2 rounded">
               {this.state.error?.message}
             </pre>
-          </Card.Content>
+          </CardContent>
         </Card>
       );
     }
@@ -169,7 +176,7 @@ function ChatContent() {
   }, [aiChat.sessionId]);
 
   // Commands for the slash-autocomplete palette
-  const localCommands: Command[] = [
+  const localCommands: SlashCommandItem[] = [
     ...backendTools.map((t) => ({
       name: `/${t.name}`,
       description: t.description})),
@@ -535,7 +542,6 @@ function ChatContent() {
             </ToolbarButton>
           </span>
         </div>
-
         {/* Activity details - one inline toggle line (no card chrome),
             so it costs almost no vertical space when collapsed. */}
         <div className="mb-1 shrink-0">
@@ -560,18 +566,17 @@ function ChatContent() {
             </div>
           )}
         </div>
-
         {/* Slash command palette - only while the input starts with "/" */}
-        {input.startsWith("/") && (
-          <SlashCommandAutocomplete
+        {input.startsWith("/") && !input.includes(" ") && (
+          <SlashCommandPalette
             commands={localCommands}
+            query={input}
+            onClose={() => setInput("")}
             onSelect={(cmd) => {
-              // Replace the input with the chosen command plus a space.
               setInput(`${cmd.name} `);
             }}
           />
         )}
-
         {/* HITL approval requests - the agent paused and needs a user
             decision per action: approve one, reject another, edit the
             next. The batch stays on screen (pending + decided items
@@ -579,16 +584,16 @@ function ChatContent() {
             resumes automatically. Approve-all / reject-all remain as
             batch conveniences. */}
         {approvalBatch.length > 0 && (
-          <Card className="mb-1.5 shrink-0 border-warning" variant="default">
-            <Card.Header>
-              <Card.Title>⏸️ Approval needed</Card.Title>
-              <Card.Description>
+          <Card className="mb-1.5 shrink-0 border-amber-500/50">
+            <CardHeader>
+              <CardTitle>⏸️ Approval needed</CardTitle>
+              <CardDescription>
                 The agent wants to run {approvalBatch.length} action
                 {approvalBatch.length > 1 ? "s" : ""}. Nothing executes until
                 you decide each one — the run resumes once all are answered.
-              </Card.Description>
-            </Card.Header>
-            <Card.Content className="flex flex-col gap-1.5">
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1.5">
               {approvalBatch.map((approval) => (
                 <ApprovalItem
                   key={approval.id}
@@ -613,7 +618,7 @@ function ChatContent() {
                 <Button
                   isDisabled={isStreaming}
                   size="sm"
-                  variant="primary"
+                  variant="default"
                   onPress={() => void respondToAllApprovals(true)}
                 >
                   ✅ Approve & run all
@@ -635,10 +640,9 @@ function ChatContent() {
                   ❌ Reject all
                 </Button>
               </div>
-            </Card.Content>
+            </CardContent>
           </Card>
         )}
-
         {/* HITL questions - the agent paused to ask the user something.
             Mirrors the approval card: one item per ask_user_question
             call (a call may carry several questions, answered
@@ -646,18 +650,18 @@ function ChatContent() {
             The questions come from the model, so the card reads as the
             model asking - never like a system gate. */}
         {questionBatch.length > 0 && (
-          <Card className="mb-1.5 shrink-0 border-warning" variant="default">
-            <Card.Header>
-              <Card.Title>❓ The model is asking</Card.Title>
-              <Card.Description>
+          <Card className="mb-1.5 shrink-0 border-amber-500/50">
+            <CardHeader>
+              <CardTitle>❓ The model is asking</CardTitle>
+              <CardDescription>
                 The agent paused to ask you {questionCount}{" "}
                 {questionCount > 1 ? "questions" : "question"}. Answer or
                 decline each call — the run continues once all are answered.
-              </Card.Description>
-            </Card.Header>
-            <Card.Content className="flex flex-col gap-1.5">
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
               {questionBatch.map((question) => (
-                <QuestionItem
+                <AskUserQuestionnaire
                   key={question.id}
                   isStreaming={isStreaming}
                   question={question}
@@ -665,10 +669,11 @@ function ChatContent() {
                 />
               ))}
               {questionBatch.some((q) => !q.answered) && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-1">
                   <Button
                     isDisabled={isStreaming}
                     size="sm"
+                    type="button"
                     variant="secondary"
                     onPress={declineAllQuestions}
                   >
@@ -676,17 +681,17 @@ function ChatContent() {
                   </Button>
                 </div>
               )}
-            </Card.Content>
+            </CardContent>
           </Card>
         )}
 
         {/* A delegated sub-agent's question. Separate from the ask_user
-            card above and deliberately not inside it: that surface
-            answers a deferred call on the parent, which has paused; this
-            answers a question a CHILD asked while the parent is still
-            streaming. The cards sit inline in the transcript's flow
-            rather than in a chrome row, because the question belongs to
-            the work that is still on screen. */}
+    card above and deliberately not inside it: that surface
+    answers a deferred call on the parent, which has paused; this
+    answers a question a CHILD asked while the parent is still
+    streaming. The cards sit inline in the transcript's flow
+    rather than in a chrome row, because the question belongs to
+    the work that is still on screen. */}
         {delegationQuestions.map((question) => (
           <DelegationQuestionCard
             key={question.taskId}
@@ -694,7 +699,6 @@ function ChatContent() {
             onAnswer={answerDelegation}
           />
         ))}
-
         {/* Orchestrator HITL gate surfaced in the UI (Phase 1 of
             unifying the two approval systems). When run_task returns
             needs_human_review with planned actions, show them here and
@@ -711,13 +715,12 @@ function ChatContent() {
           onDismiss={dismissFailureNotice}
           onRetry={retryLast}
         />
-
         {/* Slash-command answer cards - newest last, dismissible. */}
         {cmdCards.length > 0 && (
           <div className="mb-1.5 flex shrink-0 flex-col gap-1.5">
             {cmdCards.map((card) => (
-              <Card key={card.id} variant="secondary">
-                <Card.Content className="flex items-start gap-2 p-2">
+              <Card key={card.id} className="bg-secondary/50">
+                <CardContent className="flex items-start gap-2 p-2">
                   <pre className="m-0 flex-1 font-mono text-xs whitespace-pre-wrap">
                     {card.text}
                   </pre>
@@ -729,7 +732,7 @@ function ChatContent() {
                   >
                     ✕
                   </Button>
-                </Card.Content>
+                </CardContent>
               </Card>
             ))}
           </div>
@@ -809,7 +812,6 @@ function ChatContent() {
             onResolveDelegatedApproval={resolveDelegatedApproval}
           />
         )}
-
         {/* Input bar - always visible at the bottom. shrink-0 so a
             tall transcript can never squeeze it out of view (the
             actual cause of the previous "cropped" input). */}

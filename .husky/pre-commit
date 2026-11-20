@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 bunx lint-staged
-bun run typecheck
+git-format-staged -f "bun run typecheck" .
 git-format-staged -f "panache format ." .
 git-format-staged -f "uv format " .
 git-format-staged -f "shfmt . --write" .

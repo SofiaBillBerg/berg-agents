@@ -20,74 +20,123 @@
  */
 
 "use client";
+import { useFilter } from "react-aria-components";
+import * as React from "react";
+import { RiTerminalBoxLine, RiToolsLine } from "@remixicon/react";
 
-import { useState } from "react";
-import { Button, Card } from "@heroui/react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList} from "@/components/ui/command";
 
-export interface PaletteCommand {
+export interface SlashCommandItem {
   name: string;
   description: string;
 }
 
-interface SlashCommandAutocompleteProps {
-  /** Commands to offer (e.g. [{name: '/help', description: '...'}]) */
-  commands: PaletteCommand[];
-  /** Called with the chosen command */
-  onSelect: (command: PaletteCommand) => void;
+interface SlashCommandPaletteProps {
+  commands: SlashCommandItem[];
+  query: string;
+  onSelect: (command: SlashCommandItem) => void;
+  onClose: () => void;
 }
 
-/**
- * Minimal slash-command palette: a filter box plus one button per
- * matching command. Rendered by the parent only while the input
- * starts with "/". Plain HeroUI Button/Card - no Command primitives.
- */
-export const SlashCommandAutocomplete = ({
-  commands,
-  onSelect}: SlashCommandAutocompleteProps) => {
-  const [filter, setFilter] = useState("");
+const SYSTEM_COMMANDS = new Set([
+  "/help",
+  "/agents",
+  "/stats",
+  "/clear",
+  "/memory",
+  "/skills",
+  "/mcps",
+  "/exit"]);
 
-  const needle = filter.replace(/^\//, "").toLowerCase();
-  const matches = commands.filter(
-    (cmd) =>
-      cmd.name.toLowerCase().includes(needle) ||
-      cmd.description.toLowerCase().includes(needle),
+export function SlashCommandPalette({
+  commands,
+  query,
+  onSelect,
+  onClose}: SlashCommandPaletteProps) {
+  const { contains } = useFilter({ sensitivity: "base" });
+
+  const systemCommands = React.useMemo(
+    () => commands.filter((c) => SYSTEM_COMMANDS.has(c.name)),
+    [commands],
   );
+  const toolCommands = React.useMemo(
+    () => commands.filter((c) => !SYSTEM_COMMANDS.has(c.name)),
+    [commands],
+  );
+
+  // Sync search state with the chat box input (strip leading "/")
+  const search = query.replace(/^\//, "");
 
   return (
-    <Card className="mb-2" variant="secondary">
-      <Card.Content className="flex flex-col gap-1 p-2">
-        <input
-          aria-label="Filter commands"
-          className="bg-transparent text-sm px-2 py-1 outline-none"
-          placeholder="Type to filter..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        {matches.length === 0 && (
-          <span className="text-xs text-muted-foreground px-2">
-            No matching commands.
-          </span>
-        )}
-        {matches.map((cmd) => (
-          <Button
-            key={cmd.name}
-            className="justify-start"
-            size="sm"
-            variant="secondary"
-            onPress={() => onSelect(cmd)}
-          >
-            <span className="font-mono">{cmd.name}</span>
-            <span className="text-muted-foreground truncate">
-              {cmd.description}
-            </span>
-          </Button>
-        ))}
-      </Card.Content>
-    </Card>
+    <div
+      className="mb-1.5 shrink-0 rounded-lg border bg-popover text-popover-foreground shadow-md"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onClose();
+        }
+      }}
+    >
+      <Command
+        filter={(textValue, inputValue) => contains(textValue, inputValue)}
+        inputValue={search}
+        onInputChange={() => {
+          // Search is driven directly from the chat InputBar
+        }}
+      >
+        <CommandInput placeholder="Filter slash commands…" />
+        <CommandList className="max-h-56">
+          <CommandEmpty>No matching commands.</CommandEmpty>
+
+          {systemCommands.length > 0 && (
+            <CommandGroup heading="System">
+              {systemCommands.map((cmd) => (
+                <CommandItem
+                  key={cmd.name}
+                  id={cmd.name}
+                  textValue={`${cmd.name} ${cmd.description}`}
+                  onAction={() => onSelect(cmd)}
+                >
+                  <RiTerminalBoxLine className="size-3.5 shrink-0 text-primary" />
+                  <span className="font-mono text-xs font-semibold">
+                    {cmd.name}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {cmd.description}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+
+          {toolCommands.length > 0 && (
+            <CommandGroup heading="Agent Tools">
+              {toolCommands.map((cmd) => (
+                <CommandItem
+                  key={cmd.name}
+                  id={cmd.name}
+                  textValue={`${cmd.name} ${cmd.description}`}
+                  onAction={() => onSelect(cmd)}
+                >
+                  <RiToolsLine className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="font-mono text-xs font-semibold">
+                    {cmd.name}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {cmd.description}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
+        </CommandList>
+      </Command>
+    </div>
   );
-};
-
-// Backwards-compatible alias: older imports use `Command`.
-export type Command = PaletteCommand;
-
-export default SlashCommandAutocomplete;
+}
