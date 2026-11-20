@@ -39,6 +39,7 @@ const NAV_ITEMS = [
   { href: "/orchestrator", label: "Orchestrator", icon: "🧠" },
   { href: "/", label: "Chat", icon: "💬" },
   { href: "/agents", label: "Agents", icon: "🤖" },
+  { href: "/specialists", label: "Specialists", icon: "🧬" },
   { href: "/context", label: "Context", icon: "📚" },
   { href: "/history", label: "History", icon: "🕘" },
   // Plugin dev harness: standalone route for working on plugin

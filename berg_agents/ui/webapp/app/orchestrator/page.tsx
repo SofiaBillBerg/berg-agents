@@ -281,6 +281,10 @@ function OrchestratorConversation() {
     }
     return rows;
   }, [messages]);
+  // The parent of any specialist this conversation launches: the run its
+  // links carry forward, so the way back from a specialist session is to
+  // THIS conversation rather than a new one.
+  const parentRunId = resumeRunId ?? lastRunId;
   const specialistRunIds = useMemo(
     () =>
       startedSpecialists
@@ -979,7 +983,14 @@ function OrchestratorConversation() {
                   {row.runId ? (
                     <a
                       className="overflow-hidden text-ellipsis whitespace-nowrap underline opacity-70 hover:opacity-100"
-                      href={`/specialist/${encodeURIComponent(row.runId)}`}
+                      href={`/specialist/${encodeURIComponent(row.runId)}${
+                        // The parent conversation rides along, so the
+                        // specialist session's way back lands HERE rather
+                        // than in a new conversation.
+                        parentRunId
+                          ? `?from=${encodeURIComponent(parentRunId)}`
+                          : ""
+                      }`}
                       title={`Open ${row.agent}'s session (${row.runId})`}
                     >
                       open session →

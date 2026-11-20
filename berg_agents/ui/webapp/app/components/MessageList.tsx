@@ -44,6 +44,7 @@ import {
 import useSWR from "swr";
 
 import { MarkdownRenderer } from "./MarkdownRenderer.tsx";
+import SpecialistLiveFeed from "./SpecialistLiveFeed.tsx";
 import DelegationTaskControls from "./DelegationTaskControls.tsx";
 
 import {
@@ -561,6 +562,10 @@ function SubagentRow({
              there — the gate is the specialist's, and the run id is what
              addresses it. */
           <div className="flex flex-col gap-1.5">
+            {/* The specialist's own work, streaming live into the row —
+                the Subagent pattern's running state. While it works, its
+                tool calls and words arrive here as they happen. */}
+            {runId && <SpecialistLiveFeed runId={runId} />}
             {preview.pending.map((gate) => (
               <div
                 key={gate.tool_call_id}
