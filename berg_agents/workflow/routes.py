@@ -263,6 +263,50 @@ def _decode_payload(raw: Any) -> Any:
         return None
 
 
+def _specialist_sessions() -> list[dict[str, Any]]:
+    """Every specialist run berg has a record of, newest first.
+
+    A specialist is a full-scale agent with its own run, so it is a
+    session that must be findable the way any launched subagent is: by
+    name, by what it was asked to do, and by how it is doing — not only
+    through the link in the conversation that launched it.
+
+    The turn's own payload names the agent it runs as (``active_agent``);
+    a run with none is the default chat brain, which is not a specialist.
+
+    :return: One entry per specialist run: its id, agent, status, age,
+        and the task it was given.
+    """
+    from berg_agents.workflow.registry import _workflow_data_dir
+
+    runs_dir = _workflow_data_dir() / Path("runs")
+    sessions: list[dict[str, Any]] = []
+    for record_path in runs_dir.glob("*.json"):
+        record = _run_record(record_path.stem)
+        if record is None:
+            continue
+        started = _decode_payload(record.get("input"))
+        if (
+            isinstance(started, list)
+            and started
+            and isinstance(started[0], dict)
+        ):
+            started = started[0]
+        if not isinstance(started, dict):
+            continue
+        agent = str(started.get("active_agent") or "").strip()
+        if not agent:
+            continue
+        sessions.append({
+            "runId": record_path.stem,
+            "agent": agent,
+            "status": str(record.get("status") or ""),
+            "createdAt": record.get("createdAt"),
+            "task": str(started.get("prompt") or "")[:200]})
+    sessions.sort(key=lambda entry: str(entry["createdAt"] or ""), reverse=True)
+    return sessions[:50]
+
+
 def _turn_run_chain(run_id: str) -> list[str]:
     """Every run of the turn this run belongs to, oldest pass first.
 
@@ -538,8 +582,22 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
             # is what lets the UI announce the specialist and its model.
             "model": model_id})
 
+    @router.get("/api/specialists")
+    async def list_specialist_sessions() -> Any:
+        """The specialist sessions, newest first.
+
+        A specialist is a run of its own: this is the index that makes
+        those runs findable like any launched subagent — by agent,
+        status, and the task it was given — rather than only through the
+        conversation that started it.
+
+        :return: One entry per specialist run.
+        """
+        return JSONResponse({"specialists": _specialist_sessions()})
+
+
     @router.get("/api/workflow/chat/{run_id}/stream")
-    async def workflow_chat_stream(run_id: str) -> Any:
+    async def workflow_chat_stream(run_id: str, request: Request) -> Any:
         """Serve a durable turn's frames in the SSE protocol the UI renders.
 
         Same frames berg's own encoder produced, read from the durable stream —
@@ -547,10 +605,21 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
         exactly the bytes the turn emitted rather than a rebuilt approximation.
 
         :param run_id: The turn's run id.
+        :param request: The request, read for the resume position: the
+            workflow transport tracks a chunk index and asks for the tail,
+            so honouring ``startIndex`` keeps a reconnect a continuation
+            rather than a second full replay folded on top of the first.
         :return: A streaming SSE response of ``data: {...}`` frames.
         """
         from berg_agents.workflow.registry import Frame
         from fastapi.responses import StreamingResponse
+
+        try:
+            start_index = max(
+                0, int(request.query_params.get("startIndex", "0"))
+            )
+        except ValueError:
+            start_index = 0
 
         async def _frames() -> Any:
             from vercel import workflow
@@ -561,11 +630,14 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
             # The turn's token is the thread that ties the passes
             # together, and it is what makes one conversation of many
             # runs.
+            index = 0
             for run_of_pass in _turn_run_chain(run_id):
                 try:
                     run = workflow.Run(run_of_pass)
                     async for frame in run.readable(type=Frame):
-                        yield frame.data
+                        if index >= start_index:
+                            yield frame.data
+                        index += 1
                 except Exception:
                     # An unreadable record must not blank the session:
                     # the next pass's frames still reach the reader.

@@ -1,30 +1,32 @@
-"use client";
+/*
+ * The route into one specialist's session.
+ *
+ * A server component on purpose: `export const instant` is a route segment
+ * config and Next accepts it only from a Server Component module. The live
+ * surface (stream, polling, actions) is the client view this renders, so the
+ * split is the documented one rather than a workaround.
+ */
 
-// A client component, like every page that renders a live session: the stream,
-// the polling and the actions all run in the browser.
+import { Suspense, use } from "react";
 
-import { use, useState } from "react";
-
-import ChatTranscript from "@/app/components/ChatTranscript";
-import { Navbar } from "@/app/components/Navbar";
-import { useSpecialistSession } from "@/harness/useSpecialistSession";
+import SpecialistSessionView from "./session-view";
 
 /**
- * A specialist's session, as a place you can be.
+ * The route shell: the run id from the URL, and the live session it names.
  *
- * Not a view of a task: the specialist's own transcript, its gates as decisions
- * on that transcript, and a composer so work can be sent into the run while it
- * runs. The transcript is the same `ChatTranscript` the chat and the orchestrator
- * use — one renderer, because the stream is the same Vercel AI frames in one
- * protocol — and the actions are the run's own routes (answer its gate, steer it,
- * stop it), reached from here instead of through the orchestrator.
+ * A blocking route by intent — this page is one live specialist run, and every
+ * read on it (the durable stream, the run's state) is uncached and per-run, so
+ * Next's guidance is to say that outright rather than let prerender block on
+ * data that can never be cached
+ * (https://nextjs.org/docs/messages/blocking-prerender-dynamic).
+ */
+export const instant = false;
+
+/**
+ * Render one specialist's session.
  *
- * This is the surface the orchestrator's delegation should open into: the user
- * follows the specialist into its session and works there, and the specialist
- * reports back — rather than a run that happens somewhere else and hands back a
- * summary.
- *
- * @returns The specialist's session.
+ * @param props - The route's params: the run id.
+ * @returns The specialist's session surface.
  */
 export default function SpecialistSessionPage({
   params}: {
@@ -33,122 +35,18 @@ export default function SpecialistSessionPage({
   // `params` is a Promise in this Next version (per its own route docs), so
   // unwrapping it is the documented `use` rather than an await.
   const { runId } = use(params);
-  const session = useSpecialistSession(runId);
-  const [steerText, setSteerText] = useState("");
-
+  // The placeholder is a real state, not a spinner: the stream is adopted
+  // and replayed in the client, and this route renders on demand — so the
+  // shell paints immediately and the turn's history arrives as one piece.
   return (
-    <>
-      <Navbar />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex h-full w-full max-w-[95vw] flex-col gap-4 p-6">
-          <header className="flex items-baseline justify-between gap-4">
-            <div>
-              <h1 className="text-lg font-semibold">Session</h1>
-              {/* The run id is shown, not hidden: it is what the
-                                orchestrator's turn and every action address. */}
-              <code className="text-xs opacity-60">{runId}</code>
-            </div>
-            {/* Home is the default: this is an excursion into a
-                            specialist's session, and the way back is always
-                            visible rather than a browser gesture. */}
-            <a
-              className="rounded border border-current/30 px-2 py-1 text-xs"
-              href="/orchestrator"
-            >
-              ← Back to your session
-            </a>
-          </header>
-
-          {/* What the specialist is doing, and the gates it is waiting
-                        on. A gate is a decision, not a log line: the tool it
-                        wants to run and the arguments it wants to use, with the
-                        run's own words when it has any. */}
-          {session.pending.length > 0 ? (
-            <ul className="flex flex-col gap-2">
-              {session.pending.map((call) => (
-                <li
-                  key={call.tool_call_id}
-                  className="rounded border border-warning p-3 text-sm"
-                >
-                  <p className="mb-2 font-medium">
-                    {session.state === "waiting"
-                      ? "Waiting on your decision"
-                      : "Working"}
-                  </p>
-                  <p className="mb-1 opacity-80">
-                    wants to run <code>{call.tool_name}</code>
-                  </p>
-                  <pre className="mb-2 overflow-x-auto rounded bg-code-background p-2 text-xs">
-                    {JSON.stringify(call.args, null, 2)}
-                  </pre>
-                  <div className="flex gap-2">
-                    <button
-                      className="rounded border border-current/30 px-3 py-1 text-xs"
-                      type="button"
-                      onClick={() => session.answer(call, true)}
-                    >
-                      Allow
-                    </button>
-                    <button
-                      className="rounded border border-current/30 px-3 py-1 text-xs"
-                      type="button"
-                      onClick={() => session.answer(call, false)}
-                    >
-                      Refuse
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {/* The specialist's own work: reasoning, tool calls, and what
-                        it said, as they arrive. */}
-          <ChatTranscript
-            hitlRequest={null}
-            isAnimating={session.live}
-            isExecuting={session.live}
-            transcript={session.transcript}
-          />
-
-          {session.error ? (
-            <p className="text-xs text-destructive">{session.error}</p>
-          ) : null}
-
-          {/* The composer. Sending here steers the run rather than
-                        starting a new one — work continues in this session. */}
-          <form
-            className="flex items-center gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const text = steerText.trim();
-              if (!text) return;
-              setSteerText("");
-              session.steer(text);
-            }}
-          >
-            <input
-              className="flex-1 rounded border border-current/20 bg-transparent px-3 py-2 text-sm"
-              placeholder="Send into this session…"
-              value={steerText}
-              onChange={(event) => setSteerText(event.target.value)}
-            />
-            <button
-              className="rounded border border-current/30 px-3 py-2 text-sm"
-              type="submit"
-            >
-              Send
-            </button>
-            <button
-              className="rounded border border-danger px-3 py-2 text-sm text-danger"
-              type="button"
-              onClick={() => session.stop()}
-            >
-              Stop
-            </button>
-          </form>
-        </div>
-      </div>
-    </>
+    <Suspense
+      fallback={
+        <main className="p-6 text-sm text-muted-foreground">
+          Opening the specialist&rsquo;s session…
+        </main>
+      }
+    >
+      <SpecialistSessionView runId={runId} />
+    </Suspense>
   );
 }

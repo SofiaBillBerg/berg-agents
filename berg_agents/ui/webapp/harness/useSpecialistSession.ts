@@ -1,5 +1,7 @@
+import type { UIMessage } from "ai";
+
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import { WorkflowChatTransport } from "@ai-sdk/workflow/client";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -68,8 +70,17 @@ export function useSpecialistSession(runId: string): SpecialistSession {
     // The run's id IS the session's id: the SDK addresses a reconnect by
     // chat id, and a run id is what identifies this specialist's turn.
     id: runId,
-    transport: new DefaultChatTransport({
+    // The workflow transport, not a hand-rolled one: this stream is a
+    // DURABLE one that a late reader (or a server restart, or a gate that
+    // ended the pass) must replay from the beginning. The generic
+    // transport's resume folded nothing of a finished journal — the page
+    // adopted a run and stayed blank. This one replays and tracks the
+    // chunk index, so a turn of many passes reads as one conversation.
+    transport: new WorkflowChatTransport({
       api: "/api/workflow/chat",
+      // Replay from the beginning: the session is the turn's whole
+      // history, and the turn's stream now replays every pass of it.
+      initialStartIndex: 0,
       // Reading is a plain GET of the run's own stream — the durable
       // journal, not a re-send. Named rather than derived, because under
       // /api/* a dynamic segment is claimed by the proxy rewrite before
