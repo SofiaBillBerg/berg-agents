@@ -5,6 +5,7 @@
  * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
+ *
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
@@ -15,410 +16,294 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
+ * along with this program.  If not, see <https://gnu.org>.
  */
-
-/* Plugin dev mode — a standalone page for working on plugin surfaces.
- *
- * The chat app only mounts a plugin's UI in reaction to a live agent
- * tool call, so before this page there was no way to open a plugin's
- * surface on its own. This route mounts PluginUISurface directly and
- * drives the plugin's own tools through the same host endpoints the
- * chat uses, so a plugin can be developed and exercised without a
- * running agent or a real conversation.
- *
- * Contract (mirrors app/plugins/registry.tsx and ui/routes.py):
- *   GET  /api/plugins                     -> {plugins:[{...,ui:{entry_url,export,...}}]}
- *   POST /api/plugins/{id}/tools/{name}   -> {plugin,tool,result} | 404 (unknown) | 502 (raised)
- *   POST /api/plugins/{id}/enable|disable -> {id,state}
- *
- * Plugin bundles resolve React/HeroUI against window.BergRuntime. The
- * `/` route installs that runtime in client.tsx; this route does not
- * go through client.tsx, so it installs the runtime itself (idempotent).
- */
-
 "use client";
 
-import type { PluginInfo } from "@/lib/backendCatalog";
-
 import { useEffect, useState } from "react";
-import { Card, Chip, Spinner } from "@heroui/react";
-import useSWR from "swr";
 
-import { installBergRuntime } from "../../runtime/berg-runtime.ts";
 import { PluginUISurface } from "../../plugins/PluginUISurface.tsx";
 import { Navbar } from "../../components/Navbar.tsx";
 
-import { Button } from "@/components/ui/button"; // <-  replaces heroui
-import { API_BASE } from "@/envConfig";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
-  CATALOG_KEYS,
-  CATALOG_SWR_OPTIONS,
-  fetchPlugins} from "@/lib/backendCatalog";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle} from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { API_BASE } from "@/envConfig";
 
-/**
- * Plugin dev page — mount any plugin's surface and call its tools
- * directly, without a live agent run.
- */
-export default function PluginDevPage() {
-  // The catalog is the shared entry: a plugin toggled here revalidates
-  // it, and every other reader of the plugins list (chat's surface
-  // discovery, the catalog panel) sees the same answer. The throwing
-  // fetcher means a failed read leaves the previous list in place and
-  // reports itself in `error`, instead of blanking this page.
-  const {
-    data: plugins = [],
-    error,
-    isLoading: loading,
-    mutate: mutatePlugins} = useSWR<PluginInfo[]>(
-    CATALOG_KEYS.plugins,
-    fetchPlugins,
-    CATALOG_SWR_OPTIONS,
-  );
+interface PluginSummary {
+  id: string;
+  name?: string;
+  version?: string;
+  state?: string;
+  description?: string;
+  tools?: string[];
+  ui?: Record<string, unknown> | null;
+}
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+export default function DevPluginsPage() {
+  const [plugins, setPlugins] = useState<PluginSummary[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [view, setView] = useState<"panel" | "canvas">("canvas");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [uiDraft, setUiDraft] = useState("");
+  const [uiOverride, setUiOverride] = useState<Record<string, unknown> | null>(
+    null,
+  );
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Tool runner state (reset whenever the selected plugin changes).
-  const [tool, setTool] = useState<string | null>(null);
-  const [argsText, setArgsText] = useState("{}");
-  const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
-  const [toolError, setToolError] = useState<string | null>(null);
-  const [toggling, setToggling] = useState(false);
-  // A failed TOGGLE is not a failed read: the read's failure lives in
-  // SWR's `error`, this one is only about the last button press.
-  const [toggleError, setToggleError] = useState<string | null>(null);
-
-  // Plugin UI bundles resolve against window.BergRuntime; install it on
-  // this route too (client.tsx only covers the `/` route). Idempotent.
   useEffect(() => {
-    installBergRuntime();
+    const requested = new URLSearchParams(window.location.search).get("plugin");
+    void fetch(`${API_BASE}/api/plugins`)
+      .then((res) =>
+        res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)),
+      )
+      .then((data: { plugins?: PluginSummary[] }) => {
+        const all = data.plugins ?? [];
+        setPlugins(all);
+        const withUi = all.filter((p) => p.ui != null);
+        const match =
+          withUi.find((p) => p.id === requested) ?? withUi[0] ?? null;
+        if (match) {
+          setActiveId(match.id);
+          setUiDraft(JSON.stringify(match.ui, null, 2));
+          setUiOverride(null);
+        }
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
+      });
   }, []);
 
-  // Auto-select the first plugin once the catalog arrives; explicit
-  // selections (setSelectedId + reset) override afterward.
-  const selected =
-    plugins.find((p) => p.id === selectedId) ?? plugins[0] ?? null;
+  const active = plugins.find((p) => p.id === activeId) ?? null;
+  const effectiveUi = active ? (uiOverride ?? active.ui ?? null) : null;
 
-  // Reset the tool runner whenever the SELECTION changes. Done in render
-  // rather than an Effect keyed on `selected.tools`: the catalog
-  // re-polls, and each poll hands over a fresh array — an Effect that
-  // listed it would wipe the arguments the user is typing every few
-  // seconds. Keying the guard on the id resets on a real switch only.
-  const [runnerFor, setRunnerFor] = useState<string | null>(null);
-  if (selected && runnerFor !== selected.id) {
-    setRunnerFor(selected.id);
-    setTool(selected.tools?.[0] ?? null);
-    setArgsText("{}");
-    setResult(null);
-    setToolError(null);
-  }
-
-  /** Select a plugin and clear any prior tool-run output. */
-  const selectPlugin = (id: string) => {
-    setSelectedId(id);
-    setRefreshKey((k) => k + 1);
+  const selectPlugin = (plugin: PluginSummary) => {
+    setActiveId(plugin.id);
+    setUiOverride(null);
+    setDraftError(null);
+    setUiDraft(plugin.ui ? JSON.stringify(plugin.ui, null, 2) : "{}");
   };
 
-  /** Enable/disable the selected plugin through the host endpoints. */
-  const togglePlugin = async (plugin: PluginInfo) => {
-    const enabled = plugin.state === "enabled";
-    setToggling(true);
-    setToggleError(null);
+  const applyUiDraft = () => {
     try {
-      const resp = await fetch(
-        `${API_BASE}/api/plugins/${encodeURIComponent(plugin.id)}/${enabled ? "disable" : "enable"}`,
-        { method: "POST" },
-      );
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      // The toggle changed what the catalog reports: re-read the shared
-      // key so this page and every other reader update together.
-      await mutatePlugins();
-    } catch (e) {
-      setToggleError(e instanceof Error ? e.message : "Toggle failed");
-    } finally {
-      setToggling(false);
-    }
-  };
-
-  /**
-   * Run one of the selected plugin's tools exactly like the chat does.
-   * The body is the tool's own kwargs (host strips sessionId/tool/args).
-   */
-  const runTool = async (plugin: PluginInfo, toolName: string) => {
-    setRunning(true);
-    setResult(null);
-    setToolError(null);
-    try {
-      const body = JSON.parse(argsText || "{}") as Record<string, unknown>;
-      const resp = await fetch(
-        `${API_BASE}/api/plugins/${encodeURIComponent(plugin.id)}/tools/${encodeURIComponent(toolName)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)},
-      );
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) {
-        setToolError(`HTTP ${resp.status}: ${data?.detail ?? resp.statusText}`);
-      } else {
-        // Tools return a user string for the model; structured returns
-        // arrive JSON-encoded. Show the raw payload either way.
-        setResult(
-          typeof data.result === "string"
-            ? data.result
-            : JSON.stringify(data.result, null, 2),
-        );
+      const parsed: unknown = JSON.parse(uiDraft);
+      if (
+        typeof parsed !== "object" ||
+        parsed === null ||
+        Array.isArray(parsed)
+      ) {
+        setDraftError("Must be a JSON object.");
+        return;
       }
+      setUiOverride(parsed as Record<string, unknown>);
+      setDraftError(null);
+      setRefreshKey((k) => k + 1);
     } catch (e) {
-      // A JSON.parse failure lands here too; message is clear enough.
-      setToolError(e instanceof Error ? e.message : "Tool call failed");
-    } finally {
-      setRunning(false);
+      setDraftError(e instanceof Error ? e.message : String(e));
     }
   };
 
   return (
     <>
       <Navbar />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-6xl p-4">
-          <h1 className="text-2xl font-bold mb-1">Plugin Dev Mode</h1>
-          <p className="text-sm text-muted-foreground mb-4">
-            Standalone harness for plugin surfaces: mount a plugin&apos;s UI and
-            call its tools without a running agent. Surfaces resolve React /
-            HeroUI against the host runtime (<code>window.BergRuntime</code>),
-            exactly as they do inside chat.
-          </p>
+      <main className="min-h-0 flex-1 overflow-y-auto p-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h1 className="text-lg font-semibold">Plugin UI workbench</h1>
+              <p className="text-xs text-muted-foreground">
+                Inspects all installed plugins from <code>/api/plugins</code>{" "}
+                and mounts declared <code>ui:</code> surfaces against{" "}
+                <code>window.BergRuntime</code>.
+              </p>
+            </div>
+            {active?.ui && (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant={view === "panel" ? "default" : "secondary"}
+                  onPress={() => setView("panel")}
+                >
+                  ◫ Panel
+                </Button>
+                <Button
+                  size="sm"
+                  variant={view === "canvas" ? "default" : "secondary"}
+                  onPress={() => setView("canvas")}
+                >
+                  ⛶ Canvas
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => setRefreshKey((k) => k + 1)}
+                >
+                  ↻ Remount
+                </Button>
+              </div>
+            )}
+          </div>
 
-          {loading && (
-            <Card variant="default">
-              <Card.Content className="flex items-center gap-2 py-6">
-                <Spinner size="sm" />
-                <span className="text-sm text-muted-foreground">
-                  Loading plugins…
-                </span>
-              </Card.Content>
+          {error && (
+            <Card className="border-destructive">
+              <CardHeader>
+                <CardTitle className="text-destructive">
+                  Could not reach /api/plugins
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs">{error}</CardContent>
             </Card>
           )}
 
-          {(error || toggleError) && (
-            <p className="mb-3 text-xs text-red-500">
-              {error ? error.message : toggleError}
-            </p>
-          )}
-
-          {!loading && plugins.length === 0 && !error && (
-            <Card variant="default">
-              <Card.Content className="py-6">
-                <p className="text-sm text-muted-foreground">
-                  No plugins discovered. Start the app with plugins configured
-                  and they appear here.
-                </p>
-              </Card.Content>
-            </Card>
-          )}
-
+          {/* All installed plugins selector */}
           {plugins.length > 0 && (
-            <>
-              {/* Plugin picker */}
-              <div className="mb-4 flex flex-wrap gap-2">
-                {plugins.map((p) => (
-                  <Button
-                    key={p.id}
-                    size="sm"
-                    //variant={selected?.id === p.id ? "primary" : "secondary"}
-                    variant={selected?.id === p.id ? "default" : "secondary"}
-                    onPress={() => selectPlugin(p.id)}
-                  >
-                    {p.name}
-                  </Button>
-                ))}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">
+                  Installed plugins ({plugins.length})
+                </CardTitle>
+                <CardDescription>
+                  Select any plugin to inspect its manifest or mount its UI
+                  surface.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {plugins.map((p) => {
+                  const isSelected = p.id === activeId;
+                  const hasUi = p.ui != null;
+                  return (
+                    <Button
+                      key={p.id}
+                      size="sm"
+                      variant={isSelected ? "default" : "secondary"}
+                      onPress={() => selectPlugin(p)}
+                    >
+                      <span>{p.name ?? p.id}</span>
+                      {hasUi && (
+                        <Badge className="ml-1.5" variant="outline">
+                          UI
+                        </Badge>
+                      )}
+                    </Button>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
+          {!error && plugins.length === 0 && (
+            <Card>
+              <CardContent className="p-4 text-sm text-muted-foreground">
+                No plugins reported by <code>/api/plugins</code>.
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Workspace: mounted surface + manifest/UI editor */}
+          {active && (
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                {effectiveUi ? (
+                  <div className="rounded-xl border border-border p-2">
+                    <PluginUISurface
+                      pluginId={active.id}
+                      refreshKey={refreshKey}
+                      ui={effectiveUi}
+                      view={view}
+                      onClose={() => setActiveId(null)}
+                      onToggleView={() =>
+                        setView((v) => (v === "panel" ? "canvas" : "panel"))
+                      }
+                    />
+                  </div>
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">
+                        {active.name ?? active.id}
+                      </CardTitle>
+                      <CardDescription>
+                        This plugin has no declared <code>ui:</code> surface.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-xs text-muted-foreground">
+                      {active.description && <p>{active.description}</p>}
+                      {active.tools && active.tools.length > 0 && (
+                        <p className="font-mono">
+                          Tools: {active.tools.join(", ")}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
-              {selected && (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {/* Surface preview */}
-                  <Card variant="default">
-                    <Card.Header>
-                      <Card.Title>{selected.name} surface</Card.Title>
-                      <Card.Description>
-                        {selected.ui?.label ?? selected.name}
-                        {selected.ui?.placement
-                          ? ` · ${selected.ui.placement}`
-                          : ""}
-                      </Card.Description>
-                    </Card.Header>
-                    <Card.Content>
-                      <div className="mb-2 flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onPress={() =>
-                            setView(view === "panel" ? "canvas" : "panel")
-                          }
-                        >
-                          {view === "panel" ? "Canvas view" : "Panel view"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onPress={() => setRefreshKey((k) => k + 1)}
-                        >
-                          ↻ Refresh
-                        </Button>
-                      </div>
-                      {selected.ui && selected.ui.entry_url ? (
-                        <div
-                          className="rounded-md border border-border p-2"
-                          style={
-                            view === "panel"
-                              ? { maxWidth: selected.ui.width ?? 340 }
-                              : undefined
-                          }
-                        >
-                          <PluginUISurface
-                            pluginId={selected.id}
-                            refreshKey={refreshKey}
-                            ui={selected.ui as Record<string, unknown>}
-                            view={view}
-                          />
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          This plugin declares no loadable UI surface
-                          {selected.ui?.entry_built === false
-                            ? " — its bundle has not been built. Run the plugin's build:ui script."
-                            : " (no ui: block in its manifest)."}
-                        </p>
-                      )}
-                    </Card.Content>
-                  </Card>
-
-                  {/* Tool runner */}
-                  <Card variant="default">
-                    <Card.Header>
-                      <Card.Title>Tools ({selected.tools.length})</Card.Title>
-                      <Card.Description>
-                        Call the plugin&apos;s own tools directly.
-                      </Card.Description>
-                    </Card.Header>
-                    <Card.Content className="flex flex-col gap-3">
-                      {selected.tools.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          This plugin registers no tools.
-                        </p>
-                      )}
-                      {selected.tools.length > 0 && (
-                        <>
-                          <div className="flex flex-wrap gap-2">
-                            {selected.tools.map((t) => (
-                              <Button
-                                key={t}
-                                size="sm"
-                                //variant={tool === t ? "primary" : "secondary"}
-                                variant={tool === t ? "default" : "secondary"}
-                                onPress={() => {
-                                  setTool(t);
-                                  setResult(null);
-                                  setToolError(null);
-                                }}
-                              >
-                                {t}
-                              </Button>
-                            ))}
-                          </div>
-                          <label
-                            className="text-xs font-semibold text-muted-foreground"
-                            htmlFor="dev-plugin-tool-args"
-                          >
-                            Arguments (JSON kwargs)
-                          </label>
-                          <textarea
-                            className="input-bar-textarea"
-                            id="dev-plugin-tool-args"
-                            rows={3}
-                            spellCheck={false}
-                            value={argsText}
-                            onChange={(e) => setArgsText(e.target.value)}
-                          />
-                          <div>
-                            <Button
-                              isDisabled={!tool || running}
-                              variant="secondary"
-                              onPress={() =>
-                                tool && void runTool(selected, tool)
-                              }
-                            >
-                              {running ? "Running…" : `Run ${tool ?? ""}`}
-                            </Button>
-                          </div>
-                          {toolError && (
-                            <p className="text-xs text-red-500">{toolError}</p>
-                          )}
-                          {result !== null && (
-                            <pre className="max-h-64 overflow-auto rounded-md border border-border bg-background p-2 text-xs">
-                              {result}
-                            </pre>
-                          )}
-                        </>
-                      )}
-                    </Card.Content>
-                  </Card>
-
-                  {/* Metadata: state, description, capabilities */}
-                  <Card className="md:col-span-2" variant="default">
-                    <Card.Content className="flex flex-col gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Chip
-                          color={
-                            selected.state === "enabled" ? "success" : "default"
-                          }
-                          size="sm"
-                          variant="soft"
-                        >
-                          {selected.state}
-                        </Chip>
-                        <span className="text-sm text-muted-foreground">
-                          v{selected.version}
-                        </span>
-                        <span className="flex-1" />
-                        <Button
-                          isDisabled={toggling}
-                          size="sm"
-                          variant="secondary"
-                          onPress={() => void togglePlugin(selected)}
-                        >
-                          {selected.state === "enabled" ? "Disable" : "Enable"}
-                        </Button>
-                      </div>
-                      {selected.description && (
-                        <p className="text-sm">{selected.description}</p>
-                      )}
-                      {selected.capabilities.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {selected.capabilities.map((c, i) => (
-                            <Chip
-                              key={`${c.type}-${c.id ?? c.name ?? i}`}
-                              size="sm"
-                              variant="soft"
-                            >
-                              {c.type}
-                              {c.sensitive ? " 🔒" : ""}
-                            </Chip>
-                          ))}
-                        </div>
-                      )}
-                    </Card.Content>
-                  </Card>
-                </div>
-              )}
-            </>
+              <Card className="h-fit">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">
+                    Manifest & UI config
+                  </CardTitle>
+                  <CardDescription>
+                    Edit the <code>ui:</code> payload passed to{" "}
+                    <code>PluginUISurface</code>.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex flex-wrap gap-1.5 text-xs">
+                    <Badge variant="secondary">{active.id}</Badge>
+                    {active.version && (
+                      <Badge variant="outline">v{active.version}</Badge>
+                    )}
+                    {active.state && (
+                      <Badge variant="outline">{active.state}</Badge>
+                    )}
+                  </div>
+                  <Textarea
+                    aria-label="Plugin UI JSON config"
+                    className="min-h-48 font-mono text-xs"
+                    value={uiDraft}
+                    onChange={(e) => setUiDraft(e.target.value)}
+                  />
+                  {draftError && (
+                    <p className="text-xs text-destructive">{draftError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      isDisabled={!active.ui}
+                      size="sm"
+                      variant="default"
+                      onPress={applyUiDraft}
+                    >
+                      Apply & reload
+                    </Button>
+                    <Button
+                      isDisabled={!uiOverride}
+                      size="sm"
+                      variant="secondary"
+                      onPress={() => {
+                        setUiOverride(null);
+                        setDraftError(null);
+                        setUiDraft(
+                          active.ui ? JSON.stringify(active.ui, null, 2) : "{}",
+                        );
+                      }}
+                    >
+                      Reset to manifest
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
-      </div>
+      </main>
     </>
   );
 }

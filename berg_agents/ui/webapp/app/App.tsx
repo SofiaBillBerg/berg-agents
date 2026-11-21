@@ -28,8 +28,6 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Toast, toast } from "@heroui/react";
-// TODOÖ Replace Toast and toast with Toast and toast from components ui should be used instead <-  replaces heroui
 import {
   RiAddLine,
   RiArrowDownLine,
@@ -363,7 +361,6 @@ function ChatContent() {
 
   return (
     <LazyComponentErrorBoundary componentName="Chat">
-      <Toast.Provider />
       <Navbar />
       <div className="app-container p-4 w-full max-w-[95vw] mx-auto">
         {/* Single chrome row: title + sessions + nav + provider + export.
@@ -526,16 +523,15 @@ function ChatContent() {
                   link.remove();
                   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
                   const sizeKb = Math.max(1, Math.round(blob.size / 1024));
-                  toast.success("Transcript exported", {
-                    description: `Saved ~${sizeKb} KB markdown to your downloads.`,
-                    timeout: 5000});
                 } catch (e) {
-                  const toastId = toast.danger("Export failed", {
+                  /*
+    /!**!/              const toastId = toast.danger("Export failed", {
                     description: String(e),
                     timeout: 0,
                     actionProps: {
                       children: "Dismiss",
                       onPress: () => toast.close(toastId)}});
+*/
                 }
               }}
             >

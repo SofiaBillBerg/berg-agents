@@ -16,7 +16,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
+ * along with this program.  If not, see <https://gnu.org>.
  */
 
 /*
@@ -31,12 +31,19 @@
 import type { PluginInfo } from "@/lib/backendCatalog";
 
 import useSWR from "swr";
-import { Card, Chip, Spinner } from "@heroui/react";
 
 import { RouterStatsPanel } from "../components/RouterStatsPanel.tsx";
 import { SharedContextEditor } from "../components/SharedContextEditor.tsx";
 import { Navbar } from "../components/Navbar.tsx";
 
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle} from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import {
   CATALOG_KEYS,
   CATALOG_SWR_OPTIONS,
@@ -119,6 +126,9 @@ async function fetchContext(): Promise<ContextData> {
   return (await resp.json()) as ContextData;
 }
 
+const SUCCESS_BADGE_CLASS =
+  "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
+
 /**
  * ContextPage - client component showing the shared context catalog:
  * memory files, skills, MCP servers, and compact router stats.
@@ -151,11 +161,11 @@ export default function ContextPage() {
         <Navbar />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-6xl p-4">
-            <Card variant="default">
-              <Card.Content className="flex items-center justify-center py-8">
-                <Spinner size="lg" />
+            <Card>
+              <CardContent className="flex items-center justify-center py-8">
+                <Spinner className="size-6" />
                 <span className="ml-2">Loading context...</span>
-              </Card.Content>
+              </CardContent>
             </Card>
           </div>
         </div>
@@ -169,15 +179,15 @@ export default function ContextPage() {
         <Navbar />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-6xl p-4">
-            <Card className="border border-danger" variant="default">
-              <Card.Header>
-                <Card.Title className="text-danger">Error</Card.Title>
-              </Card.Header>
-              <Card.Content>
+            <Card className="border-destructive">
+              <CardHeader>
+                <CardTitle className="text-destructive">Error</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <p className="text-sm">
                   Failed to load context: {error?.message ?? "empty response"}
                 </p>
-              </Card.Content>
+              </CardContent>
             </Card>
           </div>
         </div>
@@ -185,13 +195,15 @@ export default function ContextPage() {
     );
   }
 
+  const { mcp, skills, toolPlugins } = indexPlugins(plugins);
+
   return (
     <>
       <Navbar />
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-6xl p-4">
-          <h1 className="text-2xl font-bold mb-4">Context</h1>
-          <p className="text-sm text-muted-foreground mb-4">
+          <h1 className="mb-4 text-2xl font-bold">Context</h1>
+          <p className="mb-4 text-sm text-muted-foreground">
             Everything the agent may load as shared context - memory files,
             skills, and MCP servers
             {data.active
@@ -200,180 +212,153 @@ export default function ContextPage() {
             . Runtime state comes from the plugin system
             {plugins.length > 0 ? ` (${plugins.length} plugins)` : ""}.
           </p>
+
           {/* user-owned Shared Context: view/edit it in-app (E1). */}
           <div className="mb-4">
             <SharedContextEditor />
           </div>
-          {/* NOTE: Runtime overlay — config lists what exists, the
-              plugin map adds live state (toggled off, approval flags). */}
-          {(() => {
-            const { mcp, skills, toolPlugins } = indexPlugins(plugins);
-            return (
-              <>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Card variant="default">
-                    <Card.Header>
-                      <Card.Title>Memory files</Card.Title>
-                      <Card.Description>
-                        Always-loaded AGENTS.md paths ({data.memory.length})
-                      </Card.Description>
-                    </Card.Header>
-                    <Card.Content className="flex flex-col gap-1.5">
-                      {data.memory.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          None configured - set BERG_AGENT_MEMORY to share
-                          context files with the agent.
-                        </p>
-                      )}
-                      {data.memory.map((m) => (
-                        <div
-                          key={m.path}
-                          className="flex items-center gap-2 text-sm"
-                        >
-                          <span className="font-mono truncate">{m.path}</span>
-                          <Chip
-                            color={m.exists ? "success" : "danger"}
-                            size="sm"
-                            variant="soft"
-                          >
-                            {m.exists ? "found" : "missing"}
-                          </Chip>
-                        </div>
-                      ))}
-                    </Card.Content>
-                  </Card>
-                  <Card variant="default">
-                    <Card.Header>
-                      <Card.Title>MCP servers</Card.Title>
-                      <Card.Description>
-                        External tools ({data.mcp_servers.length})
-                      </Card.Description>
-                    </Card.Header>
-                    <Card.Content className="flex flex-wrap gap-1.5">
-                      {data.mcp_servers.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          None configured in .berg-agents/mcp.json.
-                        </p>
-                      )}
-                      {data.mcp_servers.map((s) => {
-                        const plugin = mcp.get(s.name);
-                        // Runtime state is authoritative: the sidepanel
-                        // toggle changes it, and the config flag is only the
-                        // startup default. Reading the flag here is what made
-                        // the two views disagree (enabled in the panel, "off"
-                        // in this tab).
-                        const runtimeOff = plugin
-                          ? plugin.state !== "enabled"
-                          : !s.enabled;
-                        const sensitive = plugin?.capabilities.some(
-                          (c) => c.type === "mcp" && c.sensitive,
-                        );
-                        return (
-                          <Chip
-                            key={s.name}
-                            color={runtimeOff ? "default" : "success"}
-                            size="sm"
-                            title={
-                              plugin
-                                ? `${plugin.state}${sensitive ? " · tools need approval" : ""}`
-                                : "plugin system unavailable"
-                            }
-                            variant="soft"
-                          >
-                            {s.name}
-                            {runtimeOff ? " (off)" : ""}
-                            {sensitive ? " 🔒" : ""}
-                          </Chip>
-                        );
-                      })}
-                    </Card.Content>
-                  </Card>
-                </div>
-                <Card className="mt-3" variant="default">
-                  <Card.Header>
-                    <Card.Title>Skills ({data.skills.length})</Card.Title>
-                    <Card.Description>
-                      SKILL.md manuals, loaded on demand
-                    </Card.Description>
-                  </Card.Header>
-                  <Card.Content className="flex flex-col gap-2">
-                    {data.skills.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        None found - point BERG_AGENT_SKILLS at a skills
-                        directory.
-                      </p>
-                    )}
-                    {data.skills.map((s) => {
-                      const plugin = skills.get(skillKey(s.name));
-                      return (
-                        <div key={s.name} className="text-sm">
-                          <span className="font-mono font-semibold">
-                            {s.name}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {" "}
-                            — {s.description || "no description"}
-                          </span>{" "}
-                          {plugin && (
-                            <Chip
-                              color={
-                                plugin.state === "enabled"
-                                  ? "success"
-                                  : "default"
-                              }
-                              size="sm"
-                              variant="soft"
-                            >
-                              {plugin.state === "enabled"
-                                ? "Enabled"
-                                : "Disabled"}
-                            </Chip>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </Card.Content>
-                </Card>
-                {toolPlugins.length > 0 && (
-                  <Card className="mt-3" variant="default">
-                    <Card.Header>
-                      <Card.Title>
-                        Tool plugins ({toolPlugins.length})
-                      </Card.Title>
-                      <Card.Description>
-                        Plugin tools offered to the chat agent
-                      </Card.Description>
-                    </Card.Header>
-                    <Card.Content className="flex flex-col gap-2">
-                      {toolPlugins.map((p) => (
-                        <div key={p.id} className="text-sm">
-                          <span className="font-semibold">{p.name}</span>{" "}
-                          <Chip size="sm" variant="soft">
-                            v{p.version}
-                          </Chip>{" "}
-                          <Chip
-                            color={
-                              p.state === "enabled" ? "success" : "default"
-                            }
-                            size="sm"
-                            variant="soft"
-                          >
-                            {p.state}
-                          </Chip>
-                          <div className="font-mono text-[11px] text-muted-foreground">
-                            {p.tools.join(", ")}
-                          </div>
-                        </div>
-                      ))}
-                    </Card.Content>
-                  </Card>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Memory files</CardTitle>
+                <CardDescription>
+                  Always-loaded AGENTS.md paths ({data.memory.length})
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-1.5">
+                {data.memory.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    None configured - set BERG_AGENT_MEMORY to share context
+                    files with the agent.
+                  </p>
                 )}
-                <div className="mt-3">
-                  <RouterStatsPanel compact stats={stats as never} />
-                </div>
-              </>
-            );
-          })()}
+                {data.memory.map((m) => (
+                  <div key={m.path} className="flex items-center gap-2 text-sm">
+                    <span className="truncate font-mono">{m.path}</span>
+                    <Badge
+                      className={m.exists ? SUCCESS_BADGE_CLASS : undefined}
+                      variant={m.exists ? "outline" : "destructive"}
+                    >
+                      {m.exists ? "found" : "missing"}
+                    </Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>MCP servers</CardTitle>
+                <CardDescription>
+                  External tools ({data.mcp_servers.length})
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-1.5">
+                {data.mcp_servers.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    None configured in .berg-agents/mcp.json.
+                  </p>
+                )}
+                {data.mcp_servers.map((s) => {
+                  const plugin = mcp.get(s.name);
+                  const runtimeOff = plugin
+                    ? plugin.state !== "enabled"
+                    : !s.enabled;
+                  const sensitive = plugin?.capabilities.some(
+                    (c) => c.type === "mcp" && c.sensitive,
+                  );
+                  return (
+                    <Badge
+                      key={s.name}
+                      className={runtimeOff ? undefined : SUCCESS_BADGE_CLASS}
+                      title={
+                        plugin
+                          ? `${plugin.state}${sensitive ? " · tools need approval" : ""}`
+                          : "plugin system unavailable"
+                      }
+                      variant={runtimeOff ? "secondary" : "outline"}
+                    >
+                      {s.name}
+                      {runtimeOff ? " (off)" : ""}
+                      {sensitive ? " 🔒" : ""}
+                    </Badge>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </div>
+          <Card className="mt-3">
+            <CardHeader>
+              <CardTitle>Skills ({data.skills.length})</CardTitle>
+              <CardDescription>
+                SKILL.md manuals, loaded on demand
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
+              {data.skills.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  None found - point BERG_AGENT_SKILLS at a skills directory.
+                </p>
+              )}
+              {data.skills.map((s) => {
+                const plugin = skills.get(skillKey(s.name));
+                const enabled = plugin?.state === "enabled";
+                return (
+                  <div key={s.name} className="text-sm">
+                    <span className="font-mono font-semibold">{s.name}</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      - {s.description || "no description"}
+                    </span>{" "}
+                    {plugin && (
+                      <Badge
+                        className={enabled ? SUCCESS_BADGE_CLASS : undefined}
+                        variant={enabled ? "outline" : "secondary"}
+                      >
+                        {enabled ? "Enabled" : "Disabled"}
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          {toolPlugins.length > 0 && (
+            <Card className="mt-3">
+              <CardHeader>
+                <CardTitle>Tool plugins ({toolPlugins.length})</CardTitle>
+                <CardDescription>
+                  Plugin tools offered to the chat agent
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                {toolPlugins.map((p) => {
+                  const enabled = p.state === "enabled";
+                  return (
+                    <div key={p.id} className="text-sm">
+                      <span className="font-semibold">{p.name}</span>{" "}
+                      <Badge variant="secondary">v{p.version}</Badge>{" "}
+                      <Badge
+                        className={enabled ? SUCCESS_BADGE_CLASS : undefined}
+                        variant={enabled ? "outline" : "secondary"}
+                      >
+                        {p.state}
+                      </Badge>
+                      <div className="font-mono text-[11px] text-muted-foreground">
+                        {p.tools.join(", ")}
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="mt-3">
+            <RouterStatsPanel compact stats={stats as never} />
+          </div>
         </div>
       </div>
     </>

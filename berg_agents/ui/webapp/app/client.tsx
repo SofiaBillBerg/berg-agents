@@ -20,12 +20,15 @@
  */
 
 "use client";
-
 import { Suspense, useEffect, useState } from "react";
 
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
 import App from "./App.tsx";
 import { installBergRuntime } from "./runtime/berg-runtime.ts";
+
+if (typeof window !== "undefined") {
+  installBergRuntime();
+}
 
 /**
  * ClientOnly wrapper component.
@@ -43,9 +46,9 @@ export function ClientOnly() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Wait for hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
-    // Plugin UI bundles resolve React/HeroUI against this runtime, so
+    // Plugin UI bundles resolve against this runtime, so
     // it must exist before any plugin surface is imported.
     installBergRuntime();
     // Global uncaught error handler for frontend debugging

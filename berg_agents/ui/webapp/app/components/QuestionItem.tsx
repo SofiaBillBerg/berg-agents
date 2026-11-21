@@ -2,8 +2,7 @@ import type { PendingQuestion, PendingQuestionAnswer } from "@/harness";
 
 import { useState } from "react";
 
-// import { Button } from "@heroui/react";
-import { Button } from "@/components/ui/button"; // <-  replaces heroui
+import { Button } from "@/components/ui/button";
 
 /**
  * The custom-answer cap. The server enforces the same limit when it

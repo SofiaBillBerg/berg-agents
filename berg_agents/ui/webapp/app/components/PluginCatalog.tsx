@@ -18,16 +18,21 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
-
 "use client";
 
 import type { PluginInfo } from "@/lib/backendCatalog";
 
 import React, { useState } from "react";
-import { Card, Chip } from "@heroui/react";
 import useSWR from "swr";
 
-import { Button } from "@/components/ui/button"; // <-  replaces heroui
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle} from "@/components/ui/card";
 import { API_BASE } from "@/envConfig";
 import {
   CATALOG_KEYS,
@@ -43,12 +48,6 @@ export interface PluginCatalogProps {
   style?: React.CSSProperties;
 }
 
-/**
- * Group a plugin for the catalog sections below.
- *
- * @param plugin - Plugin descriptor from /api/plugins.
- * @returns Section key: tool plugins, skills, MCP servers, or other.
- */
 function sectionOf(plugin: PluginInfo): string {
   if (plugin.tools.length > 0) return "tools";
   if (plugin.capabilities.some((c) => c.type === "skill")) return "skills";
@@ -62,21 +61,10 @@ const SECTION_TITLE: Record<string, string> = {
   mcp: "🌐 MCP servers",
   other: "📦 Other"};
 
-/**
- * Plugin catalog surface: every plugin the backend has loaded, grouped
- * by kind. Tool plugins show their chat tools, skills their catalog
- * entry, MCP servers their transport plus the approval flag — the same
- * data the model side uses, now visible to the user.
- */
 export function PluginCatalog({
   onClose,
   className,
   style}: PluginCatalogProps) {
-  // One SWR reader for the catalog: mount, the ↻ button and the refresh
-  // after a toggle all resolve to `mutate`, so there is a single path
-  // from "something changed" to "this panel shows it". The three
-  // callbacks this replaced (readPlugins / applyPlugins / reloadPlugins)
-  // existed only to route a bare fetch into local state.
   const {
     data: plugins = [],
     error,
@@ -87,12 +75,8 @@ export function PluginCatalog({
     CATALOG_SWR_OPTIONS,
   );
   const [toggling, setToggling] = useState<string | null>(null);
-  // A failed TOGGLE is separate from a failed read: the read's error
-  // lives in SWR, this one is only about the last button press.
   const [toggleError, setToggleError] = useState<string | null>(null);
 
-  // Enable/disable one plugin: the next chat turn picks up the change
-  // (tools withheld, MCP toolsets and skills excluded server-side).
   const togglePlugin = async (plugin: PluginInfo) => {
     const enabled = plugin.state === "enabled";
     setToggling(plugin.id);
@@ -103,11 +87,8 @@ export function PluginCatalog({
         { method: "POST" },
       );
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      // The toggle changed what the catalog reports — re-read it.
       await mutatePlugins();
     } catch (e) {
-      // Shown against the list rather than thrown: the panel keeps
-      // rendering the plugins it already has.
       setToggleError(e instanceof Error ? e.message : String(e));
     } finally {
       setToggling(null);
@@ -124,21 +105,19 @@ export function PluginCatalog({
     <Card
       className={`mb-2 flex min-h-0 flex-col ${className ?? ""}`}
       style={style}
-      variant="default"
     >
-      <Card.Header>
-        <Card.Title>🔌 Plugins</Card.Title>
-        <Card.Description>
-          {isLoading ? "Loading…" : `${plugins.length} loaded`}
-        </Card.Description>
-        <span className="flex-1" />
+      <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+        <div className="min-w-0 flex-1">
+          <CardTitle>🔌 Plugins</CardTitle>
+          <CardDescription>
+            {isLoading ? "Loading…" : `${plugins.length} loaded`}
+          </CardDescription>
+        </div>
         <Button
           aria-label="Refresh plugins"
           size="sm"
           variant="secondary"
           onPress={() => {
-            // A bound mutate: a real refresh of the shared key, so every
-            // other reader of the catalog updates with this panel.
             void mutatePlugins();
           }}
         >
@@ -154,10 +133,10 @@ export function PluginCatalog({
             ✕
           </Button>
         )}
-      </Card.Header>
-      <Card.Content className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+      </CardHeader>
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
         {(error || toggleError) && (
-          <p className="text-xs text-red-500">
+          <p className="text-xs text-destructive">
             {error ? error.message : toggleError}
           </p>
         )}
@@ -176,16 +155,14 @@ export function PluginCatalog({
                   <span className="flex-1 truncate text-sm font-medium">
                     {plugin.name}
                   </span>
-                  <Chip size="sm" variant="soft">
-                    v{plugin.version}
-                  </Chip>
-                  <Chip
-                    color={plugin.state === "enabled" ? "success" : "default"}
-                    size="sm"
-                    variant="soft"
+                  <Badge variant="outline">v{plugin.version}</Badge>
+                  <Badge
+                    variant={
+                      plugin.state === "enabled" ? "default" : "secondary"
+                    }
                   >
                     {plugin.state}
-                  </Chip>
+                  </Badge>
                   <Button
                     aria-label={`${plugin.state === "enabled" ? "Disable" : "Enable"} ${plugin.name}`}
                     isDisabled={toggling === plugin.id}
@@ -226,7 +203,7 @@ export function PluginCatalog({
             No plugins loaded — check the backend log.
           </p>
         )}
-      </Card.Content>
+      </CardContent>
     </Card>
   );
 }

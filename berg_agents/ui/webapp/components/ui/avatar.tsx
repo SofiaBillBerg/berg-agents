@@ -22,24 +22,28 @@ function Avatar({
     />
   );
 }
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type ImageState = "loading" | "loaded" | "error";
 
-function AvatarImage({ className, ...props }: React.ComponentProps<"img">) {
-  const [state, setState] = React.useState<ImageState>(
-    props.src ? "loading" : "error",
-  );
+function AvatarImage({
+  className,
+  src,
+  alt = "",
+  ...props
+}: Omit<React.ComponentProps<typeof Image>, "src" | "alt"> & {
+  src?: string;
+  alt?: string;
+}) {
+  if (!src) return null;
+
   return (
     <Image
-      alt={props.alt || ""}
-      className={cn(
-        "peer aspect-square size-full rounded-full object-cover data-[state=error]:hidden",
-        className,
-      )}
+      alt={alt}
+      className={cn("aspect-square size-full object-cover", className)}
       data-slot="avatar-image"
-      data-state={state}
-      onError={() => setState("error")}
-      onLoad={() => setState("loaded")}
+      height={40}
+      src={src}
+      width={40}
       {...props}
     />
   );

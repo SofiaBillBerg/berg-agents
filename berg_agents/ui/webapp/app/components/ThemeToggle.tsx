@@ -27,8 +27,7 @@ import { Switch } from "@/components/ui/switch.tsx";
 /**
  * ThemeToggle component.
  * Toggles between light and dark themes by switching the `.dark` class and
- * the `data-theme` attribute on <html> - the selectors HeroUI v3 actually
- * reads (see app/globals.css: `.dark, [data-theme="dark"]`).
+ * the `data-theme` attribute on <html> - the selectors read (see app/globals.css: `.dark, [data-theme="dark"]`).
  * Persisted under the `berg-theme` key, falling back to the legacy
  * `berg-preset` key so existing visitors keep their choice.
  */

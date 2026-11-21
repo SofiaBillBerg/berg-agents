@@ -22,7 +22,7 @@
 /* Berg Agents webapp - visual design language.
  *
  * Design tokens come from ./theme.css (Berg canonical) and ./globals.css
- * (HeroUI). This file holds only component/layout rules for classes
+ * This file holds only component/layout rules for classes
  * actually rendered by the tsx components - no dead styles.
  */
 :root {
@@ -164,7 +164,7 @@ button:disabled {
 }
 
 /* Dark input fields shift blue-purple (hue 293), away from the
-   rose-red family that read as brown. Pairs with the HeroUI
+   rose-red family that read as brown. Pairs with the
    --field-background token. */
 .dark .input-bar textarea,
 .dark .input-bar-textarea {
@@ -297,4 +297,109 @@ button:disabled {
   overflow-y: auto;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* =================== Chat message bubbles & polish =================== */
+
+/* =================== Chat message bubbles & polish =================== */
+
+.message-list-item {
+  animation: berg-bubble-in 0.2s ease both;
+}
+
+/* Agent & System bubbles: bright teal accent + elevated surface contrast */
+.message-list-item [data-slot="message-content"] {
+  gap: 0.15rem;
+
+  width: fit-content;
+  max-width: min(88%, 56rem);
+  padding: 0.45rem 0.85rem;
+  border: 1px solid
+    color-mix(in oklch, var(--berg-status-success) 45%, var(--berg-border));
+  border-left: 3px solid var(--berg-status-success);
+  border-radius: var(--berg-radius-lg);
+
+  background: var(--berg-surface-tint);
+  box-shadow: var(--berg-shadow-sm);
+}
+
+/* User bubble: bright orchid accent on the right */
+.message-list-item[data-align="end"] [data-slot="message-content"] {
+  max-width: min(82%, 48rem);
+  border: 1px solid
+    color-mix(in oklch, var(--berg-accent-orchid) 45%, var(--berg-border));
+  border-right: 3px solid var(--berg-accent-orchid);
+  background: var(--berg-surface-tint);
+}
+
+/* Tighten spacing inside bubbles (header + markdown paragraphs) */
+.message-list-item [data-slot="message-content"] p {
+  margin-block: 0;
+}
+
+.message-list-item [data-slot="message-header"] {
+  padding-inline: 0;
+
+  font-size: var(--berg-fs-xs);
+  font-weight: var(--berg-fw-semibold);
+  line-height: 1.2;
+  color: var(--berg-muted);
+  letter-spacing: 0.02em;
+}
+
+.message-list-item [data-slot="message-avatar"] {
+  align-self: flex-start;
+
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--berg-border);
+
+  color: var(--berg-status-success);
+
+  background: var(--berg-surface-tint);
+  box-shadow: var(--berg-shadow-sm);
+}
+
+.message-list-item[data-align="end"] [data-slot="message-avatar"] {
+  border-color: color-mix(
+    in oklch,
+    var(--berg-accent-orchid) 45%,
+    var(--berg-border)
+  );
+  color: var(--berg-accent-orchid);
+}
+
+.message-list-item :not(pre) > code {
+  padding: 0.125rem 0.375rem;
+  border: 1px solid var(--berg-border);
+  border-radius: var(--berg-radius-sm);
+
+  font-family: var(--berg-font-mono);
+  font-size: 0.85em;
+  color: var(--berg-code-text);
+
+  background: var(--berg-code-bg);
+}
+
+.input-bar textarea:focus,
+.input-bar-textarea:focus {
+  border-color: color-mix(
+    in oklch,
+    var(--berg-accent-orchid) 60%,
+    var(--berg-border)
+  );
+  box-shadow: 0 0 0 3px
+    color-mix(in oklch, var(--berg-accent-orchid) 15%, transparent);
+}
+
+.input-bar button[data-variant="default"],
+.input-bar [data-slot="button"][data-variant="default"] {
+  border-color: transparent;
+  color: #fff;
+  background: var(--berg-gradient-brand);
+}
+
+.input-bar button[data-variant="default"]:hover:not(:disabled),
+.input-bar [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
+  opacity: 0.92;
 }

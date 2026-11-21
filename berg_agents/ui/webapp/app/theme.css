@@ -26,6 +26,8 @@
   --berg-brand-purple: #7d029c;
   --berg-brand-blue: #3b528b;
   --berg-brand-teal: #21908c;
+  --berg-primary: var(--berg-brand-purple);
+  --berg-primary-foreground: oklch(98% 0.01 320deg);
 
   /* Accent variants used in borders, callouts, hover states */
   --berg-accent-orchid: #e841c7;
@@ -105,14 +107,16 @@
 /* Dark mode: near-black rose + hot pink
    pop. Verbatim mapping; do not retune. */
 .dark {
-  /* Neutrals - near-white copy on near-black rose surfaces */
-  --berg-text: oklch(99.11% 0.0154 336.34deg);
-  --berg-bg: oklch(12% 0.0154 336.34deg);
-  --berg-surface: oklch(21.03% 0.0308 336.34deg);
-  --berg-surface-tint: oklch(27.21% 0.0231 336.34deg);
-  --berg-surface-soft: oklch(21.03% 0.0308 336.34deg / 76%);
-  --berg-border: oklch(28% 0.0154 336.34deg);
-  --berg-muted: oklch(70.5% 0.0308 336.34deg); /* callout label colour */
+  /* Neutrals - deep midnight plum surfaces */
+  --berg-text: oklch(98% 0.008 310deg);
+  --berg-bg: oklch(16.5% 0.022 298deg);
+  --berg-surface: oklch(22% 0.028 298deg);
+  --berg-surface-tint: oklch(26.5% 0.036 296deg);
+  --berg-surface-soft: oklch(22% 0.028 298deg / 80%);
+  --berg-border: oklch(31% 0.028 298deg);
+  --berg-muted: oklch(72% 0.025 310deg);
+  --berg-primary: var(--berg-accent-orchid);
+  --berg-primary-foreground: oklch(15% 0.026 336deg);
 
   /* Status - lifted for contrast on dark surfaces */
   --berg-status-info: #9db1e8;
@@ -120,10 +124,12 @@
   --berg-status-warn: #fd9f07;
   --berg-status-error: #f08a80;
 
-  /* Code - builder surface + rose accent pops on near-black */
-  --berg-code-bg: oklch(21.03% 0.0308 336.34deg);
-  --berg-code-text: oklch(77% 0.13 336.34deg);
-  --berg-shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
-  --berg-shadow-md: 0 2px 4px rgb(0 0 0 / 50%);
-  --berg-shadow-lg: 0 4px 12px rgb(0 0 0 / 60%);
+  /* Code */
+  --berg-code-bg: oklch(22% 0.028 298deg);
+  --berg-code-text: oklch(80% 0.14 330deg);
+  --berg-shadow-sm: 0 1px 2px rgb(0 0 0 / 45%);
+  --berg-shadow-md: 0 2px 4px rgb(0 0 0 / 55%);
+  --berg-shadow-lg: 0 4px 12px rgb(0 0 0 / 65%);
+
+  color-scheme: dark;
 }

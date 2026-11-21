@@ -18,21 +18,46 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
+/*
+ * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
+ *
+ * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ *
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
 
 import type { ChatMessage } from "@/harness";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Card, Spinner, Surface } from "@heroui/react";
+import { RiPauseCircleLine } from "@remixicon/react";
 import { math } from "@streamdown/math";
 
 import { ToolCard } from "./ToolCard";
 import { MessageList } from "./MessageList.tsx";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+
 // Import KaTeX styles for math rendering
 // ignore: this import is necessary for KaTeX to work properly, even if it seems unused
-
 const katexImportPath = math.getStyles?.();
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 import("katex/dist/katex.min.css");
+
 export interface ChatTranscriptProps {
   transcript: ChatMessage[];
   isExecuting: boolean;
@@ -90,11 +115,11 @@ export function ChatTranscript({
 
   return (
     <>
-      <Card className="mb-2 min-h-0 flex-1 flex flex-col" variant="default">
-        <Card.Content className="p-1.5 min-h-0 flex-1 flex flex-col">
+      <Card className="mb-2 flex min-h-0 flex-1 flex-col">
+        <CardContent className="flex min-h-0 flex-1 flex-col p-1.5">
           {/* Auto-scroll toggle - stays with the transcript so the user can
               follow streaming output or pin the viewport to read back. */}
-          <div className="flex items-center gap-1.5 mb-0.5">
+          <div className="mb-0.5 flex items-center gap-1.5">
             <button
               aria-label={
                 autoScroll ? "Disable auto-scroll" : "Enable auto-scroll"
@@ -120,30 +145,27 @@ export function ChatTranscript({
               onResolveDelegatedApproval={onResolveDelegatedApproval}
             />
 
-            {/* HITL Pending Notice - HeroUI Alert with compound components */}
+            {/* HITL Pending Notice */}
             {hitlRequest != null && (
-              <Alert className="mt-3" status="warning">
-                <Alert.Indicator />
-                <Alert.Title>⏸️ Waiting for your approval</Alert.Title>
-                <Alert.Description>
+              <Alert className="mt-3 border-amber-500/50 bg-amber-500/10 text-foreground">
+                <RiPauseCircleLine className="size-4 text-amber-500" />
+                <AlertTitle>Waiting for your approval</AlertTitle>
+                <AlertDescription>
                   A task is pending your review above. Please check the HITL
                   surface below to approve, reject, or edit the proposed action.
-                </Alert.Description>
+                </AlertDescription>
               </Alert>
             )}
           </div>
-        </Card.Content>
+        </CardContent>
       </Card>
 
-      {/* Thinking Bubble - HeroUI Spinner + Surface */}
+      {/* Thinking Bubble */}
       {isExecuting && !hitlRequest && (
-        <Surface
-          className="thinking-bubble p-3 mb-4 flex items-center gap-2"
-          variant="secondary"
-        >
-          <Spinner color="accent" size="sm" />
+        <div className="thinking-bubble mb-4 flex items-center gap-2 rounded-lg border bg-secondary/50 p-3">
+          <Spinner className="text-primary" />
           <span className="text-sm">Thinking...</span>
-        </Surface>
+        </div>
       )}
 
       {/* Tool Result Cards - rendered below the thinking bubble */}

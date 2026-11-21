@@ -38,35 +38,60 @@
  *     the read by section, so a late answer lands in its own entry and
  *     can never overwrite the one on screen.
  */
+/*
+ * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture. The system follows a harness-based execution model with multiple specialized agents working together.
+ *
+ * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
+
+/* SharedContextEditor - in-app editor for the user-owned Shared Context.
+ *
+ * Reads and writes the .berg-agents/context/*.md files through
+ * /api/context/shared, so the user edits the SAME files the agent reads
+ * every turn (and can contribute to via its tools). This is the
+ * collaboration surface for the context, with each section what/why
+ * history shown beside it. CodeMirror gives real Markdown editing.
+ */
 
 "use client";
 
 import { useEffect, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
-import { Card, Chip } from "@heroui/react";
 import { Streamdown } from "streamdown";
 import useSWR, { mutate } from "swr";
 
-import { Button } from "@/components/ui/button"; // <-  replaces heroui
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { API_BASE } from "@/envConfig";
 
 /** SWR key for the shared-context catalog (scopes + section list). */
 const CATALOG_KEY = `${API_BASE}/api/context/shared`;
 
-/**
- * SWR key for one section's body and history. Keyed by name so each
- * section has its own cache entry — this is what makes a rapid switch
- * between sections safe: answers cannot cross over.
- *
- * @param name - The section name.
- * @returns The request URL, which doubles as the cache key.
- */
 function sectionKey(name: string): string {
   return `${CATALOG_KEY}/${name}`;
 }
 
-/** One journal record from the backend history. */
 interface HistoryEntry {
   ts: string;
   scope: string;
@@ -76,32 +101,21 @@ interface HistoryEntry {
   summary: string;
 }
 
-/** One entry in the backend's section list. */
 interface CatalogSection {
   name: string;
   has_content: boolean;
 }
 
-/** What GET /api/context/shared answers. */
 interface CatalogData {
   scopes: Record<string, string>;
   sections: CatalogSection[];
 }
 
-/** What GET /api/context/shared/<name> answers. */
 interface SectionData {
   content: string;
   history: HistoryEntry[];
 }
 
-/**
- * Read the shared-context catalog: which scopes exist, and every section
- * with its content flag. The section list drives the picker, so this is
- * the single source of truth for what can be edited.
- *
- * @returns The catalog.
- * @throws When the request fails.
- */
 async function fetchCatalog(): Promise<CatalogData> {
   const resp = await fetch(CATALOG_KEY);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -111,12 +125,6 @@ async function fetchCatalog(): Promise<CatalogData> {
     sections: Array.isArray(data.sections) ? data.sections : []};
 }
 
-/**
- * Read one section's body and what/why history.
- *
- * @param name - The section name.
- * @throws When the request fails.
- */
 async function fetchSection(name: string): Promise<SectionData> {
   const resp = await fetch(sectionKey(name));
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -124,7 +132,6 @@ async function fetchSection(name: string): Promise<SectionData> {
   return { content: data.content ?? "", history: data.history ?? [] };
 }
 
-/** Follow the app's light/dark theme so CodeMirror matches. */
 function useCodeMirrorTheme(): "light" | "dark" {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   useEffect(() => {
@@ -151,15 +158,10 @@ export function SharedContextEditor() {
     isLoading: catalogLoading,
     error: catalogError} = useSWR<CatalogData>(CATALOG_KEY, fetchCatalog);
 
-  // Which section is open. Starts unset so the first one the backend
-  // reports becomes the selection — the list is the server's, not ours.
   const [selected, setSelected] = useState<string | null>(null);
   const sections = catalog?.sections ?? [];
   const section = selected ?? sections[0]?.name ?? "";
 
-  // Revalidate on focus would rewrite the editor buffer mid-keystroke,
-  // so this read is deliberately pinned: the body changes on save (which
-  // mutates the key) or when the user picks another section.
   const {
     data: sectionData,
     isLoading: sectionLoading,
@@ -167,10 +169,6 @@ export function SharedContextEditor() {
     fetchSection(section),
   );
 
-  // The editor buffer is local — the user is typing into it — and is only
-  // replaced when it belongs to a different section than the one showing.
-  // Guarded in render rather than an Effect so the editor never paints
-  // one section's text under another section's button.
   const [content, setContent] = useState("");
   const [saved, setSaved] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -188,16 +186,6 @@ export function SharedContextEditor() {
 
   const dirty = content !== saved;
 
-  /**
-   * Save (write) or append the editor buffer to a scope, with a why.
-   *
-   * The PUT's own response is the editor's new truth, so the buffer is
-   * adopted from it directly; the catalog and history are then
-   * revalidated in the background to refresh the content dots and the
-   * what/why log without blanking the editor.
-   *
-   * @param mode - "write" replaces the section, "append" adds a line.
-   */
   const save = async (mode: "write" | "append") => {
     setStatus(null);
     try {
@@ -211,8 +199,6 @@ export function SharedContextEditor() {
         changed?: boolean;
       };
       if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
-      // Adopt the canonical text the server stored (for an append that
-      // is the buffer plus the new line, which the buffer alone is not).
       const canonical = data.content || content;
       setSaved(canonical);
       setContent(canonical);
@@ -226,18 +212,15 @@ export function SharedContextEditor() {
   };
 
   return (
-    <Card variant="default">
-      <Card.Header>
-        <Card.Title>Shared Context</Card.Title>
-        <Card.Description>
+    <Card>
+      <CardHeader>
+        <CardTitle>Shared Context</CardTitle>
+        <CardDescription>
           User-owned files the agent reads every turn and can contribute to
           (with why). Project shadows global per section.
-        </Card.Description>
-      </Card.Header>
-      <Card.Content className="flex flex-col gap-3">
-        {/* Section picker; a dot marks sections that already have content.
-            The list comes from the backend, so a section added there
-            shows up here with no edit to this file. */}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
         <div className="flex flex-wrap gap-2">
           {catalogLoading && (
             <p className="text-sm text-muted-foreground">Loading…</p>
@@ -251,7 +234,6 @@ export function SharedContextEditor() {
             <Button
               key={s.name}
               size="sm"
-              //variant={section === s.name ? "primary" : "secondary"}
               variant={section === s.name ? "default" : "secondary"}
               onPress={() => setSelected(s.name)}
             >
@@ -261,11 +243,8 @@ export function SharedContextEditor() {
           ))}
         </div>
 
-        {/* Scope, `why` (the `what`/`why` discipline), and the save controls. */}
         <div className="flex flex-wrap items-center gap-2">
-          <Chip size="sm" variant="soft">
-            scope: {scope}
-          </Chip>
+          <Badge variant="secondary">scope: {scope}</Badge>
           <Button
             size="sm"
             variant="secondary"
@@ -273,9 +252,9 @@ export function SharedContextEditor() {
           >
             {scope === "project" ? "→ global" : "→ project"}
           </Button>
-          <input
+          <Input
             aria-label="Why (what/why discipline)"
-            className="flex-1 min-w-48 rounded-md border border-border bg-background px-2 py-1 text-sm"
+            className="h-8 min-w-48 flex-1 text-sm"
             id="shared-context-why"
             name="shared-context-why"
             placeholder="why (the what/why discipline)"
@@ -306,17 +285,14 @@ export function SharedContextEditor() {
           </p>
         )}
 
-        {/* The editor (left) and a live Streamdown preview (right) so the
-            user sees rendered markdown as they type — no new route, just
-            a nicer editor on the shared-context page. */}
-        <div className="flex flex-col lg:flex-row gap-3 min-h-0">
-          <div className="min-w-0 flex-1 flex flex-col border border-border rounded-lg">
-            <div className="px-2 py-1 text-[11px] text-muted-foreground border-b border-border">
+        <div className="flex min-h-0 flex-col gap-3 lg:flex-row">
+          <div className="flex min-w-0 flex-1 flex-col rounded-lg border border-border">
+            <div className="border-b border-border px-2 py-1 text-[11px] text-muted-foreground">
               Edit
             </div>
             <div className="min-h-0 flex-1">
               {sectionLoading ? (
-                <p className="text-sm text-muted-foreground p-3">Loading…</p>
+                <p className="p-3 text-sm text-muted-foreground">Loading…</p>
               ) : (
                 <CodeMirror
                   basicSetup={{ lineNumbers: false }}
@@ -329,8 +305,8 @@ export function SharedContextEditor() {
               )}
             </div>
           </div>
-          <div className="min-w-0 flex-1 flex flex-col border border-border rounded-lg bg-surface-soft/30">
-            <div className="px-2 py-1 text-[11px] text-muted-foreground border-b border-border">
+          <div className="bg-surface-soft/30 flex min-w-0 flex-1 flex-col rounded-lg border border-border">
+            <div className="border-b border-border px-2 py-1 text-[11px] text-muted-foreground">
               Preview
             </div>
             <div className="min-h-80 flex-1 overflow-y-auto p-3 text-sm leading-relaxed">
@@ -339,10 +315,9 @@ export function SharedContextEditor() {
           </div>
         </div>
 
-        {/* The sections what/why history, newest first. */}
         {history.length > 0 && (
           <div className="flex flex-col gap-1">
-            <h4 className="m-0 text-xs font-semibold uppercase tracking-wider text-muted">
+            <h4 className="m-0 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               History (what / why)
             </h4>
             <ul className="flex list-none flex-col gap-0.5 p-0 text-[11px] text-muted-foreground">
@@ -353,16 +328,14 @@ export function SharedContextEditor() {
                 </li>
               ))}
             </ul>
+            <p className="text-xs text-muted-foreground">
+              project: {catalog?.scopes.project ?? "…"} · global:{" "}
+              {catalog?.scopes.global ?? "…"}
+            </p>
           </div>
         )}
-
-        <p className="text-[11px] text-muted-foreground">
-          project: {catalog?.scopes.project ?? "…"} · global:{" "}
-          {catalog?.scopes.global ?? "…"}
-        </p>
-      </Card.Content>
+      </CardContent>
     </Card>
   );
 }
-
 export default SharedContextEditor;

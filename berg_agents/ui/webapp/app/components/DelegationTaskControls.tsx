@@ -4,7 +4,7 @@ import type { LiveDelegatedTask } from "@/harness";
 
 import { useState } from "react";
 
-import { Button } from "@/components/ui/button"; // <-  replaces heroui
+import { Button } from "@/components/ui/button";
 import { readStoredSessionId } from "@/harness/sessionIdentity";
 import {
   cancelDelegatedTask,

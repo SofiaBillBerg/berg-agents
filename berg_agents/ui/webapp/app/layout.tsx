@@ -21,12 +21,12 @@
 
 import type { Metadata } from "next";
 
-// Import KaTeX styles for math rendering
+import { Nunito_Sans, Public_Sans } from "next/font/google";
 import "katex/dist/katex.min.css";
-
 import "streamdown/styles.css";
 import React from "react";
-import { Public_Sans, Nunito_Sans } from "next/font/google";
+
+import { Providers } from "./providers";
 
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -57,7 +57,7 @@ export const metadata: Metadata = {
 /**
  * Pre-hydration theme script: reads the stored theme (`berg-theme`, falling
  * back to the legacy `berg-preset` key) or the OS preference and applies the
- * `.dark` class + `data-theme` before first paint, so the correct HeroUI
+ * `.dark` class + `data-theme` before first paint, so the correct
  * tokens apply with no light-flash. Must stay dependency-free and inline.
  */
 const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem("berg-theme")||localStorage.getItem("berg-preset");var d=s?s==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;var r=document.documentElement;r.classList.toggle("dark",d);r.setAttribute("data-theme",d?"dark":"light");r.setAttribute("data-berg-preset",d?"dark":"light");}catch(e){}})();`;
@@ -76,9 +76,11 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="flex h-dvh flex-col overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col" id="root">
-          {children}
-        </div>
+        <Providers>
+          <div className="flex min-h-0 flex-1 flex-col" id="root">
+            {children}
+          </div>
+        </Providers>
       </body>
     </html>
   );

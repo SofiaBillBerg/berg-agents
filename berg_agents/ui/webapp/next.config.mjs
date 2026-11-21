@@ -135,9 +135,6 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: "https",
-        hostname: "*.heroui.com"},
-      {
         protocol: "http",
         hostname: "localhost"}]},
 

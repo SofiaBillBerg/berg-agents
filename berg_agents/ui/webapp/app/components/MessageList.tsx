@@ -46,7 +46,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer.tsx";
 import SpecialistLiveFeed from "./SpecialistLiveFeed.tsx";
 import DelegationTaskControls from "./DelegationTaskControls.tsx";
 
-import { Button } from "@/components/ui/button"; // <-  replaces heroui
+import { Button } from "@/components/ui/button";
 import {
   Trace,
   TraceCollapsible,

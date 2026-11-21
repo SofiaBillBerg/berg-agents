@@ -44,6 +44,12 @@ import type { ComponentType } from "react";
 
 import React from "react";
 
+import { installBergRuntime } from "../runtime/berg-runtime";
+
+if (typeof window !== "undefined") {
+  installBergRuntime();
+}
+
 /** Props the host passes to any plugin surface. */
 export interface PluginSurfaceProps {
   /** Side-panel (docked) or canvas (wide) presentation. */

@@ -16,7 +16,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
+ * along with this program.  If not, see <https://gnu.org>.
  */
 
 /**
@@ -35,9 +35,11 @@ import type { ComponentType } from "react";
 import type { PluginSurfaceProps } from "./registry.tsx";
 
 import { useEffect, useState } from "react";
-import { Card, Spinner } from "@heroui/react";
 
 import { loadPluginSurface } from "./registry.tsx";
+
+import { Card } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface PluginUISurfaceProps extends PluginSurfaceProps {
   /** Plugin id to render (from `/api/plugins`). */
@@ -103,9 +105,9 @@ export function PluginUISurface({
 
   if (loading) {
     return (
-      <Card className="mb-2 p-3" variant="default">
+      <Card className="mb-2 p-3">
         <div className="flex items-center gap-2">
-          <Spinner size="sm" />
+          <Spinner className="size-4" />
           <span className="text-sm text-muted-foreground">
             Loading plugin UI…
           </span>
@@ -116,7 +118,7 @@ export function PluginUISurface({
 
   if (error || !component) {
     return (
-      <Card className="mb-2 p-3" variant="default">
+      <Card className="mb-2 p-3">
         <p className="text-sm font-medium">Plugin UI unavailable</p>
         <p className="mt-1 text-xs text-muted-foreground">
           {error ?? `${pluginId} surface did not load.`}

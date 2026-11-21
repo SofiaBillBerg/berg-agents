@@ -27,6 +27,8 @@
     "@ss-blocks": "https://shadcnstudio.com/r/blocks/{style}/{name}.json",
     "@ss-pages": "https://shadcnstudio.com/r/pages/{style}/{name}.json",
     "@ss-illustrations": "https://shadcnstudio.com/r/illustrations/{name}.json",
-    "@ss-themes": "https://shadcnstudio.com/r/themes/{name}.json"
+    "@ss-themes": "https://shadcnstudio.com/r/themes/{name}.json",
+    "@shadcnblocks": "https://shadcnblocks.com/r/{style}/{name}.json",
+    "@shadcnblocks/ui-extras": "https://shadcnblocks.com/r/aria-{style}/ui-extras/{name}.json"
   }
 }
