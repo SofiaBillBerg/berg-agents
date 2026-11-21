@@ -29,6 +29,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Toast, toast } from "@heroui/react";
+// TODOÖ Replace Toast and toast with Toast and toast from components ui should be used instead <-  replaces heroui
 import {
   RiAddLine,
   RiArrowDownLine,
@@ -68,7 +69,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle} from "@/components/ui/card.tsx";
-import { Button, Button as ToolbarButton } from "@/components/ui/button.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip.tsx";
 import { buildExportMarkdown } from "@/utils/utils";
@@ -398,7 +399,7 @@ function ChatContent() {
             sessionId={aiChat.sessionId ?? null}
             streaming={aiChat.isStreaming ?? false}
           />
-          <ToolbarButton
+          <Button
             aria-label="Open sessions (server-side history)"
             size="xs"
             variant="secondary"
@@ -406,8 +407,8 @@ function ChatContent() {
           >
             <RiHistoryLine data-icon="inline-start" />
             Sessions
-          </ToolbarButton>
-          <ToolbarButton
+          </Button>
+          <Button
             aria-label="Start a new chat (current chat is saved as a session)"
             size="xs"
             variant="secondary"
@@ -415,30 +416,30 @@ function ChatContent() {
           >
             <RiAddLine data-icon="inline-start" />
             New chat
-          </ToolbarButton>
+          </Button>
           {/* Top and Bottom are navigation for a long transcript — the two
                 least-used controls in the row, so they cost the least space:
                 icons with tooltips, no labels. */}
           <TooltipTrigger>
-            <ToolbarButton
+            <Button
               aria-label="Jump to the top of the conversation"
               size="xs"
               variant="ghost"
               onPress={() => scrollChatTo("top")}
             >
               <RiArrowUpLine data-icon="inline-start" />
-            </ToolbarButton>
+            </Button>
             <Tooltip placement="bottom">Jump to the top</Tooltip>
           </TooltipTrigger>
           <TooltipTrigger>
-            <ToolbarButton
+            <Button
               aria-label="Jump to the bottom of the conversation"
               size="xs"
               variant="ghost"
               onPress={() => scrollChatTo("bottom")}
             >
               <RiArrowDownLine data-icon="inline-start" />
-            </ToolbarButton>
+            </Button>
             <Tooltip placement="bottom">Jump to the bottom</Tooltip>
           </TooltipTrigger>
           {/*
@@ -452,7 +453,7 @@ function ChatContent() {
               typeof decl?.label === "string" ? decl.label : "Plugin";
             const isOpen = sidePluginId === surface.pluginId;
             return (
-              <ToolbarButton
+              <Button
                 key={surface.pluginId}
                 aria-label={isOpen ? `Hide ${label}` : `Show ${label}`}
                 size="sm"
@@ -468,10 +469,10 @@ function ChatContent() {
               >
                 {label}
                 {isOpen && pluginCount > 0 ? ` (${pluginCount})` : ""}
-              </ToolbarButton>
+              </Button>
             );
           })}
-          <ToolbarButton
+          <Button
             aria-label={showCatalog ? "Hide plugins" : "Show plugins"}
             size="sm"
             variant="secondary"
@@ -482,7 +483,7 @@ function ChatContent() {
             }}
           >
             🔌 Plugins
-          </ToolbarButton>
+          </Button>
           <span className="flex-1" />
           <ThemeToggle />
           {/* Auto-approve is a boolean, so it is a Switch — not a
@@ -504,7 +505,7 @@ function ChatContent() {
           <AgentSelector />
           <ProviderSelector />
           <span title="Download this conversation as a Markdown file">
-            <ToolbarButton
+            <Button
               aria-label="Export conversation as markdown"
               className="border border-primary text-primary hover:bg-primary/10"
               size="sm"
@@ -539,7 +540,7 @@ function ChatContent() {
               }}
             >
               ⬇ Export
-            </ToolbarButton>
+            </Button>
           </span>
         </div>
         {/* Activity details - one inline toggle line (no card chrome),

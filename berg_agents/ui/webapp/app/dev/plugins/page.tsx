@@ -42,13 +42,14 @@
 import type { PluginInfo } from "@/lib/backendCatalog";
 
 import { useEffect, useState } from "react";
-import { Button, Card, Chip, Spinner } from "@heroui/react";
+import { Card, Chip, Spinner } from "@heroui/react";
 import useSWR from "swr";
 
 import { installBergRuntime } from "../../runtime/berg-runtime.ts";
 import { PluginUISurface } from "../../plugins/PluginUISurface.tsx";
 import { Navbar } from "../../components/Navbar.tsx";
 
+import { Button } from "@/components/ui/button"; // <-  replaces heroui
 import { API_BASE } from "@/envConfig";
 import {
   CATALOG_KEYS,
@@ -228,7 +229,8 @@ export default function PluginDevPage() {
                   <Button
                     key={p.id}
                     size="sm"
-                    variant={selected?.id === p.id ? "primary" : "secondary"}
+                    //variant={selected?.id === p.id ? "primary" : "secondary"}
+                    variant={selected?.id === p.id ? "default" : "secondary"}
                     onPress={() => selectPlugin(p.id)}
                   >
                     {p.name}
@@ -316,7 +318,8 @@ export default function PluginDevPage() {
                               <Button
                                 key={t}
                                 size="sm"
-                                variant={tool === t ? "primary" : "secondary"}
+                                //variant={tool === t ? "primary" : "secondary"}
+                                variant={tool === t ? "default" : "secondary"}
                                 onPress={() => {
                                   setTool(t);
                                   setResult(null);
@@ -344,7 +347,7 @@ export default function PluginDevPage() {
                           <div>
                             <Button
                               isDisabled={!tool || running}
-                              variant="primary"
+                              variant="secondary"
                               onPress={() =>
                                 tool && void runTool(selected, tool)
                               }

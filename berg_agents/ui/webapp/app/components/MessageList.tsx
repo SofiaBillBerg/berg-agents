@@ -27,7 +27,6 @@ import type {
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@heroui/react";
 import {
   RiCheckLine,
   RiErrorWarningLine,
@@ -47,6 +46,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer.tsx";
 import SpecialistLiveFeed from "./SpecialistLiveFeed.tsx";
 import DelegationTaskControls from "./DelegationTaskControls.tsx";
 
+import { Button } from "@/components/ui/button"; // <-  replaces heroui
 import {
   Trace,
   TraceCollapsible,
@@ -798,7 +798,7 @@ function SubagentWork({
                 <Button
                   isDisabled={false}
                   size="sm"
-                  variant="primary"
+                  variant="default"
                   onPress={() =>
                     onResolveDelegatedApproval(call.toolCallId as string, true)
                   }

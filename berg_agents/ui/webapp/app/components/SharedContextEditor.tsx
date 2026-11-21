@@ -44,10 +44,11 @@
 import { useEffect, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
-import { Button, Card, Chip } from "@heroui/react";
+import { Card, Chip } from "@heroui/react";
 import { Streamdown } from "streamdown";
 import useSWR, { mutate } from "swr";
 
+import { Button } from "@/components/ui/button"; // <-  replaces heroui
 import { API_BASE } from "@/envConfig";
 
 /** SWR key for the shared-context catalog (scopes + section list). */
@@ -250,7 +251,8 @@ export function SharedContextEditor() {
             <Button
               key={s.name}
               size="sm"
-              variant={section === s.name ? "primary" : "secondary"}
+              //variant={section === s.name ? "primary" : "secondary"}
+              variant={section === s.name ? "default" : "secondary"}
               onPress={() => setSelected(s.name)}
             >
               {s.name}
@@ -283,7 +285,7 @@ export function SharedContextEditor() {
           <Button
             isDisabled={!dirty}
             size="sm"
-            variant="primary"
+            variant="default"
             onPress={() => void save("write")}
           >
             Save

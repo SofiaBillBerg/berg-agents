@@ -24,9 +24,10 @@
 import type { PluginInfo } from "@/lib/backendCatalog";
 
 import React, { useState } from "react";
-import { Button, Card, Chip } from "@heroui/react";
+import { Card, Chip } from "@heroui/react";
 import useSWR from "swr";
 
+import { Button } from "@/components/ui/button"; // <-  replaces heroui
 import { API_BASE } from "@/envConfig";
 import {
   CATALOG_KEYS,

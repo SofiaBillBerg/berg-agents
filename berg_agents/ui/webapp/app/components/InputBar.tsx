@@ -20,7 +20,10 @@
  */
 
 import React, { useEffect, useRef } from "react";
-import { Button, TextArea } from "@heroui/react";
+import { TextArea } from "@heroui/react";
+
+// TODO:  Replace TextArea with TextArea from commonents ui should be used instead <-  replaces heroui
+import { Button } from "@/components/ui/button"; // <-  replaces heroui
 
 /**
  * Props for the InputBar component. Prop names and semantics are frozen -
@@ -109,7 +112,7 @@ function InputBar({
         <Button
           className="min-h-11 shrink-0"
           isDisabled={!input.trim()}
-          variant="primary"
+          variant="default"
           onPress={onSend}
         >
           {streaming ? "↩ Send" : "Send"}

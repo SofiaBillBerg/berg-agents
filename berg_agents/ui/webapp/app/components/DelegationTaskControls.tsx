@@ -1,13 +1,14 @@
 import type { LiveDelegatedTask } from "@/harness";
 
-import { Button } from "@heroui/react";
+//
+
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button"; // <-  replaces heroui
 import { readStoredSessionId } from "@/harness/sessionIdentity";
 import {
   cancelDelegatedTask,
   messageDelegatedTask} from "@/harness/delegationQuestions";
-
 /**
  * Steering and stopping a delegated task that is still running.
  *

@@ -23,7 +23,9 @@
 
 import type { FailureNotice } from "@/harness";
 
-import { Button, Modal } from "@heroui/react";
+import { Modal } from "@heroui/react";
+
+import { Button } from "@/components/ui/button"; // <-  replaces heroui
 
 /**
  * FailureDialog - the ONE surface a failure is read on.

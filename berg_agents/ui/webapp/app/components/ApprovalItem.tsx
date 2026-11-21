@@ -1,7 +1,9 @@
 import type { PendingApproval } from "@/harness";
 
 import { useState } from "react";
-import { Button } from "@heroui/react";
+
+// import { Button } from "@heroui/react";
+import { Button } from "@/components/ui/button"; // <-  replaces heroui
 
 /**
  * One paused tool call inside an approval batch. Each item gets its
@@ -69,7 +71,7 @@ export function ApprovalItem({
             <Button
               isDisabled={isStreaming}
               size="sm"
-              variant="primary"
+              variant="default"
               onPress={saveEdit}
             >
               💾 Save args
@@ -109,7 +111,7 @@ export function ApprovalItem({
               <Button
                 isDisabled={isStreaming}
                 size="sm"
-                variant="primary"
+                variant="secondary"
                 onPress={() => onApprove(approval.id)}
               >
                 ✅ Approve

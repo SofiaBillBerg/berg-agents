@@ -59,18 +59,20 @@ function foldFrame(
   const last = list[list.length - 1] as Record<string, unknown> | undefined;
 
   if (type === "reasoning-delta") {
+    const delta = (frame.delta as string) ?? "";
     if (last?.type === "reasoning") {
-      last.text = `${(last.text as string) ?? ""}${(frame.text as string) ?? ""}`;
+      last.text = `${(last.text as string) ?? ""}${delta}`;
     } else {
-      list.push({ type: "reasoning", text: (frame.text as string) ?? "" });
+      list.push({ type: "reasoning", text: delta });
     }
     return;
   }
   if (type === "text-delta") {
+    const delta = (frame.delta as string) ?? "";
     if (last?.type === "text") {
-      last.text = `${(last.text as string) ?? ""}${(frame.text as string) ?? ""}`;
+      last.text = `${(last.text as string) ?? ""}${delta}`;
     } else {
-      list.push({ type: "text", text: (frame.text as string) ?? "" });
+      list.push({ type: "text", text: delta });
     }
     return;
   }
@@ -182,9 +184,8 @@ export default function SpecialistLiveFeed({ runId }: { runId: string }) {
                   toChatMessage({ id, role: "assistant", parts } as never),
                 ),
               );
-            } catch (err) {
+            } catch {
               // A torn frame is dropped: the next one carries on.
-              console.error("[SpecialistLiveFeed] frame dropped", err);
             }
           }
         }
