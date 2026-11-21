@@ -29,9 +29,24 @@ export function useSpecialistStates(runIds: string[]): Record<string, string> {
     if (ids.length === 0) return;
     let alive = true;
 
+    // Only the runs that can still move are asked about, and a settled
+    // one drops out of the rotation — its last state stays on screen as
+    // a fact, and re-asking for it every three seconds is a drain with
+    // no reader for the answer. A run that starts moving again arrives
+    // as a new run id, which re-arms through the key below.
+    const moving = new Set(ids);
+    const live = (state: string): boolean =>
+      state === "pending" || state === "working";
+
     const poll = async (): Promise<void> => {
+      const idsToAsk = [...moving];
+      if (idsToAsk.length === 0) {
+        // Everything settled: stop the clock rather than ask nobody.
+        if (typeof timer !== "undefined") window.clearInterval(timer);
+        return;
+      }
       const entries = await Promise.all(
-        ids.map(async (id) => {
+        idsToAsk.map(async (id) => {
           try {
             const response = await fetch(
               `/api/workflow/chat/${encodeURIComponent(id)}/state`,
@@ -49,11 +64,14 @@ export function useSpecialistStates(runIds: string[]): Record<string, string> {
           }
         }),
       );
+      for (const [id, state] of entries) {
+        if (!live(state as string)) moving.delete(id as string);
+      }
       if (alive) setStates(Object.fromEntries(entries));
     };
 
-    void poll();
     const timer = window.setInterval(() => void poll(), 3000);
+    void poll();
     return () => {
       alive = false;
       window.clearInterval(timer);

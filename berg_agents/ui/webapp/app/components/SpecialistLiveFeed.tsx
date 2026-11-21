@@ -130,7 +130,15 @@ function foldFrame(
  * @param props - The specialist's run id.
  * @returns The streaming transcript, or nothing before the first frame.
  */
-export default function SpecialistLiveFeed({ runId }: { runId: string }) {
+export default function SpecialistLiveFeed({
+  runId,
+  live}: {
+  runId: string;
+  /** Whether the specialist's turn is still live. A finished turn's
+      journal is not going to grow, so re-opening its stream would be a
+      pure drain, and the reconnect loop stops. */
+  live: boolean;
+}) {
   // The fold is kept in a ref so a new frame does not rebuild state from
   // scratch; the rendered messages are the ref's projection, taken on
   // every frame.
@@ -138,8 +146,16 @@ export default function SpecialistLiveFeed({ runId }: { runId: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   useEffect(() => {
-    if (!runId) return;
+    if (!runId || !live) return;
     let cancelled = false;
+
+    // A finished turn's journal is not going to grow, so re-opening its
+    // stream is a pure drain on the backend: the reconnect loop stops
+    // once the turn settles. While it IS live the loop keeps the row
+    // streaming, with a backoff so a pause costs one retry, not five a
+    // second.
+    let backoffMs = 1000;
+    const MAX_BACKOFF_MS = 15000;
 
     const open = async (): Promise<void> => {
       try {
@@ -195,8 +211,10 @@ export default function SpecialistLiveFeed({ runId }: { runId: string }) {
       } finally {
         if (!cancelled) {
           // The stream closes when a pass ends; the turn continues (a
-          // gate answer, a steer), so re-open and keep streaming.
-          window.setTimeout(() => void open(), 2000);
+          // gate answer, a steer), so re-open — with a backoff, and only
+          // while the turn is live.
+          window.setTimeout(() => void open(), backoffMs);
+          backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
         }
       }
     };
@@ -205,7 +223,7 @@ export default function SpecialistLiveFeed({ runId }: { runId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [runId]);
+  }, [runId, live]);
 
   if (messages.length === 0) return null;
   return <MessageList history={messages} isAnimating={true} />;

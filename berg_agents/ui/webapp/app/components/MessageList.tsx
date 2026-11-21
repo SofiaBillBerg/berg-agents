@@ -404,7 +404,13 @@ function useSpecialistRunPreview(
   useEffect(() => {
     if (!runId) return;
     let alive = true;
+    // Poll only while the run can still move: a settled run's state is
+    // a fact, and re-asking for it every three seconds is a drain with
+    // no reader for the answer.
+    const moving = (state: string): boolean =>
+      state === "pending" || state === "working";
     const poll = async (): Promise<void> => {
+      if (!alive) return;
       try {
         const response = await fetch(
           `/api/workflow/chat/${encodeURIComponent(runId)}/state`,
@@ -415,16 +421,23 @@ function useSpecialistRunPreview(
           pending?: PendingCall[];
         };
         if (!alive) return;
+        const state = String(data.state ?? "");
         setPreview({
-          state: String(data.state ?? ""),
+          state,
           pending: Array.isArray(data.pending) ? data.pending : []});
+        // A run that cannot still move is done being asked about. A
+        // parked gate re-arms when its answer lands: that navigation
+        // brings a new run id, and a new poller.
+        if (!moving(state)) {
+          window.clearInterval(timer);
+        }
       } catch {
         // A failed poll keeps the last reading: a transient failure
         // must not blank the row's live state.
       }
     };
-    void poll();
     const timer = window.setInterval(() => void poll(), 3000);
+    void poll();
     return () => {
       alive = false;
       window.clearInterval(timer);
@@ -565,7 +578,12 @@ function SubagentRow({
             {/* The specialist's own work, streaming live into the row —
                 the Subagent pattern's running state. While it works, its
                 tool calls and words arrive here as they happen. */}
-            {runId && <SpecialistLiveFeed runId={runId} />}
+            {runId && (
+              <SpecialistLiveFeed
+                live={status === "running" || liveRunning}
+                runId={runId}
+              />
+            )}
             {preview.pending.map((gate) => (
               <div
                 key={gate.tool_call_id}
