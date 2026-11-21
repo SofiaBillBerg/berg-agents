@@ -2,11 +2,11 @@
 
 // A client component, like every page that renders a live session: the stream,
 // the polling and the actions all run in the browser. Split from the route's
-// page module because `export const instant` is a route segment config, and
-// Next accepts it only from a Server Component module — the page stays the
-// server shell, this is the live surface.
+// page module because the route's `params` read belongs inside the server
+// shell's Suspense boundary — Next's streaming guidance — and the live surface
+// is everything after it.
 
-import { useState } from "react";
+import { use, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import ChatTranscript from "@/app/components/ChatTranscript";
@@ -31,7 +31,15 @@ import { useSpecialistSession } from "@/harness/useSpecialistSession";
  * @param props - The run whose session this is.
  * @returns The specialist's session.
  */
-export default function SpecialistSessionView({ runId }: { runId: string }) {
+export default function SpecialistSessionView({
+  params}: {
+  params: Promise<{ runId: string }>;
+}) {
+  // `params` is a Promise in this Next version (per its own route docs),
+  // so unwrapping it is the documented `use` — and because this read
+  // happens inside the route's Suspense boundary, the route prerenders
+  // its shell instead of blocking on the run id.
+  const { runId } = use(params);
   const session = useSpecialistSession(runId);
   const [steerText, setSteerText] = useState("");
   // The conversation this session was launched from, when the link that

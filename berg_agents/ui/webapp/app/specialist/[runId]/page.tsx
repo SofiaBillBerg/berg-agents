@@ -1,26 +1,18 @@
 /*
  * The route into one specialist's session.
  *
- * A server component on purpose: `export const instant` is a route segment
- * config and Next accepts it only from a Server Component module. The live
- * surface (stream, polling, actions) is the client view this renders, so the
- * split is the documented one rather than a workaround.
+ * A server component on purpose: it is the shell that renders on demand
+ * and hands the live surface to the browser. The `params` promise is
+ * passed THROUGH to the client view rather than unwrapped here, because
+ * the run id is what makes this route dynamic — unwrapping it inside the
+ * Suspense boundary (as Next's streaming guidance prescribes) lets the
+ * shell prerender and the session arrive without the route blocking:
+ * https://nextjs.org/docs/app/guides/streaming
  */
 
-import { Suspense, use } from "react";
+import { Suspense } from "react";
 
 import SpecialistSessionView from "./session-view";
-
-/**
- * The route shell: the run id from the URL, and the live session it names.
- *
- * A blocking route by intent — this page is one live specialist run, and every
- * read on it (the durable stream, the run's state) is uncached and per-run, so
- * Next's guidance is to say that outright rather than let prerender block on
- * data that can never be cached
- * (https://nextjs.org/docs/messages/blocking-prerender-dynamic).
- */
-export const instant = false;
 
 /**
  * Render one specialist's session.
@@ -32,12 +24,9 @@ export default function SpecialistSessionPage({
   params}: {
   params: Promise<{ runId: string }>;
 }) {
-  // `params` is a Promise in this Next version (per its own route docs), so
-  // unwrapping it is the documented `use` rather than an await.
-  const { runId } = use(params);
   // The placeholder is a real state, not a spinner: the stream is adopted
-  // and replayed in the client, and this route renders on demand — so the
-  // shell paints immediately and the turn's history arrives as one piece.
+  // and replayed in the client, so the shell paints immediately and the
+  // turn's history arrives as one piece.
   return (
     <Suspense
       fallback={
@@ -46,7 +35,7 @@ export default function SpecialistSessionPage({
         </main>
       }
     >
-      <SpecialistSessionView runId={runId} />
+      <SpecialistSessionView params={params} />
     </Suspense>
   );
 }
