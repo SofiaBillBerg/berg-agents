@@ -1,0 +1,34 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "aria-nova",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "globals.css",
+    "baseColor": "mauve",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "remixicon",
+  "rtl": false,
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "menuColor": "inverted-translucent",
+  "menuAccent": "subtle",
+  "registries": {
+    "@shadcn-studio": "https://shadcnstudio.com/r/{style}/{name}.json",
+    "@ss-components": "https://shadcnstudio.com/r/components/{style}/{name}.json",
+    "@ss-blocks": "https://shadcnstudio.com/r/blocks/{style}/{name}.json",
+    "@ss-pages": "https://shadcnstudio.com/r/pages/{style}/{name}.json",
+    "@ss-illustrations": "https://shadcnstudio.com/r/illustrations/{name}.json",
+    "@ss-themes": "https://shadcnstudio.com/r/themes/{name}.json",
+    "@shadcnblocks": "https://shadcnblocks.com/r/{style}/{name}.json",
+    "@shadcnblocks/ui-extras": "https://shadcnblocks.com/r/aria-{style}/ui-extras/{name}.json"
+  }
+}

@@ -1,15 +1,21 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { Button, Card, Chip, Fieldset, FieldsetLegend } from "@heroui/react";
 import { Streamdown } from "streamdown";
 
 import { apiFetch, sessionId } from "./runtime";
 
-/**
- * Types mirroring the tools this plugin's REST API returns. They are
- * the plugin's own vocabulary — the host never imports them.
- */
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle} from "@/components/ui/card";
+import { FieldLegend, FieldSet } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export interface TodoSubtask {
   index: number;
@@ -45,24 +51,12 @@ export interface TodoPanelProps {
 
 type TodoFilter = "all" | "open" | "done";
 
-/**
- * This plugin's identity in the host's plugin registry. The UI talks
- * only to the generic plugin-tool endpoint, so nothing here is
- * host-specific except the ids the manifest declares.
- */
 const PLUGIN_ID = "berg-plugin-shared-todo";
 
-/**
- * Call one of this plugin's tools through the host's generic
- * dispatch. Returns the tool's own string result.
- */
 async function callTool(
   tool: string,
   args: Record<string, unknown> = {},
 ): Promise<string> {
-  // Name the session so the server binds the plugin's scoped store to
-  // this conversation. Without it the call falls back to the manifest
-  // default and the panel shows a list no session owns.
   const sid = sessionId();
   const body = sid ? { ...args, sessionId: sid } : args;
   const resp = await apiFetch(`/api/plugins/${PLUGIN_ID}/tools/${tool}`, {
@@ -78,11 +72,6 @@ async function callTool(
   return String(data.result ?? "");
 }
 
-/**
- * Parse the Markdown-shaped output of ``list_todo_items`` into rows.
- * The tool returns a JSON array string (host-independent), so the UI
- * reads the plugin's own contract.
- */
 function parseTodoItems(listResult: string): TodoItem[] {
   const start = listResult.indexOf("[");
   if (start < 0) return [];
@@ -100,14 +89,6 @@ const STATUS_META: Record<string, { label: string; icon: string }> = {
   in_progress: { label: "Doing", icon: "🔄" },
   done: { label: "Done", icon: "✅" }};
 
-/**
- * Shared-todo plugin surface: side-panel list + expanded canvas view.
- * Reads the same Markdown store as the agent's todo tools via
- * the plugin's own tools through the host's generic dispatch, so
- * user edits and model edits converge on one store. Polls
- * lightly while mounted; parents force-refresh via refreshKey when a
- * todo tool call lands in the chat transcript.
- */
 export function TodoSurface({
   view,
   refreshKey,
@@ -147,8 +128,6 @@ export function TodoSurface({
     void fetchTodos();
   }, [fetchTodos, refreshKey]);
 
-  // Light polling keeps user edits in another tab and agent edits
-  // visible without manual refreshes.
   useEffect(() => {
     const timer = window.setInterval(() => void fetchTodos(), 15000);
     return () => window.clearInterval(timer);
@@ -225,7 +204,6 @@ export function TodoSurface({
     }
   };
 
-  // Rename a subtask's text (fix wording the model or the user wrote).
   const renameSubtask = async (todo: TodoItem, index: number) => {
     const text = subRenameText.trim();
     if (!text || busyId) return;
@@ -244,7 +222,6 @@ export function TodoSurface({
     }
   };
 
-  // Start editing a todo's own title/description.
   const startRenameTodo = (todo: TodoItem) => {
     setRenamingTodo(todo.id);
     setTodoTitleDraft(todo.title);
@@ -252,13 +229,13 @@ export function TodoSurface({
   };
 
   const saveTodo = async (todo: TodoItem) => {
-    const title = todoTitleDraft.trim();
-    if (!title || busyId) return;
+    const nextTitle = todoTitleDraft.trim();
+    if (!nextTitle || busyId) return;
     setBusyId(todo.id);
     try {
       await callTool("update_todo", {
         todo_id: todo.id,
-        title,
+        title: nextTitle,
         description: todoDescDraft});
       setRenamingTodo(null);
       await fetchTodos();
@@ -301,14 +278,14 @@ export function TodoSurface({
     <Card
       className={`mb-2 flex min-h-0 flex-col ${className ?? ""}`}
       style={style}
-      variant="default"
     >
-      <Card.Header>
-        <Card.Title>📋 Shared Todos</Card.Title>
-        <Card.Description>
-          {loading ? "Loading…" : `${openCount} open · ${todos.length} total`}
-        </Card.Description>
-        <span className="flex-1" />
+      <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+        <div className="min-w-0 flex-1">
+          <CardTitle>📋 Shared Todos</CardTitle>
+          <CardDescription>
+            {loading ? "Loading…" : `${openCount} open · ${todos.length} total`}
+          </CardDescription>
+        </div>
         {onToggleView && (
           <Button
             aria-label={
@@ -339,22 +316,25 @@ export function TodoSurface({
             ✕
           </Button>
         )}
-      </Card.Header>
-      <Card.Content className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
-        {error && <p className="text-xs text-red-500">{error}</p>}
+      </CardHeader>
+
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+        {error && <p className="text-xs text-destructive">{error}</p>}
+
         <div className="flex gap-1">
           {(["all", "open", "done"] as TodoFilter[]).map((f) => (
             <Button
               key={f}
               aria-label={`Show ${f} todos`}
               size="sm"
-              variant={filter === f ? "primary" : "secondary"}
+              variant={filter === f ? "default" : "secondary"}
               onPress={() => setFilter(f)}
             >
               {f === "all" ? "All" : f === "open" ? "Open" : "Done"}
             </Button>
           ))}
         </div>
+
         {visible.length === 0 && !loading && !error && (
           <p className="text-xs text-muted-foreground">
             {todos.length === 0
@@ -362,6 +342,7 @@ export function TodoSurface({
               : `Nothing ${filter === "all" ? "" : filter} here.`}
           </p>
         )}
+
         {visible.map((todo) => {
           const meta = STATUS_META[todo.status] ?? {
             label: todo.status,
@@ -369,13 +350,13 @@ export function TodoSurface({
           return (
             <div
               key={todo.id}
-              className="flex flex-col gap-1 rounded-md border border-border px-2 py-1.5"
+              className="flex flex-col gap-1.5 rounded-md border border-border px-2.5 py-2"
             >
               <div className="flex items-center gap-1.5">
                 <span className="flex-1 text-sm font-medium">{todo.title}</span>
-                <Chip size="sm" variant="soft">
+                <Badge variant="secondary">
                   {meta.icon} {meta.label}
-                </Chip>
+                </Badge>
                 <Button
                   aria-label={`Delete ${todo.title}`}
                   isDisabled={busyId === todo.id}
@@ -399,17 +380,18 @@ export function TodoSurface({
                   ✏️
                 </Button>
               </div>
+
               {renamingTodo === todo.id ? (
-                <div className="flex flex-col gap-1">
-                  <input
+                <div className="flex flex-col gap-1.5">
+                  <Input
                     aria-label="Todo title"
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    className="h-8 text-sm"
                     value={todoTitleDraft}
                     onChange={(e) => setTodoTitleDraft(e.target.value)}
                   />
-                  <textarea
+                  <Textarea
                     aria-label="Todo description"
-                    className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+                    className="min-h-14 text-sm"
                     placeholder="Description"
                     rows={view === "canvas" ? 3 : 2}
                     value={todoDescDraft}
@@ -420,7 +402,7 @@ export function TodoSurface({
                       aria-label="Save todo"
                       isDisabled={!todoTitleDraft.trim()}
                       size="sm"
-                      variant="primary"
+                      variant="default"
                       onPress={() => void saveTodo(todo)}
                     >
                       Save
@@ -437,33 +419,29 @@ export function TodoSurface({
                 </div>
               ) : (
                 todo.description && (
-                  <p
-                    className={`text-xs text-muted-foreground whitespace-pre-wrap ${view === "panel" ? "line-clamp-2" : ""}`}
+                  <div
+                    className={`prose prose-xs dark:prose-invert max-w-none text-xs text-muted-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 ${view === "panel" ? "line-clamp-2" : ""}`}
                   >
                     <Streamdown>{todo.description}</Streamdown>
-                  </p>
+                  </div>
                 )
               )}
-              <Fieldset>
-                <FieldsetLegend className="text-[11px] text-muted-foreground">
+
+              <FieldSet className="gap-1">
+                <FieldLegend
+                  className="mb-0 text-[11px] text-muted-foreground"
+                  variant="label"
+                >
                   Subtasks ({(todo.subtasks ?? []).filter((s) => s.done).length}
                   /{(todo.subtasks ?? []).length})
-                </FieldsetLegend>
+                </FieldLegend>
+
                 {(todo.subtasks ?? []).length === 0 && (
                   <p className="text-[11px] text-muted-foreground">
                     No subtasks — add one below.
                   </p>
                 )}
-                {/*
-                  NOTE: plain buttons, not HeroUI Checkbox/CheckboxGroup.
-                  HeroUI v3's Checkbox wraps React Aria's CheckboxField -
-                  a standalone field - which cannot participate in
-                  CheckboxGroup state and renders permanently disabled
-                  with no onChange. Verified in the browser: the fibre
-                  shows no isSelected/onChange ever reaching React Aria.
-                  A button with aria-pressed is accessible, toggles in
-                  BOTH directions, and looks identical.
-                */}
+
                 {(todo.subtasks ?? []).map((sub) => {
                   const rowBusy = busyId === `${todo.id}:sub${sub.index}`;
                   return (
@@ -475,7 +453,7 @@ export function TodoSurface({
                           className={`flex flex-1 items-center gap-1.5 rounded-md px-1 py-0.5 text-left ${
                             rowBusy
                               ? "cursor-not-allowed opacity-60"
-                              : "cursor-pointer hover:bg-surface-soft"
+                              : "cursor-pointer hover:bg-muted"
                           }`}
                           disabled={rowBusy}
                           type="button"
@@ -484,11 +462,11 @@ export function TodoSurface({
                           }
                         >
                           <span aria-hidden>{sub.done ? "☑" : "☐"}</span>
-                          <span
-                            className={`flex-1 text-xs whitespace-pre-wrap ${sub.done ? "line-through text-muted-foreground" : ""}`}
+                          <div
+                            className={`prose prose-xs dark:prose-invert min-w-0 flex-1 text-xs [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 ${sub.done ? "line-through text-muted-foreground" : ""}`}
                           >
                             <Streamdown>{sub.text}</Streamdown>
-                          </span>
+                          </div>
                         </button>
                         <Button
                           aria-label={
@@ -519,11 +497,12 @@ export function TodoSurface({
                           ✕
                         </Button>
                       </div>
+
                       {renamingSub === `${todo.id}:${sub.index}` && (
                         <div className="flex gap-1 pl-6">
-                          <input
+                          <Input
                             aria-label="Subtask text"
-                            className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs"
+                            className="h-7 min-w-0 flex-1 text-xs"
                             value={subRenameText}
                             onChange={(e) => setSubRenameText(e.target.value)}
                             onKeyDown={(e) => {
@@ -536,7 +515,7 @@ export function TodoSurface({
                           <Button
                             aria-label="Save subtask text"
                             size="sm"
-                            variant="primary"
+                            variant="default"
                             onPress={() => void renameSubtask(todo, sub.index)}
                           >
                             Save
@@ -546,10 +525,11 @@ export function TodoSurface({
                     </div>
                   );
                 })}
+
                 <div className="mt-1 flex gap-1">
-                  <input
+                  <Input
                     aria-label={`New subtask for ${todo.title}`}
-                    className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-0.5 text-xs"
+                    className="h-7 min-w-0 flex-1 text-xs"
                     id={`new-subtask-${todo.id}`}
                     name={`new-subtask-${todo.id}`}
                     placeholder="New subtask… (Enter to add)"
@@ -575,7 +555,8 @@ export function TodoSurface({
                     ＋
                   </Button>
                 </div>
-              </Fieldset>
+              </FieldSet>
+
               <div className="flex gap-1">
                 {Object.entries(STATUS_META).map(([status, m]) => (
                   <Button
@@ -583,7 +564,7 @@ export function TodoSurface({
                     aria-label={`Mark ${todo.title} as ${m.label}`}
                     isDisabled={busyId === todo.id}
                     size="sm"
-                    variant={todo.status === status ? "primary" : "secondary"}
+                    variant={todo.status === status ? "default" : "secondary"}
                     onPress={() => void setStatus(todo, status)}
                   >
                     {m.icon} {m.label}
@@ -593,10 +574,11 @@ export function TodoSurface({
             </div>
           );
         })}
-        <div className="mt-1 flex flex-col gap-1 border-t border-border pt-2">
-          <input
+
+        <div className="mt-1 flex flex-col gap-1.5 border-t border-border pt-2">
+          <Input
             aria-label="New todo title"
-            className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+            className="h-8 text-sm"
             id="new-todo-title"
             name="new-todo-title"
             placeholder="New todo… (Enter to add)"
@@ -606,9 +588,9 @@ export function TodoSurface({
               if (e.key === "Enter") void createTodo();
             }}
           />
-          <textarea
+          <Textarea
             aria-label="New todo description"
-            className="rounded-md border border-border bg-background px-2 py-1 text-sm"
+            className="min-h-10 text-sm"
             id="new-todo-description"
             name="new-todo-description"
             placeholder="Description (optional)"
@@ -619,13 +601,13 @@ export function TodoSurface({
           <Button
             isDisabled={!title.trim() || creating}
             size="sm"
-            variant="primary"
+            variant="default"
             onPress={() => void createTodo()}
           >
             ＋ Add todo
           </Button>
         </div>
-      </Card.Content>
+      </CardContent>
     </Card>
   );
 }
