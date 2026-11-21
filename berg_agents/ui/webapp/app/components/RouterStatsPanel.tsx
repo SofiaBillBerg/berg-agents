@@ -19,7 +19,15 @@
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
 
-import { Card, Chip, ProgressBar, Separator } from "@heroui/react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 
 export interface OutcomeRecord {
   success?: number;
@@ -39,9 +47,6 @@ export interface RouterStatsPanelProps {
 
 /**
  * Success rate (0-100) for one outcome record.
- *
- * @param data - Outcome record with success/failure counts
- * @returns Rounded percentage of successful outcomes
  */
 function successRate(data: OutcomeRecord | undefined): number {
   const success = data?.success || 0;
@@ -52,9 +57,6 @@ function successRate(data: OutcomeRecord | undefined): number {
 
 /**
  * Total outcomes recorded for one outcome record.
- *
- * @param data - Outcome record with success/failure counts
- * @returns Sum of successes and failures
  */
 function outcomeTotal(data: OutcomeRecord | undefined): number {
   return (data?.success || 0) + (data?.failure || 0);
@@ -64,31 +66,28 @@ interface StatRowProps {
   label: string;
   rate: number;
   total: number;
-  color: "accent" | "success";
+  tone: "accent" | "success";
 }
 
 /**
- * One labeled success-rate row with an accessible HeroUI progress bar.
- *
- * @param props - Row properties
- * @returns JSX element rendering the stat row
+ * One labeled success-rate row with an accessible progress bar.
  */
-function StatRow({ label, rate, total, color }: StatRowProps) {
+function StatRow({ label, rate, total, tone }: StatRowProps) {
   return (
     <div className="my-1 flex items-center gap-2 text-xs">
-      <span className="w-24 shrink-0 truncate">{label}</span>
-      <ProgressBar
+      <span className="w-24 shrink-0 truncate" title={label}>
+        {label}
+      </span>
+      <Progress
         aria-label={`${label} success rate`}
-        className="min-w-0 flex-1"
-        color={color}
-        size="sm"
+        className={`h-1.5 min-w-0 flex-1 ${
+          tone === "success"
+            ? "[&_[data-slot=progress-indicator]]:bg-emerald-600"
+            : ""
+        }`}
         value={rate}
-      >
-        <ProgressBar.Track>
-          <ProgressBar.Fill />
-        </ProgressBar.Track>
-      </ProgressBar>
-      <span className="w-16 shrink-0 text-right text-muted tabular-nums">
+      />
+      <span className="w-16 shrink-0 text-right text-muted-foreground tabular-nums">
         {rate}% ({total})
       </span>
     </div>
@@ -99,9 +98,6 @@ function StatRow({ label, rate, total, color }: StatRowProps) {
  * RouterStatsPanel component.
  * Displays outcome statistics, success rates, and model performance metrics
  * gathered by the router engine.
- *
- * @param props - Component properties
- * @returns JSX element rendering the router stats panel
  */
 export function RouterStatsPanel({
   stats,
@@ -110,15 +106,13 @@ export function RouterStatsPanel({
     return (
       <section aria-label="Router stats" className="router-stats empty">
         <Card>
-          <Card.Header>
-            <Card.Title>Router Stats</Card.Title>
-          </Card.Header>
-          <Card.Content>
-            <Card.Description>
-              Nothing learned yet - run a task and this panel will show what
+          <CardHeader>
+            <CardTitle>Router Stats</CardTitle>
+            <CardDescription>
+              Nothing learned yet — run a task and this panel will show what
               worked, per task type and model.
-            </Card.Description>
-          </Card.Content>
+            </CardDescription>
+          </CardHeader>
         </Card>
       </section>
     );
@@ -130,16 +124,14 @@ export function RouterStatsPanel({
   if (compact) {
     return (
       <div
-        aria-label="router stats"
-        className="router-stats-panel compact flex flex-wrap items-center gap-2 text-xs"
+        aria-label="Router stats"
+        className="router-stats-panel compact flex flex-wrap items-center gap-1.5 text-xs"
       >
-        <Chip size="sm" variant="primary">
-          {stats.total} tasks
-        </Chip>
+        <Badge variant="default">{stats.total} tasks</Badge>
         {Object.entries(byModel).map(([model, data]) => (
-          <Chip key={model} size="sm" variant="soft">
+          <Badge key={model} variant="secondary">
             {model}: {successRate(data)}%
-          </Chip>
+          </Badge>
         ))}
       </div>
     );
@@ -148,24 +140,24 @@ export function RouterStatsPanel({
   return (
     <section aria-label="Router stats" className="router-stats-panel">
       <Card>
-        <Card.Header>
-          <Card.Title>Router Stats</Card.Title>
-          <Card.Description>
+        <CardHeader>
+          <CardTitle>Router Stats</CardTitle>
+          <CardDescription>
             Total tasks evaluated: {stats.total}
-          </Card.Description>
-        </Card.Header>
-        <Card.Content className="flex flex-col gap-3">
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
           {Object.keys(byTaskType).length > 0 && (
             <div>
-              <h5 className="m-0 mb-1.5 text-xs font-semibold tracking-wider text-muted uppercase">
+              <h5 className="m-0 mb-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 By Task Type
               </h5>
               {Object.entries(byTaskType).map(([type, data]) => (
                 <StatRow
                   key={type}
-                  color="accent"
                   label={type}
                   rate={successRate(data)}
+                  tone="accent"
                   total={outcomeTotal(data)}
                 />
               ))}
@@ -177,21 +169,21 @@ export function RouterStatsPanel({
 
           {Object.keys(byModel).length > 0 && (
             <div>
-              <h5 className="m-0 mb-1.5 text-xs font-semibold tracking-wider text-muted uppercase">
+              <h5 className="m-0 mb-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 By Model
               </h5>
               {Object.entries(byModel).map(([model, data]) => (
                 <StatRow
                   key={model}
-                  color="success"
                   label={model}
                   rate={successRate(data)}
+                  tone="success"
                   total={outcomeTotal(data)}
                 />
               ))}
             </div>
           )}
-        </Card.Content>
+        </CardContent>
       </Card>
     </section>
   );

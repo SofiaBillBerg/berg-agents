@@ -18,12 +18,31 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
+/*
+ * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
+ *
+ * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ *
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
 
 import React, { useEffect, useRef } from "react";
-import { TextArea } from "@heroui/react";
 
-// TODO:  Replace TextArea with TextArea from commonents ui should be used instead <-  replaces heroui
-import { Button } from "@/components/ui/button"; // <-  replaces heroui
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 /**
  * Props for the InputBar component. Prop names and semantics are frozen -
@@ -47,15 +66,13 @@ export interface InputBarProps {
 }
 
 /**
- * InputBar component - HeroUI v3 rebuild.
+ * InputBar component.
  *
  * Chat input field with send button. The box stays editable while
  * streaming so the user can steer: pressing Send mid-stream stops the
  * current response and sends the new message instead (interrupt and
  * redirect). ⏹ Stop cancels outright. Auto-resizes based on content
- * (adaptive height between 60px and 300px). The HeroUI TextArea
- * renders a native textarea, so the auto-resize effect keeps working
- * through its forwarded ref.
+ * (adaptive height between 60px and 300px).
  */
 function InputBar({
   input,
@@ -65,7 +82,6 @@ function InputBar({
   onStop,
   onKeyDown,
   placeholder = "Type a message..."}: InputBarProps) {
-  // Ref to the underlying native textarea (forwarded by HeroUI TextArea).
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea based on content.
@@ -73,9 +89,7 @@ function InputBar({
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    // Reset height to auto to get the correct scrollHeight.
     textarea.style.height = "auto";
-    // Set height to scrollHeight, with min and max bounds.
     const minHeight = 60;
     const maxHeight = 300;
     const newHeight = Math.min(
@@ -87,11 +101,10 @@ function InputBar({
 
   return (
     <div className="input-bar">
-      <TextArea
+      <Textarea
         ref={textareaRef}
-        fullWidth
         aria-label="Message input"
-        className="flex-1 overflow-hidden resize-none"
+        className="w-full flex-1 resize-none overflow-hidden"
         id="message-input"
         name="message"
         placeholder={
@@ -122,7 +135,7 @@ function InputBar({
       {streaming && onStop && (
         <span title="Cancel the in-flight response">
           <Button
-            className="min-h-11 shrink-0 border border-warning text-warning hover:bg-warning/10"
+            className="min-h-11 shrink-0 border border-amber-500/60 text-amber-600 hover:bg-amber-500/10"
             variant="outline"
             onPress={onStop}
           >

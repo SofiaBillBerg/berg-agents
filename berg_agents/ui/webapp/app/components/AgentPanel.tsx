@@ -17,10 +17,29 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://gnu.org/licenses/agpl-3.0.html>.
  */
+/*
+ * Berg Agents is a sophisticated multi-agent system built with a modular, extensible architecture.
+ * The system follows a harness-based execution model with multiple specialized agents working together.
+ *
+ * Copyright (C) 2026 Sofia Billger Bergström <sofia.billger.bergstrom@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
 
-import { Avatar, Card, Chip } from "@heroui/react";
-
-import { Badge } from "@/components/ui/badge.tsx";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
 
 export interface AgentInfo {
   name: string;
@@ -44,9 +63,6 @@ export interface AgentPanelProps {
  * capabilities, descriptions, and current activity status. When
  * `onSelect` is provided each agent is a button with a clear active
  * state; without it the panel stays read-only.
- *
- * @param props - Component properties
- * @returns JSX element rendering the agent directory list
  */
 export function AgentPanel({
   agents = [],
@@ -57,9 +73,9 @@ export function AgentPanel({
     return (
       <section aria-label="Registered agents" className="agent-panel empty">
         <Card>
-          <Card.Content>
-            <Card.Description>No agents registered.</Card.Description>
-          </Card.Content>
+          <CardContent className="pt-4">
+            <CardDescription>No agents registered.</CardDescription>
+          </CardContent>
         </Card>
       </section>
     );
@@ -73,23 +89,26 @@ export function AgentPanel({
       >
         {agents.map((agent) => {
           const isActive = activeAgent === agent.name;
+          const initials = agent.name?.substring(0, 2).toUpperCase() || "??";
           const row = (
             <div className="flex items-center gap-1.5">
-              <Avatar color={isActive ? "success" : "default"} size="sm">
-                {agent.name?.substring(0, 2).toUpperCase() || "??"}
+              <Avatar className="size-6 text-[10px]">
+                <AvatarFallback
+                  className={
+                    isActive
+                      ? "bg-emerald-600 text-white"
+                      : "bg-muted text-muted-foreground"
+                  }
+                >
+                  {initials}
+                </AvatarFallback>
               </Avatar>
-              {isActive ? (
-                <Chip color="accent" size="sm" variant="soft">
-                  {agent.name}
-                </Chip>
-              ) : (
-                <Chip size="sm" variant="secondary">
-                  {agent.name}
-                </Chip>
-              )}
+              <Badge variant={isActive ? "default" : "secondary"}>
+                {agent.name}
+              </Badge>
             </div>
           );
-          // Read-only when no handler; otherwise a clear pressable chip.
+
           if (!onSelect) {
             return <div key={agent.name}>{row}</div>;
           }
@@ -98,7 +117,7 @@ export function AgentPanel({
               key={agent.name}
               aria-pressed={isActive}
               className={`cursor-pointer rounded-full transition hover:opacity-90 ${
-                isActive ? "ring-2 ring-success" : ""
+                isActive ? "ring-2 ring-emerald-600" : ""
               }`}
               type="button"
               onClick={() => onSelect(agent.name)}
@@ -111,20 +130,21 @@ export function AgentPanel({
     );
   }
 
-  // Full view: a LIST, not a grid of cards. Five rows do not need a
-  // card each — that was five boxes around a name and some text, which
-  // made the page about its own chrome. The row keeps everything the
-  // cards had (initials, name, description, complexity, capabilities,
-  // active state) at a fraction of the height, and selects the same way.
   const row = (agent: AgentInfo) => {
     const isActive = activeAgent === agent.name;
+    const initials = agent.name?.substring(0, 2).toUpperCase() || "??";
     const content = (
       <>
-        <Avatar
-          className="size-6 text-[10px]"
-          color={isActive ? "success" : "accent"}
-        >
-          {agent.name?.substring(0, 2).toUpperCase() || "??"}
+        <Avatar className="size-6 text-[10px]">
+          <AvatarFallback
+            className={
+              isActive
+                ? "bg-emerald-600 text-white"
+                : "bg-primary/15 text-primary"
+            }
+          >
+            {initials}
+          </AvatarFallback>
         </Avatar>
         <span className="font-medium">{agent.name}</span>
         {isActive && <Badge variant="secondary">Active</Badge>}
@@ -141,6 +161,7 @@ export function AgentPanel({
         ))}
       </>
     );
+
     if (!onSelect) {
       return (
         <div key={agent.name} className="flex items-center gap-2 px-1 py-1">

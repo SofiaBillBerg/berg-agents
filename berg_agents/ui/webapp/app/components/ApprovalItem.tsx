@@ -2,8 +2,9 @@ import type { PendingApproval } from "@/harness";
 
 import { useState } from "react";
 
-// import { Button } from "@heroui/react";
-import { Button } from "@/components/ui/button"; // <-  replaces heroui
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 /**
  * One paused tool call inside an approval batch. Each item gets its
@@ -43,27 +44,29 @@ export function ApprovalItem({
   };
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-border p-1.5">
-      <div className="font-mono text-sm">
-        🔧 {approval.toolName}{" "}
+    <div className="flex flex-col gap-1.5 rounded-md border border-border p-2">
+      <div className="flex items-center gap-2 font-mono text-sm">
+        <span>🔧 {approval.toolName}</span>
         {approval.decided ? (
-          <span className="text-xs">
+          <Badge variant={approval.reason ? "destructive" : "secondary"}>
             {approval.reason ? "❌ Rejected" : "✅ Approved"}
-          </span>
+          </Badge>
         ) : (
-          <span className="text-xs">⏳ Pending</span>
+          <Badge variant="outline">⏳ Pending</Badge>
         )}
       </div>
+
       {approval.reason && (
         <div className="text-xs text-muted-foreground">
           Reason: {approval.reason}
         </div>
       )}
+
       {editing ? (
         <>
-          <textarea
+          <Textarea
             aria-label={`Edit arguments for ${approval.toolName}`}
-            className="font-mono bg-surface-soft p-2 rounded text-xs w-full min-h-20"
+            className="min-h-20 w-full bg-muted/50 font-mono text-xs"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
           />
@@ -91,7 +94,7 @@ export function ApprovalItem({
       ) : (
         <>
           {approval.args && (
-            <pre className="font-mono bg-surface-soft p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+            <pre className="overflow-x-auto rounded bg-muted/50 p-2 font-mono text-xs whitespace-pre-wrap">
               {approval.args}
             </pre>
           )}
@@ -107,7 +110,7 @@ export function ApprovalItem({
               </Button>
             </div>
           ) : (
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex flex-wrap gap-2">
               <Button
                 isDisabled={isStreaming}
                 size="sm"
