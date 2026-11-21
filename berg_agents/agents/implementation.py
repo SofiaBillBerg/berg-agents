@@ -56,7 +56,7 @@ from berg_agents.tools.workspace_toolset import (
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.capabilities import LocalWorkspace, ReinjectSystemPrompt
-from pydantic_ai_harness.filesystem import FileEditedEvent, FileWrittenEvent
+from pydantic_ai_harness.file_system import FileEditedEvent, FileWrittenEvent
 
 # Restored module constants (see the comment above each): the
 # implementer's step templates, its run-span name, and its explicit

@@ -131,6 +131,7 @@ def build_chat_agent(
     from pathlib import Path
 
     from berg_agents.agents.delegation import build_delegation_capabilities
+    from berg_agents.capabilities.ask_user_repair import AskUserRepair
     from berg_agents.capabilities.context_capabilities import (
         build_context_capabilities,
     )
@@ -405,6 +406,12 @@ def build_chat_agent(
             # same approval batch as every other user decision - one
             # HITL surface, not a second one.
             AskUser(answerer=None),
+            # A local model writes headers the harness's 25-character
+            # limit rejects, and pydantic-ai's three retries all carry
+            # the same over-long header - so the turn dies as a tool
+            # retry error while the question itself was fine. This
+            # brings such a call inside the harness's own limits instead.
+            AskUserRepair(),
             # Two-stage check-in so a run cannot go on indefinitely
             # without the user having a say: an advisory reminder at the
             # configured limit, and a forced approval pause at twice it.

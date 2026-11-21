@@ -232,7 +232,7 @@ def workspace_file_tools(read_only: bool = False) -> list[str]:
     :param read_only: Whether the agent may not write at all.
     :return: The tool names, in the order to register them.
     """
-    from pydantic_ai_harness.filesystem import READ_ONLY_TOOL_NAMES
+    from pydantic_ai_harness.file_system import READ_ONLY_TOOL_NAMES
 
     selected = [
         "read_file",
