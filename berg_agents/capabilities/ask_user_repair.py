@@ -20,8 +20,8 @@ r"""Normalize and repair ``ask_user_question`` calls the local model writes.
 
 Two failures, one root: the harness's ask_user tool ADVERTISES
 ``options: ["str", ...]`` in the schema the model sees, while its runtime
-signature wants ``[{"label": ...}, ...]``. A local model follows the
-advertised schema, writes strings, and the call-time check (which
+signature wants ``[{"label": ...}, ...]``. A model that follows the
+advertised schema writes strings, and the call-time check (which
 validates against the advertised schema) passes. Then:
 
 1. the ANSWER path re-validates against the real function signature and
@@ -37,14 +37,14 @@ This capability covers both sides of the seam:
   the answer path validates and the run continues;
 - :meth:`AskUserRepair.on_tool_validate_error` remains the repair for the
   values themselves (an over-long header — the harness caps it at 25
-  characters and a 9B model does not count — which pydantic-ai retries
+  characters and counting is not something generation reliably does
+  — which pydantic-ai retries
   three times before killing the turn).
 
 Both are bound to the harness's own constants, so neither can enforce a
 number or a shape the harness does not; anything with no honest repair
 re-raises rather than being silently invented.
 """
-
 
 from __future__ import annotations
 
@@ -119,10 +119,20 @@ def _repair_options(raw_options: Any) -> list[dict[str, Any]]:
     options: list[dict[str, Any]] = []
     seen_labels: set[str] = set()
     for option in raw_options or []:
-        repaired = _repair_option(option, MAX_LABEL_LENGTH)
+        # The option repair accepts both shapes itself - a string is its
+        # own label, as the advertised schema says - so the answer
+        # renderer, which repairs directly without the wrapper, keeps
+        # the model's choices instead of filling its own.
+        if isinstance(option, str):
+            if not option.strip():
+                continue
+            repaired: dict[str, Any] | None = {
+                "label": _clip(option.strip(), MAX_LABEL_LENGTH)
+            }
+        else:
+            repaired = _repair_option(option, MAX_LABEL_LENGTH)
         if repaired is None or repaired["label"] in seen_labels:
             continue
-        seen_labels.add(repaired["label"])
         options.append(repaired)
     # Below the minimum, a neutral choice keeps the question answerable;
     # above the maximum, the first ones are the model's own ordering, so
@@ -174,10 +184,21 @@ def _repair_question(
     if not isinstance(question, dict):
         return None
     text = question.get("question")
+    header = question.get("header")
+    # The advertised schema calls `header` "Header of the question", so a
+    # local model regularly writes the QUESTION into the header and
+    # omits `question` altogether. The header then holds the only
+    # question text there is: move it, and derive a short label from it.
+    if (
+        (not isinstance(text, str) or not text.strip())
+        and isinstance(header, str)
+        and header.strip()
+    ):
+        text = header
+        header = None
     # A question needs its text: without it there is nothing to ask.
     if not isinstance(text, str) or not text.strip():
         return None
-    header = question.get("header")
     if not isinstance(header, str) or not header.strip():
         # The header is the answer's key; a missing one is derived from
         # the question's first words rather than dropped.
@@ -194,7 +215,7 @@ def _repair_question(
         "multi_select": question.get("multi_select") is True}
 
 
-def _repair_questions(raw: Any) -> dict[str, Any] | None:
+def repair_questions(raw: Any) -> dict[str, Any] | None:
     """Bring an ask_user call's arguments inside the harness's limits.
 
     :param raw: The tool's raw arguments (a JSON string or an object).
@@ -224,6 +245,55 @@ def _repair_questions(raw: Any) -> dict[str, Any] | None:
     return {"questions": repaired}
 
 
+def _normalize_shapes(raw: Any) -> dict[str, Any] | None:
+    """Bring an ask_user call's SHAPE inside the runtime signature.
+
+    The harness advertises ``options: ["str", ...]`` to the model, so a
+    compliant model writes strings — and its runtime signature wants
+    ``[{"label": ...}]`` objects, which the ANSWER path enforces. This
+    rewrites the option shape only (a string becomes that string's
+    label, description intact when the model wrote an object); the
+    value-level repair (lengths, counts) stays in
+    :func:`_repair_questions`, reached through the error hook.
+
+    :param raw: The tool's raw arguments (a JSON string or an object).
+    :return: Normalized arguments, or None when there is nothing to
+        rewrite (which lets the original arguments through untouched).
+    """
+    parsed: Any = raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw or "{}")
+        except ValueError:
+            return None
+    if not isinstance(parsed, dict):
+        return None
+    questions = parsed.get("questions")
+    if not isinstance(questions, list) or not questions:
+        return None
+
+    normalized: list[dict[str, Any]] = []
+    changed = False
+    for question in questions:
+        if not isinstance(question, dict):
+            return None
+        options = question.get("options")
+        if not isinstance(options, list):
+            return None
+        rewritten: list[Any] = []
+        for option in options:
+            if isinstance(option, str):
+                # The string IS the label, as the advertised schema says.
+                rewritten.append({"label": option})
+                changed = True
+            else:
+                rewritten.append(option)
+        normalized.append({**question, "options": rewritten})
+    if not changed:
+        return None
+    return {"questions": normalized}
+
+
 class AskUserRepair(AbstractCapability):
     """Repair ask_user_question arguments instead of failing the turn.
 
@@ -231,6 +301,40 @@ class AskUserRepair(AbstractCapability):
     because a local model will occasionally write a header the harness
     rejects, and a rejected header should not cost the user the turn.
     """
+
+    @staticmethod
+    async def wrap_tool_validate(
+        ctx: Any, *, call: Any, tool_def: Any, args: Any, handler: Any
+    ) -> dict[str, Any]:
+        """Normalize the option shape before the lifecycle validates it.
+
+        Runs on EVERY call, so a model that followed the advertised
+        schema (string options) reaches the runtime signature as
+        objects and the ANSWER path validates — the turn continues
+        past the question instead of ``question answer skipped``.
+
+        :param ctx: The run context (unused; the rewrite is context-free).
+        :param call: The tool call.
+        :param tool_def: The tool's definition.
+        :param args: The raw arguments the model wrote.
+        :param handler: The rest of the validation lifecycle.
+        :return: The validated arguments (of the rewritten call when a
+            rewrite applied).
+        """
+        if getattr(tool_def, "name", "") != ASK_USER_TOOL_NAME:
+            return await handler(args)
+        normalized = _normalize_shapes(args)
+        if normalized is None:
+            # Nothing to rewrite: the ordinary lifecycle, unchanged.
+            return await handler(args)
+        try:
+            return await handler(normalized)
+        except Exception:
+            # A rewritten call that still fails is reported on the
+            # model's OWN arguments, so the error it sees is about what
+            # it actually wrote — and the error hook's value repair
+            # still applies to the original.
+            return await handler(args)
 
     @staticmethod
     async def on_tool_validate_error(
@@ -247,7 +351,7 @@ class AskUserRepair(AbstractCapability):
         """
         if getattr(tool_def, "name", "") != ASK_USER_TOOL_NAME:
             raise error
-        repaired = _repair_questions(args)
+        repaired = repair_questions(args)
         if repaired is None:
             # Nothing honest to repair: the original error stands, so the
             # model is told what was wrong rather than silently fixed.

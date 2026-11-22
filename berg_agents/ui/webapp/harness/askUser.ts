@@ -118,6 +118,15 @@ export function parseQuestionCall(input: unknown): PendingQuestionData[] {
     if (!Array.isArray(q.options)) return [];
     const options: PendingQuestionOption[] = [];
     for (const opt of q.options) {
+      // The harness ADVERTISES options as strings (`["str", ...]`), so a
+      // model that follows the advertised schema writes strings even
+      // though the runtime signature wants objects - and a parked call
+      // records what the model wrote. A string is its own label.
+      if (typeof opt === "string") {
+        if (opt.trim() === "") return [];
+        options.push({ label: opt });
+        continue;
+      }
       if (typeof opt !== "object" || opt === null) return [];
       const o = opt as Record<string, unknown>;
       if (typeof o.label !== "string") return [];

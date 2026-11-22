@@ -34,6 +34,7 @@ from typing import Any
 from berg_agents.agents.chat_agent import build_chat_agent
 from berg_agents.agents.deps import AgentDeps
 from berg_agents.agents.implementation import resolve_write_approval
+from berg_agents.capabilities.ask_user_repair import repair_questions
 from berg_agents.config.settings import get_settings
 from berg_agents.core.harness import Harness
 from berg_agents.core.turn import record_turn_outcome
@@ -237,10 +238,14 @@ def _ask_user_answer_from_output(
     try:
         # The part's input is the original call's args; rebuild the exact
         # request the harness deferred, so validation runs against what
-        # the model actually asked.
+        # the model actually asked. The model's raw shape is repaired
+        # first, with the SAME function the call-time capability uses -
+        # an answer dropped because the model wrote a `value` key or left
+        # `question` out is a question the run never gets answered, which
+        # is the auto-resend loop.
         call = ToolCallPart(
             tool_name=ASK_USER_TOOL_NAME,
-            args=question_args,
+            args=repair_questions(question_args) or question_args,
             tool_call_id=tool_call_id,
         )
         request = AskUserRequest.from_tool_call(call)
