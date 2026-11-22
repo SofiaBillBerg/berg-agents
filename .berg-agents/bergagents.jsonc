@@ -64,6 +64,9 @@
         "timeout": 120000
       },
       "models": {
+        
+        "mradermacher/qwen3-14b-code-reasoning-conversational-GGUF:Q6_K": {  "name":"mradermacher/qwen3-14b-code-reasoning-conversational-GGUF:Q6_K"},
+        "lainlives/Qwen3-Coder-30B-A3B-Instruct_Pruned_REAP-15B-A3B-SafeTensors-Q5_0-GGUF:q5_0": {  "name":"lainlives/Qwen3-Coder-30B-A3B-Instruct_Pruned_REAP-15B-A3B-SafeTensors-Q5_0-GGUF:q5_0"},
         "unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF:UD-IQ3_XXS": {
           "name": "unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF:UD-IQ3_XXS"
         },
@@ -203,6 +206,7 @@
 
           "ssfdre38/gemma4-turbo:latest",
                     "bonsai-2:9b",
+          "mradermacher/qwen3-14b-code-reasoning-conversational-GGUF:Q6_K",
           "gemma4:12b",
           "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
           "ornith:9b-q4_K_M"
@@ -212,7 +216,7 @@
       "standard": {
         "models": [          "gemma4:12b",
           "ssfdre38/gemma4-turbo:latest",
-
+"mradermacher/qwen3-14b-code-reasoning-conversational-GGUF:Q6_K",
           "bonsai-2:9b",
           "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
           "sofia/free-routing",
@@ -224,7 +228,7 @@
         "max_tokens": 200000
       },
       "complex": {
-        "models": [          "auto/best-free",
+        "models": [    "mradermacher/qwen3-14b-code-reasoning-conversational-GGUF:Q6_K",      "auto/best-free",
           "ssfdre38/gemma4-turbo:latest",
           "gemma4:12b",
           "logfare/logfare/auto",
@@ -236,7 +240,7 @@
       },
       "critical": {
         "models": [
-                    "auto/best-free",
+                    "auto/best-free","mradermacher/qwen3-14b-code-reasoning-conversational-GGUF:Q6_K",
           "ssfdre38/gemma4-turbo:latest",
           "auto/free-combo",
           "gemma4:12b",
