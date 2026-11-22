@@ -177,7 +177,7 @@ def _subagent_api() -> dict[str, Any]:
     :return: Mapping of role to the event class (or None when a role's
         class does not exist in the installed harness).
     """
-    from pydantic_ai_harness import subagents as harness
+    from pydantic_ai_harness import sub_agents as harness
 
     def cls(name: str) -> Any:
         return getattr(harness, name, None)

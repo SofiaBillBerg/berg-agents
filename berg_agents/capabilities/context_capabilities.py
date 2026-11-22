@@ -55,8 +55,8 @@ discarded by it.
 
 Stores live under the project's resolved config directory
 (``.berg-agents/``), following the same single-source rule as everything
-else. ``SqliteMemoryStore`` is used rather than ``FileStore`` because the
-chat agent has no workspace backend, and ``FileStore`` without one fails
+else. ``SqliteMemoryStore`` is used rather than ``FileMemoryStore`` because the
+chat agent has no workspace backend, and ``FileMemoryStore`` without one fails
 at run start.
 """
 
@@ -463,7 +463,7 @@ def build_compaction_capabilities() -> list[Any]:
 def build_memory_capability(root_dir: str | Path | None = None) -> Any:
     """Build the ``Memory`` capability, or None on failure.
 
-    ``FileStore`` keeps the notebook as plain Markdown, which is the
+    ``FileMemoryStore`` keeps the notebook as plain Markdown, which is the
     point: you can read and edit ``MEMORY.md`` (and the topic files)
     with any editor, grep them, and the model can open them with its
     own file tools. A store carrying its own workspace follows that
@@ -529,21 +529,21 @@ def build_memory_capability(root_dir: str | Path | None = None) -> Any:
 
 
 def build_file_store(config_dir: Path) -> Any:
-    """Build a ``FileStore`` rooted at the config dir on this machine.
+    """Build a ``FileMemoryStore`` rooted at the config dir on this machine.
 
-    ``FileStore('.', workspace=LocalWorkspaceBackend(dir))`` is the
+    ``FileMemoryStore('.', workspace=LocalWorkspaceBackend(dir))`` is the
     documented shape for keeping memory in a chosen directory while the
     agent works elsewhere; ``'.'`` then resolves inside that workspace.
     The store root is the config dir and the capability's scope supplies
     the ``memory`` segment, so files land at ``<config>/memory/*.md``.
 
     :param config_dir: Resolved config directory (``.berg-agents``).
-    :return: A configured ``FileStore``.
+    :return: A configured ``FileMemoryStore``.
     """
     from pydantic_ai.workspaces import LocalWorkspaceBackend
-    from pydantic_ai_harness.memory import FileStore
+    from pydantic_ai_harness.memory import FileMemoryStore
 
-    return FileStore(
+    return FileMemoryStore(
         # The documented shape: the directory resolves inside the
         # workspace the store is given, so ``'.'`` is the config dir
         # itself and the capability's scope adds the ``memory``
