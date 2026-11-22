@@ -63,6 +63,31 @@ class ActiveProvider(BaseModel):
     model: str
 
 
+class ResolvedModel(BaseModel):
+    """One model resolved to the endpoint that actually serves it.
+
+    The answer to "where does this model live", for a caller that must build
+    its own model object — which is what the orchestrator does, because its
+    agent runs on the TypeScript side of the language boundary. Everything
+    here comes from ``providers`` in ``bergagents.jsonc`` through
+    :func:`berg_agents.providers.registry.resolve_model`, the same resolver
+    every Python agent already uses, so a model moves provider without the
+    front end learning a second rule.
+
+    ``api`` is the wire: ``anthropic-messages`` means the endpoint speaks
+    Anthropic's Messages API and anything else means OpenAI Chat
+    Completions. ``base_url`` and ``api_key`` are what a model constructor
+    needs for that wire, already normalized the way the Python resolver
+    normalizes them.
+    """
+
+    model: str
+    provider: str
+    api: str
+    base_url: str
+    api_key: str = ""
+
+
 class DelegateModel(BaseModel):
     """The model delegated sub-agents run on."""
 

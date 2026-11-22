@@ -31,6 +31,7 @@ from berg_agents.ui.schemas import (
     ModelTier,
     ProviderInfo,
     ProviderListResponse,
+    ResolvedModel,
     SpecialistModels,
     TierListResponse,
 )
@@ -119,6 +120,62 @@ def register_provider_routes(
         """
         return ActiveProvider(
             provider=sessions.active_provider, model=sessions.active_model
+        )
+
+    @router.get("/api/providers/resolve")
+    async def resolve_provider_model(model: str = "") -> ResolvedModel:
+        """Resolve a model id to the endpoint that serves it.
+
+        The orchestrator agent runs on the TypeScript side of the language
+        boundary, so it has to build its own model object — and building one
+        needs to know which endpoint and which wire. That knowledge already
+        lives here, in ``providers`` in ``bergagents.jsonc`` and the resolver
+        every Python agent uses, so this endpoint answers with it rather than
+        letting a second implementation of the rule grow on the other side of
+        the boundary. ``/api/providers`` lists pairs without endpoints, which
+        is not enough to build anything.
+
+        Empty ``model`` resolves the configured default, exactly as
+        :func:`berg_agents.providers.registry.resolve_model` does — one rule
+        for "the one I picked" and "the default".
+
+        TRUST BOUNDARY, deliberately: ``api_key`` travels in this response. The
+        caller is berg's own front-end server, on loopback, in the same trust
+        domain as the environment the key came from — the same domain the
+        Python agents themselves run in. This is an internal berg-to-berg
+        call, not a public surface.
+
+        :param model: Model id as declared under a provider's ``models`` map,
+            or empty for the configured default.
+        :return: The resolved endpoint and wire.
+        :raises HTTPException: 404 when the model is not declared anywhere.
+        """
+        from fastapi import HTTPException
+
+        from berg_agents.providers.registry import resolve_model
+
+        try:
+            resolved = resolve_model(model or None)
+        except KeyError as exc:
+            # The resolver's message already names the known models and where
+            # to add a missing one, so it is passed through rather than
+            # paraphrased into something vaguer.
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        raw_key = resolved.get("api_key", "") or ""
+        return ResolvedModel(
+            model=str(resolved.get("model", "")),
+            provider=str(resolved.get("_provider", "")),
+            api=str(resolved.get("api", "") or ""),
+            base_url=str(resolved.get("base_url", "")),
+            # Normalized exactly as ``resolve_model_instance`` normalizes it:
+            # a placeholder empty string is not a credential, and sending one
+            # as a bearer yields opaque 401s instead of clean keyless behaviour.
+            api_key=(
+                raw_key.strip().strip("'\"").strip()
+                if isinstance(raw_key, str)
+                else str(raw_key)
+            ),
         )
 
     @router.post("/api/providers/active")
