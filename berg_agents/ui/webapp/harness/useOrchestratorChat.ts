@@ -36,7 +36,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import { DefaultChatTransport, generateId, type UIMessage } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** What the page needs to render and drive the orchestrator. */
@@ -121,6 +121,14 @@ export function useOrchestratorChat(
   // React does not — the callback fires outside render. State (not a ref) is
   // what makes the page re-render with the id once it lands.
   const [lastRunId, setLastRunId] = useState<string | null>(null);
+  // The same id, readable from a callback created in an earlier render. The
+  // reconnect callback is one of those: it fires on a network event long after
+  // the transport was built, and it needs the CURRENT session to address the
+  // right run rather than the one this render started with.
+  const sessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    sessionIdRef.current = lastRunId;
+  }, [lastRunId]);
   // Which brain this conversation runs on. Empty means the configured
   // default, so a user who never chooses behaves as before.
   const [model, setModel] = useState<string>("");
@@ -142,7 +150,6 @@ export function useOrchestratorChat(
     status,
     error,
     stop,
-    addToolApprovalResponse,
     resumeStream} = useChat({
     // The transport's callbacks can only be attached at construction
     // (the SDK's fields are protected), and they read the model through
@@ -168,24 +175,30 @@ export function useOrchestratorChat(
       prepareSendMessagesRequest: ({ messages: toSend }) => ({
         body: { messages: toSend, model: modelRef.current }}),
       /**
-       * Point the reconnect at where a run's recorded stream lives.
+       * Point the reconnect at where the session's recorded stream lives.
        *
-       * Kept for interrupted turns: this is the path that continues a
-       * stream that was cut off mid-flight. Restoring a *finished* turn
-       * does not come through here at all — the page loads berg's stored
-       * conversation (lib/orchestrator-turns.ts) and adopts it directly,
-       * because a workflow stream records only what the agent wrote.
+       * Read from the ref rather than the URL's chat id, because a session's
+       * address is its WORKFLOW RUN id — that is what the hook is keyed on and
+       * what the stream route replays — while the SDK addresses reconnects by
+       * its own chat id. The two are the same conversation and different
+       * identifiers.
+       *
+       * Kept for interrupted turns and for the resume below: continuing a
+       * stream that was cut off mid-flight, and re-attaching after a follow-up
+       * is delivered to a parked run. Restoring a *finished* session does not
+       * come through here at all — the page loads berg's stored conversation
+       * (lib/orchestrator-turns.ts) and adopts it directly, because a workflow
+       * stream records only what the agent wrote.
        *
        * The URL is named rather than derived from `api`, because under
        * `/api/*` a DYNAMIC segment is claimed by the proxy rewrite before
        * its handler runs (measured 2026-11-15), so the replay route sits
        * outside `/api`.
        *
-       * @param options - The transport's reconnect description.
        * @returns The absolute URL to GET, response headers untouched.
        */
-      prepareReconnectToStreamRequest: ({ id }) => ({
-        api: `/orchestrator/${id}/stream`}),
+      prepareReconnectToStreamRequest: () => ({
+        api: `/orchestrator/${sessionIdRef.current ?? ""}/stream`}),
       /**
        * Adopt the workflow run id from the response.
        *
@@ -205,39 +218,40 @@ export function useOrchestratorChat(
         return response;
       }}),
     // Adopting the run means adopting its id: the SDK addresses a reconnect
-    // by chat id, and a run id is what identifies the recorded turn.
+    // by chat id, and a run id is what identifies the recorded session.
     id: resumeRunId,
-    // Resume the suspended run once the user has answered.
+    // NO `sendAutomaticallyWhen` here, deliberately.
     //
-    // Answering an approval only marks the part "approval-responded"; it
-    // does not continue the turn by itself. Without this, the page showed
-    // `approval-responded` and then simply stopped — the specialist never
-    // started (found 2026-11-12 by clicking Allow and watching nothing
-    // happen). Same rule as `useAISDKChat`, minus its ask_user branch,
-    // which the orchestrator has no equivalent of: fire when at least one
-    // part is answered and none is still waiting, so a multi-approval step
-    // never resumes halfway.
-    sendAutomaticallyWhen: ({ messages }) => {
-      const last = messages[messages.length - 1] as
-        { role?: unknown; parts?: unknown } | undefined;
-      if (!last || last.role !== "assistant" || !Array.isArray(last.parts)) {
-        return false;
-      }
-      let answered = 0;
-      let waiting = 0;
-      for (const part of last.parts) {
-        if (typeof part !== "object" || part === null) continue;
-        const p = part as Record<string, unknown>;
-        const type = typeof p.type === "string" ? p.type : "";
-        if (!type.startsWith("tool-")) continue;
-        if (p.state === "approval-responded") answered += 1;
-        else if (p.state === "approval-requested") waiting += 1;
-      }
-      return answered > 0 && waiting === 0;
-    }});
+    // It used to fire on an answered approval, which sent the whole
+    // conversation back out as a POST — and that POST STARTED A NEW RUN. That
+    // is the defect this session refactor exists to remove: an approval answer
+    // launched a sibling session, and the next turn re-planned from the
+    // client's view of the past instead of the run's own history. An answer now
+    // goes to the run's own hook (`answerApproval` below), which resumes THE
+    // SAME run; the client re-attaches to that run's stream afterwards instead
+    // of asking the server to start something new.
+  });
 
   /**
-   * Send one user message and start a turn.
+   * Send one user message.
+   *
+   * Two doors, decided by whether this conversation already has a session:
+   *
+   * - no run id: the first message STARTS a session. The SDK posts to
+   *   `/api/orchestrator`, which starts the run and streams its answer, and
+   *   the `x-workflow-run-id` header above records the session for later.
+   * - a run id: the message RESUMES the session's own run. Posting the
+   *   conversation again would start a second run beside the first — which is
+   *   what produced 74 runs for a handful of conversations. So the text goes to
+   *   the run's hook and the client re-attaches to that run's stream, which
+   *   holds everything the session has said since its beginning.
+   *
+   * The user message is appended locally because a workflow stream records only
+   * what the AGENT writes: messages delivered through a hook are not written to
+   * it, so without this the transcript would lose its own turns on every
+   * reconnect. That is also why the conversation store exists
+   * (lib/orchestrator-turns.ts) — the two halves answer different halves of
+   * "what did we say".
    *
    * @param text - What the user typed.
    */
@@ -245,9 +259,27 @@ export function useOrchestratorChat(
     async (text: string): Promise<void> => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      await sendMessage({ text: trimmed });
+      const session = sessionIdRef.current;
+      if (!session) {
+        await sendMessage({ text: trimmed });
+        return;
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateId(),
+          role: "user",
+          parts: [{ type: "text", text: trimmed }]} as UIMessage]);
+      await fetch(`/orchestrator/${encodeURIComponent(session)}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "message", text: trimmed })}).catch(() => undefined);
+      // Re-attach to the session's stream: the run continues in it, and the
+      // replay carries this turn's answer.
+      await resumeStream();
     },
-    [sendMessage],
+    [sendMessage, setMessages, resumeStream],
   );
 
   // A paused tool call arrives as a part with state "approval-requested".
@@ -311,11 +343,59 @@ export function useOrchestratorChat(
 
   const answerApproval = useCallback(
     (approvalId: string, approved: boolean): void => {
-      // The SDK resolves the paused part and resumes the turn, which is
-      // the whole point of the suspension model.
-      addToolApprovalResponse({ id: approvalId, approved });
+      const session = sessionIdRef.current;
+      if (!session) return;
+
+      // The card steps aside locally, in the same shape the SDK would have
+      // written, because a replay does not carry the user's decision back: it
+      // records model output, not what the user answered.
+      setMessages(
+        (prev) =>
+          prev.map((message) => {
+            const parts = message.parts as unknown as Array<
+              Record<string, unknown>
+            >;
+            if (!Array.isArray(parts)) return message;
+            let changed = false;
+            const nextParts = parts.map((part) => {
+              if (
+                typeof part !== "object" ||
+                part === null ||
+                part.state !== "approval-requested"
+              ) {
+                return part;
+              }
+              const approval = part.approval as { id?: unknown } | undefined;
+              if (approval?.id !== approvalId) return part;
+              changed = true;
+              return {
+                ...part,
+                state: "approval-responded",
+                approval: { ...approval, approved }};
+            });
+            return changed ? { ...message, parts: nextParts } : message;
+          }) as unknown as UIMessage[],
+      );
+
+      void (async () => {
+        try {
+          await fetch(`/orchestrator/${encodeURIComponent(session)}/message`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              kind: "approval",
+              approvalId,
+              approved})});
+        } catch {
+          // A failed answer leaves the card answered but the run parked. The
+          // user's next message still reaches the run, so this must not break
+          // the UI.
+          return;
+        }
+        await resumeStream();
+      })();
     },
-    [addToolApprovalResponse],
+    [setMessages, resumeStream],
   );
 
   // Restore, on mount only, and in the order that matters: berg's stored

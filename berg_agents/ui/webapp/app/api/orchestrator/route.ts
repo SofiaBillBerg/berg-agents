@@ -32,24 +32,68 @@ import { createUIMessageStreamResponse, type UIMessage } from "ai";
 import { start } from "workflow/api";
 
 import { saveTurn } from "@/lib/orchestrator-turns";
-import { localModel } from "@/harness/local-model";
+import { bergModel, type ModelSpec } from "@/harness/berg-model";
 import { orchestratorTurn } from "@/workflows/orchestrator-turn";
+import { backendOrigin } from "@/harness/specialists";
 
 /**
- * The orchestrator's model.
+ * Resolve the brain this turn runs on.
  *
- * `localModel` rather than a provider built here, because a `WorkflowAgent`
- * runs each model call as its own step and the model crosses that boundary as
- * data. The AI SDK's own providers serialize their config and lose `baseURL`
- * and the request `url` builder along the way, so the model here carries plain
- * strings and rebuilds itself. berg's endpoint is its own Ollama — never a
- * hosted gateway.
+ * Asks berg's Python backend, which owns the provider configuration in
+ * `bergagents.jsonc` and the resolver every Python agent already uses. That is
+ * deliberate: this app used to hardcode berg's own Ollama, so a model chosen in
+ * the UI — even an Ollama one — was silently replaced by the fallback, and a
+ * model on another provider could not be addressed at all. One resolver, asked
+ * once per turn, means a model moves provider without this side learning a
+ * second rule.
  *
- * @param modelId - Chosen model, or undefined for the configured default.
- * @returns A model bound to berg's local endpoint, serializable across steps.
+ * The answer carries an `api_key` for endpoints that need one. The caller is
+ * berg's own front-end server on loopback, in the same trust domain as the
+ * environment that key came from — the same domain the Python agents run in.
+ *
+ * @param modelId - The chosen model, or empty for the configured default.
+ * @returns The resolved endpoint, wire and name, as plain data the workflow
+ *   boundary can carry.
+ * @throws When the backend cannot resolve it, so a turn fails with the reason
+ *   visible rather than quietly running somewhere else.
  */
-function orchestratorModel(modelId?: string) {
-  return localModel(modelId ? { modelId } : undefined);
+async function resolveOrchestratorModel(modelId: string): Promise<ModelSpec> {
+  const query = modelId ? `?model=${encodeURIComponent(modelId)}` : "";
+  const response = await fetch(
+    `${backendOrigin()}/api/providers/resolve${query}`,
+  );
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(
+      `Could not resolve the orchestrator's model${
+        modelId ? ` (${modelId})` : ""
+      }: HTTP ${response.status} ${detail}`.slice(0, 400),
+    );
+  }
+  const resolved = (await response.json()) as {
+    model?: string;
+    provider?: string;
+    api?: string;
+    base_url?: string;
+    api_key?: string;
+  };
+  // Mapped here, once, from the backend's own field names into this app's
+  // spec: the API speaks snake_case and the model builder speaks its own
+  // shape, and one translation between them is better than two.
+  const spec: ModelSpec = {
+    modelId: resolved.model ?? "",
+    baseURL: resolved.base_url ?? "",
+    apiKey: resolved.api_key ?? "",
+    provider: resolved.provider ?? "",
+    api: resolved.api ?? ""};
+  // Never build a model without an endpoint: fail here, where the reason is
+  // visible, rather than in a step where it reads as a model failure.
+  if (!spec.modelId || !spec.baseURL) {
+    throw new Error(
+      "The backend resolved no endpoint for the orchestrator's model.",
+    );
+  }
+  return spec;
 }
 
 /**
@@ -65,10 +109,12 @@ export async function POST(request: Request): Promise<Response> {
     model?: string;
   };
   const messages = Array.isArray(body.messages) ? body.messages : [];
+  const spec = await resolveOrchestratorModel(body.model?.trim() ?? "");
 
-  const run = await start(orchestratorTurn, [
-    messages,
-    orchestratorModel(body.model?.trim() || undefined)]);
+  // The instance, not the spec: the workflow boundary serializes a model
+  // through WORKFLOW_SERIALIZE, so what crosses is plain data either way, and
+  // passing the built model keeps the workflow from re-deriving one.
+  const run = await start(orchestratorTurn, [messages, bergModel(spec)]);
 
   // The conversation, recorded against the run it became. This is the only
   // moment both exist together: the run id comes back from `start`, and the

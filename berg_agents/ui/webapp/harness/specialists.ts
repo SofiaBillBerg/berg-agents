@@ -85,7 +85,19 @@ export interface SpecialistReport {
  * backend's address two different ways is how the step side ended up with a
  * hardcoded `:8001` default while every configured run was on another port.
  */
-function backendOrigin(): string {
+/**
+ * Where berg's Python backend lives.
+ *
+ * Exported for the one caller that is NOT inside a workflow: the orchestrator's
+ * start route resolves its model against the backend, and a route handler runs
+ * outside the runtime, where `workflow`'s own `fetch` is unavailable. It still
+ * asks HERE for the origin rather than deriving a second one, so the rule stays
+ * single — `API_BASE` (which reads `BERG_BACKEND_URL`), then the environment,
+ * then the documented default.
+ *
+ * @returns The backend's origin, without a trailing slash.
+ */
+export function backendOrigin(): string {
   if (API_BASE) return API_BASE;
   const url = process.env.BERG_BACKEND_URL;
   if (url) return url.replace(/\/+$/, "");
