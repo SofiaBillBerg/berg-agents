@@ -232,6 +232,43 @@ export function useOrchestratorChat(
     // of asking the server to start something new.
   });
 
+  // The conversation, readable from a callback that runs after a stream has
+  // finished. A callback captures one render's closures, so without this a
+  // persist fired from `send` would write the messages as they were at that
+  // render — which for a follow-up is BEFORE the turn that just landed. That
+  // is exactly how a session came to be stored holding only its first turn.
+  // Declared here, after `useChat`, because it is seeded from `messages`.
+  const messagesRef = useRef<UIMessage[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  /**
+   * Write the conversation against the session it belongs to.
+   *
+   * ONE row per session, keyed by its run id, which is what a restore reads and
+   * what the History panel lists. The turn route wrote the messages the FIRST
+   * turn started with; every later turn has to add what the agent replied, and
+   * a follow-up's user words, which a workflow stream never carries because
+   * messages delivered through a hook are not written to it. Without this the
+   * store held a session's first turn only, and restoring it showed a
+   * transcript that ended before the conversation did.
+   */
+  const persistConversation = useCallback(async (): Promise<void> => {
+    const session = sessionIdRef.current;
+    if (!session) return;
+    try {
+      await fetch(`/orchestrator/runs/${encodeURIComponent(session)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: messagesRef.current })});
+    } catch {
+      // A failed write loses the session's later half until the next turn
+      // re-writes the whole conversation; it must never break the turn that
+      // just finished.
+    }
+  }, [messagesRef]);
+
   /**
    * Send one user message.
    *
@@ -276,7 +313,9 @@ export function useOrchestratorChat(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: "message", text: trimmed })}).catch(() => undefined);
       // Re-attach to the session's stream: the run continues in it, and the
-      // replay carries this turn's answer.
+      // replay carries this turn's answer. The write happens in the effect
+      // further down, once this turn has settled — one path, so a follow-up
+      // and a first turn are stored by the same rule.
       await resumeStream();
     },
     [sendMessage, setMessages, resumeStream],
@@ -311,35 +350,31 @@ export function useOrchestratorChat(
    * @param approvalId - Which request to answer.
    * @param approved - Whether the call may run.
    */
-  // Whether a turn is in flight — the edge the persist below watches.
-  const streaming = status === "streaming" || status === "submitted";
-
-  // Persist the conversation when a turn finishes, so a restore has BOTH sides.
-  // The turn route already wrote the messages the turn started with; this adds
-  // what the agent replied, which that write cannot see because the reply
-  // arrives on the stream rather than in the next request. One edge, one route:
-  // from streaming to not-streaming, once, with the run id the turn reported.
-  const wasStreaming = useRef(false);
+  // Persist a turn once it has settled, so a restore has BOTH sides.
+  //
+  // Keyed on the CONVERSATION, with a short settle window, rather than on a
+  // streaming edge — because the two send paths do not signal settlement the
+  // same way: the first turn streams from the start route, while a follow-up is
+  // delivered to a parked run and re-attached, and that transition is not
+  // guaranteed to be observable. An edge only one path produces is how a
+  // session came to be stored holding its first turn alone.
+  //
+  // The window doubles as the mid-turn filter: stream chunks arrive in bursts
+  // and keep resetting it, so a live turn writes nothing and the transcript is
+  // written once, shortly after it stops moving. No timer survives unmount.
+  const PERSIST_SETTLE_MS = 1200;
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (streaming) {
-      wasStreaming.current = true;
-      return;
-    }
-    if (!wasStreaming.current || !lastRunId) return;
-    wasStreaming.current = false;
-    void (async () => {
-      try {
-        await fetch(`/orchestrator/runs/${encodeURIComponent(lastRunId)}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages })});
-      } catch {
-        // A failed write loses the agent's half until the next turn
-        // re-writes the whole conversation; it must never break the turn
-        // that just finished.
-      }
-    })();
-  }, [streaming, lastRunId, messages]);
+    if (!lastRunId) return;
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      persistTimer.current = null;
+      void persistConversation();
+    }, PERSIST_SETTLE_MS);
+    return () => {
+      if (persistTimer.current) clearTimeout(persistTimer.current);
+    };
+  }, [messages, lastRunId, persistConversation]);
 
   const answerApproval = useCallback(
     (approvalId: string, approved: boolean): void => {

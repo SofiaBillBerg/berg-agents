@@ -65,6 +65,18 @@ export interface ModelSpec {
    * OpenAI Chat Completions.
    */
   api: string;
+  /**
+   * The provider block's declared request timeout, in MILLISECONDS — the AI
+   * SDK's convention, and the unit berg's configuration file follows. Absent
+   * means no override, and the provider's own default applies.
+   *
+   * It is carried rather than dropped on purpose: a provider block that
+   * declares one is saying "wait this long, no longer", and silently
+   * discarding that leaves a hung endpoint hanging for the SDK's default
+   * instead. The Python resolver applies the same declaration to its own
+   * model instances, so both sides of the language boundary honour it.
+   */
+  timeoutMs?: number;
 }
 
 /** The provider-block values that mean "speaks Anthropic Messages". */
@@ -92,6 +104,8 @@ export class BergModel {
   private readonly apiKey: string;
   /** The wire this endpoint speaks. */
   private readonly api: string;
+  /** The declared request timeout, in milliseconds, when there is one. */
+  private readonly timeoutMs?: number;
 
   /**
    * @param spec - The resolved endpoint, wire and name.
@@ -102,6 +116,16 @@ export class BergModel {
     this.baseURL = spec.baseURL;
     this.apiKey = spec.apiKey;
     this.api = spec.api;
+    // Only a positive number is a timeout. Zero or a negative one is a
+    // configuration mistake that must not become "fail every request
+    // immediately", so it is treated as absent and the provider's own default
+    // applies.
+    this.timeoutMs =
+      typeof spec.timeoutMs === "number" &&
+      Number.isFinite(spec.timeoutMs) &&
+      spec.timeoutMs > 0
+        ? spec.timeoutMs
+        : undefined;
   }
 
   /**
@@ -116,7 +140,8 @@ export class BergModel {
       baseURL: model.baseURL,
       apiKey: model.apiKey,
       provider: model.provider,
-      api: model.api};
+      api: model.api,
+      timeoutMs: model.timeoutMs};
   }
 
   /**
@@ -161,20 +186,44 @@ export class BergModel {
     return root;
   }
 
+  /**
+   * The provider's fetch, bounded by the declared timeout.
+   *
+   * Both wires accept a `fetch` override, and a signal is the whole override
+   * needs: the request is aborted once the declared window closes. This is an
+   * approximation rather than the equivalent of the per-phase timeouts the
+   * Python side builds through its HTTP client — one window for the whole
+   * request, rather than separate connect and read windows — and it is
+   * recorded as such rather than presented as more than it is.
+   *
+   * @returns The fetch to install, or undefined to install none.
+   */
+  private boundedFetch(): typeof globalThis.fetch | undefined {
+    const ms = this.timeoutMs;
+    if (!ms) return undefined;
+    return (input, init) =>
+      globalThis.fetch(input, {
+        ...init,
+        signal: init?.signal ?? AbortSignal.timeout(ms)});
+  }
+
   /** The provider model for this wire, rebuilt from the strings above. */
   private inner() {
     // Built per call rather than cached: a deserialized instance has no usable
     // config of its own, so reconstructing is what makes the model work on the
     // far side of the step boundary.
+    const fetch = this.boundedFetch();
     if (this.isAnthropic) {
       return createAnthropic({
         apiKey: this.apiKey || undefined,
-        baseURL: this.anthropicBaseURL()})(this.modelId);
+        baseURL: this.anthropicBaseURL(),
+        ...(fetch ? { fetch } : {})})(this.modelId);
     }
     return createOpenAICompatible({
       name: this.provider,
       baseURL: this.baseURL,
-      apiKey: this.apiKey})(this.modelId);
+      apiKey: this.apiKey,
+      ...(fetch ? { fetch } : {})})(this.modelId);
   }
 
   /** Which URLs the endpoint can fetch itself, delegated to the provider. */

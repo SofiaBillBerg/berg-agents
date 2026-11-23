@@ -163,6 +163,7 @@ def register_provider_routes(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
         raw_key = resolved.get("api_key", "") or ""
+        raw_timeout = resolved.get("timeout")
         return ResolvedModel(
             model=str(resolved.get("model", "")),
             provider=str(resolved.get("_provider", "")),
@@ -175,6 +176,16 @@ def register_provider_routes(
                 raw_key.strip().strip("'\"").strip()
                 if isinstance(raw_key, str)
                 else str(raw_key)
+            ),
+            # Milliseconds, as declared — the conversion to whatever the
+            # caller's HTTP stack wants is that caller's business, and the
+            # declaration is unit-free only if everyone agrees on the unit.
+            timeout_ms=(
+                int(raw_timeout)
+                if isinstance(raw_timeout, (int, float))
+                and not isinstance(raw_timeout, bool)
+                and raw_timeout > 0
+                else None
             ),
         )
 

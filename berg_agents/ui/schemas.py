@@ -86,6 +86,9 @@ class ResolvedModel(BaseModel):
     api: str
     base_url: str
     api_key: str = ""
+    #: The provider block's ``timeout``, in milliseconds as the configuration
+    #: declares it (the AI SDK convention). Absent means no override.
+    timeout_ms: int | None = None
 
 
 class DelegateModel(BaseModel):

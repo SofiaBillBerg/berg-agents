@@ -101,6 +101,8 @@ const RUNS_KEY = "/api/orchestrator/runs";
 const TIERS_KEY = `${API_BASE}/api/tiers`;
 const DELEGATE_KEY = `${API_BASE}/api/providers/delegate`;
 const SPECIALISTS_KEY = `${API_BASE}/api/providers/specialists`;
+/** What an empty orchestrator choice actually resolves to. */
+const DEFAULT_MODEL_KEY = "/api/orchestrator/default-model";
 
 /**
  * Read the list of past orchestration runs.
@@ -302,6 +304,19 @@ function OrchestratorConversation() {
     fetchTiers,
   );
   const tiers = tiersPayload?.tiers ?? [];
+  // What an EMPTY choice resolves to, asked rather than assumed. The label
+  // below used to name the first model of the first tier, which is not what an
+  // empty choice runs on — it resolves through the configured `defaultModel` —
+  // so the picker described one thing while doing another. The answer comes
+  // from the server because the resolver that knows it also holds credentials.
+  const { data: defaultModelPayload } = useSWR<{ model?: string }>(
+    DEFAULT_MODEL_KEY,
+    async () => {
+      const resp = await fetch(DEFAULT_MODEL_KEY);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return (await resp.json()) as { model?: string };
+    },
+  );
   // Past orchestration runs. They live in the workflow world's database, not
   // in Python's sessions, so the History tab can never show them — this is
   // their surface. A reload used to lose the run entirely.
@@ -827,8 +842,10 @@ function OrchestratorConversation() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem id="__default">
-                    default ({tiers.flatMap((t) => t.models)[0] ?? "configured"}
-                    )
+                    {/* The model an empty choice REALLY resolves to, from the
+                        backend — not the first model of the first tier, which
+                        is a different thing. */}
+                    default ({defaultModelPayload?.model || "configured"})
                   </SelectItem>
                   {/* Flat, in tier order, deduplicated: a model that sits
                           in two tiers is the same model, and a collection

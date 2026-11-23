@@ -76,6 +76,7 @@ async function resolveOrchestratorModel(modelId: string): Promise<ModelSpec> {
     api?: string;
     base_url?: string;
     api_key?: string;
+    timeout_ms?: number;
   };
   // Mapped here, once, from the backend's own field names into this app's
   // spec: the API speaks snake_case and the model builder speaks its own
@@ -85,7 +86,8 @@ async function resolveOrchestratorModel(modelId: string): Promise<ModelSpec> {
     baseURL: resolved.base_url ?? "",
     apiKey: resolved.api_key ?? "",
     provider: resolved.provider ?? "",
-    api: resolved.api ?? ""};
+    api: resolved.api ?? "",
+    timeoutMs: resolved.timeout_ms ?? undefined};
   // Never build a model without an endpoint: fail here, where the reason is
   // visible, rather than in a step where it reads as a model failure.
   if (!spec.modelId || !spec.baseURL) {
