@@ -31,7 +31,7 @@ plugin-deps = [
     "dotenv>=0.9.9",
     "httpx>=0.27.0",
     "pydantic-settings>=2.15.0"]
-    # "berg-agents"]
+# "berg-agents"]
 
 [build-system]
 requires = ["uv-build>=0.11.26,<0.22"]
