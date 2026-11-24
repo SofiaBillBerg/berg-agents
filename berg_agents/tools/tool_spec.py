@@ -442,7 +442,7 @@ def make_tool_spec(
     doc = (func.__doc__ or "").strip()
     first_line = doc.split("\n", 1)[0].strip() if doc else ""
     return ToolSpec(
-        name=getattr(name or func.__name__, "strip", lambda: func.__name__)(),
+        name=getattr(name or func.__name__, "strip", lambda: func.__name__)(),  # ty: ignore[missing-attribute]
         description=description or first_line,
         params=tuple(params),
         execute=func,
