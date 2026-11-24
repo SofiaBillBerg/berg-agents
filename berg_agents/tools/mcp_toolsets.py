@@ -128,7 +128,7 @@ class _ResilientToolset(WrapperToolset[None]):
             logger.warning("MCP server connect failed, hiding server: %s", exc)
         return self
 
-    async def __aexit__(self, *exc_info: object) -> bool:
+    async def __aexit__(self, *exc_info: object) -> bool | None:
         """Close the wrapped session; a close that fails changes nothing.
 
         :param exc_info: The exception triple leaving the run, if any.

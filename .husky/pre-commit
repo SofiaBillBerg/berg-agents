@@ -2,10 +2,11 @@
 bunx lint-staged
 git-format-staged -f "bun run typecheck" .
 git-format-staged -f "panache format ." .
+git-format-staged -f "panache lint . --fix" .
 git-format-staged -f "uv format " .
 git-format-staged -f "shfmt . --write" .
 git-format-staged -f 'pettier --ignore-unknown --stdin --stdin-filepath "{}"' .
-prettier $(git diff --cached --name-only --diff-filter=ACMR | sed 's| |\\ |g') --write --ignore-unknown
+#prettier $(git diff --cached --name-only --diff-filter=ACMR | sed 's| |\\ |g') --write --ignore-unknown
 git update-index --again
 
 exit 0

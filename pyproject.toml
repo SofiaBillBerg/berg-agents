@@ -13,11 +13,9 @@ classifiers = ["Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.15",
+    "Programming Language :: Python :: 3.15"]
   #  "Operating System :: OS Independent"]
-dependencies = [
-
-] # use dependency groups
+dependencies = [] # use dependency groups
 
 [build-system]
 requires = ["uv-build>=0.11.26,<0.22"]
@@ -76,7 +74,8 @@ agent-deps = [
     "typesafe-sdk>=0.7.4",
     "uvicorn>=0.52.1",
     'vercel-workflow>=0.13.1 ;  sys_platform == "linux"']
-docs = ["pydoctor>=25.10.1",
+docs = [
+    "pydoctor>=25.10.1",
     "quarto>=0.1.0"]
 
 dev = [

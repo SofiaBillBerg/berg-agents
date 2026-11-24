@@ -78,8 +78,7 @@ class HitlRequest:
     """A snapshot of a tool call the loop is pausing for review.
 
     The request is **immutable**; the caller must build a new one to
-    change fields.  The loop stashes the request into the snapshot's
-    ``pending_hitl`` slot, so a `resume' action in a different process can
+    change fields.  The loop stashes the request into the snapshot's ``pending_hitl`` slot, so a `resume' action in a different process can
     re-create the same pause state.
 
     :var tool_call_id: Stable id assigned by the loop (matches the id of the corresponding :class:`LoopEvent` ``ToolCallRequest``).

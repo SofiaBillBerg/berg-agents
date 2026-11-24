@@ -7,17 +7,19 @@ r"""Validate that all required configuration fields are present and correctly fo
 
 **How to use it**
 
-user_cfg = {
-    "plugin_id": "shared_todo",
-    "enabled": True,
-    "log_level": "DEBUG",
-    # "extra_field": "should_fail"  # <-- would raise ValidationError
-}
-try:
-    config = validate_shared_todo_config(user_cfg)
-    print("✅ Configuration is valid:", config)
-except ValidationError as e:
-    print("❌ Configuration validation failed:\n", e)
+    ```
+    user_cfg = {
+        "plugin_id": "shared_todo",
+        "enabled": True,
+        "log_level": "DEBUG",
+        # "extra_field": "should_fail"  # <-- would raise ValidationError
+    }
+    try:
+        config = validate_shared_todo_config(user_cfg)
+        print("✅ Configuration is valid:", config)
+    except ValidationError as e:
+        print("❌ Configuration validation failed:\n", e)
+    ```
 """
 
 from pydantic import BaseModel, Field

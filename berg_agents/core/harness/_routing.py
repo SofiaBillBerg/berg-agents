@@ -47,6 +47,13 @@ class _AgentCard:
     reports. Cards are display metadata only; routing uses
     the confidence functions, not these levels.
 
+    ``build_agent`` is what makes the agent the card describes
+    *addressable*: a protocol peer (A2A today, ACP next) sends a
+    task to a registry name, and the card assembles the real
+    pydantic-ai agent through the same builders the harness
+    already uses. One path, so a card's agent is the same agent
+    whoever asks for it.
+
     Attributes:
         name: Registry key and display name.
         description: One-line role description.
@@ -72,6 +79,58 @@ class _AgentCard:
             "description": self.description,
             "preferred_complexity": self.preferred_complexity,
             "capabilities": list(self.capabilities)}
+
+    def build_agent(self, **kwargs: Any) -> Any:
+        """Assemble the pydantic-ai agent this card names.
+
+        Dispatches to the builders the harness already uses, so a peer
+        speaking A2A reaches the same agent the chat path and the
+        delegating parent reach — there is deliberately no second
+        assembly path per protocol.
+
+        Imports are inside the method because
+        ``berg_agents.agents`` imports this module (the harness is
+        built from it), so a module-level import here would close a
+        cycle.
+
+        :param kwargs: Forwarded to the builder (``root_dir``,
+            ``plugin_tools``, ``model_id``).
+        :return: A configured pydantic-ai ``Agent``.
+        :raises NotImplementedError: When the card names something that
+            is not an agent today — said plainly, rather than handed
+            back something that cannot run.
+        """
+        if self.name == "guardian":
+            from berg_agents.agents.guardian import build_guardian_agent
+
+            return build_guardian_agent(**kwargs)
+        if self.name == "implementation":
+            from berg_agents.agents.implementation import (
+                build_implementation_agent,
+            )
+
+            return build_implementation_agent(
+                complexity=self.preferred_complexity, **kwargs
+            )
+        if self.name == "planner":
+            from berg_agents.agents.planner import build_planner_agent
+
+            return build_planner_agent(**kwargs)
+        if self.name in {"curator", "router_agent"}:
+            # Chat-shaped agents today: a peer addresses the card and
+            # the card answers through the same chat builder the spec
+            # agents use. One path, not one per protocol or name.
+            from berg_agents.agents.chat_agent import build_chat_agent
+
+            return build_chat_agent(
+                active_agent=self.name,
+                active_agent_description=self.description,
+                **kwargs,
+            )
+        raise NotImplementedError(
+            f"Agent {self.name!r} is not an agent: no builder to "
+            "address it over A2A yet."
+        )
 
 
 def _tool_is_mutating(tool_name: str) -> bool:

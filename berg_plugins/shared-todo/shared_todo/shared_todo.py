@@ -24,13 +24,14 @@ Todos are stored as Markdown files for easy editing by both parties.
 
 In the function on_load(), the plugin performs several validation checks to ensure that it is configured correctly and can operate as expected. The following table summarizes the key validation steps, where they occur, and what happens if they fail:
 
--------------------------------------------------------
+----------------------------------------------------------
 # Check -> Where it happens -> What it raises if it fails
 ----------------------------------------------------------
     - Plugin settings schema -> TodoSettings(**context.settings) -> RuntimeError with ValidationError details
     - User env and config file -> validate_user_config() -> RuntimeError with a clear “User config error” message
     - Distribution mode	-> is_plugin_installable() vs is_integrated_into_berg_agents() -> Logs a friendly note – no exception
     - Extra config‑field validation	-> validate_shared_todo_config(your_extra_dict) (optional) -> RuntimeError with Pydantic validation errors
+
 """
 
 import logging
@@ -92,8 +93,7 @@ class SharedToDoPlugin(BergPlugin):
     async def on_load(self, context: PluginContext) -> None:
         """Load plugin and initialize todo directory.
 
-        Args:
-            context: Plugin context
+        :param context: Plugin context
         """
         logger.info(f"Loading {context.plugin_id}")
 
@@ -157,8 +157,7 @@ class SharedToDoPlugin(BergPlugin):
     async def on_enable(self, context: PluginContext) -> None:
         """Enable plugin and register tools.
 
-        Args:
-            context: Plugin context
+        :param context: Plugin context
         """
         logger.info(f"Enabling {context.plugin_id}")
 
@@ -170,8 +169,7 @@ class SharedToDoPlugin(BergPlugin):
     async def on_disable(self, context: PluginContext) -> None:
         """Disable plugin.
 
-        Args:
-            context: Plugin context
+        :param context: Plugin context
         """
         logger.info(f"Disabling {context.plugin_id}")
 
@@ -181,8 +179,7 @@ class SharedToDoPlugin(BergPlugin):
     async def on_unload(self, context: PluginContext) -> None:
         """Unload plugin.
 
-        Args:
-            context: Plugin context
+        :param context: Plugin context
         """
         logger.info(f"Unloading {context.plugin_id}")
 
@@ -197,8 +194,7 @@ class SharedToDoPlugin(BergPlugin):
         are invariant, so a narrower element type is not a valid
         override even though every item here is a tool.
 
-        Returns:
-            List of tool capabilities as the base capability type.
+        :return: List of tool capabilities as the base capability type.
         """
         # NOTE: Absolute package import works when the plugin dir is
         # on sys.path (see PluginManager._import_plugin).
@@ -235,8 +231,7 @@ class SharedToDoPlugin(BergPlugin):
     def get_settings_schema(self) -> dict[str, Any] | None:
         """Return settings schema.
 
-        Returns:
-            JSON schema for plugin settings
+        :return: JSON schema for plugin settings
         """
         return {
             "type": "object",
@@ -252,11 +247,9 @@ class SharedToDoPlugin(BergPlugin):
     def _get_todo_path(self, todo_id: str) -> Path:
         """Get path to a todo file.
 
-        Args:
-            todo_id: Todo identifier
+        :param todo_id: Todo identifier
 
-        Returns:
-            Path to todo Markdown file
+        :return: Path to todo Markdown file
         """
         assert self.todo_dir is not None
         return self.todo_dir / f"{todo_id}.md"
@@ -264,8 +257,7 @@ class SharedToDoPlugin(BergPlugin):
     def _list_todo_files(self) -> list[Path]:
         """List all todo files.
 
-        Returns:
-            List of todo file paths
+        :return: List of todo file paths
         """
         assert self.todo_dir is not None
         return list(self.todo_dir.glob("*.md"))
@@ -273,8 +265,7 @@ class SharedToDoPlugin(BergPlugin):
     def _create_todo_file(self, todo: TodoItem) -> None:
         """Create a todo Markdown file.
 
-        Args:
-            todo: Todo item to save
+        :param todo: Todo item to save
         """
         path = self._get_todo_path(todo.id)
 
@@ -300,11 +291,9 @@ class SharedToDoPlugin(BergPlugin):
     def _parse_todo_file(self, path: Path) -> TodoItem:
         """Parse a todo Markdown file.
 
-        Args:
-            path: Path to todo file
+        :param path: Path to todo file
 
-        Returns:
-            Parsed todo item
+        :return: Parsed todo item
         """
         content = path.read_text(encoding="utf-8")
         lines = content.split("\n")

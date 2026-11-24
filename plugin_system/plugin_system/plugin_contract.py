@@ -51,7 +51,7 @@ class ToolCapability(PluginCapability):
     """A plugin capability that provides a tool."""
 
     type: str = "tool"
-    tool: Tool = None
+    tool: Tool | None = None
     risk_level: RiskClass = "medium"
     deferred: bool = True
 
@@ -62,7 +62,7 @@ class AgentCapability(PluginCapability):
 
     type: str = "agent"
     agent_class: type[AbstractAgent] = None
-    complexity_level: TaskComplexity = "medium"
+    complexity_level: TaskComplexity= TaskComplexity.STANDARD
 
 
 @dataclass
@@ -71,7 +71,7 @@ class ProviderCapability(PluginCapability):
 
     type: str = "provider"
     provider_id: str = ""
-    models: dict[str, dict[str, Any]] = None
+    models: dict[str, dict[str, Any]] | None = None  # model_id -> model_info
 
 
 @dataclass

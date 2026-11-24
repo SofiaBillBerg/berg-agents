@@ -59,16 +59,26 @@ class CapabilityWrapper(PluginCapability):
 class SkillPluginAdapter(BergPlugin):
     """Adapter to wrap existing skills as plugins."""
 
-    def __init__(self, skill_path: Path) -> None:
+    def __init__(self, skill_path) -> None:
         self.skill_path = skill_path
         self.skill_data = None
 
     async def on_load(self, context: PluginContext) -> None:
-        """Load skill content."""
-        self.skill_data = parse_skill(self.skill_path)
+        """Load skill content.
+
+        Iterate through the skill_path (list str) and parse the skill content into a structured format."""
+        for path in self.skill_path:
+            # Read and parse the skill content from the given path
+            if Path(path).exists():
+                self.skill_data = parse_skill(path)
+                break
+        else:
+            self.skill_data = parse_skill(self.skill_path)
 
     def get_capabilities(self) -> list[PluginCapability]:
         """Return skill as a capability."""
+        if not self.skill_data:
+            return []
         return [
             CapabilityWrapper(
                 type="skill",
@@ -102,7 +112,9 @@ class MCPPluginAdapter(BergPlugin):
 
     def get_capabilities(self) -> list[PluginCapability]:
         """Return MCP tools as capabilities."""
-        return [
-            ToolCapability(tool=tool, risk_level="medium", deferred=False)
-            for tool in self.toolset.tools
-        ]
+        if isinstance(self.toolset, dict) and "tools" in self.toolset:
+            return [
+                ToolCapability(tool=tool, risk_level="medium", deferred=False)
+                for tool in self.toolset["tools"]
+            ]
+        return []

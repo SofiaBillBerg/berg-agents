@@ -31,39 +31,45 @@ import logging
 from pathlib import Path
 from typing import Any
 
-
 logger = logging.getLogger(__name__)
 
 
-def parse_skill(skill_path: Path) -> Any:
+def parse_skill(skill_path: list[str | list[str]] | None) -> Any:
     """Parse a skill file into plugin metadata.
 
     Wraps existing berg_agents skills as deferred-load plugins.
     More resource efficient than loading all skills upfront.
 
-    Args:
-        skill_path: Path to skill file or directory
+    :param skill_path: Path to skill file or directory
 
-    Returns:
-        Skill metadata wrapped as plugin or None if parsing fails
+    :return: Skill metadata wrapped as plugin or None if parsing fails
     """
     try:
         # Use berg_agents skill loader
         # Check if load_skill exists in berg_agents
         try:
-            from berg_agents.capabilities.base import load_skill
+            from berg_agents.capabilities.skills import load_skill_capabilities
 
-            skill = load_skill(skill_path)
+            skill = load_skill_capabilities(skill_path)
         except (ImportError, AttributeError):
             # Fallback: read skill file directly
             logger.debug("load_skill not available, reading file directly")
-            skill = {
-                "path": str(skill_path),
-                "content": (
-                    skill_path.read_text(encoding="utf-8")
-                    if skill_path.exists()
-                    else ""
-                )}
+            # iterate skill_path to find skill files
+            if isinstance(skill_path, list):
+                for path in skill_path:
+                    skill_file = path if isinstance(path, Path) else Path(path)  # ty: ignore[invalid-argument-type]
+                    if skill_file.exists() and skill_file.is_file():
+                        skill = {
+                        "path": str(skill_file),
+                        "content": skill_file.read_text(encoding="utf-8")}
+                    break
+                else:
+                    logger.warning(f"No valid skill file found in {skill_path}")
+                    return None
+            else:
+                logger.warning(f"Invalid skill_path: {skill_path}")
+                return None
+
         logger.info(f"Parsed skill as plugin: {skill_path}")
 
         # Return wrapped as deferred plugin
@@ -88,11 +94,9 @@ def create_mcp_toolset(mcp_spec: dict[str, Any]) -> Any:
     Wraps existing berg_agents MCP as deferred plugin.
     Connection established only when plugin is enabled (resource efficient).
 
-    Args:
-        mcp_spec: MCP toolset specification
+    :param mcp_spec: MCP toolset specification
 
-    Returns:
-        MCP toolset wrapped as plugin or None if creation fails
+    :return: MCP toolset wrapped as plugin or None if creation fails
     """
     try:
         # Return wrapped spec for deferred connection

@@ -20,9 +20,9 @@ Tool functions for Shared ToDo plugin.
 
 These functions are exposed to the AI agent for todo list management.
 """
+from __future__ import annotations
 
 import logging
-
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -122,13 +122,11 @@ def create_todo(
     Creates a new todo item and saves it as a Markdown file in the shared
     todo directory. Both user and agent can edit these files.
 
-    Args:
-        title: Title of the todo item
-        description: Detailed description
-        todo_path: Path to todo directory
+    :param title: Title of the todo item
+    :param description: Detailed description
+    :param todo_path: Path to todo directory
 
-    Returns:
-        Success message with todo ID
+    :return: Success message with todo ID
     """
     # Generate ID from title. The id is re-typed by models into later
     # calls (plan_task's reply → implement_task's todo_id argument), and
@@ -320,12 +318,11 @@ def delete_todo(
 
     Removes the todo Markdown file permanently.
 
-    Args:
-        todo_id: ID of the todo to delete
-        todo_path: Path to todo directory
 
-    Returns:
-        Success message
+    :param todo_id: ID of the todo to delete
+    :param todo_path: Path to todo directory
+
+    :return: Success message
     """
     todo_dir = Path(todo_path)
     todo_file = todo_dir / f"{todo_id}.md"
@@ -358,15 +355,13 @@ def update_todo(
     Updates one or more fields of a todo item. The Markdown file is updated
     accordingly.
 
-    Args:
-        todo_id: ID of the todo to update
-        title: New title (optional)
-        description: New description (optional)
-        status: New status (optional)
-        todo_path: Path to todo directory
+    :param todo_id: ID of the todo to update
+    :param title: New title (optional)
+    :param description: New description (optional)
+    :param status: New status (optional)
+    :param todo_path: Path to todo directory
 
-    Returns:
-        Success message
+    :return: Success message
     """
     todo_dir = Path(todo_path)
     todo_file = todo_dir / f"{todo_id}.md"
@@ -443,12 +438,10 @@ def complete_todo(
 
     Updates the todo status to 'done' and adds a completion timestamp.
 
-    Args:
-        todo_id: ID of the todo to complete
-        todo_path: Path to todo directory
+    :param todo_id: ID of the todo to complete
+    :param todo_path: Path to todo directory
 
-    Returns:
-        Success message
+    :return: Success message
     """
     return update_todo(todo_id=todo_id, status="done", todo_path=todo_path)
 
@@ -523,13 +516,11 @@ def add_subtask(
     Appends ``- [ ] <text>`` to the todo's ``## Subtasks`` section,
     creating the section when missing.
 
-    Args:
-        todo_id: ID of the todo to extend
-        text: Subtask text (must not be blank)
-        todo_path: Path to todo directory
+    :param todo_id: ID of the todo to extend
+    :param text: Subtask text (must not be blank)
+    :param todo_path: Path to todo directory
 
-    Returns:
-        Success message with the subtask index
+    :return: Success message with the subtask index
     """
     if not text.strip():
         return "Error: Subtask text must not be blank."
@@ -591,14 +582,13 @@ def set_subtask_done(
 ) -> str:
     """Check or uncheck a subtask by index.
 
-    Args:
-        todo_id: ID of the todo
-        index: Subtask index in file order (from 0)
-        done: True to check off, False to reopen
-        todo_path: Path to todo directory
 
-    Returns:
-        Success message
+    :param todo_id: ID of the todo
+    :param index: Subtask index in file order (from 0)
+    :param done: True to check off, False to reopen
+    :param todo_path: Path to todo directory
+
+    :return: Success message
     """
     loaded = _load_subtasks(todo_id, todo_path)
     if isinstance(loaded, str):
@@ -622,13 +612,11 @@ def delete_subtask(
 ) -> str:
     """Delete a subtask by index (later items shift down).
 
-    Args:
-        todo_id: ID of the todo
-        index: Subtask index in file order (from 0)
-        todo_path: Path to todo directory
+    :param todo_id: ID of the todo
+    :param index: Subtask index in file order (from 0)
+    :param todo_path: Path to todo directory
 
-    Returns:
-        Success message
+    :return: Success message
     """
     loaded = _load_subtasks(todo_id, todo_path)
     if isinstance(loaded, str):
@@ -655,14 +643,12 @@ def rename_subtask(
 ) -> str:
     """Rename a subtask's text (user or agent may correct wording).
 
-    Args:
-        todo_id: ID of the todo
-        index: Subtask index in file order (from 0)
-        text: Replacement text (must not be blank)
-        todo_path: Path to todo directory
+    :param todo_id: ID of the todo
+    :param index: Subtask index in file order (from 0)
+    :param text: Replacement text (must not be blank)
+    :param todo_path: Path to todo directory
 
-    Returns:
-        Success message
+    :return: Success message
     """
     if not text.strip():
         return "Error: Subtask text must not be blank."

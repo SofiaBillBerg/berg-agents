@@ -278,6 +278,23 @@ def create_app(
     )
     app.include_router(router)
 
+    # Berg's agents are peers over A2A: each registry entry gets a card and a
+    # JSON-RPC endpoint under /a2a/<name>. Mounted here, after the router,
+    # because the protocol is a second front door onto the same agent registry
+    # — not a route handler inside the webapp's own API.
+    try:
+        from berg_agents.a2a.serve import serve_berg_agents
+
+        serve_berg_agents(
+            app,
+            harness=app.state.harness,
+            base_url=f"http://127.0.0.1:{web_port}",
+        )
+    except Exception as exc:  # ruff: ignore[blind-except] - a protocol must not stop the app
+        # Failure-isolated like the plugin warmup above: the web UI, chat and
+        # workflow host keep serving even if the A2A surface cannot start.
+        logger.warning("A2A agent surface not mounted: %s", exc)
+
     @app.get("/api/health")
     async def health() -> dict[str, str]:
         """Liveness probe."""

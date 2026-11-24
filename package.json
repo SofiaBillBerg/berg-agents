@@ -39,9 +39,6 @@
     ],
     "*.{png,jpg,jpeg,gif,svg}": [
       "imagemin-lint-staged"
-    ],
-    "*.py": [
-      "panache lint . --fix  --config .panache.toml"
     ]
   },
   "dependencies": {

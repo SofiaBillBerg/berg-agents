@@ -619,3 +619,17 @@ class Planner(AbstractAgent):
                 "estimated_complexity": plan["estimated_complexity"]},
             metadata={"plan_depth": plan["plan_depth"]},
         )
+
+    # ruff: ignore[no-self-use]
+    def build_agent(self, **kwargs: Any) -> Any:
+        """The planner's runnable pydantic-ai agent.
+
+        The facade is the deterministic contract; this is what a
+        peer addresses when it sends the planner real work, so the
+        same builder serves both. See ``_AgentCard.build_agent``
+        for the registry-level version of the same idea.
+
+        :param kwargs: Forwarded to :func:`build_planner_agent`.
+        :return: A configured planner agent.
+        """
+        return build_planner_agent(**kwargs)

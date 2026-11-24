@@ -27,15 +27,13 @@ validation.
 
 berg's own request shape produces exactly that, for two reasons that only
 combine into a failure on strict backends:
-1. The harness Memory capability enqueues its ``<memory>`` snapshot with
-   ``ctx.enqueue(UserPromptPart(...))``, which lands it **beside** the
-   user's own prompt in the same ``ModelRequest`` (a tool call's enqueued
-   content rides along with that call's ``ToolReturnPart``, so a steered
-   message does the same).
-2. pydantic-ai's repair merges adjacent ``ModelRequest``\\ s into one turn
-   but keeps each ``UserPromptPart`` separate, and the OpenAI serializer
-   emits **one wire message per part** — so two user parts become two
-   ``user`` messages.
+
+1. The harness Memory capability enqueues its ``<memory>`` snapshot with ``ctx.enqueue(UserPromptPart(...))``,
+which lands it **beside** the user's own prompt in the same ``ModelRequest`` (a tool call's enqueued content rides
+along with that call's ``ToolReturnPart``, so a steered message does the same).
+2. pydantic-ai's repair merges
+adjacent ``ModelRequest``\\ s into one turn but keeps each ``UserPromptPart`` separate, and the OpenAI serializer
+emits **one wire message per part** — so two user parts become two ``user`` messages.
 
 Permissive backends (ollama, most OpenAI-compatible servers) accept the
 shape silently, which is why this never surfaced until a strict template
