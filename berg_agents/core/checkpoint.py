@@ -92,7 +92,7 @@ class Checkpointer(Protocol):
         """
         ...
 
-    def list(self) -> list[str]:
+    def list(self) -> list[str]:  # ty: ignore[invalid-type-form]
         """Return all known thread ids in lexicographic order."""
         ...
 
@@ -162,7 +162,7 @@ class InMemoryCheckpointer:
             snap = self._snapshots.get(thread_id)
         return None if snap is None else copy.deepcopy(snap)
 
-    def list(self) -> list[str]:
+    def list(self) -> list[str]:  # ty: ignore[invalid-type-form]
         """Return all known thread ids sorted lexicographically.
 
         :return: Sorted list of thread ids.
@@ -235,7 +235,7 @@ class FileCheckpointer:
         """Return the per-thread lock, creating it lazily.
 
         :param thread_id: Thread identifier.
-        :return: The :class:`threading.Lock` guarding this thread's file.
+        :return: The :class:`~threading.Lock` guarding this thread's file.
         """
         with self._locks_guard:
             lock = self._locks.get(thread_id)
@@ -298,7 +298,7 @@ class FileCheckpointer:
             )
         return result
 
-    def list(self) -> list[str]:
+    def list(self) -> list[str]:  # ty: ignore[invalid-type-form]
         """Return all known thread ids (filenames without the ``.json``).
 
         :return: Sorted list of thread ids.

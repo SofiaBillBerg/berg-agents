@@ -303,7 +303,7 @@ def _resolve_annotation(
 
     Modules that use ``from __future__ import annotations`` expose
     annotations as strings at runtime.  This helper consults
-    :func:`typing.get_type_hints` to turn them back into real types so
+    :func:`~typing.get_type_hints` to turn them back into real types so
     type-inference downstream (``_python_type_to_json``) sees ``int`` and
     not ``"int"``.
 
@@ -725,22 +725,26 @@ def _tool_specs_from_tools(tools: dict[str, Any]) -> list[ToolSpec]:
             ToolSpec(
                 name=name,
                 description=_clean_tool_description(tool_def.description or ""),
-                params=[
+                params=tuple(
                     ToolParam(
                         name=param_name,
-                        type=str(prop.get("type", "string"))
-                        if isinstance(prop, dict)
-                        else "string",
-                        description=str(prop.get("description", ""))
-                        if isinstance(prop, dict)
-                        else "",
+                        type=(
+                            str(prop.get("type", "string"))
+                            if isinstance(prop, dict)
+                            else "string"
+                        ),
+                        description=(
+                            str(prop.get("description", ""))
+                            if isinstance(prop, dict)
+                            else ""
+                        ),
                         required=param_name in required,
-                        enum=prop.get("enum")
-                        if isinstance(prop, dict)
-                        else None,
+                        enum=(
+                            prop.get("enum") if isinstance(prop, dict) else None
+                        ),
                     )
                     for param_name, prop in properties.items()
-                ],
+                ),
                 execute=None,
                 risk_class=infer_risk_class(name),
             )

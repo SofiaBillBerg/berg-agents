@@ -40,6 +40,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import logging
+from pathlib import Path
 from typing import Any
 
 from berg_agents.core.harness._inference import _ModelUnavailableError
@@ -77,7 +78,7 @@ class TurnResult:
     error: str | None = None
 
 
-def read_shared_context(root_dir: str | None) -> str:
+def read_shared_context(root_dir: Path) -> str:
     """Read the effective Shared Context render for a turn.
 
     Project scope shadows global. Failure-isolated: a broken context
@@ -96,15 +97,15 @@ def read_shared_context(root_dir: str | None) -> str:
 
 
 def record_turn_outcome(
-    harness: Any,
-    *,
-    task_type: str,
-    complexity: Any,
-    description: str,
-    inference_attempted: bool,
-    model_used: str,
-    success: bool = True,
-    trace: list[dict[str, Any]] | None = None,
+        harness: Any,
+        *,
+        task_type: str,
+        complexity: Any,
+        description: str,
+        inference_attempted: bool,
+        model_used: str,
+        success: bool = True,
+        trace: list[dict[str, Any]] | None = None,
 ) -> Any:
     """Record one turn outcome via the harness Router Stats .
 
@@ -144,20 +145,20 @@ def record_turn_outcome(
 
 
 def run_turn(
-    harness: Any,
-    *,
-    description: str,
-    task_type: str = "generic",
-    complexity: TaskComplexity | None = None,
-    plan: dict[str, Any] | None = None,
-    steps: list[dict[str, Any]] | None = None,
-    metadata: dict[str, Any] | None = None,
-    message_history: Any = None,
-    root_dir: str | None = None,
-    model: str | None = None,
-    inference_attempted: bool | None = None,
-    record: bool = True,
-    trace: list[dict[str, Any]] | None = None,
+        harness: Any,
+        *,
+        description: str,
+        task_type: str = "generic",
+        complexity: TaskComplexity | None = None,
+        plan: dict[str, Any] | None = None,
+        steps: list[dict[str, Any]] | None = None,
+        metadata: dict[str, Any] | None = None,
+        message_history: Any = None,
+        root_dir: Path | None = None,
+        model: str | None = None,
+        inference_attempted: bool | None = None,
+        record: bool = True,
+        trace: list[dict[str, Any]] | None = None,
 ) -> TurnResult:
     """Run one inference turn through the spine.
 
@@ -199,7 +200,7 @@ def run_turn(
 
     if trace is None:
         trace = []
-    shared = read_shared_context(root_dir)
+    shared = read_shared_context(root_dir)  # ty: ignore[invalid-argument-type]
     trace.append({
         "event": "turn_start",
         "shared_context_present": bool(shared)})

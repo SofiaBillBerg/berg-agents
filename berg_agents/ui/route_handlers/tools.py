@@ -28,7 +28,7 @@ import asyncio
 from functools import lru_cache
 import json
 import logging
-from typing import Any
+from typing import Any, cast
 
 from berg_agents.core.harness import Harness
 from berg_agents.ui.schemas import ToolExecuteRequest, ToolExecuteResponse
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 async def _run_task_tool(
-    harness: Harness, args: dict[str, Any]
+        harness: Harness, args: dict[str, Any]
 ) -> ToolExecuteResponse:
     """Run one task through the harness and return its tool response.
 
@@ -60,7 +60,7 @@ async def _run_task_tool(
         return ToolExecuteResponse(
             tool="run_task",
             output="Missing 'description': tell me what to do, "
-            'e.g. /run_task {"description": "summarize README"}.',
+                   'e.g. /run_task {"description": "summarize README"}.',
             status="error",
         )
     result = await asyncio.to_thread(
@@ -115,7 +115,6 @@ GITHUB_READ_TOOLS: frozenset[str] = frozenset({
     "search_code",
     "search_issues",
     "search_users"})
-
 
 #: How far to unwrap berg's toolset wrappers looking for the MCP client. Two is
 #: what today's stacking needs (prefixed → resilient → MCP toolset); the bound
@@ -252,7 +251,7 @@ async def _list_mcp_tools() -> dict[str, Any]:
 
 
 async def _execute_mcp_tool(
-    server: str, tool: str, request: Request
+        server: str, tool: str, request: Request
 ) -> dict[str, Any]:
     """Run one MCP tool directly and return its output.
 
@@ -303,7 +302,8 @@ async def _execute_mcp_tool(
                         status_code=404,
                         detail=f"{server} has no tool named {tool!r}",
                     )
-                result = await client.call_tool(tool, args)
+                result = await entered.call_tool(tool, args)
+
                 text = (
                     result
                     if isinstance(result, str)
@@ -372,9 +372,9 @@ def _file_toolset() -> Any:
                 "file_info",
                 "list_files",
                 "grep"]
-        ).get_toolset()
-    except Exception as exc:  # a missing harness must not 500 the route
-        logger.warning("FileSystem toolset unavailable: %s", exc)
+        )
+    except Exception as exc:
+        logger.warning("FileSystem capability unavailable: %s", exc)
         return None
 
 
@@ -460,7 +460,7 @@ def _run_command(args: dict[str, Any], root_dir: str) -> ToolExecuteResponse:
         return ToolExecuteResponse(
             tool="run_command",
             output="Missing 'command': e.g. "
-            '/run_command {"command": "pytest -q"}.',
+                   '/run_command {"command": "pytest -q"}.',
             status="error",
         )
     try:
@@ -482,7 +482,7 @@ def _run_command(args: dict[str, Any], root_dir: str) -> ToolExecuteResponse:
 
 
 def register_tool_routes(
-    router: APIRouter, *, harness: Harness, sessions: SessionManager
+        router: APIRouter, *, harness: Harness, sessions: SessionManager
 ) -> None:
     """Register the tool catalog and synchronous execution endpoints.
 
@@ -553,7 +553,7 @@ def register_tool_routes(
 
     @router.post("/api/mcp/{server}/tools/{tool}")
     async def execute_mcp_tool(
-        server: str, tool: str, request: Request
+            server: str, tool: str, request: Request
     ) -> dict[str, Any]:
         """Run one MCP tool directly and return its output.
 
@@ -613,12 +613,11 @@ def register_tool_routes(
             # WorkspaceToolset (see _run_command) — not a second body.
             return _run_command(args, sessions._harness_root_dir())
 
-            # The specs dict this route used to build is gone with specs.py:
-            # the seam serves the harness toolset plus the one bridge above,
-            # so an unknown name is exactly that.
-            raise HTTPException(
-                status_code=404,
-                detail=f"Unknown tool '{name}'. "
-                f"Available: {', '.join(sorted({*_SEAM_FILE_TOOLS, 'run_command'}))}"
-                ", run_task.",
-            )
+        # The specs dict this route used to build is gone with specs.py:
+        # the seam serves the harness toolset plus the one bridge above,
+        # so an unknown name is exactly that.
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown tool '{name}'. "
+                   f"Available: {', '.join(sorted({*_SEAM_FILE_TOOLS, 'run_command'}))}"
+                   ", run_task.", )

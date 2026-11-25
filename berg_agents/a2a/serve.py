@@ -8,34 +8,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License along with this program. If not, see <https://gnu.org/licenses/agpl-3.0.html>.
 
-"""Berg's agents, served to other agents and to editors over A2A.
-
-WHY THIS EXISTS: berg has always had ONE agent concept — the harness registry
-(:class:`~berg_agents.core.harness.orchestrator.Harness`), its ``AbstractAgent``
-contract, and ``_AgentCard`` carrying name, description, preferred complexity
-and capabilities. What it never had was a PROTOCOL, so every caller invented
-its own: the Next orchestrator drove specialists through bespoke
-``start_specialist``/``answer_specialist`` tools, the chat surface had its own
-transport, and neither could talk to the other. That is the "two interfaces
-that don't talk" this module removes.
-
-THE RULE THIS ENCODES: berg's registry is the source of agents, and berg's own
-runs and hooks are the source of execution. A2A is the WIRE, not a second
-runtime. ``fasta2a`` ships a complete server with its own storage and broker,
-and adopting it would give berg a second task system beside the workflow host
-it already runs — the exact duplication this module exists to avoid. So the
-protocol layer is used for what it is: ``AgentCard`` for discovery, the
-``AgentExecutor`` seam for the one thing berg implements, and the JSON-RPC
-routes for the transport.
-
-API note, because it cost a measurement to get right: ``a2a.types`` is the
-CURRENT (v1) protobuf surface. The v0_3 names — ``TextPart``, ``Role.user``,
-``TaskState.completed`` — live in ``a2a.compat`` and are NOT what a new server
-uses. Here a text part is ``Part(text=...)``, the card's address is
-``supported_interfaces=[AgentInterface(url=...)]`` rather than ``url=``, and the
-status/artifact events are published through the SDK's own ``TaskUpdater``
-rather than hand-built protobuf messages.
-"""
+"""Berg's agents, served to other agents and to editors over A2A."""
 
 from __future__ import annotations
 
@@ -234,10 +207,15 @@ class BergAgentExecutor(AgentExecutor):
         """
         prompt = _prompt_from(context)
 
-        # 1. Use the SDK's helper (or include history=[context.message] and guard for None).
         task = context.current_task
+        # 1. Use the SDK's helper (or include history=[context.message] and guard for None).
         if task is None:
-            task = new_task_from_user_message(context.message)
+            msg = context.message
+            if msg is None:
+                raise ValueError(
+                    "RequestContext.message is required to create a task"
+                )
+            task = new_task_from_user_message(msg)
             await event_queue.enqueue_event(task)
 
         updater = TaskUpdater(event_queue, task.id, task.context_id)
@@ -264,17 +242,23 @@ class BergAgentExecutor(AgentExecutor):
     async def cancel(
         self, context: RequestContext, event_queue: EventQueue
     ) -> None:
-        """Report the task as cancelled.
+        """Report the task as canceled.
 
-        Berg's real cancellation lives in the workflow host (a cancelled step, a
+        Berg's real cancellation lives in the workflow host (a canceled step, a
         withdrawn gate); this reports the protocol-level outcome so a peer that
         cancels is answered honestly rather than left watching a task that will
         never finish.
 
-        :param context: The task being cancelled.
+        :param context: The task being canceled.
         :param event_queue: The queue the protocol's events go on.
         """
-        updater = TaskUpdater(event_queue, context.task_id, context.context_id)
+        task_id = context.task_id
+        context_id = context.context_id
+        if task_id is None or context_id is None:
+            raise ValueError(
+                "RequestContext.task_id and context_id are required to cancel"
+            )
+        updater = TaskUpdater(event_queue, task_id, context_id)
         await updater.cancel(_message([Part(text="Cancelled.")]))
 
     def _run(self, prompt: str) -> str:

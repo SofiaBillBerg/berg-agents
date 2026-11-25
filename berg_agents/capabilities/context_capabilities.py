@@ -257,7 +257,7 @@ def build_decision_model() -> Any | None:
         return None
 
 
-def _config_dir(root_dir: str | Path | None = None) -> Path:
+def _config_dir(root_dir: Path) -> Path:
     """Resolved config directory for this project.
 
     :param root_dir: Explicit root; defaults to this checkout.
@@ -268,7 +268,7 @@ def _config_dir(root_dir: str | Path | None = None) -> Path:
     return resolve_config_dir(root_dir or Path(__file__).resolve().parents[2])
 
 
-def memory_database(root_dir: str | Path | None = None) -> Path:
+def memory_database(root_dir: Path) -> Path:
     """Path of the memory store database.
 
     :param root_dir: Explicit project root.
@@ -277,7 +277,7 @@ def memory_database(root_dir: str | Path | None = None) -> Path:
     return _config_dir(root_dir) / "memory.db"
 
 
-def step_database(root_dir: str | Path | None = None) -> Path:
+def step_database(root_dir: Path) -> Path:
     """Path of the step/run persistence database.
 
     :param root_dir: Explicit project root.
@@ -460,7 +460,7 @@ def build_compaction_capabilities() -> list[Any]:
     return capabilities
 
 
-def build_memory_capability(root_dir: str | Path | None = None) -> Any:
+def build_memory_capability(root_dir: Path) -> Any:
     """Build the ``Memory`` capability, or None on failure.
 
     ``FileMemoryStore`` keeps the notebook as plain Markdown, which is the
@@ -558,7 +558,7 @@ def build_file_store(config_dir: Path) -> Any:
 
 
 def build_persistence_capabilities(
-    root_dir: str | Path | None = None,
+        root_dir: Path,
 ) -> list[Any]:
     """Build step persistence and conversation search (never raises).
 
@@ -594,7 +594,7 @@ def build_persistence_capabilities(
     return capabilities
 
 
-def build_context_capabilities(root_dir: str | Path | None = None) -> list[Any]:
+def build_context_capabilities(root_dir: Path) -> list[Any]:
     """All context capabilities for the chat agent (never raises).
 
     Order is load-bearing: compaction first (it rewrites history

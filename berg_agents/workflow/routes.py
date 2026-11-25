@@ -152,11 +152,6 @@ async def _answer_parked(
 ) -> dict[str, Any] | None:
     """Deliver one gate decision to the run parked on it.
 
-    The route's whole body of work, out at module level: the parked run is
-    woken through its :class:`~berg_agents.workflow.gated_turn.GateDecision`
-    hook, keyed by the turn token the parked record carries, and the caller
-    keeps the run id it already had.
-
     :param run_id: The run parked on the gate.
     :param body: The decision payload — ``decision``, optional ``reason``
         and ``steer``.
@@ -170,9 +165,8 @@ async def _answer_parked(
 
     from berg_agents.workflow.gated_turn import GateDecision, gate_token
 
-    # resume() is a side effect that delivers a payload into a parked run;
-    # from a route there is no workflow context, so it is awaited directly
-    # rather than inside a step.
+    # resume() is a side effect delivered to a parked run; a route has no
+    # workflow context, so it is awaited directly.
     decision = str(body.get("decision", "rejected"))
     await GateDecision(
         approved=decision == "approved",
@@ -337,12 +331,8 @@ def _parked_pass(run_id: str) -> dict[str, Any] | None:
     if not events_dir.is_dir():
         return None
 
-    # Every completed step is scanned, and the LATEST one that reported a pass
-    # outcome decides: a turn is ONE run looping on its gate hook, so an
-    # earlier pass's already-answered gate must not read as still parked —
-    # the false positive that made a spent decision look pending forever.
-    # (The first-gate-wins scan was written when a run held one pass; the
-    # loop holds many, and only the newest says whether the run is parked.)
+    # The LATEST pass outcome decides: a turn is one run looping on its gate
+    # hook, so an earlier pass's answered gate must not read as still parked.
     latest: dict[str, Any] | None = None
     for path in sorted(events_dir.glob("*.json")):
         try:
@@ -397,13 +387,10 @@ def _run_record(run_id: str) -> dict[str, Any] | None:
 async def _start_chat_turn(
     app: Any, body: dict[str, Any], query_model: str, port: int
 ) -> Any:
-    """Start one durable turn for a named agent, on the ONE gated host.
+    """Start one durable turn on the gated host.
 
-    The start route's whole body of work, out at module level. An explicit
-    ``agent`` names the specialist this run is for; without one the session's
-    active agent is used, exactly as the chat path does. A specialist run is
-    otherwise identical — same host, same wire, same record — which is what
-    makes "a specialist is a run" literal.
+    An explicit ``agent`` names the specialist this run is for; without one
+    the session's active agent is used.
 
     :param app: The FastAPI app, for the harness and the chat session.
     :param body: The request body — ``prompt``, optional ``token`` and
@@ -476,11 +463,9 @@ async def _start_chat_turn(
 def _steer_turn(run_id: str, text: str) -> Any:
     """File one steer against the turn the run belongs to.
 
-    The steer route's body, out at module level. The store is what makes the
-    text survive until the run next reads it: a run parked on its gate hook
-    picks the text up on the pass the decision wakes, and a live one on its
-    next pass. Either way it becomes a user turn in the run's history — the
-    SDK's own rule for content arriving at a deferred-tool pause.
+    The store makes the text survive until the run next reads it: a parked
+    run picks it up on the pass the decision wakes, a live one on its next
+    pass. It becomes a user turn in the run's history.
 
     :param run_id: The run the text is addressed to.
     :param text: The user's instruction.
@@ -580,10 +565,6 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
     async def workflow_chat(request: Request) -> JSONResponse:
         """Start a durable chat turn on berg's real chat agent.
 
-        ONE host: ``gated_turn`` — the plain host this used to select could
-        not park a gated tool, and a turn with no gated call is identical
-        under the gated one, so there is no second path.
-
         :param request: JSON body with ``prompt``, optional ``token``, and
             an optional ``agent`` naming the specialist; an optional
             ``model`` query overrides the model ladder.
@@ -634,10 +615,8 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
             start_index = 0
 
         async def _frames() -> Any:
-            # One run per turn: every pass of the loop writes the same durable
-            # stream, so the addressed run's frames ARE the whole conversation
-            # — there is no chain of passes to stitch, and a reader that joins
-            # mid-gate sees the turn so far plus whatever the decision wakes.
+            # One run per turn: every pass writes the same durable stream,
+            # so the addressed run's frames are the whole conversation.
             live = str(
                 (_run_record(run_id) or {}).get("status") or ""
             ).lower() in {"working", "running"}
@@ -658,18 +637,13 @@ def register_workflow_routes(router: APIRouter, *, port: int) -> None:
     ) -> JSONResponse:
         """Answer a gated write by waking the run parked on it.
 
-        The run parks on a :class:`~berg_agents.workflow.gated_turn.GateDecision`
-        hook keyed by its turn's token; this route resumes that hook and the
-        SAME run continues with the decision. The run id in the answer is the
-        run id in the request — a turn has one address from start to finish,
-        and a caller never switches handles mid-conversation.
+        Resumes the turn's gate hook; the SAME run continues. The answer's
+        run id is the request's run id.
 
-        :param run_id: The run parked on the gate, as the start route returned
-            it.
-        :param request: JSON body with ``decision`` ("approved" | "rejected"),
-            optional ``reason``, and optional ``steer`` — an orchestrator may
-            submit the new instruction with the decision so it does not have
-            to write the steer store and race the turn's own read.
+        :param run_id: The run parked on the gate, as the start route
+            returned it.
+        :param request: JSON body with ``decision`` ("approved" |
+            "rejected"), optional ``reason`` and ``steer``.
         :return: The same run id, or 409 when that run has nothing pending.
         """
         answered = await _answer_parked(run_id, await request.json())

@@ -49,11 +49,8 @@ def start_specialist(
     root_dir: str = ".",
     model_id: str | None = None,
 ) -> dict[str, Any]:
-    """Start a specialist's turn as a run of its own.
-
-    The run is started exactly as a chat turn is — the same gated workflow, the
-    same wire, the same durable record — with the specialist as the active
-    agent. Nothing here is a new runtime; it is the same host, addressed by name.
+    """Start a specialist's turn as a run of its own: the same gated host a
+    chat turn uses, with the specialist as the active agent.
 
     :param agent_name: Which specialist (``implementation``, ``planner``, …).
     :param task: What it should do, in the user's words.
@@ -69,12 +66,10 @@ def start_specialist(
             f"known: {sorted(known_specialists())}"
         )
 
-    # Started THROUGH berg's own intake over HTTP, not by calling
-    # ``workflow.start`` here. That distinction is not style: ``workflow.start``
-    # uses whatever queue the importing process has configured, so a caller that
-    # is not the server enqueues into a process that then exits and the run sits
-    # ``pending`` forever (observed 2026-11-11, queue empty, status pending). The
-    # intake is the one door the whole port was proven through.
+    # Started through berg's own intake over HTTP, not ``workflow.start``
+    # here: the SDK's start uses the calling process's queue, so a caller
+    # outside the server enqueues into a process that then exits and the run
+    # sits ``pending`` forever.
     token = secrets.token_hex(6)
     payload: dict[str, Any] = {
         "prompt": task,
@@ -195,14 +190,11 @@ async def approve_specialist_async(
     reason: str | None = None,
     steer: str | None = None,
 ) -> dict[str, Any]:
-    """Answer a specialist's gated call, by re-driving its run.
+    """Answer a specialist's gated call.
 
-    Goes through berg's **approval endpoint**, not the in-process helper. That is
-    not a convenience: ``workflow.start`` uses whatever queue the *calling*
-    process has configured, so a caller outside the server enqueues into a
-    process that then exits — the run sits ``pending`` with an empty broker
-    (observed twice). The endpoint is where the server does it, with its queue
-    already pointed at itself, so every caller takes the one working path.
+    Goes through berg's approval endpoint, not the in-process helper: the
+    endpoint has the server's queue pointed at itself, so every caller takes
+    the one working path.
 
     :param run_id: The specialist run currently parked on a gate.
     :param approved: Whether the user allowed the call.
@@ -264,17 +256,9 @@ async def steer_specialist_async(run_id: str, text: str) -> dict[str, Any]:
         return {"run_id": resumed["run_id"], "queued": True, "state": "waiting"}
 
     # A WORKING specialist has already read its steer store for the pass it is
-    # running, and a pass reads it once. There is no second read point inside a
-    # pass, so text queued now is only seen by a pass that starts later — which
-    # for a one-pass turn means after the work is done. Observed exactly that:
-    # the steer sat unread in the store while the run finished (2026-11-11).
-    #
-    # So it is stored and reported as ``queued``, NOT claimed as delivered: the
-    # honest status is "waiting for its next pass". Making a working specialist
-    # take new input mid-pass needs the run to accept an enqueue, which the
-    # durable host does not have (``AgentRun.enqueue`` lives on a live run
-    # context). That is a design question for the orchestrator slice, not
-    # something to paper over here.
+    # running, and a pass reads it once. Text queued now is only seen by a
+    # pass that starts later, so it is stored and reported as ``queued``,
+    # not claimed as ``delivered``.
     turn = _turn_token(run_id) or run_id
     append_steer(turn, text)
     return {

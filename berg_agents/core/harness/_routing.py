@@ -38,21 +38,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class _AgentCard:
-    """Display/override card for non-facade agents.
-
-    Agents without an ``AbstractAgent`` facade (guardian,
-    implementation, curator, router_agent) still appear in the
-    catalog and accept complexity overrides, so they get a card
-    carrying the same fields ``AbstractAgent.get_info``
-    reports. Cards are display metadata only; routing uses
-    the confidence functions, not these levels.
-
-    ``build_agent`` is what makes the agent the card describes
-    *addressable*: a protocol peer (A2A today, ACP next) sends a
-    task to a registry name, and the card assembles the real
-    pydantic-ai agent through the same builders the harness
-    already uses. One path, so a card's agent is the same agent
-    whoever asks for it.
+    """Display/override card for agents without an ``AbstractAgent`` facade
+    (guardian, implementation, curator, router_agent): the same catalog fields
+    ``get_info`` reports, plus the complexity override. ``build_agent``
+    assembles the real pydantic-ai agent, so the card is addressable by a
+    protocol peer.
 
     Attributes:
         name: Registry key and display name.
@@ -81,24 +71,17 @@ class _AgentCard:
             "capabilities": list(self.capabilities)}
 
     def build_agent(self, **kwargs: Any) -> Any:
-        """Assemble the pydantic-ai agent this card names.
+        """The pydantic-ai agent this card names, from the harness's own
+        builders.
 
-        Dispatches to the builders the harness already uses, so a peer
-        speaking A2A reaches the same agent the chat path and the
-        delegating parent reach — there is deliberately no second
-        assembly path per protocol.
-
-        Imports are inside the method because
-        ``berg_agents.agents`` imports this module (the harness is
-        built from it), so a module-level import here would close a
-        cycle.
+        Imports sit inside the method: ``berg_agents.agents`` imports this
+        module, so a module-level import would close a cycle.
 
         :param kwargs: Forwarded to the builder (``root_dir``,
             ``plugin_tools``, ``model_id``).
         :return: A configured pydantic-ai ``Agent``.
-        :raises NotImplementedError: When the card names something that
-            is not an agent today — said plainly, rather than handed
-            back something that cannot run.
+        :raises NotImplementedError: When the card names something that is
+            not an agent today.
         """
         if self.name == "guardian":
             from berg_agents.agents.guardian import build_guardian_agent
@@ -379,9 +362,8 @@ def _review_gate_result(
     :param approved: True when metadata records a user approval.
     :param action_requests: Pre-planned concrete mutating actions,
         if planning inference ran, else None.
-
-    :return:        The ``needs_human_review`` result dict when the task must
-        pause, else None to let execution proceed.
+    :return: The ``needs_human_review`` result dict when the task must pause,
+        else None to let execution proceed.
     """
     if not verdict.needs_human_review:
         return None

@@ -120,7 +120,7 @@ def build_chat_agent(
         or settings' default.
     :param root_dir: Workspace root for file tools.
     :param plugin_tools: Tools the ``chat`` role may use, already
-        resolved and session-bound by :func:`plugin_system.get_chat_plugin_state`;
+        resolved and session-bound by :func:`~plugin_system.get_chat_plugin_state`;
         pass ``None`` (or omit) for a plugin-free agent. It is handed in
         rather than fetched here so tool membership and session binding
         are decided in one place.
@@ -220,7 +220,7 @@ def build_chat_agent(
     # Shared Context: the shared foundation this agent leverages.
     # Rendered fresh per request (this builder runs per /api/chat/stream),
     # project scope shadowing global. The block below is the read path;
-    # the two tools are the contribute path (author + why recorded).
+    # the two tools are the contribution path (author + why recorded).
     # ``root_dir`` arrives as a str (it is interpolated into the prompt
     # above); the resolver takes a Path, so convert once here rather than
     # rely on the callee tolerating either.

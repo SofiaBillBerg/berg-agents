@@ -36,7 +36,7 @@ import logging
 import os
 from pathlib import Path
 import threading
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from berg_agents.agents.deps import AgentDeps, FileChange
 from berg_agents.capabilities.registry import ToolCatalog
@@ -57,8 +57,12 @@ from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext, Tool
 from pydantic_ai.capabilities import LocalWorkspace, ReinjectSystemPrompt
 from pydantic_ai_harness.file_system import FileEditedEvent, FileWrittenEvent
+from pydantic_ai.agent import AgentRetries
+from pydantic_ai.capabilities import AbstractCapability
+from pydantic_ai.settings import ModelSettings
+from pydantic_ai.toolsets import AbstractToolset
 
-# Restored module constants (see the comment above each): the
+# module constants (see the comment above each): the
 # implementer's step templates, its run-span name, and its explicit
 # output-retry budget. They live here so one definition serves both
 # the standalone agent and the delegated one.
@@ -416,11 +420,34 @@ def build_implementation_agent(
     files = WorkspaceFileSystem(
         root, read_only=read_only or not _writes_gated()
     )
+
     # berg's one shell function, alongside the file tools the way the
     # chat agent carries it. The implementer had a shell in every mode,
     # read-only included, so the bridge is registered unconditionally.
     bridge = WorkspaceToolset(root, allow_shell=True)
+    agent_capabilities: list[AbstractCapability[AgentDeps]] = [
+        ReinjectSystemPrompt(),
+        *([cap] if (cap := build_turn_shape_capability()) else []),
+        LocalWorkspace(root),
+        files]
+    agent_toolsets: list[AbstractToolset[AgentDeps]] = [
+        cast("AbstractToolset[AgentDeps]", bridge)
+    ]
 
+    resolved_instructions = fill_tool_inventory(
+        (
+            instructions
+            if instructions is not None
+            else (
+                f"{default_instructions}\n\n{extra_instructions}"
+                if extra_instructions
+                else default_instructions
+            )
+        ),
+        [
+            *specs_from_toolset(files.get_toolset()),
+            *bridge.inventory_specs()],
+    )
     agent: Agent[AgentDeps, str] = Agent[AgentDeps, str](
         model,
         # Explicit name labels this agent's Logfire run span.
@@ -430,51 +457,27 @@ def build_implementation_agent(
         # this one; ReinjectSystemPrompt keeps this agent's own system
         # prompt at the head (otherwise a non-empty history suppresses
         # it). See pydantic-ai message-history sharing.
-        capabilities=[
-            ReinjectSystemPrompt(),
-            # One user turn per request: the plan handed to this agent is
-            # a user message, and a strict template (Mistral/Devstral)
-            # rejects two user turns in a row. Harmless elsewhere.
-            *([cap] if (cap := build_turn_shape_capability()) else []),
-            # The workspace the file tools act on, and the tools
-            # themselves (a capability, because they emit capability
-            # events).
-            LocalWorkspace(root),
-            files],
+        capabilities=agent_capabilities,
         # berg's staged/bridge tools (run_command), same toolset object
         # the chat agent uses.
-        toolsets=[bridge],
+        toolsets=agent_toolsets,
         # Plugin tools for this role (e.g. the plan store the planner
         # wrote into). Empty by default, so the agent still runs with no
         # plugins — the same rule the chat agent follows.
         tools=list(plugin_tools or []),
         # Per-model request options as extra_body (a strict chat template
         # override, for example). None when the model declares none.
-        model_settings={"extra_body": extra_body} if extra_body else None,
+        model_settings=(
+            ModelSettings(extra_body=extra_body) if extra_body else None
+        ),
         # Plain-text output so the model can freely call tools
         # and return a final answer string. A structured output
         # schema would risk `UnexpectedModelBehavior` retry
         # exhaustion when the model cannot serialize the schema.
-        retries={"output": OUTPUT_RETRIES},
-        instructions=fill_tool_inventory(
-            # explicit instructions replace; extra_instructions append,
-            # so a caller adding one rule does not copy the defaults.
-            instructions
-            if instructions is not None
-            else (
-                f"{default_instructions}\n\n{extra_instructions}"
-                if extra_instructions
-                else default_instructions
-            ),
-            # THIS agent's real specs, so the implementer cannot be told a
-            # parameter name the tool rejects - the failure that made its
-            # calls fail validation and its turn stall. Derived from the
-            # toolsets the agent is actually built with.
-            [
-                *specs_from_toolset(files.get_toolset()),
-                *bridge.inventory_specs()],
-        ),
+        retries=AgentRetries(output=OUTPUT_RETRIES),
+        instructions=resolved_instructions,
     )
+
 
     @agent.tool
     def build_execution_plan(ctx: RunContext[AgentDeps], task_type: str) -> str:

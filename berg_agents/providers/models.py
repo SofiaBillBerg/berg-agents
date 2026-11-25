@@ -347,7 +347,7 @@ def resolve_model_instance(
             provider=AnthropicProvider(
                 base_url=root, api_key=api_key, http_client=http_client
             ),
-        )
+        )  # ty: ignore[invalid-explicit-return]
     if base_url.rstrip("/").endswith("/messages"):
         raise ValueError(
             f"Provider base URL {base_url!r} looks like an Anthropic "

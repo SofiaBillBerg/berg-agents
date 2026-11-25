@@ -81,7 +81,7 @@ _ENV_UNSET = _EnvUnset()
 def _load_substitution_env() -> dict[str, str]:
     """Build the env mapping used for ``${env:VAR}`` substitution in config.
 
-    Merges the project ``.env`` (read without mutating :data:`os.environ`)
+    Merges the project ``.env`` (read without mutating :data:`~os.environ`)
     under the current process environment, so explicit environment variables
     win over ``.env`` values - the same precedence pydantic-settings uses.
 
@@ -142,7 +142,7 @@ def ensure_env_loaded() -> None:
     Reads only the repo-root ``.env`` (the single centralized env
     file); it never overrides a variable the process environment
     already defines, so explicit exports always win. This is the
-    only place that mutates :data:`os.environ` from files - the
+    only place that mutates :data:`~os.environ` from files - the
     settings sources themselves read files without side effects.
 
     Also derives ``OLLAMA_BASE_URL`` from the
@@ -176,9 +176,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 # implementation sub-agent's own instructions. A second copy is how the two
 # drift apart: the chat prompt carried parameter names and the implementer's
 # did not, so a delegated run's tool calls were rejected as unrecognised
-# inputs and the sub-agent stalled and confabulated. Verified against the real
-# signatures in berg_agents/agents/factory.py and the harness's subagent
-# toolset on 2026-11-12 — all nine match.
+# inputs and the sub-agent stalled and confabulated.
 #:
 #: Why the names are in the text at all: a call carrying any other key is
 #: rejected BEFORE the tool runs, so `list_directory(path=...)` fails and
