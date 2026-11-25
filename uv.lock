@@ -3,16 +3,16 @@ revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and sys_platform == 'emscripten'",
-    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
     "python_full_version >= '3.15' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'emscripten'",
     "python_full_version == '3.14.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'win32'",
-    "python_full_version < '3.13' and sys_platform == 'win32'",
     "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
-    "python_full_version < '3.13' and sys_platform == 'emscripten'",
     "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.13' and sys_platform == 'win32'",
+    "python_full_version < '3.13' and sys_platform == 'emscripten'",
     "python_full_version < '3.13' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
@@ -472,6 +472,9 @@ name = "berg-agents"
 version = "0.1.0"
 source = { editable = "." }
 default-groups = ["agent-deps", "dev", "docs", "plugin-deps", "tests"]
+dependencies = [
+    { name = "pydantic-ai-harness", extra = ["pgtask"] },
+]
 
 [package.dev-dependencies]
 agent-deps = [
@@ -497,7 +500,7 @@ agent-deps = [
     { name = "prompt-toolkit" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
-    { name = "pydantic-ai-harness", extra = ["acp", "anthropic", "code-mode", "coder", "dynamic-workflow", "researcher", "skills"] },
+    { name = "pydantic-ai-harness", extra = ["acp", "anthropic", "code-mode", "coder", "dynamic-workflow", "pgtask", "researcher", "skills"] },
     { name = "pydantic-ai-slim", extra = ["duckduckgo", "openai", "web-fetch"] },
     { name = "pydantic-config" },
     { name = "pydantic-settings" },
@@ -543,7 +546,7 @@ default-base = [
     { name = "pyanalyze" },
     { name = "pydantic" },
     { name = "pydantic-ai" },
-    { name = "pydantic-ai-harness", extra = ["acp", "anthropic", "code-mode", "coder", "dynamic-workflow", "researcher", "skills"] },
+    { name = "pydantic-ai-harness", extra = ["acp", "anthropic", "code-mode", "coder", "dynamic-workflow", "pgtask", "researcher", "skills"] },
     { name = "pydantic-ai-slim", extra = ["duckduckgo", "openai", "web-fetch"] },
     { name = "pydantic-config" },
     { name = "pydantic-settings" },
@@ -3734,6 +3737,23 @@ wheels = [
 ]
 
 [[package]]
+name = "pgtask"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "psycopg" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/74/85/645b268f8f6b15400b5a3baa4901e963703a870d19c0cdee5858918b726e/pgtask-0.4.0.tar.gz", hash = "sha256:6264fa78c75f3d0f169ecdd5b5ce08090c9393cce7eaa0e1c738f5818f3cd562", size = 239318, upload-time = "2026-10-07T02:00:03.448Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/35/6888ba8ce26ff85a4242a10f67c7db7a9e2a04ab665fdf7ab5f02d2310c2/pgtask-0.4.0-cp310-abi3-macosx_10_12_x86_64.whl", hash = "sha256:6b0dbe2ff788ddb0dabaf3b378b8b15b7fe11d6980384daf0cae96207a6f23f7", size = 4309193, upload-time = "2026-10-07T01:59:54.266Z" },
+    { url = "https://files.pythonhosted.org/packages/15/cc/c429c63be8503e8d251e3f9dda24e502cb81003cfd086d5e24b459e5fcb7/pgtask-0.4.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:633536d8df80cff48eedb8b7ca987020d880033ba093fcf547d8beb29548507d", size = 4164677, upload-time = "2026-10-07T01:59:56.294Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/8a/662120bedf4ebb7adaecbf2b79bd31d0fa28ee4229a6e3733fea87b86b4f/pgtask-0.4.0-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:4872defd7be392381899e1b5e9d640d46f99121d0c4e394acbef8b46c9bec7da", size = 4580446, upload-time = "2026-10-07T01:59:58.021Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/6c/1d86cf8c641340efd6c561a5367d443cd554cdf06c51f445582c4450bbe5/pgtask-0.4.0-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:bb13b2980ae90054eeb87a76374fc7776fdac8b515eed70901576382f10e4e10", size = 4592066, upload-time = "2026-10-07T01:59:59.683Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/b6/93767ff61a2cae27c0717c32c559eec066d368684161054e006d8d0471b7/pgtask-0.4.0-cp310-abi3-win_amd64.whl", hash = "sha256:e094b497acdc8eac3a39fd39094e8b26b8a50a657b3baf16ec43e4e4669750d4", size = 3873577, upload-time = "2026-10-07T02:00:01.399Z" },
+]
+
+[[package]]
 name = "pillow"
 version = "13.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3975,6 +3995,19 @@ wheels = [
 ]
 
 [[package]]
+name = "psycopg"
+version = "3.3.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "tzdata", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b4/74/ff710399dfa9fe9b546c2f5a05ea2f9b9d1dc2145c0b59e53a3fa2013679/psycopg-3.3.9.tar.gz", hash = "sha256:87c1d85c3e0e88e811d3c0b3808f947bd967c6faf34af6cd86fd021f77793d6c", size = 171122, upload-time = "2026-11-12T09:04:06.548Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/52/5d/a7957d1b5484f8e5094a15b1a400929324f978b670bd4a95179e1a012ec2/psycopg-3.3.9-py3-none-any.whl", hash = "sha256:d2d7d04a1ce6dab4f5b27316bea3b52585cafa2f2d631e5b09dd69823f5c26f6", size = 219041, upload-time = "2026-11-12T08:58:18.454Z" },
+]
+
+[[package]]
 name = "ptyprocess"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4144,6 +4177,9 @@ coder = [
 ]
 dynamic-workflow = [
     { name = "pydantic-monty" },
+]
+pgtask = [
+    { name = "pgtask" },
 ]
 researcher = [
     { name = "pydantic-ai-slim", extra = ["duckduckgo", "web-fetch"] },

@@ -101,10 +101,15 @@ async def deliver(message: dict, consumer: Any) -> bool:
     :param consumer: The SDK's consumer callable.
     :return: Whether the consumer accepted it.
     """
+    from vercel.workflow._internal import world as wf_world  # ruff: ignore[import-private-name]
+
     headers = {
         "x-vqs-queue-name": message["topic"],
         "x-vqs-message-id": message["message_id"],
-        "x-vqs-message-attempt": str(message["attempts"])}
+        "x-vqs-message-attempt": str(message["attempts"]),
+        # The world's queue handler authenticates every delivery against
+        # this key; the SDK's own client sends it on every enqueue.
+        "x-workflow-auth": wf_world.get_world()._queue_auth_key()}
     body = bytes(message["payload"])
     # The consumer expects the bare payload and wraps the envelope itself, so
     # the stored envelope is unwrapped here exactly once. A body that is not
@@ -118,7 +123,10 @@ async def deliver(message: dict, consumer: Any) -> bool:
     )
     try:
         response = await consumer(request)
-        ok = getattr(response, "status_code", 200) < _HTTP_OK_MAX
+        status = getattr(
+            response, "status", getattr(response, "status_code", 200)
+        )
+        ok = int(status) < _HTTP_OK_MAX
     except Exception as exc:  # a failed delivery is retried, never dropped
         print(
             f"[workflow-queue] consumer raised for {message['message_id'][:14]}: {exc}"

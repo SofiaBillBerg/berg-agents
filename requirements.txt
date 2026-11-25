@@ -1962,6 +1962,7 @@ opentelemetry-api==1.45.2 \
     #   opentelemetry-instrumentation-httpx
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
+    #   pgtask
     #   pydantic-ai-slim
 opentelemetry-exporter-http-transport==0.66b2 \
     --hash=sha256:66d6ed810a515432c8891da9a834464332fd70badeca45bdeeae81b4280c903b \
@@ -2096,6 +2097,14 @@ pexpect==4.9.0 ; sys_platform != 'emscripten' and sys_platform != 'win32' \
     --hash=sha256:7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523 \
     --hash=sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f
     # via ipython
+pgtask==0.4.0 \
+    --hash=sha256:4872defd7be392381899e1b5e9d640d46f99121d0c4e394acbef8b46c9bec7da \
+    --hash=sha256:6264fa78c75f3d0f169ecdd5b5ce08090c9393cce7eaa0e1c738f5818f3cd562 \
+    --hash=sha256:633536d8df80cff48eedb8b7ca987020d880033ba093fcf547d8beb29548507d \
+    --hash=sha256:6b0dbe2ff788ddb0dabaf3b378b8b15b7fe11d6980384daf0cae96207a6f23f7 \
+    --hash=sha256:bb13b2980ae90054eeb87a76374fc7776fdac8b515eed70901576382f10e4e10 \
+    --hash=sha256:e094b497acdc8eac3a39fd39094e8b26b8a50a657b3baf16ec43e4e4669750d4
+    # via pydantic-ai-harness
 pillow==13.0.0 \
     --hash=sha256:02464da86f561f410e13b061ec37c3068a9cb557a095494157742d07b3c24a27 \
     --hash=sha256:04a63720f79e22fd54d897c233a68314c50ca0603360f54ce2bd5db8f0f43782 \
@@ -2273,6 +2282,10 @@ psutil==7.2.2 ; sys_platform != 'android' and sys_platform != 'cygwin' and sys_p
     --hash=sha256:eed63d3b4d62449571547b60578c5b2c4bcccc5387148db46e0c2313dad0ee00 \
     --hash=sha256:fd04ef36b4a6d599bbdb225dd1d3f51e00105f6d48a28f006da7f9822f2606d8
     # via ipython
+psycopg==3.3.9 \
+    --hash=sha256:87c1d85c3e0e88e811d3c0b3808f947bd967c6faf34af6cd86fd021f77793d6c \
+    --hash=sha256:d2d7d04a1ce6dab4f5b27316bea3b52585cafa2f2d631e5b09dd69823f5c26f6
+    # via pgtask
 ptyprocess==0.7.0 ; sys_platform != 'emscripten' and sys_platform != 'win32' \
     --hash=sha256:4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35 \
     --hash=sha256:5c5d0a3b48ceee0b48485e0c26037c0acd7d29765ca3fbb5cb3831d347423220
@@ -3497,6 +3510,7 @@ typing-extensions==4.16.0 \
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
+    #   psycopg
     #   py-key-value-aio
     #   pyanalyze
     #   pydantic
@@ -3528,6 +3542,7 @@ tzdata==2026.6 \
     --hash=sha256:85d2cd9c09f81f0bb29db27759fc83af4f1e620efb814f8c5bf8b4cc4feece6d
     # via
     #   pandas
+    #   psycopg
     #   python-dateutil
 urllib3==2.8.0 \
     --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3 \
