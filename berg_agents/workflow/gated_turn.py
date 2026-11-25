@@ -1,29 +1,34 @@
-"""A gated write on the durable host — phase 1c, slice b.
+"""A gated write on the durable host — one run per turn, parked on a hook.
 
-**The shape this implements, and why it is not a waiting hook:** a deferred
-write means the run has ENDED. pydantic-ai's UI adapter makes that explicit —
-``dispatch_request`` passes ``deferred_tool_results=`` into the agent run, and
-``deferred_tool_results`` is built from the approval responses carried in the
-POST body (``pydantic_ai/ui/vercel_ai/_adapter.py:314``, ``:356``). The
-``ToolApprovalRequestedPart`` the frontend renders from is emitted at ``:1073``,
-in the message-reconstruction path, whose own comment says it exists so the
-frontend can draw buttons on *reload*. So there is no in-process wait to hold —
-the durable gate is: the run ends parked, the user decides, and the *same run*
-is re-driven with the decision plus its own history.
+**The shape this implements, and why:** the turn is ONE durable run. When a
+pass ends at the gate (``DeferredToolRequests``), the body does not return —
+it parks on a ``GateDecision`` hook keyed by the turn's token, and the same
+run stays alive until the decision arrives. The approval endpoint resumes
+that hook, the body loops, and the next pass runs with the decision and the
+history the parked pass produced. One run id from start to finish: there is
+no sibling run, no second record, and nothing to go stale.
 
-That shape is also exactly what the durable host wants, and better than a hook:
-each pass is a durable run, so the decision survives because the run record
-does — no process-local future, no hook to resolve.
+The earlier shape — end the pass, start a new run per decision — was tried
+and was wrong: every decision minted a run, the addressed run's record never
+advanced, and a caller holding the first run id watched a gate that would
+never move. The docstrings of that shape claimed the same run was re-driven;
+it never was. This hook shape is what the reference implementation
+(vercel-labs/seal, ``backend/agent/turn.py``) does, read against the same
+installed SDK: ``<Hook>.wait(token=...)`` parks inside the body,
+``<Hook>(...).resume(token)`` delivers from outside, and the workflow's
+deterministic replay carries both the recorded passes and the parked hook
+across restarts.
 
-Two passes, one workflow:
+    while True:
+        outcome = await run_pass(...)              # ends parked at the gate
+        if not outcome["pending"]:
+            break
+        decision = await GateDecision.wait(gate_token(token))
+        outcome = await run_pass(..., decisions=..., history=outcome["history"])
 
-    outcome = await run_pass(...)          # ends parked, cards on the stream
-    if outcome.pending:
-        decision = <stored by the approval endpoint>
-        outcome = await run_pass(..., deferred=decision, history=outcome.history)
-
-The approval endpoint stores the decision keyed by the run id, and re-drives
-*that run* — so Sofia's click answers the same turn, not a new one.
+The approval endpoint resumes the hook by the same pure ``gate_token`` —
+one definition here, imported by the route, so the body and the wire can
+never disagree about where a decision is delivered.
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ from typing import Any
 
 from berg_agents.ui.route_handlers.chat import encode_run_stream
 from berg_agents.workflow.registry import Frame, wf
+import pydantic
 from vercel import workflow
 
 # A step must be declared async even when its body has nothing to await:
@@ -70,7 +76,6 @@ async def _stream_pass(
     last_error: BaseException | None = None
     produced_by: str | None = None
     for candidate in chain:
-        seen: dict[str, Any] = {"result": None, "messages": []}
         buffered: list[Any] = []
         failed = False
         try:
@@ -96,6 +101,40 @@ async def _stream_pass(
             frames += 1
         break
     return frames, last_error, produced_by
+
+
+def gate_token(turn_token: str) -> str:
+    """The hook token a turn's gate decisions are delivered on.
+
+    A pure function of the turn's token, defined once here and used by both
+    the parked body and the approval route: one namespace for decisions, so
+    neither side can drift from the other. Prefixed rather than bare because
+    the turn token also namespaces the frame stream and the steer store —
+    a hook on the bare token would collide with whatever hooks those grow.
+
+    :param turn_token: The turn's token, minted in the request path.
+    :return: The hook token to park on and to resume.
+    """
+    return f"gate:{turn_token}"
+
+
+class GateDecision(pydantic.BaseModel, workflow.BaseHook):
+    """One decision for the calls a pass parked at this turn's gate.
+
+    The payload the approval endpoint delivers into the parked run. A pydantic
+    model because the SDK's ``resume`` carries payloads as pydantic models or
+    dataclasses — anything else is refused — and it subclasses
+    :class:`vercel.workflow.BaseHook` so ``GateDecision.wait(token)`` parks the
+    body and ``GateDecision(...).resume(token)`` wakes it.
+
+    One decision covers the whole parked batch: the body fans it out over the
+    pending call ids itself, which is exactly what the old new-run resume did
+    with ``{call_id: decision for call in parked["pending"]}``.
+    """
+
+    approved: bool
+    reason: str | None = None
+    steer: str | None = None
 
 
 def _decision_for(answer: dict[str, Any]) -> Any:
@@ -376,49 +415,66 @@ async def gated_turn(
     root_dir: str,
     active_agent: str | None = None,
     active_agent_description: str | None = None,
-    _decisions: dict[str, Any] | None = None,
-    _history: list[Any] | None = None,
-    _steer_key: str | None = None,
 ) -> dict[str, Any]:
-    """One chat turn whose writes end parked until the user decides.
+    """One chat turn: one durable run, looping on its gate hook.
 
-    The decision does not arrive on a hook: this workflow ends parked, the
-    approval endpoint stores the decision against the run id, and the endpoint
-    re-drives *this run* with it. So the body only ever runs one pass — the
-    resumed pass is a fresh run of the same workflow, started by the endpoint
-    with the decision and this run's history.
+    The body runs passes until one ends complete. When a pass ends at the
+    gate, the body parks on :class:`GateDecision` — the run stays alive,
+    under the same run id, until the approval endpoint resumes the hook.
+    The decision and the parked pass's history then feed the next pass,
+    entirely in-body: nothing crosses a run boundary, because there is
+    only one run.
 
-    :param token: Namespace for this turn's stream; the approval route is
-        keyed on the run id, which is durable.
+    Deterministic replay carries this loop: each pass and each hook wait is
+    a recorded position, so a restart mid-gate replays the recorded passes,
+    finds the hook still unanswered, and parks again. The state and report
+    surfaces read those same recorded pass outcomes.
+
+    :param token: Namespace for this turn's stream, steers, and gate hook.
     :param prompt: The user's message.
     :param model_id: Active provider/model id.
     :param root_dir: Workspace root the agent's tools bind to.
     :param active_agent: Persona selected via ``/api/agents/active``.
     :param active_agent_description: That persona's description.
-    :return: The turn's outcome, readable from a fresh ``Run`` handle.
+    :return: The final pass's outcome, readable from a fresh ``Run`` handle.
     """
     stream = workflow.get_writable(type=Frame)
-    # Steers are read in a STEP, never in the body: a workflow body re-runs on
-    # every replay and the runtime refuses file access there (`io.open`), so
-    # the read has to be a step's work like every other side effect.
-    # Taken here so a steer is delivered exactly once, by whichever pass
-    # reaches it first — the approval endpoint reads the same store when it
-    # resumes a parked run, so this pass sees only what arrived afterwards.
-    pending_steers = await take_steers(key=_steer_key or token)
-    outcome = await run_pass(
-        writable=stream,
-        prompt=prompt,
-        model_id=model_id,
-        root_dir=root_dir,
-        # A resumed run carries the parked turn's history and the decision;
-        # the first run starts empty. Both arrive as plain values so the
-        # workflow boundary can cross them.
-        history=_history or [],
-        decisions=_decisions,
-        steers=pending_steers,
-        active_agent=active_agent,
-        active_agent_description=active_agent_description,
-    )
+    history: list[Any] = []
+    decisions: dict[str, Any] | None = None
+    outcome: dict[str, Any] = {}
+    while True:
+        # Steers are read in a STEP, never in the body: a workflow body re-runs
+        # on every replay and the runtime refuses file access there (`io.open`),
+        # so the read has to be a step's work like every other side effect.
+        # Taken at the top of every pass, so a steer that arrives while the run
+        # is parked is delivered by the pass the decision wakes — exactly once.
+        pending_steers = await take_steers(key=token)
+        outcome = await run_pass(
+            writable=stream,
+            prompt=prompt,
+            model_id=model_id,
+            root_dir=root_dir,
+            history=history,
+            decisions=decisions,
+            steers=pending_steers,
+            active_agent=active_agent,
+            active_agent_description=active_agent_description,
+        )
+        if not outcome["pending"]:
+            break
+        # Park: the SAME run holds the gate open. No new run, no sibling
+        # record — the caller's run id stays the only address of this turn.
+        decision = await GateDecision.wait(token=gate_token(token))
+        # One decision for the batch, fanned out over the parked call ids —
+        # the fan-out the old new-run resume did, now where the calls live.
+        decisions = {
+            call["tool_call_id"]: {
+                "approved": decision.approved,
+                "reason": decision.reason,
+                "steer": decision.steer}
+            for call in outcome["pending"]
+        }
+        history = outcome["history"]
     await close_frames(writable=stream)
     return outcome
 
