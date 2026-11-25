@@ -153,8 +153,8 @@
         "timeout": 120000
       },
       "models": {
-        "free-stack-route": {
-          "name": "free-stack-route"
+        "sofia/free-stack-route": {
+          "name": "sofia/free-stack-route"
         },
         "sofia/free-routing": {
           "name": "sofia/free-routing"
@@ -168,11 +168,23 @@
         "llmkiwi/auto": {
           "name": "llmkiwi/auto"
         },
-        "base-free-stack": {
-          "name": "base-free-stack"
+        "sofia/free-stack": {
+          "name": "sofia/free-stack"
         },
-        "auto/free-combo": {
-          "name": "auto/free-combo"
+        "sofia/base-free-stack": {
+          "name": "sofia/base-free-stack"
+        },
+        "sofia/coding-free": {
+          "name": "sofia/coding-free"
+        },
+        "sofia/logfare": {
+          "name": "sofia/logfare"
+        },
+        "sofia/nvidia-nim": {
+          "name": "sofia/nvidia-nim"
+        },
+        "sofia/best-free": {
+          "name": "sofia/best-free"
         }
       }
     }
@@ -220,10 +232,16 @@
           "bonsai-2:9b",
           "yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF:Q6_K",
           "sofia/free-routing",
+          "sofia/nvidia-nim",
           "auto/best-free",
+          "sofia/best-free",
           "unsloth/Devstral-Small-2-24B-Instruct-2512-GGUF:UD-IQ3_XXS",
           "mradermacher/Muse-Glimmer-30B-Hermes-Agentic-i1-GGUF:IQ3_M",
-          "mudler/Qwen3.8-27B-APEX-GGUF:Qwen3.8-27B-APEX-I-Nano"
+          "mudler/Qwen3.8-27B-APEX-GGUF:Qwen3.8-27B-APEX-I-Nano",
+          "sofia/best-free",
+           "sofia/coding-free",
+          "sofia/logfare",
+          "sofia/free-stack-route"
         ],
         "max_tokens": 200000
       },
@@ -233,8 +251,13 @@
           "gemma4:12b",
           "logfare/logfare/auto",
           "bonsai-2:9b",
+          "sofia/logfare",
           "auto/free-combo",
-          "base-free-stack"
+          "sofia/nvidia-nim",
+          "sofia/base-free-stack",
+           "sofia/coding-free",
+          "sofia/best-free",
+          "sofia/free-stack-route"
         ],
         "max_tokens": 230000
       },
@@ -245,8 +268,13 @@
           "auto/free-combo",
           "gemma4:12b",
           "bonsai-2:9b",
+          "sofia/logfare",
+          "sofia/nvidia-nim",
           "logfare/logfare/auto",
-          "base-free-stack"
+          "sofia/base-free-stack",
+           "sofia/coding-free",
+          "sofia/best-free",
+          "sofia/free-stack-route"
         ],
         "max_tokens": 230000
       }
